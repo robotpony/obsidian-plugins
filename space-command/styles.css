@@ -23,7 +23,6 @@
   align-items: center;
 }
 
-.sidebar-sort-btn,
 .sidebar-refresh-btn {
   padding: 4px;
   border: none;
@@ -33,7 +32,6 @@
   transition: opacity 0.2s, transform 0.2s;
 }
 
-.sidebar-sort-btn:hover,
 .sidebar-refresh-btn:hover {
   opacity: 1;
 }

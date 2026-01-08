@@ -6,8 +6,6 @@ import { TodoItem } from "./types";
 
 export const VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 
-type SortMode = "date" | "file" | "folder";
-
 export class TodoSidebarView extends ItemView {
   private scanner: TodoScanner;
   private processor: TodoProcessor;
@@ -16,7 +14,6 @@ export class TodoSidebarView extends ItemView {
   private todonesCollapsed: boolean = false;
   private projectsCollapsed: boolean = false;
   private updateListener: (() => void) | null = null;
-  private sortMode: SortMode = "date";
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -100,20 +97,6 @@ export class TodoSidebarView extends ItemView {
 
     const buttonGroup = headerDiv.createEl("div", { cls: "sidebar-button-group" });
 
-    // Sort button
-    const sortBtn = buttonGroup.createEl("button", {
-      cls: "clickable-icon sidebar-sort-btn",
-      attr: { "aria-label": `Sort by: ${this.sortMode}` },
-    });
-    this.updateSortIcon(sortBtn);
-
-    sortBtn.addEventListener("click", () => {
-      this.cycleSortMode();
-      this.updateSortIcon(sortBtn);
-      sortBtn.setAttribute("aria-label", `Sort by: ${this.sortMode}`);
-      this.render();
-    });
-
     // Refresh button
     const refreshBtn = buttonGroup.createEl("button", {
       cls: "clickable-icon sidebar-refresh-btn",
@@ -137,35 +120,8 @@ export class TodoSidebarView extends ItemView {
     this.renderRecentTodones(container);
   }
 
-  private cycleSortMode(): void {
-    const modes: SortMode[] = ["date", "file", "folder"];
-    const currentIndex = modes.indexOf(this.sortMode);
-    this.sortMode = modes[(currentIndex + 1) % modes.length];
-  }
-
-  private updateSortIcon(button: HTMLElement): void {
-    const icons = {
-      date: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>',
-      file: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>',
-      folder: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>'
-    };
-    button.innerHTML = icons[this.sortMode];
-  }
-
-  private sortTodos(todos: TodoItem[]): TodoItem[] {
-    const sorted = [...todos];
-    switch (this.sortMode) {
-      case "date":
-        return sorted.sort((a, b) => a.dateCreated - b.dateCreated);
-      case "file":
-        return sorted.sort((a, b) => a.filePath.localeCompare(b.filePath));
-      case "folder":
-        return sorted.sort((a, b) => {
-          const folderCompare = a.folder.localeCompare(b.folder);
-          if (folderCompare !== 0) return folderCompare;
-          return a.filePath.localeCompare(b.filePath);
-        });
-    }
+  private sortTodosByDate(todos: TodoItem[]): TodoItem[] {
+    return [...todos].sort((a, b) => a.dateCreated - b.dateCreated);
   }
 
   private renderProjects(container: HTMLElement): void {
@@ -244,7 +200,7 @@ export class TodoSidebarView extends ItemView {
 
   private renderActiveTodos(container: HTMLElement): void {
     let todos = this.scanner.getTodos();
-    todos = this.sortTodos(todos);
+    todos = this.sortTodosByDate(todos);
 
     const section = container.createEl("div", { cls: "todo-section" });
 
