@@ -29,6 +29,24 @@ export class EmbedRenderer {
     this.focusListLimit = focusListLimit;
   }
 
+  // Public helper method for code block processor
+  // Renders a TODO list with filters
+  public renderTodos(
+    container: HTMLElement,
+    filterString: string,
+    todoneFile: string
+  ): void {
+    const filters = FilterParser.parse(filterString);
+    let todos = this.scanner.getTodos();
+    todos = FilterParser.applyFilters(todos, filters);
+    this.renderTodoList(container, todos, todoneFile);
+  }
+
+  // Public helper method for focus-list code blocks
+  public renderProjects(container: HTMLElement): void {
+    this.renderFocusList(container);
+  }
+
   async render(
     source: string,
     el: HTMLElement,
@@ -42,9 +60,10 @@ export class EmbedRenderer {
     }
 
     // Parse the embed syntax: {{focus-todos: [todone-file] | [filters]}}
+    // Supports: {{focus-todos}}, {{focus-todos | filters}}, {{focus-todos: file | filters}}
     // Both todone-file and filters are optional
     const match = source.match(
-      /\{\{focus-todos:?\s*([^|}\s]*)(?:\s*\|\s*(.+))?\}\}/
+      /\{\{focus-todos:?\s*([^|}]*)(?:\s*\|\s*(.+))?\}\}/
     );
 
     if (!match) {
@@ -55,9 +74,29 @@ export class EmbedRenderer {
       return;
     }
 
-    // Use provided file or default
-    const todoneFile = match[1]?.trim() || this.defaultTodoneFile;
-    const filterString = match[2] || "";
+    // Extract parts
+    const beforePipe = match[1]?.trim() || "";
+    const afterPipe = match[2] || "";
+
+    // Determine if beforePipe is a filter or file path
+    // If it contains filter keywords, treat as filters
+    const isFilter =
+      beforePipe.startsWith("path:") ||
+      beforePipe.startsWith("tags:") ||
+      beforePipe.startsWith("limit:");
+
+    let todoneFile: string;
+    let filterString: string;
+
+    if (isFilter) {
+      // beforePipe is filters, use default file
+      todoneFile = this.defaultTodoneFile;
+      filterString = beforePipe + (afterPipe ? " " + afterPipe : "");
+    } else {
+      // beforePipe is file path (or empty)
+      todoneFile = beforePipe || this.defaultTodoneFile;
+      filterString = afterPipe;
+    }
 
     // Parse filters
     const filters = FilterParser.parse(filterString);
@@ -157,8 +196,15 @@ export class EmbedRenderer {
       const textSpan = item.createEl("span", { cls: "todo-text" });
       const cleanText = todo.text.replace(/#todo\b/g, "").trim();
       // Remove leading checkbox if present
-      const displayText = cleanText.replace(/^-\s*\[\s*\]\s*/, "");
-      textSpan.textContent = displayText + " ";
+      let displayText = cleanText.replace(/^-\s*\[\s*\]\s*/, "");
+      // Remove block-level markdown markers (list bullets, quotes)
+      displayText = displayText
+        .replace(/^[*\-+]\s+/, "")  // Remove list markers
+        .replace(/^>\s+/, "");       // Remove quote markers
+
+      // Render inline markdown manually to avoid extra <p> tags
+      this.renderInlineMarkdown(displayText, textSpan);
+      textSpan.append(" ");
 
       // Add link to source
       const link = item.createEl("a", {
@@ -172,6 +218,31 @@ export class EmbedRenderer {
         this.openFileAtLine(todo.file, todo.lineNumber);
       });
     }
+  }
+
+  // Render inline markdown without creating block elements
+  private renderInlineMarkdown(text: string, container: HTMLElement): void {
+    // Process markdown inline syntax (bold, italic, links)
+    // This avoids the extra <p> tags that MarkdownRenderer adds
+
+    let html = text;
+
+    // Bold: **text** or __text__
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
+
+    // Italic: *text* or _text_ (but not inside words)
+    html = html.replace(/\*([^\s*][^*]*?)\*/g, '<em>$1</em>');
+    html = html.replace(/\b_([^_]+?)_\b/g, '<em>$1</em>');
+
+    // Links: [text](url)
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+
+    // Code: `text`
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+    // Set the HTML content
+    container.innerHTML = html;
   }
 
   private openFileAtLine(file: any, line: number): void {

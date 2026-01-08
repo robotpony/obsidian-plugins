@@ -45,6 +45,57 @@ An Obsidian plugin for managing TODOs and TODONEs across your vault with live em
 - `tags:#tag1,#tag2` - Show only TODOs with specific tags
 - `limit:N` - Limit to first N results
 
+### Code Block Syntax
+
+**New in v0.2.0:** Code blocks work in **both Reading Mode and Live Preview mode**, unlike inline syntax which only works in Reading Mode.
+
+#### Basic Code Block
+
+````markdown
+```focus-todos
+```
+````
+Uses default TODONE file from settings.
+
+#### Custom TODONE File
+
+````markdown
+```focus-todos
+todos/done.md
+```
+````
+
+#### With Filters
+
+````markdown
+```focus-todos
+path:projects/
+tags:#urgent
+limit:10
+```
+````
+
+Or single-line (same as inline syntax):
+
+````markdown
+```focus-todos
+todos/done.md | path:projects/ tags:#urgent limit:10
+```
+````
+
+#### Focus List
+
+````markdown
+```focus-list
+```
+````
+
+**When to use each syntax:**
+- **Inline `{{focus-todos}}`**: Quick embeds, only works in Reading Mode (Cmd+E)
+- **Code blocks**: Works in both Reading Mode and Live Preview, recommended for daily use
+
+Both syntaxes support the same filters and produce identical interactive lists.
+
 ### Creating TODOs
 
 Just add `#todo` to any line in your vault:

@@ -410,6 +410,18 @@ var EmbedRenderer = class {
     this.defaultTodoneFile = defaultTodoneFile;
     this.focusListLimit = focusListLimit;
   }
+  // Public helper method for code block processor
+  // Renders a TODO list with filters
+  renderTodos(container, filterString, todoneFile) {
+    const filters = FilterParser.parse(filterString);
+    let todos = this.scanner.getTodos();
+    todos = FilterParser.applyFilters(todos, filters);
+    this.renderTodoList(container, todos, todoneFile);
+  }
+  // Public helper method for focus-list code blocks
+  renderProjects(container) {
+    this.renderFocusList(container);
+  }
   async render(source, el, ctx) {
     var _a;
     const focusListMatch = source.match(/\{\{focus-list\}\}/);
@@ -418,7 +430,7 @@ var EmbedRenderer = class {
       return;
     }
     const match = source.match(
-      /\{\{focus-todos:?\s*([^|}\s]*)(?:\s*\|\s*(.+))?\}\}/
+      /\{\{focus-todos:?\s*([^|}]*)(?:\s*\|\s*(.+))?\}\}/
     );
     if (!match) {
       el.createEl("div", {
@@ -427,8 +439,18 @@ var EmbedRenderer = class {
       });
       return;
     }
-    const todoneFile = ((_a = match[1]) == null ? void 0 : _a.trim()) || this.defaultTodoneFile;
-    const filterString = match[2] || "";
+    const beforePipe = ((_a = match[1]) == null ? void 0 : _a.trim()) || "";
+    const afterPipe = match[2] || "";
+    const isFilter = beforePipe.startsWith("path:") || beforePipe.startsWith("tags:") || beforePipe.startsWith("limit:");
+    let todoneFile;
+    let filterString;
+    if (isFilter) {
+      todoneFile = this.defaultTodoneFile;
+      filterString = beforePipe + (afterPipe ? " " + afterPipe : "");
+    } else {
+      todoneFile = beforePipe || this.defaultTodoneFile;
+      filterString = afterPipe;
+    }
     const filters = FilterParser.parse(filterString);
     let todos = this.scanner.getTodos();
     todos = FilterParser.applyFilters(todos, filters);
@@ -496,8 +518,10 @@ var EmbedRenderer = class {
       });
       const textSpan = item.createEl("span", { cls: "todo-text" });
       const cleanText = todo.text.replace(/#todo\b/g, "").trim();
-      const displayText = cleanText.replace(/^-\s*\[\s*\]\s*/, "");
-      textSpan.textContent = displayText + " ";
+      let displayText = cleanText.replace(/^-\s*\[\s*\]\s*/, "");
+      displayText = displayText.replace(/^[*\-+]\s+/, "").replace(/^>\s+/, "");
+      this.renderInlineMarkdown(displayText, textSpan);
+      textSpan.append(" ");
       const link = item.createEl("a", {
         text: "\u2192",
         cls: "todo-source-link",
@@ -508,6 +532,17 @@ var EmbedRenderer = class {
         this.openFileAtLine(todo.file, todo.lineNumber);
       });
     }
+  }
+  // Render inline markdown without creating block elements
+  renderInlineMarkdown(text, container) {
+    let html = text;
+    html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    html = html.replace(/__(.+?)__/g, "<strong>$1</strong>");
+    html = html.replace(/\*([^\s*][^*]*?)\*/g, "<em>$1</em>");
+    html = html.replace(/\b_([^_]+?)_\b/g, "<em>$1</em>");
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+    html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
+    container.innerHTML = html;
   }
   openFileAtLine(file, line) {
     const leaf = this.app.workspace.getLeaf(false);
@@ -533,6 +568,88 @@ var EmbedRenderer = class {
     setTimeout(() => {
       editor.setCursor({ line, ch: 0 });
     }, 1500);
+  }
+};
+
+// src/CodeBlockProcessor.ts
+var CodeBlockProcessor = class {
+  constructor(app, scanner, processor, projectManager, defaultTodoneFile, focusListLimit) {
+    this.app = app;
+    this.scanner = scanner;
+    this.processor = processor;
+    this.projectManager = projectManager;
+    this.defaultTodoneFile = defaultTodoneFile;
+    this.focusListLimit = focusListLimit;
+  }
+  // Register both code block processors
+  registerProcessors(plugin) {
+    plugin.registerMarkdownCodeBlockProcessor(
+      "focus-todos",
+      this.processFocusTodos.bind(this)
+    );
+    plugin.registerMarkdownCodeBlockProcessor(
+      "focus-list",
+      this.processFocusList.bind(this)
+    );
+  }
+  // Handle focus-todos code blocks
+  processFocusTodos(source, el, ctx) {
+    const { todoneFile, filterString } = this.parseContent(source);
+    const embedRenderer = new EmbedRenderer(
+      this.app,
+      this.scanner,
+      this.processor,
+      this.projectManager,
+      this.defaultTodoneFile,
+      this.focusListLimit
+    );
+    embedRenderer.renderTodos(el, filterString, todoneFile);
+  }
+  // Handle focus-list code blocks
+  processFocusList(source, el, ctx) {
+    const embedRenderer = new EmbedRenderer(
+      this.app,
+      this.scanner,
+      this.processor,
+      this.projectManager,
+      this.defaultTodoneFile,
+      this.focusListLimit
+    );
+    embedRenderer.renderProjects(el);
+  }
+  // Parse code block content
+  // Supports multiple formats:
+  // 1. Empty block: uses defaults
+  // 2. File only: first line is TODONE file
+  // 3. Filters only: all lines are filters (uses default file)
+  // 4. File + filters (single line): "file.md | filters"
+  // 5. File + filters (multi-line): first line is file, rest are filters
+  parseContent(source) {
+    const lines = source.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+    if (lines.length === 0) {
+      return {
+        todoneFile: this.defaultTodoneFile,
+        filterString: ""
+      };
+    }
+    const firstLine = lines[0];
+    const isFilter = firstLine.includes("|") || firstLine.startsWith("path:") || firstLine.startsWith("tags:") || firstLine.startsWith("limit:");
+    if (isFilter) {
+      return {
+        todoneFile: this.defaultTodoneFile,
+        filterString: lines.join(" ")
+      };
+    }
+    if (firstLine.includes("|")) {
+      const [file, ...filterParts] = firstLine.split("|");
+      return {
+        todoneFile: file.trim(),
+        filterString: filterParts.join("|").trim()
+      };
+    }
+    const todoneFile = firstLine;
+    const filterString = lines.slice(1).join(" ");
+    return { todoneFile, filterString };
   }
 };
 
@@ -913,6 +1030,15 @@ var SpaceCommandPlugin = class extends import_obsidian6.Plugin {
         }
       }
     });
+    const codeBlockProcessor = new CodeBlockProcessor(
+      this.app,
+      this.scanner,
+      this.processor,
+      this.projectManager,
+      this.settings.defaultTodoneFile,
+      this.settings.focusListLimit
+    );
+    codeBlockProcessor.registerProcessors(this);
     this.addCommand({
       id: "toggle-todo-sidebar",
       name: "Toggle TODO Sidebar",

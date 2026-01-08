@@ -30,6 +30,38 @@ With filters:
 
 **Note:** TODONE file path is optional - omit to use settings default.
 
+## 📦 Code Block Syntax (Works in Live Preview!)
+
+Code blocks render in **both Reading Mode and Live Preview**:
+
+````markdown
+```focus-todos
+todos/done.md
+```
+````
+
+With filters:
+````markdown
+```focus-todos
+path:projects/
+tags:#urgent
+limit:10
+```
+````
+
+Focus list:
+````markdown
+```focus-list
+```
+````
+
+**Comparison:**
+
+| Syntax | Reading Mode | Live Preview |
+|--------|--------------|--------------|
+| `{{focus-todos}}` | ✓ | ✗ |
+| ` ```focus-todos ``` ` | ✓ | ✓ |
+
 ## ⌨️ Keyboard Shortcuts
 
 | Shortcut | Action |

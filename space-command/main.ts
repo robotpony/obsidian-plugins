@@ -9,6 +9,7 @@ import { TodoScanner } from "./src/TodoScanner";
 import { TodoProcessor } from "./src/TodoProcessor";
 import { ProjectManager } from "./src/ProjectManager";
 import { EmbedRenderer } from "./src/EmbedRenderer";
+import { CodeBlockProcessor } from "./src/CodeBlockProcessor";
 import {
   TodoSidebarView,
   VIEW_TYPE_TODO_SIDEBAR,
@@ -93,6 +94,18 @@ export default class SpaceCommandPlugin extends Plugin {
         }
       }
     });
+
+    // Register code block processors for focus-todos and focus-list
+    // These work in BOTH Reading Mode AND Live Preview mode
+    const codeBlockProcessor = new CodeBlockProcessor(
+      this.app,
+      this.scanner,
+      this.processor,
+      this.projectManager,
+      this.settings.defaultTodoneFile,
+      this.settings.focusListLimit
+    );
+    codeBlockProcessor.registerProcessors(this);
 
     // Commands
     this.addCommand({

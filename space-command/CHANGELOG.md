@@ -2,6 +2,58 @@
 
 All notable changes to the Weekly Log Helpers plugin will be documented in this file.
 
+## [0.2.1] - 2026-01-08
+
+### Fixed
+- **Filter parsing bug**: Fixed regex to support flexible filter syntax
+  - Now works: `{{focus-todos | tags:#urgent}}` (filters only with pipe)
+  - Now works: `{{focus-todos: tags:#urgent}}` (filters only with colon)
+  - Already worked: `{{focus-todos: done.md | tags:#urgent}}` (file + filters)
+  - Supports both colon and pipe separators for maximum flexibility
+- **Markdown rendering**: TODO text now renders inline markdown
+  - **Bold**, *italic*, `code`, and [links](url) now display correctly
+  - Strips block-level markers (list bullets, quotes)
+  - No extra spacing or newlines (fixed in v0.2.1)
+  - Custom inline renderer avoids block-level <p> tags
+
+### Technical
+- Updated inline syntax regex from `[^|}\s]*` to `[^|}]*` to allow spaces
+- Added smart detection to distinguish file paths from filter keywords
+- Implemented custom `renderInlineMarkdown()` method to avoid block elements
+- Supports **bold**, *italic*, `code`, and [links](url) inline syntax
+
+## [0.2.0] - 2026-01-08
+
+### Added
+- **Code block syntax support** for `focus-todos` and `focus-list`
+  - Works in **both Reading Mode and Live Preview mode**
+  - Use ````focus-todos```` for better editing experience
+  - Supports multi-line filter syntax for improved readability
+  - Example:
+    ````markdown
+    ```focus-todos
+    todos/done.md
+    path:projects/
+    tags:#urgent
+    limit:10
+    ```
+    ````
+- **Comprehensive SYNTAX_GUIDE.md** documentation
+  - Complete syntax reference for both inline and code block styles
+  - Mode compatibility matrix
+  - Migration guide from inline to code blocks
+  - Examples and best practices
+
+### Improved
+- README.md now explains mode compatibility and both syntax options
+- QUICK_REFERENCE.md includes code block examples and comparison table
+- Better documentation of inline vs code block syntax differences
+
+### Technical
+- New CodeBlockProcessor class for handling code block syntax
+- Public helper methods in EmbedRenderer for code reuse
+- Both syntaxes share the same rendering engine for consistency
+
 ## [0.1.0] - 2026-01-07
 
 ### Added
