@@ -1,0 +1,314 @@
+import {
+  App,
+  Plugin,
+  PluginSettingTab,
+  Setting,
+  WorkspaceLeaf,
+} from "obsidian";
+import { TodoScanner } from "./src/TodoScanner";
+import { TodoProcessor } from "./src/TodoProcessor";
+import { ProjectManager } from "./src/ProjectManager";
+import { EmbedRenderer } from "./src/EmbedRenderer";
+import {
+  TodoSidebarView,
+  VIEW_TYPE_TODO_SIDEBAR,
+} from "./src/SidebarView";
+import {
+  SpaceCommandSettings,
+  DEFAULT_SETTINGS,
+} from "./src/types";
+
+export default class SpaceCommandPlugin extends Plugin {
+  settings: SpaceCommandSettings;
+  scanner: TodoScanner;
+  processor: TodoProcessor;
+  projectManager: ProjectManager;
+  embedRenderer: EmbedRenderer;
+
+  async onload() {
+    await this.loadSettings();
+
+    // Initialize core components
+    this.scanner = new TodoScanner(this.app);
+    this.processor = new TodoProcessor(this.app, this.settings.dateFormat);
+    this.projectManager = new ProjectManager(
+      this.app,
+      this.scanner,
+      this.settings.defaultProjectsFolder,
+      this.settings.pinnedProjects
+    );
+    this.embedRenderer = new EmbedRenderer(
+      this.app,
+      this.scanner,
+      this.processor,
+      this.projectManager,
+      this.settings.defaultTodoneFile,
+      this.settings.focusListLimit
+    );
+
+    // Configure scanner to exclude TODONE log file from Recent TODONEs
+    if (this.settings.excludeTodoneFilesFromRecent) {
+      this.scanner.setExcludeFromTodones([this.settings.defaultTodoneFile]);
+    }
+
+    // Set up processor callback to trigger re-scan after completion
+    this.processor.setOnCompleteCallback(() => {
+      // File will be modified, which will trigger scanner's file watcher
+      // But we can also refresh the workspace to update embeds
+      this.app.workspace.trigger("markdown-changed");
+    });
+
+    // Scan vault on load
+    await this.scanner.scanVault();
+
+    // Watch for file changes
+    this.scanner.watchFiles();
+
+    // Register sidebar view
+    this.registerView(
+      VIEW_TYPE_TODO_SIDEBAR,
+      (leaf) =>
+        new TodoSidebarView(
+          leaf,
+          this.scanner,
+          this.processor,
+          this.projectManager,
+          this.settings.defaultTodoneFile,
+          () => this.savePinnedProjects()
+        )
+    );
+
+    // Show sidebar by default if setting is enabled
+    if (this.settings.showSidebarByDefault) {
+      this.activateSidebar();
+    }
+
+    // Register markdown post processor for {{focus-todos}} and {{focus-list}} syntax
+    this.registerMarkdownPostProcessor((el, ctx) => {
+      const codeBlocks = el.findAll("p, div");
+      for (const block of codeBlocks) {
+        const text = block.textContent || "";
+        if (text.includes("{{focus-todos")) {
+          this.embedRenderer.render(text, block, ctx);
+        } else if (text.includes("{{focus-list}}")) {
+          this.embedRenderer.render(text, block, ctx);
+        }
+      }
+    });
+
+    // Commands
+    this.addCommand({
+      id: "toggle-todo-sidebar",
+      name: "Toggle TODO Sidebar",
+      callback: () => {
+        this.toggleSidebar();
+      },
+      hotkeys: [
+        {
+          modifiers: ["Mod", "Shift"],
+          key: "t",
+        },
+      ],
+    });
+
+    this.addCommand({
+      id: "quick-add-todo",
+      name: "Quick Add TODO",
+      editorCallback: (editor, view) => {
+        const cursor = editor.getCursor();
+        const line = editor.getLine(cursor.line);
+
+        // If line is empty or whitespace, insert a new todo
+        if (line.trim() === "") {
+          editor.replaceRange("- [ ] #todo ", cursor);
+          editor.setCursor({ line: cursor.line, ch: 6 });
+        } else {
+          // Append #todo to the end of the line
+          const endOfLine = { line: cursor.line, ch: line.length };
+          editor.replaceRange(" #todo", endOfLine);
+        }
+      },
+      hotkeys: [
+        {
+          modifiers: ["Mod", "Shift"],
+          key: "a",
+        },
+      ],
+    });
+
+    this.addCommand({
+      id: "refresh-todos",
+      name: "Refresh TODOs",
+      callback: async () => {
+        await this.scanner.scanVault();
+        this.refreshSidebar();
+      },
+    });
+
+    // Add ribbon icon
+    this.addRibbonIcon("checkbox-glyph", "Toggle TODO Sidebar", () => {
+      this.toggleSidebar();
+    });
+
+    // Add settings tab
+    this.addSettingTab(new SpaceCommandSettingTab(this.app, this));
+  }
+
+  onunload() {
+    // Detach all sidebar views
+    this.app.workspace.detachLeavesOfType(VIEW_TYPE_TODO_SIDEBAR);
+  }
+
+  async loadSettings() {
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+  }
+
+  async saveSettings() {
+    await this.saveData(this.settings);
+  }
+
+  async activateSidebar() {
+    const { workspace } = this.app;
+
+    let leaf: WorkspaceLeaf | null = null;
+    const leaves = workspace.getLeavesOfType(VIEW_TYPE_TODO_SIDEBAR);
+
+    if (leaves.length > 0) {
+      // Sidebar already exists
+      leaf = leaves[0];
+    } else {
+      // Create new sidebar
+      const rightLeaf = workspace.getRightLeaf(false);
+      if (rightLeaf) {
+        leaf = rightLeaf;
+        await leaf.setViewState({
+          type: VIEW_TYPE_TODO_SIDEBAR,
+          active: true,
+        });
+      }
+    }
+
+    if (leaf) {
+      workspace.revealLeaf(leaf);
+    }
+  }
+
+  async toggleSidebar() {
+    const { workspace } = this.app;
+    const leaves = workspace.getLeavesOfType(VIEW_TYPE_TODO_SIDEBAR);
+
+    if (leaves.length > 0) {
+      // Close sidebar
+      leaves.forEach((leaf) => leaf.detach());
+    } else {
+      // Open sidebar
+      await this.activateSidebar();
+    }
+  }
+
+  refreshSidebar() {
+    const { workspace } = this.app;
+    const leaves = workspace.getLeavesOfType(VIEW_TYPE_TODO_SIDEBAR);
+
+    for (const leaf of leaves) {
+      const view = leaf.view;
+      if (view instanceof TodoSidebarView) {
+        view.render();
+      }
+    }
+  }
+
+  async savePinnedProjects() {
+    this.settings.pinnedProjects = this.projectManager.getPinnedProjects();
+    await this.saveSettings();
+  }
+}
+
+class SpaceCommandSettingTab extends PluginSettingTab {
+  plugin: SpaceCommandPlugin;
+
+  constructor(app: App, plugin: SpaceCommandPlugin) {
+    super(app, plugin);
+    this.plugin = plugin;
+  }
+
+  display(): void {
+    const { containerEl } = this;
+    containerEl.empty();
+
+    containerEl.createEl("h2", { text: "⌥⌘ Space Command Settings" });
+
+    new Setting(containerEl)
+      .setName("Default TODONE file")
+      .setDesc("Default file path for logging completed TODOs")
+      .addText((text) =>
+        text
+          .setPlaceholder("todos/done.md")
+          .setValue(this.plugin.settings.defaultTodoneFile)
+          .onChange(async (value) => {
+            this.plugin.settings.defaultTodoneFile = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Show sidebar by default")
+      .setDesc("Show the TODO sidebar when Obsidian starts")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.showSidebarByDefault)
+          .onChange(async (value) => {
+            this.plugin.settings.showSidebarByDefault = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Date format")
+      .setDesc("Format for completion dates (using moment.js format)")
+      .addText((text) =>
+        text
+          .setPlaceholder("YYYY-MM-DD")
+          .setValue(this.plugin.settings.dateFormat)
+          .onChange(async (value) => {
+            this.plugin.settings.dateFormat = value;
+            this.plugin.processor = new TodoProcessor(
+              this.app,
+              value
+            );
+            await this.plugin.saveSettings();
+          })
+      );
+
+    containerEl.createEl("h3", { text: "Projects Settings" });
+
+    new Setting(containerEl)
+      .setName("Default projects folder")
+      .setDesc("Folder where project files are created (e.g., projects/)")
+      .addText((text) =>
+        text
+          .setPlaceholder("projects/")
+          .setValue(this.plugin.settings.defaultProjectsFolder)
+          .onChange(async (value) => {
+            this.plugin.settings.defaultProjectsFolder = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Focus list limit")
+      .setDesc("Maximum number of projects to show in {{focus-list}}")
+      .addText((text) =>
+        text
+          .setPlaceholder("5")
+          .setValue(String(this.plugin.settings.focusListLimit))
+          .onChange(async (value) => {
+            const num = parseInt(value);
+            if (!isNaN(num) && num > 0) {
+              this.plugin.settings.focusListLimit = num;
+              await this.plugin.saveSettings();
+            }
+          })
+      );
+  }
+}
