@@ -17,22 +17,19 @@ export class TodoSidebarView extends ItemView {
   private projectsCollapsed: boolean = false;
   private updateListener: (() => void) | null = null;
   private sortMode: SortMode = "date";
-  private onPinnedProjectsChanged: (() => void) | null = null;
 
   constructor(
     leaf: WorkspaceLeaf,
     scanner: TodoScanner,
     processor: TodoProcessor,
     projectManager: ProjectManager,
-    defaultTodoneFile: string,
-    onPinnedProjectsChanged?: () => void
+    defaultTodoneFile: string
   ) {
     super(leaf);
     this.scanner = scanner;
     this.processor = processor;
     this.projectManager = projectManager;
     this.defaultTodoneFile = defaultTodoneFile;
-    this.onPinnedProjectsChanged = onPinnedProjectsChanged || null;
   }
 
   getViewType(): string {
@@ -45,6 +42,35 @@ export class TodoSidebarView extends ItemView {
 
   getIcon(): string {
     return "checkbox-glyph";
+  }
+
+  private stripMarkdownSyntax(text: string): string {
+    let cleaned = text;
+    // Remove task list markers
+    cleaned = cleaned.replace(/^-\s*\[\s*\]\s*/, "");
+    cleaned = cleaned.replace(/^-\s*\[x\]\s*/, "");
+    // Remove unordered list markers
+    cleaned = cleaned.replace(/^-\s+/, "");
+    // Remove bold
+    cleaned = cleaned.replace(/\*\*(.+?)\*\*/g, "$1");
+    // Remove italic (single asterisk)
+    cleaned = cleaned.replace(/\*(.+?)\*/g, "$1");
+    // Remove bold (double underscore)
+    cleaned = cleaned.replace(/__(.+?)__/g, "$1");
+    // Remove italic (single underscore)
+    cleaned = cleaned.replace(/_(.+?)_/g, "$1");
+    // Remove strikethrough
+    cleaned = cleaned.replace(/~~(.+?)~~/g, "$1");
+    // Remove inline code
+    cleaned = cleaned.replace(/`(.+?)`/g, "$1");
+    // Remove links but keep the text
+    cleaned = cleaned.replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1");
+    return cleaned;
+  }
+
+  private wrapTagsInSpans(text: string): string {
+    // Wrap tags in spans for styling
+    return text.replace(/(#[\w-]+)/g, '<span class="tag">$1</span>');
   }
 
   async onOpen(): Promise<void> {
@@ -151,13 +177,9 @@ export class TodoSidebarView extends ItemView {
       cls: "todo-section-header projects-header",
     });
 
-    const titleSpan = header.createEl("span", {
-      text: this.projectsCollapsed ? "▶" : "▼",
-      cls: "collapse-icon",
-    });
-
-    titleSpan.appendText(` Projects (${projects.length})`);
-    titleSpan.addClass("todo-section-title");
+    const titleSpan = header.createEl("span", { cls: "todo-section-title" });
+    const collapseIcon = this.projectsCollapsed ? "▶" : "▼";
+    titleSpan.innerHTML = `<span class="collapse-icon">${collapseIcon}</span> Projects <span class="project-count">(${projects.length})</span>`;
 
     header.addEventListener("click", () => {
       this.projectsCollapsed = !this.projectsCollapsed;
@@ -176,12 +198,8 @@ export class TodoSidebarView extends ItemView {
       return;
     }
 
-    // Sort projects by pinned first, then by count
-    projects.sort((a, b) => {
-      if (a.isPinned && !b.isPinned) return -1;
-      if (!a.isPinned && b.isPinned) return 1;
-      return b.count - a.count;
-    });
+    // Sort projects by count (descending)
+    projects.sort((a, b) => b.count - a.count);
 
     const list = section.createEl("ul", { cls: "project-list" });
 
@@ -193,27 +211,23 @@ export class TodoSidebarView extends ItemView {
   private renderProjectItem(list: HTMLElement, project: any): void {
     const item = list.createEl("li", { cls: "project-item" });
 
-    // Star icon for pinning
-    const starBtn = item.createEl("button", {
-      cls: `project-star ${project.isPinned ? "pinned" : ""}`,
-      attr: { "aria-label": project.isPinned ? "Unpin project" : "Pin project" },
+    // Checkbox for completing all project TODOs
+    const checkbox = item.createEl("input", {
+      type: "checkbox",
+      cls: "project-checkbox",
     });
-    starBtn.innerHTML = project.isPinned
-      ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>'
-      : '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>';
 
-    starBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      this.projectManager.togglePin(project.tag);
-      if (this.onPinnedProjectsChanged) {
-        this.onPinnedProjectsChanged();
+    checkbox.addEventListener("change", async () => {
+      checkbox.checked = false; // Uncheck immediately
+      const confirmed = await this.confirmCompleteProject(project);
+      if (confirmed) {
+        await this.completeAllProjectTodos(project);
       }
-      this.render();
     });
 
     // Project name and count
     const textSpan = item.createEl("span", { cls: "project-text" });
-    textSpan.textContent = `${project.tag} (${project.count}) `;
+    textSpan.innerHTML = `${project.tag} <span class="project-count">(${project.count})</span> `;
 
     // Link to project file
     const link = item.createEl("a", {
@@ -235,10 +249,8 @@ export class TodoSidebarView extends ItemView {
     const section = container.createEl("div", { cls: "todo-section" });
 
     const header = section.createEl("div", { cls: "todo-section-header" });
-    header.createEl("span", {
-      text: `▼ Active TODOs (${todos.length})`,
-      cls: "todo-section-title",
-    });
+    const titleSpan = header.createEl("span", { cls: "todo-section-title" });
+    titleSpan.innerHTML = `▼ Active TODOs <span class="todo-count">(${todos.length})</span>`;
 
     if (todos.length === 0) {
       section.createEl("div", {
@@ -278,37 +290,12 @@ export class TodoSidebarView extends ItemView {
       }
     });
 
-    // Star icon for pinning project tags
-    const projectTags = todo.tags.filter(
-      (tag) => tag !== "#todo" && tag !== "#todone"
-    );
-    if (projectTags.length > 0) {
-      const primaryTag = projectTags[0]; // Use first project tag
-      const isPinned = this.projectManager.isPinned(primaryTag);
-
-      const starBtn = item.createEl("button", {
-        cls: `todo-star ${isPinned ? "pinned" : ""}`,
-        attr: { "aria-label": isPinned ? "Unpin project" : "Pin project" },
-      });
-      starBtn.innerHTML = isPinned
-        ? '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>'
-        : '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>';
-
-      starBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        this.projectManager.togglePin(primaryTag);
-        if (this.onPinnedProjectsChanged) {
-          this.onPinnedProjectsChanged();
-        }
-        this.render();
-      });
-    }
-
-    // Text content
+    // Text content (strip markdown but keep tags)
     const textSpan = item.createEl("span", { cls: "todo-text" });
     const cleanText = todo.text.replace(/#todo\b/g, "").trim();
-    const displayText = cleanText.replace(/^-\s*\[\s*\]\s*/, "");
-    textSpan.textContent = displayText + " ";
+    const displayText = this.stripMarkdownSyntax(cleanText);
+    const displayWithStyledTags = this.wrapTagsInSpans(displayText);
+    textSpan.innerHTML = displayWithStyledTags + " ";
 
     // Link to source
     const link = item.createEl("a", {
@@ -332,13 +319,9 @@ export class TodoSidebarView extends ItemView {
       cls: "todo-section-header todone-header",
     });
 
-    const titleSpan = header.createEl("span", {
-      text: this.todonesCollapsed ? "▶" : "▼",
-      cls: "collapse-icon",
-    });
-
-    titleSpan.appendText(` Recent TODONEs (${todones.length})`);
-    titleSpan.addClass("todo-section-title");
+    const titleSpan = header.createEl("span", { cls: "todo-section-title" });
+    const collapseIcon = this.todonesCollapsed ? "▶" : "▼";
+    titleSpan.innerHTML = `<span class="collapse-icon">${collapseIcon}</span> Recent TODONEs <span class="todo-count">(${todones.length})</span>`;
 
     header.addEventListener("click", () => {
       this.todonesCollapsed = !this.todonesCollapsed;
@@ -374,11 +357,12 @@ export class TodoSidebarView extends ItemView {
       attr: { checked: "checked", disabled: "disabled" },
     });
 
-    // Text content
+    // Text content (strip markdown but keep tags)
     const textSpan = item.createEl("span", { cls: "todo-text todone-text" });
     const cleanText = todone.text.replace(/#todone\b/g, "").trim();
-    const displayText = cleanText.replace(/^-\s*\[x\]\s*/, "");
-    textSpan.textContent = displayText + " ";
+    const displayText = this.stripMarkdownSyntax(cleanText);
+    const displayWithStyledTags = this.wrapTagsInSpans(displayText);
+    textSpan.innerHTML = displayWithStyledTags + " ";
 
     // Link to source
     const link = item.createEl("a", {
@@ -391,6 +375,74 @@ export class TodoSidebarView extends ItemView {
       e.preventDefault();
       this.openFileAtLine(todone.file, todone.lineNumber);
     });
+  }
+
+  private async confirmCompleteProject(project: any): Promise<boolean> {
+    return new Promise((resolve) => {
+      const { Modal } = require("obsidian");
+      const modal = new Modal(this.app);
+      modal.titleEl.setText("Complete All Project TODOs?");
+      modal.contentEl.createEl("p", {
+        text: `This will mark all ${project.count} TODO(s) for project ${project.tag} as complete. This action cannot be undone.`,
+      });
+
+      const buttonContainer = modal.contentEl.createEl("div", {
+        cls: "modal-button-container",
+      });
+      buttonContainer.style.display = "flex";
+      buttonContainer.style.justifyContent = "flex-end";
+      buttonContainer.style.gap = "8px";
+      buttonContainer.style.marginTop = "16px";
+
+      const cancelBtn = buttonContainer.createEl("button", { text: "Cancel" });
+      cancelBtn.addEventListener("click", () => {
+        modal.close();
+        resolve(false);
+      });
+
+      const confirmBtn = buttonContainer.createEl("button", {
+        text: "Complete All",
+        cls: "mod-cta",
+      });
+      confirmBtn.addEventListener("click", () => {
+        modal.close();
+        resolve(true);
+      });
+
+      modal.open();
+    });
+  }
+
+  private async completeAllProjectTodos(project: any): Promise<void> {
+    const todos = this.scanner.getTodos().filter((todo) =>
+      todo.tags.includes(project.tag)
+    );
+
+    let completed = 0;
+    let failed = 0;
+
+    for (const todo of todos) {
+      const success = await this.processor.completeTodo(
+        todo,
+        this.defaultTodoneFile
+      );
+      if (success) {
+        completed++;
+      } else {
+        failed++;
+      }
+    }
+
+    const { Notice } = require("obsidian");
+    if (failed > 0) {
+      new Notice(
+        `Completed ${completed} TODO(s), ${failed} failed. See console for details.`
+      );
+    } else {
+      new Notice(`Completed all ${completed} TODO(s) for ${project.tag}!`);
+    }
+
+    this.render();
   }
 
   private openFileAtLine(file: any, line: number): void {

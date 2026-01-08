@@ -5,41 +5,16 @@ import { ProjectInfo } from "./types";
 export class ProjectManager {
   private app: App;
   private scanner: TodoScanner;
-  private pinnedProjects: Set<string>;
   private projectsFolder: string;
 
   constructor(
     app: App,
     scanner: TodoScanner,
-    projectsFolder: string,
-    pinnedProjects: string[]
+    projectsFolder: string
   ) {
     this.app = app;
     this.scanner = scanner;
     this.projectsFolder = projectsFolder;
-    this.pinnedProjects = new Set(pinnedProjects);
-  }
-
-  setPinnedProjects(projects: string[]): void {
-    this.pinnedProjects = new Set(projects);
-  }
-
-  getPinnedProjects(): string[] {
-    return Array.from(this.pinnedProjects);
-  }
-
-  togglePin(tag: string): boolean {
-    if (this.pinnedProjects.has(tag)) {
-      this.pinnedProjects.delete(tag);
-      return false;
-    } else {
-      this.pinnedProjects.add(tag);
-      return true;
-    }
-  }
-
-  isPinned(tag: string): boolean {
-    return this.pinnedProjects.has(tag);
   }
 
   getProjects(): ProjectInfo[] {
@@ -67,7 +42,6 @@ export class ProjectManager {
             tag,
             count: 1,
             lastActivity: todo.dateCreated,
-            isPinned: this.pinnedProjects.has(tag),
           });
         }
       }
@@ -80,13 +54,8 @@ export class ProjectManager {
   getFocusProjects(limit?: number): ProjectInfo[] {
     const projects = this.getProjects();
 
-    // Sort: pinned first, then by activity (count + recency)
+    // Sort by activity (count + recency)
     projects.sort((a, b) => {
-      // Pinned projects come first
-      if (a.isPinned && !b.isPinned) return -1;
-      if (!a.isPinned && b.isPinned) return 1;
-
-      // For non-pinned (or both pinned), sort by activity
       // Higher count = more active
       const countDiff = b.count - a.count;
       if (countDiff !== 0) return countDiff;

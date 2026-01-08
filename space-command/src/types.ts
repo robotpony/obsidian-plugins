@@ -21,7 +21,6 @@ export interface ProjectInfo {
   tag: string;
   count: number;
   lastActivity: number;
-  isPinned: boolean;
 }
 
 export interface SpaceCommandSettings {
@@ -31,7 +30,6 @@ export interface SpaceCommandSettings {
   excludeTodoneFilesFromRecent: boolean;
   defaultProjectsFolder: string;
   focusListLimit: number;
-  pinnedProjects: string[];
 }
 
 export const DEFAULT_SETTINGS: SpaceCommandSettings = {
@@ -41,5 +39,4 @@ export const DEFAULT_SETTINGS: SpaceCommandSettings = {
   excludeTodoneFilesFromRecent: true,
   defaultProjectsFolder: "projects/",
   focusListLimit: 5,
-  pinnedProjects: [],
 };

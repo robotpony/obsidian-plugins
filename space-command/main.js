@@ -24,10 +24,10 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // main.ts
 var main_exports = {};
 __export(main_exports, {
-  default: () => WeeklyLogHelpersPlugin
+  default: () => SpaceCommandPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian5 = require("obsidian");
+var import_obsidian6 = require("obsidian");
 
 // src/TodoScanner.ts
 var import_obsidian2 = require("obsidian");
@@ -274,6 +274,85 @@ ${todoneText}` : todoneText;
   }
 };
 
+// src/ProjectManager.ts
+var import_obsidian4 = require("obsidian");
+var ProjectManager = class {
+  constructor(app, scanner, projectsFolder) {
+    this.app = app;
+    this.scanner = scanner;
+    this.projectsFolder = projectsFolder;
+  }
+  getProjects() {
+    const todos = this.scanner.getTodos();
+    const projectMap = /* @__PURE__ */ new Map();
+    for (const todo of todos) {
+      const projectTags = todo.tags.filter(
+        (tag) => tag !== "#todo" && tag !== "#todone"
+      );
+      for (const tag of projectTags) {
+        if (projectMap.has(tag)) {
+          const project = projectMap.get(tag);
+          project.count++;
+          project.lastActivity = Math.max(
+            project.lastActivity,
+            todo.dateCreated
+          );
+        } else {
+          projectMap.set(tag, {
+            tag,
+            count: 1,
+            lastActivity: todo.dateCreated
+          });
+        }
+      }
+    }
+    return Array.from(projectMap.values());
+  }
+  getFocusProjects(limit) {
+    const projects = this.getProjects();
+    projects.sort((a, b) => {
+      const countDiff = b.count - a.count;
+      if (countDiff !== 0)
+        return countDiff;
+      return b.lastActivity - a.lastActivity;
+    });
+    if (limit !== void 0 && limit > 0) {
+      return projects.slice(0, limit);
+    }
+    return projects;
+  }
+  async openProjectFile(tag) {
+    const filename = tag.replace(/^#/, "") + ".md";
+    const filepath = this.projectsFolder + filename;
+    const file = this.app.vault.getAbstractFileByPath(filepath);
+    if (file instanceof import_obsidian4.TFile) {
+      const leaf = this.app.workspace.getLeaf(false);
+      await leaf.openFile(file);
+    } else {
+      await this.createProjectFile(filepath, tag);
+    }
+  }
+  async createProjectFile(filepath, tag) {
+    const folderPath = filepath.substring(0, filepath.lastIndexOf("/"));
+    if (folderPath && !this.app.vault.getAbstractFileByPath(folderPath)) {
+      await this.app.vault.createFolder(folderPath);
+    }
+    const projectName = tag.replace(/^#/, "");
+    const content = `# ${projectName}
+
+${tag}
+
+## Overview
+
+## TODOs
+
+`;
+    const file = await this.app.vault.create(filepath, content);
+    const leaf = this.app.workspace.getLeaf(false);
+    await leaf.openFile(file);
+  }
+};
+
 // src/FilterParser.ts
 var FilterParser = class {
   static parse(filterString) {
@@ -323,21 +402,28 @@ var FilterParser = class {
 
 // src/EmbedRenderer.ts
 var EmbedRenderer = class {
-  constructor(app, scanner, processor, defaultTodoneFile = "todos/done.md") {
+  constructor(app, scanner, processor, projectManager, defaultTodoneFile = "todos/done.md", focusListLimit = 5) {
     this.app = app;
     this.scanner = scanner;
     this.processor = processor;
+    this.projectManager = projectManager;
     this.defaultTodoneFile = defaultTodoneFile;
+    this.focusListLimit = focusListLimit;
   }
   async render(source, el, ctx) {
     var _a;
+    const focusListMatch = source.match(/\{\{focus-list\}\}/);
+    if (focusListMatch) {
+      this.renderFocusList(el);
+      return;
+    }
     const match = source.match(
       /\{\{focus-todos:?\s*([^|}\s]*)(?:\s*\|\s*(.+))?\}\}/
     );
     if (!match) {
       el.createEl("div", {
-        text: "Invalid focus-todos syntax",
-        cls: "weekly-log-helpers-error"
+        text: "Invalid syntax (use {{focus-todos}} or {{focus-list}})",
+        cls: "space-command-error"
       });
       return;
     }
@@ -348,13 +434,40 @@ var EmbedRenderer = class {
     todos = FilterParser.applyFilters(todos, filters);
     this.renderTodoList(el, todos, todoneFile);
   }
+  renderFocusList(container) {
+    container.empty();
+    container.addClass("space-command-embed", "focus-list-embed");
+    const projects = this.projectManager.getFocusProjects(this.focusListLimit);
+    if (projects.length === 0) {
+      container.createEl("div", {
+        text: "No focus projects",
+        cls: "space-command-empty"
+      });
+      return;
+    }
+    const list = container.createEl("ul", { cls: "focus-list" });
+    for (const project of projects) {
+      const item = list.createEl("li", { cls: "focus-list-item" });
+      const textSpan = item.createEl("span", { cls: "focus-project-text" });
+      textSpan.textContent = `${project.tag} (${project.count}) `;
+      const link = item.createEl("a", {
+        text: "\u2192",
+        cls: "focus-project-link",
+        href: "#"
+      });
+      link.addEventListener("click", async (e) => {
+        e.preventDefault();
+        await this.projectManager.openProjectFile(project.tag);
+      });
+    }
+  }
   renderTodoList(container, todos, todoneFile) {
     container.empty();
-    container.addClass("weekly-log-helpers-embed");
+    container.addClass("space-command-embed");
     if (todos.length === 0) {
       container.createEl("div", {
         text: "No active TODOs",
-        cls: "weekly-log-helpers-empty"
+        cls: "space-command-empty"
       });
       return;
     }
@@ -374,7 +487,7 @@ var EmbedRenderer = class {
             container.empty();
             container.createEl("div", {
               text: "No active TODOs",
-              cls: "weekly-log-helpers-empty"
+              cls: "space-command-empty"
             });
           }
         } else {
@@ -424,16 +537,18 @@ var EmbedRenderer = class {
 };
 
 // src/SidebarView.ts
-var import_obsidian4 = require("obsidian");
-var VIEW_TYPE_TODO_SIDEBAR = "weekly-log-helpers-sidebar";
-var TodoSidebarView = class extends import_obsidian4.ItemView {
-  constructor(leaf, scanner, processor, defaultTodoneFile) {
+var import_obsidian5 = require("obsidian");
+var VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
+var TodoSidebarView = class extends import_obsidian5.ItemView {
+  constructor(leaf, scanner, processor, projectManager, defaultTodoneFile) {
     super(leaf);
     this.todonesCollapsed = false;
+    this.projectsCollapsed = false;
     this.updateListener = null;
     this.sortMode = "date";
     this.scanner = scanner;
     this.processor = processor;
+    this.projectManager = projectManager;
     this.defaultTodoneFile = defaultTodoneFile;
   }
   getViewType() {
@@ -444,6 +559,23 @@ var TodoSidebarView = class extends import_obsidian4.ItemView {
   }
   getIcon() {
     return "checkbox-glyph";
+  }
+  stripMarkdownSyntax(text) {
+    let cleaned = text;
+    cleaned = cleaned.replace(/^-\s*\[\s*\]\s*/, "");
+    cleaned = cleaned.replace(/^-\s*\[x\]\s*/, "");
+    cleaned = cleaned.replace(/^-\s+/, "");
+    cleaned = cleaned.replace(/\*\*(.+?)\*\*/g, "$1");
+    cleaned = cleaned.replace(/\*(.+?)\*/g, "$1");
+    cleaned = cleaned.replace(/__(.+?)__/g, "$1");
+    cleaned = cleaned.replace(/_(.+?)_/g, "$1");
+    cleaned = cleaned.replace(/~~(.+?)~~/g, "$1");
+    cleaned = cleaned.replace(/`(.+?)`/g, "$1");
+    cleaned = cleaned.replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1");
+    return cleaned;
+  }
+  wrapTagsInSpans(text) {
+    return text.replace(/(#[\w-]+)/g, '<span class="tag">$1</span>');
   }
   async onOpen() {
     this.updateListener = () => this.render();
@@ -459,7 +591,7 @@ var TodoSidebarView = class extends import_obsidian4.ItemView {
   render() {
     const container = this.containerEl.children[1];
     container.empty();
-    container.addClass("weekly-log-helpers-sidebar");
+    container.addClass("space-command-sidebar");
     const headerDiv = container.createEl("div", { cls: "sidebar-header" });
     headerDiv.createEl("h4", { text: "\u2325\u2318 TODOs" });
     const buttonGroup = headerDiv.createEl("div", { cls: "sidebar-button-group" });
@@ -484,6 +616,7 @@ var TodoSidebarView = class extends import_obsidian4.ItemView {
       await this.scanner.scanVault();
       setTimeout(() => refreshBtn.removeClass("rotating"), 500);
     });
+    this.renderProjects(container);
     this.renderActiveTodos(container);
     this.renderRecentTodones(container);
   }
@@ -516,15 +649,67 @@ var TodoSidebarView = class extends import_obsidian4.ItemView {
         });
     }
   }
+  renderProjects(container) {
+    const projects = this.projectManager.getProjects();
+    const section = container.createEl("div", { cls: "projects-section" });
+    const header = section.createEl("div", {
+      cls: "todo-section-header projects-header"
+    });
+    const titleSpan = header.createEl("span", { cls: "todo-section-title" });
+    const collapseIcon = this.projectsCollapsed ? "\u25B6" : "\u25BC";
+    titleSpan.innerHTML = `<span class="collapse-icon">${collapseIcon}</span> Projects <span class="project-count">(${projects.length})</span>`;
+    header.addEventListener("click", () => {
+      this.projectsCollapsed = !this.projectsCollapsed;
+      this.render();
+    });
+    if (this.projectsCollapsed) {
+      return;
+    }
+    if (projects.length === 0) {
+      section.createEl("div", {
+        text: "No projects yet",
+        cls: "todo-empty"
+      });
+      return;
+    }
+    projects.sort((a, b) => b.count - a.count);
+    const list = section.createEl("ul", { cls: "project-list" });
+    for (const project of projects) {
+      this.renderProjectItem(list, project);
+    }
+  }
+  renderProjectItem(list, project) {
+    const item = list.createEl("li", { cls: "project-item" });
+    const checkbox = item.createEl("input", {
+      type: "checkbox",
+      cls: "project-checkbox"
+    });
+    checkbox.addEventListener("change", async () => {
+      checkbox.checked = false;
+      const confirmed = await this.confirmCompleteProject(project);
+      if (confirmed) {
+        await this.completeAllProjectTodos(project);
+      }
+    });
+    const textSpan = item.createEl("span", { cls: "project-text" });
+    textSpan.innerHTML = `${project.tag} <span class="project-count">(${project.count})</span> `;
+    const link = item.createEl("a", {
+      text: "\u2192",
+      cls: "project-link",
+      href: "#"
+    });
+    link.addEventListener("click", async (e) => {
+      e.preventDefault();
+      await this.projectManager.openProjectFile(project.tag);
+    });
+  }
   renderActiveTodos(container) {
     let todos = this.scanner.getTodos();
     todos = this.sortTodos(todos);
     const section = container.createEl("div", { cls: "todo-section" });
     const header = section.createEl("div", { cls: "todo-section-header" });
-    header.createEl("span", {
-      text: `\u25BC Active TODOs (${todos.length})`,
-      cls: "todo-section-title"
-    });
+    const titleSpan = header.createEl("span", { cls: "todo-section-title" });
+    titleSpan.innerHTML = `\u25BC Active TODOs <span class="todo-count">(${todos.length})</span>`;
     if (todos.length === 0) {
       section.createEl("div", {
         text: "No active TODOs",
@@ -557,8 +742,9 @@ var TodoSidebarView = class extends import_obsidian4.ItemView {
     });
     const textSpan = item.createEl("span", { cls: "todo-text" });
     const cleanText = todo.text.replace(/#todo\b/g, "").trim();
-    const displayText = cleanText.replace(/^-\s*\[\s*\]\s*/, "");
-    textSpan.textContent = displayText + " ";
+    const displayText = this.stripMarkdownSyntax(cleanText);
+    const displayWithStyledTags = this.wrapTagsInSpans(displayText);
+    textSpan.innerHTML = displayWithStyledTags + " ";
     const link = item.createEl("a", {
       text: "\u2192",
       cls: "todo-link",
@@ -575,12 +761,9 @@ var TodoSidebarView = class extends import_obsidian4.ItemView {
     const header = section.createEl("div", {
       cls: "todo-section-header todone-header"
     });
-    const titleSpan = header.createEl("span", {
-      text: this.todonesCollapsed ? "\u25B6" : "\u25BC",
-      cls: "collapse-icon"
-    });
-    titleSpan.appendText(` Recent TODONEs (${todones.length})`);
-    titleSpan.addClass("todo-section-title");
+    const titleSpan = header.createEl("span", { cls: "todo-section-title" });
+    const collapseIcon = this.todonesCollapsed ? "\u25B6" : "\u25BC";
+    titleSpan.innerHTML = `<span class="collapse-icon">${collapseIcon}</span> Recent TODONEs <span class="todo-count">(${todones.length})</span>`;
     header.addEventListener("click", () => {
       this.todonesCollapsed = !this.todonesCollapsed;
       this.render();
@@ -609,8 +792,9 @@ var TodoSidebarView = class extends import_obsidian4.ItemView {
     });
     const textSpan = item.createEl("span", { cls: "todo-text todone-text" });
     const cleanText = todone.text.replace(/#todone\b/g, "").trim();
-    const displayText = cleanText.replace(/^-\s*\[x\]\s*/, "");
-    textSpan.textContent = displayText + " ";
+    const displayText = this.stripMarkdownSyntax(cleanText);
+    const displayWithStyledTags = this.wrapTagsInSpans(displayText);
+    textSpan.innerHTML = displayWithStyledTags + " ";
     const link = item.createEl("a", {
       text: "\u2192",
       cls: "todo-link",
@@ -620,6 +804,64 @@ var TodoSidebarView = class extends import_obsidian4.ItemView {
       e.preventDefault();
       this.openFileAtLine(todone.file, todone.lineNumber);
     });
+  }
+  async confirmCompleteProject(project) {
+    return new Promise((resolve) => {
+      const { Modal } = require("obsidian");
+      const modal = new Modal(this.app);
+      modal.titleEl.setText("Complete All Project TODOs?");
+      modal.contentEl.createEl("p", {
+        text: `This will mark all ${project.count} TODO(s) for project ${project.tag} as complete. This action cannot be undone.`
+      });
+      const buttonContainer = modal.contentEl.createEl("div", {
+        cls: "modal-button-container"
+      });
+      buttonContainer.style.display = "flex";
+      buttonContainer.style.justifyContent = "flex-end";
+      buttonContainer.style.gap = "8px";
+      buttonContainer.style.marginTop = "16px";
+      const cancelBtn = buttonContainer.createEl("button", { text: "Cancel" });
+      cancelBtn.addEventListener("click", () => {
+        modal.close();
+        resolve(false);
+      });
+      const confirmBtn = buttonContainer.createEl("button", {
+        text: "Complete All",
+        cls: "mod-cta"
+      });
+      confirmBtn.addEventListener("click", () => {
+        modal.close();
+        resolve(true);
+      });
+      modal.open();
+    });
+  }
+  async completeAllProjectTodos(project) {
+    const todos = this.scanner.getTodos().filter(
+      (todo) => todo.tags.includes(project.tag)
+    );
+    let completed = 0;
+    let failed = 0;
+    for (const todo of todos) {
+      const success = await this.processor.completeTodo(
+        todo,
+        this.defaultTodoneFile
+      );
+      if (success) {
+        completed++;
+      } else {
+        failed++;
+      }
+    }
+    const { Notice: Notice2 } = require("obsidian");
+    if (failed > 0) {
+      new Notice2(
+        `Completed ${completed} TODO(s), ${failed} failed. See console for details.`
+      );
+    } else {
+      new Notice2(`Completed all ${completed} TODO(s) for ${project.tag}!`);
+    }
+    this.render();
   }
   openFileAtLine(file, line) {
     const leaf = this.app.workspace.getLeaf(false);
@@ -653,20 +895,29 @@ var DEFAULT_SETTINGS = {
   defaultTodoneFile: "todos/done.md",
   showSidebarByDefault: true,
   dateFormat: "YYYY-MM-DD",
-  excludeTodoneFilesFromRecent: true
+  excludeTodoneFilesFromRecent: true,
+  defaultProjectsFolder: "projects/",
+  focusListLimit: 5
 };
 
 // main.ts
-var WeeklyLogHelpersPlugin = class extends import_obsidian5.Plugin {
+var SpaceCommandPlugin = class extends import_obsidian6.Plugin {
   async onload() {
     await this.loadSettings();
     this.scanner = new TodoScanner(this.app);
     this.processor = new TodoProcessor(this.app, this.settings.dateFormat);
+    this.projectManager = new ProjectManager(
+      this.app,
+      this.scanner,
+      this.settings.defaultProjectsFolder
+    );
     this.embedRenderer = new EmbedRenderer(
       this.app,
       this.scanner,
       this.processor,
-      this.settings.defaultTodoneFile
+      this.projectManager,
+      this.settings.defaultTodoneFile,
+      this.settings.focusListLimit
     );
     if (this.settings.excludeTodoneFilesFromRecent) {
       this.scanner.setExcludeFromTodones([this.settings.defaultTodoneFile]);
@@ -682,6 +933,7 @@ var WeeklyLogHelpersPlugin = class extends import_obsidian5.Plugin {
         leaf,
         this.scanner,
         this.processor,
+        this.projectManager,
         this.settings.defaultTodoneFile
       )
     );
@@ -692,7 +944,9 @@ var WeeklyLogHelpersPlugin = class extends import_obsidian5.Plugin {
       const codeBlocks = el.findAll("p, div");
       for (const block of codeBlocks) {
         const text = block.textContent || "";
-        if (text.includes("{{focus-todos:")) {
+        if (text.includes("{{focus-todos")) {
+          this.embedRenderer.render(text, block, ctx);
+        } else if (text.includes("{{focus-list}}")) {
           this.embedRenderer.render(text, block, ctx);
         }
       }
@@ -742,7 +996,7 @@ var WeeklyLogHelpersPlugin = class extends import_obsidian5.Plugin {
     this.addRibbonIcon("checkbox-glyph", "Toggle TODO Sidebar", () => {
       this.toggleSidebar();
     });
-    this.addSettingTab(new WeeklyLogHelpersSettingTab(this.app, this));
+    this.addSettingTab(new SpaceCommandSettingTab(this.app, this));
   }
   onunload() {
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_TODO_SIDEBAR);
@@ -793,7 +1047,7 @@ var WeeklyLogHelpersPlugin = class extends import_obsidian5.Plugin {
     }
   }
 };
-var WeeklyLogHelpersSettingTab = class extends import_obsidian5.PluginSettingTab {
+var SpaceCommandSettingTab = class extends import_obsidian6.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -801,20 +1055,20 @@ var WeeklyLogHelpersSettingTab = class extends import_obsidian5.PluginSettingTab
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: "Weekly Log Helpers Settings" });
-    new import_obsidian5.Setting(containerEl).setName("Default TODONE file").setDesc("Default file path for logging completed TODOs").addText(
+    containerEl.createEl("h2", { text: "\u2325\u2318 Space Command Settings" });
+    new import_obsidian6.Setting(containerEl).setName("Default TODONE file").setDesc("Default file path for logging completed TODOs").addText(
       (text) => text.setPlaceholder("todos/done.md").setValue(this.plugin.settings.defaultTodoneFile).onChange(async (value) => {
         this.plugin.settings.defaultTodoneFile = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian5.Setting(containerEl).setName("Show sidebar by default").setDesc("Show the TODO sidebar when Obsidian starts").addToggle(
+    new import_obsidian6.Setting(containerEl).setName("Show sidebar by default").setDesc("Show the TODO sidebar when Obsidian starts").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.showSidebarByDefault).onChange(async (value) => {
         this.plugin.settings.showSidebarByDefault = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian5.Setting(containerEl).setName("Date format").setDesc("Format for completion dates (using moment.js format)").addText(
+    new import_obsidian6.Setting(containerEl).setName("Date format").setDesc("Format for completion dates (using moment.js format)").addText(
       (text) => text.setPlaceholder("YYYY-MM-DD").setValue(this.plugin.settings.dateFormat).onChange(async (value) => {
         this.plugin.settings.dateFormat = value;
         this.plugin.processor = new TodoProcessor(
@@ -822,6 +1076,22 @@ var WeeklyLogHelpersSettingTab = class extends import_obsidian5.PluginSettingTab
           value
         );
         await this.plugin.saveSettings();
+      })
+    );
+    containerEl.createEl("h3", { text: "Projects Settings" });
+    new import_obsidian6.Setting(containerEl).setName("Default projects folder").setDesc("Folder where project files are created (e.g., projects/)").addText(
+      (text) => text.setPlaceholder("projects/").setValue(this.plugin.settings.defaultProjectsFolder).onChange(async (value) => {
+        this.plugin.settings.defaultProjectsFolder = value;
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian6.Setting(containerEl).setName("Focus list limit").setDesc("Maximum number of projects to show in {{focus-list}}").addText(
+      (text) => text.setPlaceholder("5").setValue(String(this.plugin.settings.focusListLimit)).onChange(async (value) => {
+        const num = parseInt(value);
+        if (!isNaN(num) && num > 0) {
+          this.plugin.settings.focusListLimit = num;
+          await this.plugin.saveSettings();
+        }
       })
     );
   }

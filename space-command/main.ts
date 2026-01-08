@@ -34,8 +34,7 @@ export default class SpaceCommandPlugin extends Plugin {
     this.projectManager = new ProjectManager(
       this.app,
       this.scanner,
-      this.settings.defaultProjectsFolder,
-      this.settings.pinnedProjects
+      this.settings.defaultProjectsFolder
     );
     this.embedRenderer = new EmbedRenderer(
       this.app,
@@ -73,8 +72,7 @@ export default class SpaceCommandPlugin extends Plugin {
           this.scanner,
           this.processor,
           this.projectManager,
-          this.settings.defaultTodoneFile,
-          () => this.savePinnedProjects()
+          this.settings.defaultTodoneFile
         )
     );
 
@@ -216,11 +214,6 @@ export default class SpaceCommandPlugin extends Plugin {
         view.render();
       }
     }
-  }
-
-  async savePinnedProjects() {
-    this.settings.pinnedProjects = this.projectManager.getPinnedProjects();
-    await this.saveSettings();
   }
 }
 
