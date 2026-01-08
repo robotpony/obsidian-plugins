@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the Weekly Log Helpers plugin will be documented in this file.
+All notable changes to the ⌥⌘ Space Command plugin will be documented in this file.
 
 ## [0.2.1] - 2026-01-08
 
@@ -15,11 +15,21 @@ All notable changes to the Weekly Log Helpers plugin will be documented in this 
   - Strips block-level markers (list bullets, quotes)
   - No extra spacing or newlines (fixed in v0.2.1)
   - Custom inline renderer avoids block-level <p> tags
+- **XSS security vulnerability**: Replaced `innerHTML` with safe DOM methods
+  - Protects against potential XSS attacks in TODO text
+  - Uses tokenizer and DOM manipulation instead of HTML injection
+
+### Improved
+- Plugin name consistency: All docs now use "⌥⌘ Space Command"
+- Documentation reorganization: Internal docs moved to `docs/development/`
+- Comprehensive README with table of contents and v0.2.1 features
+- Installation paths corrected to `.obsidian/plugins/space-command/`
 
 ### Technical
 - Updated inline syntax regex from `[^|}\s]*` to `[^|}]*` to allow spaces
 - Added smart detection to distinguish file paths from filter keywords
-- Implemented custom `renderInlineMarkdown()` method to avoid block elements
+- Implemented custom `renderInlineMarkdown()` with token parser
+- Safe markdown rendering using `appendText()` and `createEl()` instead of `innerHTML`
 - Supports **bold**, *italic*, `code`, and [links](url) inline syntax
 
 ## [0.2.0] - 2026-01-08
@@ -57,7 +67,7 @@ All notable changes to the Weekly Log Helpers plugin will be documented in this 
 ## [0.1.0] - 2026-01-07
 
 ### Added
-- Initial release of Weekly Log Helpers plugin
+- Initial release of Space Command plugin
 - TODO/TODONE tracking across entire vault
 - Interactive embed syntax: `{{focus-todos: file.md}}`
 - Filter support: `path:`, `tags:`, `limit:`

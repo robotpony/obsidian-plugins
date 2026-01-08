@@ -1,72 +1,84 @@
-# Weekly Log Helpers
+# ⌥⌘ Space Command
 
 An Obsidian plugin for managing TODOs and TODONEs across your vault with live embeds and interactive sidebar.
+
+## Table of Contents
+
+- [Features](#features)
+- [Quick Start](#quick-start)
+- [Syntax](#syntax)
+  - [Inline Syntax](#inline-syntax)
+  - [Code Block Syntax](#code-block-syntax-recommended)
+  - [Filters](#filters)
+- [Usage](#usage)
+  - [Creating TODOs](#creating-todos)
+  - [Completing TODOs](#completing-todos)
+  - [Keyboard Shortcuts](#keyboard-shortcuts)
+- [Installation](#installation)
+- [Settings](#settings)
+- [Documentation](#documentation)
+- [License](#license)
 
 ## Features
 
 - **TODO Tracking**: Automatically detect and track all `#todo` items across your vault
 - **Live Embeds**: Embed interactive TODO lists in any markdown file
 - **Interactive Sidebar**: View and manage all TODOs from a dedicated sidebar
-- **Auto-Refresh**: Sidebar automatically updates when TODOs change, with manual refresh button
-- **Line Highlighting**: Click `→` to jump to source with line highlighting (1.5s flash)
-- **Automatic Logging**: Completed TODOs are automatically logged with completion dates
-- **Filtering**: Filter TODOs by path, tags, or limit results
+- **Code Block Syntax**: Works in both Reading Mode and Live Preview mode (v0.2.0+)
+- **Flexible Filtering**: Filter TODOs by path, tags, or limit results (v0.2.1+)
+- **Markdown Rendering**: TODO text renders **bold**, *italic*, `code`, and [links](url) (v0.2.1+)
+- **Auto-Refresh**: Sidebar automatically updates when TODOs change
+- **Line Highlighting**: Click `→` to jump to source with 1.5s highlight
+- **Automatic Logging**: Completed TODOs logged with completion dates
 - **Smart Code Filtering**: Automatically excludes TODOs in code blocks
 - **Keyboard Shortcuts**: Quick commands for common actions
 
-## Usage
+## Quick Start
 
-### Embed Syntax
+1. **Create a TODO** - Add `#todo` to any line:
+   ```markdown
+   - [ ] Finish the report #todo
+   ```
 
-**Basic syntax:**
+2. **Embed TODO list** - Use code blocks (works in Live Preview):
+   ````markdown
+   ```focus-todos
+   ```
+   ````
 
-```markdown
-{{focus-todos: todos/done.md}}
-```
+3. **Complete TODOs** - Click the checkbox in the embed or sidebar
 
-**Using default TODONE file (from settings):**
+That's it! See [Syntax](#syntax) for more options.
+
+## Syntax
+
+### Inline Syntax
+
+Works in **Reading Mode only** (Cmd+E):
 
 ```markdown
 {{focus-todos}}
+{{focus-todos | tags:#urgent}}
+{{focus-todos: todos/done.md | path:projects/}}
 ```
 
-**With filters:**
+### Code Block Syntax (Recommended)
 
-```markdown
-{{focus-todos: done.md | path:projects/ tags:#urgent limit:10}}
-{{focus-todos | path:projects/}}
-```
-
-**Parameters:**
-- **TODONE file path** (optional) - Where completed TODOs are logged. If omitted, uses the default from settings (default: `todos/done.md`)
-
-**Available filters:**
-- `path:folder/subfolder/` - Show only TODOs from specific path
-- `tags:#tag1,#tag2` - Show only TODOs with specific tags
-- `limit:N` - Limit to first N results
-
-### Code Block Syntax
-
-**New in v0.2.0:** Code blocks work in **both Reading Mode and Live Preview mode**, unlike inline syntax which only works in Reading Mode.
-
-#### Basic Code Block
+Works in **both Reading Mode and Live Preview**:
 
 ````markdown
 ```focus-todos
 ```
 ````
-Uses default TODONE file from settings.
 
-#### Custom TODONE File
-
+With custom file:
 ````markdown
 ```focus-todos
 todos/done.md
 ```
 ````
 
-#### With Filters
-
+With filters (multi-line):
 ````markdown
 ```focus-todos
 path:projects/
@@ -75,26 +87,47 @@ limit:10
 ```
 ````
 
-Or single-line (same as inline syntax):
-
+Or single-line:
 ````markdown
 ```focus-todos
 todos/done.md | path:projects/ tags:#urgent limit:10
 ```
 ````
 
-#### Focus List
-
+Focus list:
 ````markdown
 ```focus-list
 ```
 ````
 
-**When to use each syntax:**
-- **Inline `{{focus-todos}}`**: Quick embeds, only works in Reading Mode (Cmd+E)
-- **Code blocks**: Works in both Reading Mode and Live Preview, recommended for daily use
+**When to use:**
+- **Code blocks**: Recommended for daily use (works everywhere)
+- **Inline `{{...}}`**: Quick embeds in Reading Mode only
 
-Both syntaxes support the same filters and produce identical interactive lists.
+### Filters
+
+All filters work with both syntaxes:
+
+| Filter | Syntax | Description |
+|--------|--------|-------------|
+| **Path** | `path:folder/subfolder/` | Show only TODOs from specific path |
+| **Tags** | `tags:#tag1,#tag2` | Show only TODOs with ALL specified tags (AND logic) |
+| **Limit** | `limit:N` | Limit to first N results |
+
+**Examples:**
+
+```markdown
+{{focus-todos | tags:#urgent}}
+{{focus-todos | path:projects/ limit:5}}
+{{focus-todos | path:work/ tags:#urgent,#today}}
+```
+
+**v0.2.1 improvements:**
+- ✅ Flexible syntax: `{{focus-todos | tags:#urgent}}` now works
+- ✅ Both colon and pipe separators supported
+- ✅ Markdown rendering in TODO text
+
+## Usage
 
 ### Creating TODOs
 
@@ -106,12 +139,22 @@ Remember to call John #todo
 - [ ] Review PR #urgent #todo
 ```
 
-**Note:** TODOs in code blocks (triple backticks) or inline code (single backticks) are automatically filtered out and treated as examples. See [FILTERING.md](FILTERING.md) for details.
+**Markdown support (v0.2.1+):**
+TODOs can include **bold**, *italic*, `code`, and [links](url):
+
+```markdown
+- [ ] Review **urgent** PR #todo
+- [ ] Call *John* about the report #todo
+- [ ] See [design doc](link) for details #todo
+```
+
+**Smart filtering:**
+TODOs in code blocks (triple backticks) or inline code (single backticks) are automatically excluded. See [docs/development/FILTERING.md](docs/development/FILTERING.md) for details.
 
 ### Completing TODOs
 
 Click the checkbox in an embed or sidebar to complete a TODO. This will:
-1. Change `#todo` to `#todone @2026-01-07` in the source file
+1. Change `#todo` to `#todone @2026-01-08` in the source file
 2. Mark the checkbox `[x]` if present
 3. Log the completed item to your TODONE file
 
@@ -124,7 +167,7 @@ Click the checkbox in an embed or sidebar to complete a TODO. This will:
 
 ### Manual Installation
 
-1. Copy the plugin folder to `.obsidian/plugins/weekly-log-helpers/`
+1. Copy the plugin folder to `.obsidian/plugins/space-command/`
 2. Install dependencies: `npm install`
 3. Build the plugin: `npm run build`
 4. Enable the plugin in Obsidian Settings → Community Plugins
@@ -133,21 +176,56 @@ Click the checkbox in an embed or sidebar to complete a TODO. This will:
 
 ```bash
 npm install
-npm run dev
+npm run dev    # Watch mode
+npm run build  # Production build
 ```
 
 ## Settings
 
+Access via: Settings → Community Plugins → ⌥⌘ Space Command
+
 - **Default TODONE file**: Path where completed TODOs are logged (default: `todos/done.md`)
 - **Show sidebar by default**: Auto-show sidebar on startup
 - **Date format**: Format for completion dates (using moment.js format)
+- **Default projects folder**: Folder for project files (default: `projects/`)
+- **Focus list limit**: Max projects in `{{focus-list}}` (default: 5)
+
+## Documentation
+
+### User Guides
+- **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Cheat sheet with examples
+- **[SYNTAX_GUIDE.md](SYNTAX_GUIDE.md)** - Comprehensive syntax reference (300+ lines)
+- **[CHANGELOG.md](CHANGELOG.md)** - Version history and release notes
+- **[CODE_BLOCK_QUICK_START.md](CODE_BLOCK_QUICK_START.md)** - Code block syntax intro
+
+### Developer Docs
+- [docs/development/FILTERING.md](docs/development/FILTERING.md) - Code block filtering details
+- [docs/development/AUTO_REFRESH.md](docs/development/AUTO_REFRESH.md) - Event-driven refresh
+- [docs/development/LINE_HIGHLIGHTING.md](docs/development/LINE_HIGHLIGHTING.md) - Line highlight feature
+- [docs/development/DEDUPLICATION.md](docs/development/DEDUPLICATION.md) - TODONE deduplication
+- [docs/development/IMPLEMENTATION_v0.2.0.md](docs/development/IMPLEMENTATION_v0.2.0.md) - v0.2.0 technical details
+- [docs/development/BUGFIXES_v0.2.1.md](docs/development/BUGFIXES_v0.2.1.md) - v0.2.1 bug fixes
 
 ## Commands
+
+Available via Command Palette (Cmd/Ctrl+P):
 
 - **Toggle TODO Sidebar**: Show/hide the sidebar
 - **Quick Add TODO**: Insert `#todo` at cursor position
 - **Refresh TODOs**: Force rescan of all vault files
 
+## Version History
+
+- **v0.2.1** (2026-01-08) - Bug fixes: flexible filter parsing, markdown rendering, XSS security fix
+- **v0.2.0** (2026-01-08) - Code block syntax support for Live Preview mode
+- **v0.1.0** (2026-01-07) - Initial release
+
+See [CHANGELOG.md](CHANGELOG.md) for detailed release notes.
+
 ## License
 
 MIT
+
+---
+
+**Made with ⌥⌘** by Bruce Alderson

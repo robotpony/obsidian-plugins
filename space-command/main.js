@@ -534,15 +534,81 @@ var EmbedRenderer = class {
     }
   }
   // Render inline markdown without creating block elements
+  // Uses DOM methods to avoid XSS vulnerabilities
   renderInlineMarkdown(text, container) {
-    let html = text;
-    html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-    html = html.replace(/__(.+?)__/g, "<strong>$1</strong>");
-    html = html.replace(/\*([^\s*][^*]*?)\*/g, "<em>$1</em>");
-    html = html.replace(/\b_([^_]+?)_\b/g, "<em>$1</em>");
-    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
-    html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
-    container.innerHTML = html;
+    const tokens = this.parseMarkdownTokens(text);
+    for (const token of tokens) {
+      switch (token.type) {
+        case "text":
+          container.appendText(token.content);
+          break;
+        case "bold":
+          container.createEl("strong", { text: token.content });
+          break;
+        case "italic":
+          container.createEl("em", { text: token.content });
+          break;
+        case "code":
+          container.createEl("code", { text: token.content });
+          break;
+        case "link":
+          container.createEl("a", {
+            text: token.content,
+            attr: { href: token.url || "#" }
+          });
+          break;
+      }
+    }
+  }
+  // Parse markdown into tokens for safe rendering
+  parseMarkdownTokens(text) {
+    const tokens = [];
+    let remaining = text;
+    while (remaining.length > 0) {
+      let matched = false;
+      let match = remaining.match(/^(\*\*|__)(.+?)\1/);
+      if (match) {
+        tokens.push({ type: "bold", content: match[2] });
+        remaining = remaining.substring(match[0].length);
+        matched = true;
+        continue;
+      }
+      match = remaining.match(/^`([^`]+)`/);
+      if (match) {
+        tokens.push({ type: "code", content: match[1] });
+        remaining = remaining.substring(match[0].length);
+        matched = true;
+        continue;
+      }
+      match = remaining.match(/^\[([^\]]+)\]\(([^)]+)\)/);
+      if (match) {
+        tokens.push({ type: "link", content: match[1], url: match[2] });
+        remaining = remaining.substring(match[0].length);
+        matched = true;
+        continue;
+      }
+      match = remaining.match(/^(\*|_)([^\s\*_][^\*_]*?)\1/);
+      if (match) {
+        tokens.push({ type: "italic", content: match[2] });
+        remaining = remaining.substring(match[0].length);
+        matched = true;
+        continue;
+      }
+      if (!matched) {
+        const nextSpecial = remaining.search(/[\*_`\[]/);
+        if (nextSpecial === -1) {
+          tokens.push({ type: "text", content: remaining });
+          break;
+        } else if (nextSpecial > 0) {
+          tokens.push({ type: "text", content: remaining.substring(0, nextSpecial) });
+          remaining = remaining.substring(nextSpecial);
+        } else {
+          tokens.push({ type: "text", content: remaining[0] });
+          remaining = remaining.substring(1);
+        }
+      }
+    }
+    return tokens;
   }
   openFileAtLine(file, line) {
     const leaf = this.app.workspace.getLeaf(false);

@@ -1,4 +1,4 @@
-# Weekly Log Helpers - Quick Reference
+# ⌥⌘ Space Command - Quick Reference
 
 ## 🎯 Creating TODOs
 
@@ -101,7 +101,7 @@ Open Command Palette (`Cmd/Ctrl + P`) and search:
 
 ## ⚙️ Settings
 
-Settings → Community Plugins → Weekly Log Helpers → Options
+Settings → Community Plugins → ⌥⌘ Space Command → Options
 
 - **Default TODONE file** - Where completions are logged
 - **Show sidebar by default** - Auto-open on startup

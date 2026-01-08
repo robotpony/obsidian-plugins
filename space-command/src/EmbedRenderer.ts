@@ -221,28 +221,114 @@ export class EmbedRenderer {
   }
 
   // Render inline markdown without creating block elements
+  // Uses DOM methods to avoid XSS vulnerabilities
   private renderInlineMarkdown(text: string, container: HTMLElement): void {
     // Process markdown inline syntax (bold, italic, links)
     // This avoids the extra <p> tags that MarkdownRenderer adds
 
-    let html = text;
+    // Parse markdown tokens
+    const tokens = this.parseMarkdownTokens(text);
 
-    // Bold: **text** or __text__
-    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-    html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
+    // Render tokens as DOM elements
+    for (const token of tokens) {
+      switch (token.type) {
+        case 'text':
+          container.appendText(token.content);
+          break;
+        case 'bold':
+          container.createEl('strong', { text: token.content });
+          break;
+        case 'italic':
+          container.createEl('em', { text: token.content });
+          break;
+        case 'code':
+          container.createEl('code', { text: token.content });
+          break;
+        case 'link':
+          container.createEl('a', {
+            text: token.content,
+            attr: { href: token.url || '#' }
+          });
+          break;
+      }
+    }
+  }
 
-    // Italic: *text* or _text_ (but not inside words)
-    html = html.replace(/\*([^\s*][^*]*?)\*/g, '<em>$1</em>');
-    html = html.replace(/\b_([^_]+?)_\b/g, '<em>$1</em>');
+  // Parse markdown into tokens for safe rendering
+  private parseMarkdownTokens(text: string): Array<{
+    type: 'text' | 'bold' | 'italic' | 'code' | 'link';
+    content: string;
+    url?: string;
+  }> {
+    const tokens: Array<{
+      type: 'text' | 'bold' | 'italic' | 'code' | 'link';
+      content: string;
+      url?: string;
+    }> = [];
 
-    // Links: [text](url)
-    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+    let remaining = text;
 
-    // Code: `text`
-    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    while (remaining.length > 0) {
+      // Try to match markdown patterns
+      let matched = false;
 
-    // Set the HTML content
-    container.innerHTML = html;
+      // Bold: **text** or __text__
+      let match = remaining.match(/^(\*\*|__)(.+?)\1/);
+      if (match) {
+        tokens.push({ type: 'bold', content: match[2] });
+        remaining = remaining.substring(match[0].length);
+        matched = true;
+        continue;
+      }
+
+      // Code: `text`
+      match = remaining.match(/^`([^`]+)`/);
+      if (match) {
+        tokens.push({ type: 'code', content: match[1] });
+        remaining = remaining.substring(match[0].length);
+        matched = true;
+        continue;
+      }
+
+      // Links: [text](url)
+      match = remaining.match(/^\[([^\]]+)\]\(([^)]+)\)/);
+      if (match) {
+        tokens.push({ type: 'link', content: match[1], url: match[2] });
+        remaining = remaining.substring(match[0].length);
+        matched = true;
+        continue;
+      }
+
+      // Italic: *text* or _text_
+      match = remaining.match(/^(\*|_)([^\s\*_][^\*_]*?)\1/);
+      if (match) {
+        tokens.push({ type: 'italic', content: match[2] });
+        remaining = remaining.substring(match[0].length);
+        matched = true;
+        continue;
+      }
+
+      // No markdown pattern found, consume one character as text
+      if (!matched) {
+        // Find the next markdown character or end of string
+        const nextSpecial = remaining.search(/[\*_`\[]/);
+        if (nextSpecial === -1) {
+          // No more markdown, add rest as text
+          tokens.push({ type: 'text', content: remaining });
+          break;
+        } else if (nextSpecial > 0) {
+          // Add text before next markdown
+          tokens.push({ type: 'text', content: remaining.substring(0, nextSpecial) });
+          remaining = remaining.substring(nextSpecial);
+        } else {
+          // Special char at start but didn't match pattern, treat as text
+          tokens.push({ type: 'text', content: remaining[0] });
+          remaining = remaining.substring(1);
+        }
+      }
+    }
+
+    return tokens;
   }
 
   private openFileAtLine(file: any, line: number): void {
