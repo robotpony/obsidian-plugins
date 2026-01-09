@@ -66,3 +66,4 @@ Start with the TODO/TODONE system described in the README before expanding to ot
 - When creating plugins, follow Obsidian's plugin development best practices
 - Test plugins thoroughly to avoid data loss in the vault
 - When clarifying requirements or approach, use AskUserQuestion
+- Update the changelog with each release

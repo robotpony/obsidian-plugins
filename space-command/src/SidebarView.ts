@@ -1,8 +1,9 @@
-import { ItemView, WorkspaceLeaf } from "obsidian";
+import { ItemView, WorkspaceLeaf, TFile } from "obsidian";
 import { TodoScanner } from "./TodoScanner";
 import { TodoProcessor } from "./TodoProcessor";
 import { ProjectManager } from "./ProjectManager";
 import { TodoItem } from "./types";
+import { ContextMenuHandler } from "./ContextMenuHandler";
 
 export const VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 
@@ -14,19 +15,33 @@ export class TodoSidebarView extends ItemView {
   private todonesCollapsed: boolean = false;
   private projectsCollapsed: boolean = false;
   private updateListener: (() => void) | null = null;
+  private contextMenuHandler: ContextMenuHandler;
+  private priorityTags: string[];
+  private recentTodonesLimit: number;
 
   constructor(
     leaf: WorkspaceLeaf,
     scanner: TodoScanner,
     processor: TodoProcessor,
     projectManager: ProjectManager,
-    defaultTodoneFile: string
+    defaultTodoneFile: string,
+    priorityTags: string[],
+    recentTodonesLimit: number
   ) {
     super(leaf);
     this.scanner = scanner;
     this.processor = processor;
     this.projectManager = projectManager;
     this.defaultTodoneFile = defaultTodoneFile;
+    this.priorityTags = priorityTags;
+    this.recentTodonesLimit = recentTodonesLimit;
+
+    // Initialize context menu handler
+    this.contextMenuHandler = new ContextMenuHandler(
+      this.app,
+      processor,
+      priorityTags
+    );
   }
 
   getViewType(): string {
@@ -97,6 +112,19 @@ export class TodoSidebarView extends ItemView {
 
     const buttonGroup = headerDiv.createEl("div", { cls: "sidebar-button-group" });
 
+    // Settings button
+    const settingsBtn = buttonGroup.createEl("button", {
+      cls: "clickable-icon sidebar-settings-btn",
+      attr: { "aria-label": "Open Settings" },
+    });
+    settingsBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 1v6m0 6v6m9-9h-6m-6 0H3"></path></svg>';
+
+    settingsBtn.addEventListener("click", () => {
+      // Open settings
+      (this.app as any).setting.open();
+      (this.app as any).setting.openTabById("space-command");
+    });
+
     // Refresh button
     const refreshBtn = buttonGroup.createEl("button", {
       cls: "clickable-icon sidebar-refresh-btn",
@@ -122,6 +150,27 @@ export class TodoSidebarView extends ItemView {
 
   private sortTodosByDate(todos: TodoItem[]): TodoItem[] {
     return [...todos].sort((a, b) => a.dateCreated - b.dateCreated);
+  }
+
+  private getPriorityValue(todo: TodoItem): number {
+    // Priority order: #focus=0, #p0=1, #p1=2, #p2=3, no priority=4, #p3=5, #p4=6, #future=7
+    if (todo.tags.includes("#focus")) return 0;
+    if (todo.tags.includes("#p0")) return 1;
+    if (todo.tags.includes("#p1")) return 2;
+    if (todo.tags.includes("#p2")) return 3;
+    if (todo.tags.includes("#p3")) return 5;
+    if (todo.tags.includes("#p4")) return 6;
+    if (todo.tags.includes("#future")) return 7;
+    return 4; // No priority = medium (between #p2 and #p3)
+  }
+
+  private sortTodosByPriority(todos: TodoItem[]): TodoItem[] {
+    return [...todos].sort((a, b) => {
+      const priorityDiff = this.getPriorityValue(a) - this.getPriorityValue(b);
+      if (priorityDiff !== 0) return priorityDiff;
+      // If same priority, sort by date created
+      return a.dateCreated - b.dateCreated;
+    });
   }
 
   private renderProjects(container: HTMLElement): void {
@@ -154,8 +203,13 @@ export class TodoSidebarView extends ItemView {
       return;
     }
 
-    // Sort projects by count (descending)
-    projects.sort((a, b) => b.count - a.count);
+    // Sort projects by priority, then by count
+    projects.sort((a, b) => {
+      const priorityDiff = a.highestPriority - b.highestPriority;
+      if (priorityDiff !== 0) return priorityDiff;
+      // If same priority, sort by count (higher count first)
+      return b.count - a.count;
+    });
 
     const list = section.createEl("ul", { cls: "project-list" });
 
@@ -200,7 +254,12 @@ export class TodoSidebarView extends ItemView {
 
   private renderActiveTodos(container: HTMLElement): void {
     let todos = this.scanner.getTodos();
-    todos = this.sortTodosByDate(todos);
+
+    // Filter out #future (snoozed) TODOs
+    todos = todos.filter(todo => !todo.tags.includes("#future"));
+
+    // Sort by priority
+    todos = this.sortTodosByPriority(todos);
 
     const section = container.createEl("div", { cls: "todo-section" });
 
@@ -225,6 +284,12 @@ export class TodoSidebarView extends ItemView {
 
   private renderTodoItem(list: HTMLElement, todo: TodoItem): void {
     const item = list.createEl("li", { cls: "todo-item" });
+
+    // Add right-click context menu
+    item.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      this.contextMenuHandler.showTodoMenu(e, todo, () => this.render());
+    });
 
     // Checkbox
     const checkbox = item.createEl("input", {
@@ -267,7 +332,8 @@ export class TodoSidebarView extends ItemView {
   }
 
   private renderRecentTodones(container: HTMLElement): void {
-    const todones = this.scanner.getTodones(10); // Show last 10
+    const allTodones = this.scanner.getTodones(100); // Get more than we need
+    const todones = allTodones.slice(0, this.recentTodonesLimit); // Limit display
 
     const section = container.createEl("div", { cls: "todone-section" });
 
@@ -288,7 +354,7 @@ export class TodoSidebarView extends ItemView {
       return;
     }
 
-    if (todones.length === 0) {
+    if (allTodones.length === 0) {
       section.createEl("div", {
         text: "No completed TODOs yet",
         cls: "todo-empty",
@@ -300,6 +366,24 @@ export class TodoSidebarView extends ItemView {
 
     for (const todone of todones) {
       this.renderTodoneItem(list, todone);
+    }
+
+    // Add "View all" link if there are more TODONEs than the limit
+    if (allTodones.length > this.recentTodonesLimit) {
+      const linkDiv = section.createEl("div", { cls: "todone-view-all" });
+      const link = linkDiv.createEl("a", {
+        text: `View all in ${this.defaultTodoneFile}`,
+        cls: "todone-view-all-link",
+        href: "#",
+      });
+
+      link.addEventListener("click", async (e) => {
+        e.preventDefault();
+        const file = this.app.vault.getAbstractFileByPath(this.defaultTodoneFile);
+        if (file instanceof TFile) {
+          await this.app.workspace.getLeaf(false).openFile(file);
+        }
+      });
     }
   }
 

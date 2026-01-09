@@ -122,4 +122,49 @@ export class TodoProcessor {
       await this.app.vault.createFolder(folderPath);
     }
   }
+
+  async setPriorityTag(todo: TodoItem, newTag: string, addFocus: boolean = false): Promise<boolean> {
+    try {
+      const content = await this.app.vault.read(todo.file);
+      const lines = content.split("\n");
+
+      if (todo.lineNumber >= lines.length) {
+        throw new Error(
+          `Line number ${todo.lineNumber} out of bounds for file ${todo.filePath}`
+        );
+      }
+
+      let line = lines[todo.lineNumber];
+
+      // Remove existing priority tags (#p0-#p4, #future)
+      line = line.replace(/#p[0-4]\b/g, "");
+      line = line.replace(/#future\b/g, "");
+
+      // Clean up extra whitespace
+      line = line.replace(/\s+/g, " ").trim();
+
+      // Add new priority tag at end
+      line = line + ` ${newTag}`;
+
+      // Add #focus tag if requested (and not already present)
+      if (addFocus && !line.includes("#focus")) {
+        line = line + " #focus";
+      }
+
+      lines[todo.lineNumber] = line;
+      await this.app.vault.modify(todo.file, lines.join("\n"));
+
+      // Trigger callback if set
+      if (this.onComplete) {
+        this.onComplete();
+      }
+
+      new Notice(`Priority set to ${newTag}${addFocus ? " + #focus" : ""}`);
+      return true;
+    } catch (error) {
+      console.error("Error setting priority:", error);
+      new Notice("Failed to set priority. See console for details.");
+      return false;
+    }
+  }
 }

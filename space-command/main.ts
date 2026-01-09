@@ -35,7 +35,8 @@ export default class SpaceCommandPlugin extends Plugin {
     this.projectManager = new ProjectManager(
       this.app,
       this.scanner,
-      this.settings.defaultProjectsFolder
+      this.settings.defaultProjectsFolder,
+      this.settings.priorityTags
     );
     this.embedRenderer = new EmbedRenderer(
       this.app,
@@ -73,7 +74,9 @@ export default class SpaceCommandPlugin extends Plugin {
           this.scanner,
           this.processor,
           this.projectManager,
-          this.settings.defaultTodoneFile
+          this.settings.defaultTodoneFile,
+          this.settings.priorityTags,
+          this.settings.recentTodonesLimit
         )
     );
 
@@ -312,6 +315,53 @@ class SpaceCommandSettingTab extends PluginSettingTab {
             const num = parseInt(value);
             if (!isNaN(num) && num > 0) {
               this.plugin.settings.focusListLimit = num;
+              await this.plugin.saveSettings();
+            }
+          })
+      );
+
+    containerEl.createEl("h3", { text: "Priority Settings" });
+
+    new Setting(containerEl)
+      .setName("Priority tags")
+      .setDesc("Comma-separated list of priority tags (e.g., #p0, #p1, #p2, #p3, #p4). These tags won't appear in the Projects list.")
+      .addText((text) =>
+        text
+          .setPlaceholder("#p0, #p1, #p2, #p3, #p4")
+          .setValue(this.plugin.settings.priorityTags.join(", "))
+          .onChange(async (value) => {
+            // Parse comma-separated tags
+            const tags = value
+              .split(",")
+              .map(tag => tag.trim())
+              .filter(tag => tag.length > 0)
+              .map(tag => tag.startsWith("#") ? tag : `#${tag}`);
+
+            this.plugin.settings.priorityTags = tags;
+
+            // Update ProjectManager with new priority tags
+            this.plugin.projectManager = new ProjectManager(
+              this.app,
+              this.plugin.scanner,
+              this.plugin.settings.defaultProjectsFolder,
+              tags
+            );
+
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Recent TODONEs limit")
+      .setDesc("Maximum number of recent TODONEs to show in sidebar")
+      .addText((text) =>
+        text
+          .setPlaceholder("5")
+          .setValue(String(this.plugin.settings.recentTodonesLimit))
+          .onChange(async (value) => {
+            const num = parseInt(value);
+            if (!isNaN(num) && num > 0) {
+              this.plugin.settings.recentTodonesLimit = num;
               await this.plugin.saveSettings();
             }
           })

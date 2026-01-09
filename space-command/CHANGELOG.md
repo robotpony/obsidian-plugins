@@ -2,6 +2,68 @@
 
 All notable changes to the ⌥⌘ Space Command plugin will be documented in this file.
 
+## [0.3.1] - 2026-01-08
+
+### Added
+- **Priority-based sorting**: TODOs and Projects now sorted by priority
+  - Order: #focus, #p0, #p1, #p2, no priority, #p3, #p4
+  - Unprioritized TODOs placed between #p2 and #p3 (medium priority)
+  - Projects sorted by highest priority of their TODOs, then by TODO count
+- **#focus tag support**: Focus action now adds #focus tag in addition to setting #p0
+  - #focus tag automatically excluded from Projects list
+  - TODOs with #focus appear at the very top of the list
+- **Configurable TODONEs limit**: Control number of recent TODONEs displayed in sidebar
+  - Default: 5 recent TODONEs
+  - New setting: "Recent TODONEs limit"
+  - "View all in [filename]" link appears when limit reached
+- **#future filtering**: Snoozed TODOs (#future) now hidden from Active TODOs list
+  - Keeps Active TODOs list focused on current work
+  - #future TODOs still counted but not displayed
+
+### Improved
+- Projects list now reflects priority of associated TODOs
+- Sidebar UI is more focused with limited TODONEs display
+- Priority system is more intuitive with visible #focus tag
+- Better distinction between active work and snoozed tasks
+
+### Technical
+- Added `highestPriority` field to `ProjectInfo` interface
+- Added `recentTodonesLimit` setting to plugin settings
+- ProjectManager now tracks highest priority for each project
+- New `getPriorityValue()` helper method for consistent priority sorting
+- SidebarView filters #future before rendering Active TODOs
+
+## [0.3.0] - 2026-01-08
+
+### Added
+- **Context menu for TODO items**: Right-click TODOs in sidebar for quick actions
+  - **Focus** (⚡): Increase priority (set to #p0 or decrease priority number)
+  - **Later** (🕐): Decrease priority (set to #p4 or increase priority number)
+  - **Snooze** (🌙): Set to #future for deferred tasks
+- **Priority tag system**: Configurable priority tags (#p0-#p4 by default)
+  - #p0 = highest priority (Focus)
+  - #p4 = lowest priority (Later)
+  - #future = snoozed/deferred tasks
+  - Priority tags excluded from Projects list automatically
+- **Settings button in sidebar**: Quick access to plugin settings (⚙️ icon next to refresh)
+
+### Fixed
+- Priority tags (#p0-#p4, #future) no longer appear in Projects list
+- Projects list now correctly excludes all priority-related tags
+
+### Improved
+- Smart priority actions are idempotent (safe to repeat)
+- Context menu provides keyboard-free workflow for priority management
+- Sidebar refreshes automatically after priority changes
+- User feedback via Notice for all priority operations
+
+### Technical
+- New `ContextMenuHandler` class for managing context menus
+- New `setPriorityTag()` method in TodoProcessor for priority manipulation
+- ProjectManager now filters configurable priority tags + #future
+- Settings UI for customizing priority tags (comma-separated list)
+- Uses Obsidian's native Menu API for context menus
+
 ## [0.2.1] - 2026-01-08
 
 ### Fixed
