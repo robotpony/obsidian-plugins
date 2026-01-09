@@ -65,3 +65,4 @@ Start with the TODO/TODONE system described in the README before expanding to ot
 - The `.obsidian` directory is gitignored and should remain so
 - When creating plugins, follow Obsidian's plugin development best practices
 - Test plugins thoroughly to avoid data loss in the vault
+- When clarifying requirements or approach, use AskUserQuestion
