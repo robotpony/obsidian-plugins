@@ -221,19 +221,7 @@ Access via: Settings → Community Plugins → ⌥⌘ Space Command
 
 ## Documentation
 
-### User Guides
-- **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Cheat sheet with examples
-- **[SYNTAX_GUIDE.md](SYNTAX_GUIDE.md)** - Comprehensive syntax reference (300+ lines)
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history and release notes
-- **[CODE_BLOCK_QUICK_START.md](CODE_BLOCK_QUICK_START.md)** - Code block syntax intro
-
-### Developer Docs
-- [docs/development/FILTERING.md](docs/development/FILTERING.md) - Code block filtering details
-- [docs/development/AUTO_REFRESH.md](docs/development/AUTO_REFRESH.md) - Event-driven refresh
-- [docs/development/LINE_HIGHLIGHTING.md](docs/development/LINE_HIGHLIGHTING.md) - Line highlight feature
-- [docs/development/DEDUPLICATION.md](docs/development/DEDUPLICATION.md) - TODONE deduplication
-- [docs/development/IMPLEMENTATION_v0.2.0.md](docs/development/IMPLEMENTATION_v0.2.0.md) - v0.2.0 technical details
-- [docs/development/BUGFIXES_v0.2.1.md](docs/development/BUGFIXES_v0.2.1.md) - v0.2.1 bug fixes
 
 ## Commands
 
@@ -245,9 +233,9 @@ Available via Command Palette (Cmd/Ctrl+P):
 
 ## Version History
 
-- **v0.4.0** (2026-01-08) - Slash commands and @date quick insert
-- **v0.2.1** (2026-01-08) - Bug fixes: flexible filter parsing, markdown rendering, XSS security fix
-- **v0.2.0** (2026-01-08) - Code block syntax support for Live Preview mode
+- **v0.4.0** (2026-01-08) - Slash commands, @date quick insert, priority sorting, context menus
+- **v0.3.x** (2026-01-08) - Right-click context menus, priority tags (#p0-#p4, #focus, #future)
+- **v0.2.x** (2026-01-08) - Code block syntax, bug fixes, markdown rendering
 - **v0.1.0** (2026-01-07) - Initial release
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed release notes.
