@@ -10,6 +10,8 @@ import { TodoProcessor } from "./src/TodoProcessor";
 import { ProjectManager } from "./src/ProjectManager";
 import { EmbedRenderer } from "./src/EmbedRenderer";
 import { CodeBlockProcessor } from "./src/CodeBlockProcessor";
+import { SlashCommandSuggest } from "./src/SlashCommandSuggest";
+import { DateSuggest } from "./src/DateSuggest";
 import {
   TodoSidebarView,
   VIEW_TYPE_TODO_SIDEBAR,
@@ -109,6 +111,10 @@ export default class SpaceCommandPlugin extends Plugin {
       this.settings.focusListLimit
     );
     codeBlockProcessor.registerProcessors(this);
+
+    // Register editor suggesters for slash commands and @date
+    this.registerEditorSuggest(new SlashCommandSuggest(this.app, this.settings));
+    this.registerEditorSuggest(new DateSuggest(this.app, this.settings));
 
     // Commands
     this.addCommand({

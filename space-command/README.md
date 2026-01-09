@@ -6,6 +6,7 @@ An Obsidian plugin for managing TODOs and TODONEs across your vault with live em
 
 - [Features](#features)
 - [Quick Start](#quick-start)
+- [Slash Commands & Quick Insert](#slash-commands--quick-insert)
 - [Syntax](#syntax)
   - [Inline Syntax](#inline-syntax)
   - [Code Block Syntax](#code-block-syntax-recommended)
@@ -24,6 +25,8 @@ An Obsidian plugin for managing TODOs and TODONEs across your vault with live em
 - **TODO Tracking**: Automatically detect and track all `#todo` items across your vault
 - **Live Embeds**: Embed interactive TODO lists in any markdown file
 - **Interactive Sidebar**: View and manage all TODOs from a dedicated sidebar
+- **Slash Commands**: `/todo`, `/callout`, `/today`, `/tomorrow` at start of line (v0.4.0+)
+- **Quick Date Insert**: `@date`, `@today`, `@tomorrow`, `@yesterday` anywhere (v0.4.0+)
 - **Code Block Syntax**: Works in both Reading Mode and Live Preview mode (v0.2.0+)
 - **Flexible Filtering**: Filter TODOs by path, tags, or limit results (v0.2.1+)
 - **Markdown Rendering**: TODO text renders **bold**, *italic*, `code`, and [links](url) (v0.2.1+)
@@ -49,6 +52,32 @@ An Obsidian plugin for managing TODOs and TODONEs across your vault with live em
 3. **Complete TODOs** - Click the checkbox in the embed or sidebar
 
 That's it! See [Syntax](#syntax) for more options.
+
+## Slash Commands & Quick Insert
+
+Type `/` at the start of a line or `@` anywhere to quickly insert content.
+
+### Slash Commands (at start of line)
+
+| Command | Inserts |
+|---------|---------|
+| `/todo` | `- [ ] #todo ` - a new TODO item |
+| `/today` | Today's date (e.g., `2026-01-08`) |
+| `/tomorrow` | Tomorrow's date |
+| `/callout` | Shows callout type menu, then inserts `> [!type]` block |
+
+**Callout types:** info, tip, note, warning, danger, bug, example, quote, abstract, success, question, failure
+
+### @date Quick Insert (anywhere)
+
+| Trigger | Inserts |
+|---------|---------|
+| `@date` or `@d` | Today's date |
+| `@today` or `@t` | Today's date |
+| `@tomorrow` | Tomorrow's date |
+| `@yesterday` | Yesterday's date |
+
+Dates use your configured date format (default: `YYYY-MM-DD`).
 
 ## Syntax
 
@@ -216,6 +245,7 @@ Available via Command Palette (Cmd/Ctrl+P):
 
 ## Version History
 
+- **v0.4.0** (2026-01-08) - Slash commands and @date quick insert
 - **v0.2.1** (2026-01-08) - Bug fixes: flexible filter parsing, markdown rendering, XSS security fix
 - **v0.2.0** (2026-01-08) - Code block syntax support for Live Preview mode
 - **v0.1.0** (2026-01-07) - Initial release

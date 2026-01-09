@@ -21,6 +21,7 @@ This is **Space Command** (`space-command`), an Obsidian plugin for tracking TOD
 [main.ts](main.ts) - Plugin entry point extending `Plugin`. Initializes all components and registers:
 - Markdown post-processors for `{{focus-todos}}` inline syntax (Reading Mode only)
 - Code block processors for `` ```focus-todos `` and `` ```focus-list `` (works in Live Preview)
+- Editor suggesters for `/` slash commands and `@date` quick insert
 - Commands, ribbon icon, settings tab, and sidebar view
 
 ### Key Components (src/)
@@ -35,6 +36,8 @@ This is **Space Command** (`space-command`), an Obsidian plugin for tracking TOD
 | [SidebarView.ts](src/SidebarView.ts) | Custom sidebar view showing Active TODOs, Projects, Recent TODONEs |
 | [ProjectManager.ts](src/ProjectManager.ts) | Groups TODOs by project tags (excludes priority tags like #p0-#p4) |
 | [ContextMenuHandler.ts](src/ContextMenuHandler.ts) | Right-click context menu for priority actions (Focus, Later, Snooze) |
+| [SlashCommandSuggest.ts](src/SlashCommandSuggest.ts) | EditorSuggest for `/` commands at column 0: `/todo`, `/callout`, `/today`, `/tomorrow` |
+| [DateSuggest.ts](src/DateSuggest.ts) | EditorSuggest for `@date`, `@today`, `@tomorrow`, `@yesterday` quick insert |
 | [types.ts](src/types.ts) | TypeScript interfaces: `TodoItem`, `TodoFilters`, `ProjectInfo`, `SpaceCommandSettings` |
 
 ### Data Flow

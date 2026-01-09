@@ -2,6 +2,28 @@
 
 All notable changes to the ⌥⌘ Space Command plugin will be documented in this file.
 
+## [0.4.0] - 2026-01-08
+
+### Added
+- **Slash commands**: Type `/` at start of line for quick insertions
+  - `/todo` - Insert a new TODO item (`- [ ] #todo `)
+  - `/today` - Insert today's date
+  - `/tomorrow` - Insert tomorrow's date
+  - `/callout` - Shows callout type sub-menu, inserts `> [!type]` block
+  - Callout types: info, tip, note, warning, danger, bug, example, quote, abstract, success, question, failure
+- **@date quick insert**: Type `@` anywhere for date suggestions
+  - `@date` / `@d` - Today's date
+  - `@today` / `@t` - Today's date
+  - `@tomorrow` - Tomorrow's date
+  - `@yesterday` - Yesterday's date
+  - Uses configured date format (default: YYYY-MM-DD)
+
+### Technical
+- New `SlashCommandSuggest` class using Obsidian's `EditorSuggest` API
+- New `DateSuggest` class for @-triggered date insertion
+- Slash commands only trigger at column 0 to avoid conflict with Obsidian's built-in slash commands
+- Callouts use native Obsidian callout syntax (`> [!type]`)
+
 ## [0.3.1] - 2026-01-08
 
 ### Added

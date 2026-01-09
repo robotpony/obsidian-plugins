@@ -184,7 +184,7 @@ export class TodoSidebarView extends ItemView {
 
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
     const collapseIcon = this.projectsCollapsed ? "▶" : "▼";
-    titleSpan.innerHTML = `<span class="collapse-icon">${collapseIcon}</span> Projects <span class="project-count">(${projects.length})</span>`;
+    titleSpan.innerHTML = `<span class="collapse-icon">${collapseIcon}</span> Focus <span class="project-count">(${projects.length})</span>`;
 
     header.addEventListener("click", () => {
       this.projectsCollapsed = !this.projectsCollapsed;
@@ -197,7 +197,7 @@ export class TodoSidebarView extends ItemView {
 
     if (projects.length === 0) {
       section.createEl("div", {
-        text: "No projects yet",
+        text: "No focus projects yet",
         cls: "todo-empty",
       });
       return;
@@ -265,11 +265,11 @@ export class TodoSidebarView extends ItemView {
 
     const header = section.createEl("div", { cls: "todo-section-header" });
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
-    titleSpan.innerHTML = `▼ Active TODOs <span class="todo-count">(${todos.length})</span>`;
+    titleSpan.innerHTML = `▼ TODO <span class="todo-count">(${todos.length})</span>`;
 
     if (todos.length === 0) {
       section.createEl("div", {
-        text: "No active TODOs",
+        text: "No TODOs",
         cls: "todo-empty",
       });
       return;
@@ -343,7 +343,22 @@ export class TodoSidebarView extends ItemView {
 
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
     const collapseIcon = this.todonesCollapsed ? "▶" : "▼";
-    titleSpan.innerHTML = `<span class="collapse-icon">${collapseIcon}</span> Recent TODONEs <span class="todo-count">(${todones.length})</span>`;
+    titleSpan.innerHTML = `<span class="collapse-icon">${collapseIcon}</span> DONE <span class="todo-count">(${todones.length})</span>`;
+
+    // Add link to done file
+    const fileLink = header.createEl("a", {
+      text: this.defaultTodoneFile,
+      cls: "done-file-link",
+      href: "#",
+    });
+    fileLink.addEventListener("click", async (e) => {
+      e.preventDefault();
+      e.stopPropagation(); // Don't toggle collapse
+      const file = this.app.vault.getAbstractFileByPath(this.defaultTodoneFile);
+      if (file instanceof TFile) {
+        await this.app.workspace.getLeaf(false).openFile(file);
+      }
+    });
 
     header.addEventListener("click", () => {
       this.todonesCollapsed = !this.todonesCollapsed;
@@ -356,7 +371,7 @@ export class TodoSidebarView extends ItemView {
 
     if (allTodones.length === 0) {
       section.createEl("div", {
-        text: "No completed TODOs yet",
+        text: "No completed TODOs",
         cls: "todo-empty",
       });
       return;

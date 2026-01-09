@@ -27,7 +27,7 @@ __export(main_exports, {
   default: () => SpaceCommandPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian7 = require("obsidian");
+var import_obsidian9 = require("obsidian");
 
 // src/TodoScanner.ts
 var import_obsidian2 = require("obsidian");
@@ -772,11 +772,261 @@ var CodeBlockProcessor = class {
   }
 };
 
-// src/SidebarView.ts
+// src/SlashCommandSuggest.ts
+var import_obsidian5 = require("obsidian");
+var CALLOUT_TYPES = [
+  { id: "info", name: "Info", icon: "\u2139\uFE0F" },
+  { id: "tip", name: "Tip", icon: "\u{1F4A1}" },
+  { id: "note", name: "Note", icon: "\u{1F4DD}" },
+  { id: "warning", name: "Warning", icon: "\u26A0\uFE0F" },
+  { id: "danger", name: "Danger", icon: "\u{1F534}" },
+  { id: "bug", name: "Bug", icon: "\u{1F41B}" },
+  { id: "example", name: "Example", icon: "\u{1F4CB}" },
+  { id: "quote", name: "Quote", icon: "\u{1F4AC}" },
+  { id: "abstract", name: "Abstract", icon: "\u{1F4C4}" },
+  { id: "success", name: "Success", icon: "\u2705" },
+  { id: "question", name: "Question", icon: "\u2753" },
+  { id: "failure", name: "Failure", icon: "\u274C" }
+];
+var SlashCommandSuggest = class extends import_obsidian5.EditorSuggest {
+  constructor(app, settings) {
+    super(app);
+    this.inCalloutMenu = false;
+    this.triggerStart = null;
+    this.settings = settings;
+  }
+  getCommands() {
+    return [
+      {
+        id: "todo",
+        name: "Todo",
+        description: "Insert a TODO item",
+        icon: "\u2610",
+        action: (editor, start, end) => {
+          editor.replaceRange("- [ ] #todo ", start, end);
+          editor.setCursor({ line: start.line, ch: start.ch + 12 });
+        }
+      },
+      {
+        id: "today",
+        name: "Today",
+        description: "Insert today's date",
+        icon: "\u{1F4C5}",
+        action: (editor, start, end) => {
+          const date = formatDate(/* @__PURE__ */ new Date(), this.settings.dateFormat);
+          editor.replaceRange(date, start, end);
+          editor.setCursor({ line: start.line, ch: start.ch + date.length });
+        }
+      },
+      {
+        id: "tomorrow",
+        name: "Tomorrow",
+        description: "Insert tomorrow's date",
+        icon: "\u{1F4C6}",
+        action: (editor, start, end) => {
+          const tomorrow = /* @__PURE__ */ new Date();
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          const date = formatDate(tomorrow, this.settings.dateFormat);
+          editor.replaceRange(date, start, end);
+          editor.setCursor({ line: start.line, ch: start.ch + date.length });
+        }
+      },
+      {
+        id: "callout",
+        name: "Callout",
+        description: "Insert a callout block",
+        icon: "\u{1F4E2}",
+        action: () => {
+        }
+      }
+    ];
+  }
+  onTrigger(cursor, editor, file) {
+    const line = editor.getLine(cursor.line);
+    const beforeCursor = line.substring(0, cursor.ch);
+    const match = beforeCursor.match(/^(\s*)\/(\S*)$/);
+    if (!match) {
+      this.inCalloutMenu = false;
+      return null;
+    }
+    const whitespace = match[1];
+    const query = match[2];
+    this.triggerStart = { line: cursor.line, ch: whitespace.length };
+    return {
+      start: this.triggerStart,
+      end: cursor,
+      query
+    };
+  }
+  getSuggestions(context) {
+    const query = context.query.toLowerCase();
+    if (this.inCalloutMenu) {
+      return CALLOUT_TYPES.filter(
+        (type) => type.id.includes(query) || type.name.toLowerCase().includes(query)
+      );
+    }
+    const commands = this.getCommands();
+    if (!query) {
+      return commands;
+    }
+    return commands.filter(
+      (cmd) => cmd.id.includes(query) || cmd.name.toLowerCase().includes(query)
+    );
+  }
+  renderSuggestion(item, el) {
+    el.addClass("space-command-suggestion");
+    const iconSpan = el.createEl("span", { cls: "suggestion-icon" });
+    iconSpan.textContent = item.icon;
+    const textContainer = el.createEl("div", { cls: "suggestion-content" });
+    textContainer.createEl("span", {
+      cls: "suggestion-name",
+      text: item.name
+    });
+    if ("description" in item) {
+      textContainer.createEl("span", {
+        cls: "suggestion-description",
+        text: item.description
+      });
+    }
+  }
+  selectSuggestion(item, evt) {
+    var _a;
+    const editor = (_a = this.context) == null ? void 0 : _a.editor;
+    if (!editor || !this.context)
+      return;
+    const start = this.context.start;
+    const end = this.context.end;
+    if (this.inCalloutMenu) {
+      const calloutType = item;
+      const calloutText = `> [!${calloutType.id}]
+> `;
+      editor.replaceRange(calloutText, start, end);
+      editor.setCursor({ line: start.line + 1, ch: 2 });
+      this.inCalloutMenu = false;
+    } else if ("action" in item) {
+      const command = item;
+      if (command.id === "callout") {
+        this.inCalloutMenu = true;
+        editor.replaceRange("/", start, end);
+        editor.setCursor({ line: start.line, ch: start.ch + 1 });
+      } else {
+        command.action(editor, start, end);
+      }
+    }
+  }
+};
+
+// src/DateSuggest.ts
 var import_obsidian6 = require("obsidian");
+var DateSuggest = class extends import_obsidian6.EditorSuggest {
+  constructor(app, settings) {
+    super(app);
+    this.settings = settings;
+  }
+  getDateOptions() {
+    return [
+      {
+        id: "date",
+        name: "@date",
+        description: "Today's date",
+        icon: "\u{1F4C5}",
+        getDate: () => /* @__PURE__ */ new Date()
+      },
+      {
+        id: "today",
+        name: "@today",
+        description: "Today's date",
+        icon: "\u{1F4C5}",
+        getDate: () => /* @__PURE__ */ new Date()
+      },
+      {
+        id: "tomorrow",
+        name: "@tomorrow",
+        description: "Tomorrow's date",
+        icon: "\u{1F4C6}",
+        getDate: () => {
+          const d = /* @__PURE__ */ new Date();
+          d.setDate(d.getDate() + 1);
+          return d;
+        }
+      },
+      {
+        id: "yesterday",
+        name: "@yesterday",
+        description: "Yesterday's date",
+        icon: "\u{1F4C6}",
+        getDate: () => {
+          const d = /* @__PURE__ */ new Date();
+          d.setDate(d.getDate() - 1);
+          return d;
+        }
+      }
+    ];
+  }
+  onTrigger(cursor, editor, file) {
+    const line = editor.getLine(cursor.line);
+    const beforeCursor = line.substring(0, cursor.ch);
+    const match = beforeCursor.match(/@(\w*)$/);
+    if (!match) {
+      return null;
+    }
+    const atIndex = beforeCursor.lastIndexOf("@");
+    if (atIndex > 0) {
+      const charBefore = beforeCursor[atIndex - 1];
+      if (/[a-zA-Z0-9]/.test(charBefore)) {
+        return null;
+      }
+    }
+    return {
+      start: { line: cursor.line, ch: atIndex },
+      end: cursor,
+      query: match[1].toLowerCase()
+    };
+  }
+  getSuggestions(context) {
+    const query = context.query.toLowerCase();
+    const options = this.getDateOptions();
+    if (!query) {
+      return options;
+    }
+    return options.filter((opt) => {
+      const id = opt.id.toLowerCase();
+      return id.startsWith(query) || id.includes(query);
+    });
+  }
+  renderSuggestion(item, el) {
+    el.addClass("space-command-suggestion");
+    const iconSpan = el.createEl("span", { cls: "suggestion-icon" });
+    iconSpan.textContent = item.icon;
+    const textContainer = el.createEl("div", { cls: "suggestion-content" });
+    const nameSpan = textContainer.createEl("span", {
+      cls: "suggestion-name",
+      text: item.name
+    });
+    const date = formatDate(item.getDate(), this.settings.dateFormat);
+    textContainer.createEl("span", {
+      cls: "suggestion-description",
+      text: date
+    });
+  }
+  selectSuggestion(item, evt) {
+    var _a;
+    const editor = (_a = this.context) == null ? void 0 : _a.editor;
+    if (!editor || !this.context)
+      return;
+    const start = this.context.start;
+    const end = this.context.end;
+    const date = formatDate(item.getDate(), this.settings.dateFormat);
+    editor.replaceRange(date, start, end);
+    editor.setCursor({ line: start.line, ch: start.ch + date.length });
+  }
+};
+
+// src/SidebarView.ts
+var import_obsidian8 = require("obsidian");
 
 // src/ContextMenuHandler.ts
-var import_obsidian5 = require("obsidian");
+var import_obsidian7 = require("obsidian");
 var ContextMenuHandler = class {
   constructor(app, processor, priorityTags) {
     this.app = app;
@@ -787,7 +1037,7 @@ var ContextMenuHandler = class {
    * Show context menu for an active TODO item
    */
   showTodoMenu(evt, todo, onRefresh) {
-    const menu = new import_obsidian5.Menu();
+    const menu = new import_obsidian7.Menu();
     const currentPriority = this.getCurrentPriority(todo);
     menu.addItem((item) => {
       item.setTitle("Focus").setIcon("zap").onClick(async () => {
@@ -864,7 +1114,7 @@ var ContextMenuHandler = class {
 
 // src/SidebarView.ts
 var VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
-var TodoSidebarView = class extends import_obsidian6.ItemView {
+var TodoSidebarView = class extends import_obsidian8.ItemView {
   constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, recentTodonesLimit) {
     super(leaf);
     this.todonesCollapsed = false;
@@ -985,7 +1235,7 @@ var TodoSidebarView = class extends import_obsidian6.ItemView {
     });
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
     const collapseIcon = this.projectsCollapsed ? "\u25B6" : "\u25BC";
-    titleSpan.innerHTML = `<span class="collapse-icon">${collapseIcon}</span> Projects <span class="project-count">(${projects.length})</span>`;
+    titleSpan.innerHTML = `<span class="collapse-icon">${collapseIcon}</span> Focus <span class="project-count">(${projects.length})</span>`;
     header.addEventListener("click", () => {
       this.projectsCollapsed = !this.projectsCollapsed;
       this.render();
@@ -995,7 +1245,7 @@ var TodoSidebarView = class extends import_obsidian6.ItemView {
     }
     if (projects.length === 0) {
       section.createEl("div", {
-        text: "No projects yet",
+        text: "No focus projects yet",
         cls: "todo-empty"
       });
       return;
@@ -1043,10 +1293,10 @@ var TodoSidebarView = class extends import_obsidian6.ItemView {
     const section = container.createEl("div", { cls: "todo-section" });
     const header = section.createEl("div", { cls: "todo-section-header" });
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
-    titleSpan.innerHTML = `\u25BC Active TODOs <span class="todo-count">(${todos.length})</span>`;
+    titleSpan.innerHTML = `\u25BC TODO <span class="todo-count">(${todos.length})</span>`;
     if (todos.length === 0) {
       section.createEl("div", {
-        text: "No active TODOs",
+        text: "No TODOs",
         cls: "todo-empty"
       });
       return;
@@ -1102,7 +1352,20 @@ var TodoSidebarView = class extends import_obsidian6.ItemView {
     });
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
     const collapseIcon = this.todonesCollapsed ? "\u25B6" : "\u25BC";
-    titleSpan.innerHTML = `<span class="collapse-icon">${collapseIcon}</span> Recent TODONEs <span class="todo-count">(${todones.length})</span>`;
+    titleSpan.innerHTML = `<span class="collapse-icon">${collapseIcon}</span> DONE <span class="todo-count">(${todones.length})</span>`;
+    const fileLink = header.createEl("a", {
+      text: this.defaultTodoneFile,
+      cls: "done-file-link",
+      href: "#"
+    });
+    fileLink.addEventListener("click", async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const file = this.app.vault.getAbstractFileByPath(this.defaultTodoneFile);
+      if (file instanceof import_obsidian8.TFile) {
+        await this.app.workspace.getLeaf(false).openFile(file);
+      }
+    });
     header.addEventListener("click", () => {
       this.todonesCollapsed = !this.todonesCollapsed;
       this.render();
@@ -1112,7 +1375,7 @@ var TodoSidebarView = class extends import_obsidian6.ItemView {
     }
     if (allTodones.length === 0) {
       section.createEl("div", {
-        text: "No completed TODOs yet",
+        text: "No completed TODOs",
         cls: "todo-empty"
       });
       return;
@@ -1131,7 +1394,7 @@ var TodoSidebarView = class extends import_obsidian6.ItemView {
       link.addEventListener("click", async (e) => {
         e.preventDefault();
         const file = this.app.vault.getAbstractFileByPath(this.defaultTodoneFile);
-        if (file instanceof import_obsidian6.TFile) {
+        if (file instanceof import_obsidian8.TFile) {
           await this.app.workspace.getLeaf(false).openFile(file);
         }
       });
@@ -1257,7 +1520,7 @@ var DEFAULT_SETTINGS = {
 };
 
 // main.ts
-var SpaceCommandPlugin = class extends import_obsidian7.Plugin {
+var SpaceCommandPlugin = class extends import_obsidian9.Plugin {
   async onload() {
     await this.loadSettings();
     this.scanner = new TodoScanner(this.app);
@@ -1319,6 +1582,8 @@ var SpaceCommandPlugin = class extends import_obsidian7.Plugin {
       this.settings.focusListLimit
     );
     codeBlockProcessor.registerProcessors(this);
+    this.registerEditorSuggest(new SlashCommandSuggest(this.app, this.settings));
+    this.registerEditorSuggest(new DateSuggest(this.app, this.settings));
     this.addCommand({
       id: "toggle-todo-sidebar",
       name: "Toggle TODO Sidebar",
@@ -1415,7 +1680,7 @@ var SpaceCommandPlugin = class extends import_obsidian7.Plugin {
     }
   }
 };
-var SpaceCommandSettingTab = class extends import_obsidian7.PluginSettingTab {
+var SpaceCommandSettingTab = class extends import_obsidian9.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -1424,19 +1689,19 @@ var SpaceCommandSettingTab = class extends import_obsidian7.PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     containerEl.createEl("h2", { text: "\u2325\u2318 Space Command Settings" });
-    new import_obsidian7.Setting(containerEl).setName("Default TODONE file").setDesc("Default file path for logging completed TODOs").addText(
+    new import_obsidian9.Setting(containerEl).setName("Default TODONE file").setDesc("Default file path for logging completed TODOs").addText(
       (text) => text.setPlaceholder("todos/done.md").setValue(this.plugin.settings.defaultTodoneFile).onChange(async (value) => {
         this.plugin.settings.defaultTodoneFile = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian7.Setting(containerEl).setName("Show sidebar by default").setDesc("Show the TODO sidebar when Obsidian starts").addToggle(
+    new import_obsidian9.Setting(containerEl).setName("Show sidebar by default").setDesc("Show the TODO sidebar when Obsidian starts").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.showSidebarByDefault).onChange(async (value) => {
         this.plugin.settings.showSidebarByDefault = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian7.Setting(containerEl).setName("Date format").setDesc("Format for completion dates (using moment.js format)").addText(
+    new import_obsidian9.Setting(containerEl).setName("Date format").setDesc("Format for completion dates (using moment.js format)").addText(
       (text) => text.setPlaceholder("YYYY-MM-DD").setValue(this.plugin.settings.dateFormat).onChange(async (value) => {
         this.plugin.settings.dateFormat = value;
         this.plugin.processor = new TodoProcessor(
@@ -1447,13 +1712,13 @@ var SpaceCommandSettingTab = class extends import_obsidian7.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: "Projects Settings" });
-    new import_obsidian7.Setting(containerEl).setName("Default projects folder").setDesc("Folder where project files are created (e.g., projects/)").addText(
+    new import_obsidian9.Setting(containerEl).setName("Default projects folder").setDesc("Folder where project files are created (e.g., projects/)").addText(
       (text) => text.setPlaceholder("projects/").setValue(this.plugin.settings.defaultProjectsFolder).onChange(async (value) => {
         this.plugin.settings.defaultProjectsFolder = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian7.Setting(containerEl).setName("Focus list limit").setDesc("Maximum number of projects to show in {{focus-list}}").addText(
+    new import_obsidian9.Setting(containerEl).setName("Focus list limit").setDesc("Maximum number of projects to show in {{focus-list}}").addText(
       (text) => text.setPlaceholder("5").setValue(String(this.plugin.settings.focusListLimit)).onChange(async (value) => {
         const num = parseInt(value);
         if (!isNaN(num) && num > 0) {
@@ -1463,7 +1728,7 @@ var SpaceCommandSettingTab = class extends import_obsidian7.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: "Priority Settings" });
-    new import_obsidian7.Setting(containerEl).setName("Priority tags").setDesc("Comma-separated list of priority tags (e.g., #p0, #p1, #p2, #p3, #p4). These tags won't appear in the Projects list.").addText(
+    new import_obsidian9.Setting(containerEl).setName("Priority tags").setDesc("Comma-separated list of priority tags (e.g., #p0, #p1, #p2, #p3, #p4). These tags won't appear in the Projects list.").addText(
       (text) => text.setPlaceholder("#p0, #p1, #p2, #p3, #p4").setValue(this.plugin.settings.priorityTags.join(", ")).onChange(async (value) => {
         const tags = value.split(",").map((tag) => tag.trim()).filter((tag) => tag.length > 0).map((tag) => tag.startsWith("#") ? tag : `#${tag}`);
         this.plugin.settings.priorityTags = tags;
@@ -1476,7 +1741,7 @@ var SpaceCommandSettingTab = class extends import_obsidian7.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian7.Setting(containerEl).setName("Recent TODONEs limit").setDesc("Maximum number of recent TODONEs to show in sidebar").addText(
+    new import_obsidian9.Setting(containerEl).setName("Recent TODONEs limit").setDesc("Maximum number of recent TODONEs to show in sidebar").addText(
       (text) => text.setPlaceholder("5").setValue(String(this.plugin.settings.recentTodonesLimit)).onChange(async (value) => {
         const num = parseInt(value);
         if (!isNaN(num) && num > 0) {
