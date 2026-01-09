@@ -387,7 +387,7 @@ export class TodoSidebarView extends ItemView {
     if (allTodones.length > this.recentTodonesLimit) {
       const linkDiv = section.createEl("div", { cls: "todone-view-all" });
       const link = linkDiv.createEl("a", {
-        text: `View all in ${this.defaultTodoneFile}`,
+        text: "View completed TODOs",
         cls: "todone-view-all-link",
         href: "#",
       });
