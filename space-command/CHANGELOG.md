@@ -22,6 +22,9 @@ All notable changes to the ⌥⌘ Space Command plugin will be documented in thi
 
 ### Fixed
 
+- **Duplicate TODOs from lines with both tags**: Lines containing both `#todo` and `#todone` now:
+  - Treated as completed (`#todone` wins)
+  - `#todo` tag automatically removed from the line
 - **Muted tag visibility in sidebar**: Tags and dates now have visible background
   - Changed from `--background-secondary` to `--background-primary` in sidebar
   - Proper contrast against grey sidebar background
@@ -36,6 +39,7 @@ All notable changes to the ⌥⌘ Space Command plugin will be documented in thi
 - Added `setupAutoRefresh()`, `setupFocusListAutoRefresh()`, `refreshEmbed()` methods
 - DOM event listener in main.ts for native checkbox changes
 - New `.embed-header` and `.embed-refresh-btn` CSS classes
+- Scanner now detects and auto-cleans lines with both `#todo` and `#todone`
 
 ## [0.5.0] - 2026-01-10
 

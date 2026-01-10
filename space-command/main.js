@@ -85,6 +85,7 @@ var TodoScanner = class extends import_obsidian2.Events {
       const lines = content.split("\n");
       const todos = [];
       const todones = [];
+      const linesToCleanup = [];
       let inCodeBlock = false;
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
@@ -99,11 +100,17 @@ var TodoScanner = class extends import_obsidian2.Events {
           continue;
         }
         const tags = extractTags(line);
-        if (tags.includes("#todo")) {
+        if (tags.includes("#todone") && tags.includes("#todo")) {
+          linesToCleanup.push(i);
+          todones.push(this.createTodoItem(file, i, line, tags));
+        } else if (tags.includes("#todo")) {
           todos.push(this.createTodoItem(file, i, line, tags));
         } else if (tags.includes("#todone")) {
           todones.push(this.createTodoItem(file, i, line, tags));
         }
+      }
+      if (linesToCleanup.length > 0) {
+        this.cleanupDuplicateTags(file, lines, linesToCleanup);
       }
       if (todos.length > 0) {
         this.todosCache.set(file.path, todos);
@@ -203,6 +210,20 @@ var TodoScanner = class extends import_obsidian2.Events {
         this.scanFile(file);
       }
     });
+  }
+  // Clean up lines that have both #todo and #todone (remove #todo)
+  async cleanupDuplicateTags(file, lines, lineNumbers) {
+    let modified = false;
+    for (const lineNum of lineNumbers) {
+      const newLine = lines[lineNum].replace(/#todo\b\s*/g, "");
+      if (newLine !== lines[lineNum]) {
+        lines[lineNum] = newLine;
+        modified = true;
+      }
+    }
+    if (modified) {
+      await this.app.vault.modify(file, lines.join("\n"));
+    }
   }
 };
 

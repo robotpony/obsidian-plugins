@@ -33,6 +33,7 @@ export class TodoScanner extends Events {
       const lines = content.split("\n");
       const todos: TodoItem[] = [];
       const todones: TodoItem[] = [];
+      const linesToCleanup: number[] = [];
 
       // Track code block state
       let inCodeBlock = false;
@@ -58,11 +59,22 @@ export class TodoScanner extends Events {
 
         const tags = extractTags(line);
 
-        if (tags.includes("#todo")) {
+        // If line has both #todo and #todone, #todone wins and we clean up the #todo
+        if (tags.includes("#todone") && tags.includes("#todo")) {
+          // Queue this line for cleanup (remove #todo tag)
+          linesToCleanup.push(i);
+          // Treat as completed
+          todones.push(this.createTodoItem(file, i, line, tags));
+        } else if (tags.includes("#todo")) {
           todos.push(this.createTodoItem(file, i, line, tags));
         } else if (tags.includes("#todone")) {
           todones.push(this.createTodoItem(file, i, line, tags));
         }
+      }
+
+      // Clean up lines that have both #todo and #todone
+      if (linesToCleanup.length > 0) {
+        this.cleanupDuplicateTags(file, lines, linesToCleanup);
       }
 
       if (todos.length > 0) {
@@ -200,5 +212,27 @@ export class TodoScanner extends Events {
         this.scanFile(file);
       }
     });
+  }
+
+  // Clean up lines that have both #todo and #todone (remove #todo)
+  private async cleanupDuplicateTags(
+    file: TFile,
+    lines: string[],
+    lineNumbers: number[]
+  ): Promise<void> {
+    let modified = false;
+
+    for (const lineNum of lineNumbers) {
+      // Remove #todo tag from lines that also have #todone
+      const newLine = lines[lineNum].replace(/#todo\b\s*/g, "");
+      if (newLine !== lines[lineNum]) {
+        lines[lineNum] = newLine;
+        modified = true;
+      }
+    }
+
+    if (modified) {
+      await this.app.vault.modify(file, lines.join("\n"));
+    }
   }
 }
