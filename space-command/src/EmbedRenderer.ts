@@ -56,16 +56,22 @@ export class EmbedRenderer {
   }
 
   // Public helper method for code block processor
-  // Renders a TODO list with filters
+  // Renders a TODO list with filters (includes both TODOs and TODONEs)
   public renderTodos(
     container: HTMLElement,
     filterString: string,
     todoneFile: string
   ): void {
     const filters = FilterParser.parse(filterString);
+    // Get both active TODOs and completed TODONEs
     let todos = this.scanner.getTodos();
+    let todones = this.scanner.getTodones();
+    // Apply filters to both
     todos = FilterParser.applyFilters(todos, filters);
-    this.renderTodoList(container, todos, todoneFile, filterString);
+    todones = FilterParser.applyFilters(todones, filters);
+    // Combine them - sortTodos will separate and sort them properly
+    const combined = [...todos, ...todones];
+    this.renderTodoList(container, combined, todoneFile, filterString);
   }
 
   // Public helper method for focus-list code blocks
@@ -127,12 +133,15 @@ export class EmbedRenderer {
     // Parse filters
     const filters = FilterParser.parse(filterString);
 
-    // Get todos and apply filters
+    // Get both TODOs and TODONEs, apply filters
     let todos = this.scanner.getTodos();
+    let todones = this.scanner.getTodones();
     todos = FilterParser.applyFilters(todos, filters);
+    todones = FilterParser.applyFilters(todones, filters);
+    const combined = [...todos, ...todones];
 
     // Render the todo list
-    this.renderTodoList(el, todos, todoneFile, filterString);
+    this.renderTodoList(el, combined, todoneFile, filterString);
   }
 
   private renderFocusList(container: HTMLElement): void {
@@ -567,9 +576,13 @@ export class EmbedRenderer {
     filterString: string
   ): void {
     const filters = FilterParser.parse(filterString);
+    // Get both TODOs and TODONEs
     let todos = this.scanner.getTodos();
+    let todones = this.scanner.getTodones();
     todos = FilterParser.applyFilters(todos, filters);
-    this.renderTodoList(container, todos, todoneFile, filterString);
+    todones = FilterParser.applyFilters(todones, filters);
+    const combined = [...todos, ...todones];
+    this.renderTodoList(container, combined, todoneFile, filterString);
   }
 
   private openFileAtLine(file: any, line: number): void {

@@ -629,12 +629,15 @@ var EmbedRenderer = class {
     this.activeRenders.clear();
   }
   // Public helper method for code block processor
-  // Renders a TODO list with filters
+  // Renders a TODO list with filters (includes both TODOs and TODONEs)
   renderTodos(container, filterString, todoneFile) {
     const filters = FilterParser.parse(filterString);
     let todos = this.scanner.getTodos();
+    let todones = this.scanner.getTodones();
     todos = FilterParser.applyFilters(todos, filters);
-    this.renderTodoList(container, todos, todoneFile, filterString);
+    todones = FilterParser.applyFilters(todones, filters);
+    const combined = [...todos, ...todones];
+    this.renderTodoList(container, combined, todoneFile, filterString);
   }
   // Public helper method for focus-list code blocks
   renderProjects(container) {
@@ -671,8 +674,11 @@ var EmbedRenderer = class {
     }
     const filters = FilterParser.parse(filterString);
     let todos = this.scanner.getTodos();
+    let todones = this.scanner.getTodones();
     todos = FilterParser.applyFilters(todos, filters);
-    this.renderTodoList(el, todos, todoneFile, filterString);
+    todones = FilterParser.applyFilters(todones, filters);
+    const combined = [...todos, ...todones];
+    this.renderTodoList(el, combined, todoneFile, filterString);
   }
   renderFocusList(container) {
     container.empty();
@@ -976,8 +982,11 @@ var EmbedRenderer = class {
   refreshEmbed(container, todoneFile, filterString) {
     const filters = FilterParser.parse(filterString);
     let todos = this.scanner.getTodos();
+    let todones = this.scanner.getTodones();
     todos = FilterParser.applyFilters(todos, filters);
-    this.renderTodoList(container, todos, todoneFile, filterString);
+    todones = FilterParser.applyFilters(todones, filters);
+    const combined = [...todos, ...todones];
+    this.renderTodoList(container, combined, todoneFile, filterString);
   }
   openFileAtLine(file, line) {
     const leaf = this.app.workspace.getLeaf(false);

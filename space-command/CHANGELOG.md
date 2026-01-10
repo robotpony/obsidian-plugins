@@ -22,6 +22,9 @@ All notable changes to the ⌥⌘ Space Command plugin will be documented in thi
 
 ### Fixed
 
+- **Embeds missing TODONEs**: Embedded lists now show both active TODOs and completed TODONEs
+  - TODONEs appear at end of list with strikethrough styling
+  - Filters apply to both TODOs and TODONEs
 - **Duplicate TODOs from lines with both tags**: Lines containing both `#todo` and `#todone` now:
   - Treated as completed (`#todone` wins)
   - `#todo` tag automatically removed from the line
