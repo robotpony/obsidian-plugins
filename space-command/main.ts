@@ -68,6 +68,56 @@ export default class SpaceCommandPlugin extends Plugin {
     // Watch for file changes
     this.scanner.watchFiles();
 
+    // Watch for native checkbox clicks on #todo lines
+    this.registerDomEvent(document, "change", async (evt) => {
+      const target = evt.target as HTMLInputElement;
+
+      // Only handle checkbox changes in the editor
+      if (!target.matches('input[type="checkbox"].task-list-item-checkbox')) {
+        return;
+      }
+
+      // Only process if checkbox was just checked (not unchecked)
+      if (!target.checked) {
+        return;
+      }
+
+      // Give Obsidian time to update the file
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      const file = this.app.workspace.getActiveFile();
+      if (!file) return;
+
+      // Read the updated file content to find any #todo with [x]
+      const content = await this.app.vault.read(file);
+      const lines = content.split("\n");
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+
+        // Find lines with #todo (not #todone) that have completed checkbox
+        if (
+          line.includes("#todo") &&
+          !line.includes("#todone") &&
+          /^-\s*\[x\]/i.test(line.trim())
+        ) {
+          // This is a #todo line with a checked checkbox - process it
+          const todos = this.scanner.getTodos();
+          const todo = todos.find(
+            (t) => t.file.path === file.path && t.lineNumber === i
+          );
+
+          if (todo) {
+            await this.processor.completeTodo(
+              todo,
+              this.settings.defaultTodoneFile
+            );
+            break; // Process one at a time
+          }
+        }
+      }
+    });
+
     // Register sidebar view
     this.registerView(
       VIEW_TYPE_TODO_SIDEBAR,

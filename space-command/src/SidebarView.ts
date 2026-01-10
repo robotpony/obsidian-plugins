@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, TFile } from "obsidian";
+import { ItemView, WorkspaceLeaf, TFile, Menu, Notice } from "obsidian";
 import { TodoScanner } from "./TodoScanner";
 import { TodoProcessor } from "./TodoProcessor";
 import { ProjectManager } from "./ProjectManager";
@@ -136,6 +136,36 @@ export class TodoSidebarView extends ItemView {
       refreshBtn.addClass("rotating");
       await this.scanner.scanVault();
       setTimeout(() => refreshBtn.removeClass("rotating"), 500);
+    });
+
+    // Copy embed button
+    const copyBtn = buttonGroup.createEl("button", {
+      cls: "clickable-icon sidebar-copy-btn",
+      attr: { "aria-label": "Copy embed syntax" },
+    });
+    copyBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+
+    copyBtn.addEventListener("click", (evt) => {
+      const menu = new Menu();
+      menu.addItem((item) => {
+        item
+          .setTitle("Embed TODOs (inline)")
+          .setIcon("brackets")
+          .onClick(() => {
+            navigator.clipboard.writeText("{{focus-todos}}");
+            new Notice("Copied inline embed syntax");
+          });
+      });
+      menu.addItem((item) => {
+        item
+          .setTitle("Embed TODOs (code block)")
+          .setIcon("code")
+          .onClick(() => {
+            navigator.clipboard.writeText("```focus-todos\n```");
+            new Notice("Copied code block embed syntax");
+          });
+      });
+      menu.showAtMouseEvent(evt);
     });
 
     // Projects section
@@ -405,11 +435,23 @@ export class TodoSidebarView extends ItemView {
   private renderTodoneItem(list: HTMLElement, todone: TodoItem): void {
     const item = list.createEl("li", { cls: "todo-item todone-item" });
 
-    // Checked checkbox (non-interactive)
-    item.createEl("input", {
+    // Checked checkbox - interactive for uncompleting
+    const checkbox = item.createEl("input", {
       type: "checkbox",
       cls: "todo-checkbox",
-      attr: { checked: "checked", disabled: "disabled" },
+      attr: { checked: "checked" },
+    });
+
+    checkbox.addEventListener("change", async () => {
+      checkbox.disabled = true;
+      const success = await this.processor.uncompleteTodo(todone);
+      if (success) {
+        // Re-render the entire sidebar
+        this.render();
+      } else {
+        checkbox.disabled = false;
+        checkbox.checked = true; // Revert to checked state on failure
+      }
     });
 
     // Text content (strip markdown but keep tags)

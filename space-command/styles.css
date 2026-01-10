@@ -230,20 +230,20 @@
 /* Shared muted pill style for tags, counts, and dates */
 .muted-pill {
   opacity: 0.65;
-  background-color: var(--background-secondary);
+  background-color: var(--background-modifier-border);
   border-radius: 4px;
   padding: 1px 5px;
-  font-size: 0.9em;
+  font-size: 0.8em;
 }
 
 /* Count styling */
 .todo-count,
 .project-count {
   opacity: 0.65;
-  background-color: var(--background-secondary);
+  background-color: var(--background-modifier-border);
   border-radius: 4px;
   padding: 1px 5px;
-  font-size: 0.9em;
+  font-size: 0.8em;
 }
 
 /* Tag styling in sidebar text */
@@ -251,9 +251,18 @@
 .project-item .tag,
 .todo-text .tag {
   opacity: 0.65;
-  background-color: var(--background-secondary);
+  background-color: var(--background-modifier-border);
   border-radius: 4px;
   padding: 1px 5px;
+  font-size: 0.8em;
+}
+
+/* Sidebar-specific override for better contrast on grey background */
+.space-command-sidebar .muted-pill,
+.space-command-sidebar .tag,
+.space-command-sidebar .todo-count,
+.space-command-sidebar .project-count {
+  background-color: var(--background-primary);
 }
 
 /* Completion date styling in embeds */
@@ -308,4 +317,24 @@
 .done-file-link:hover {
   opacity: 1;
   color: var(--text-accent);
+}
+
+/* Embed header with refresh button */
+.embed-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 4px;
+}
+
+.embed-refresh-btn {
+  padding: 2px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0.4;
+  transition: opacity 0.2s;
+}
+
+.embed-refresh-btn:hover {
+  opacity: 1;
 }

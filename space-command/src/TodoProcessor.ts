@@ -4,6 +4,8 @@ import {
   formatDate,
   replaceTodoWithTodone,
   markCheckboxComplete,
+  replaceTodoneWithTodo,
+  markCheckboxIncomplete,
 } from "./utils";
 
 export class TodoProcessor {
@@ -45,6 +47,51 @@ export class TodoProcessor {
       new Notice("Failed to complete TODO. See console for details.");
       return false;
     }
+  }
+
+  async uncompleteTodo(todo: TodoItem): Promise<boolean> {
+    try {
+      // Update the source file - revert #todone @date to #todo
+      await this.revertSourceFile(todo);
+
+      // Note: We do NOT remove from the TODONE log file as it serves as history
+
+      // Trigger callback if set
+      if (this.onComplete) {
+        this.onComplete();
+      }
+
+      new Notice("TODO marked as incomplete!");
+      return true;
+    } catch (error) {
+      console.error("Error uncompleting TODO:", error);
+      new Notice("Failed to uncomplete TODO. See console for details.");
+      return false;
+    }
+  }
+
+  private async revertSourceFile(todo: TodoItem): Promise<void> {
+    const content = await this.app.vault.read(todo.file);
+    const lines = content.split("\n");
+
+    if (todo.lineNumber >= lines.length) {
+      throw new Error(
+        `Line number ${todo.lineNumber} out of bounds for file ${todo.filePath}`
+      );
+    }
+
+    let updatedLine = lines[todo.lineNumber];
+
+    // Replace #todone (with optional @date) with #todo
+    updatedLine = replaceTodoneWithTodo(updatedLine);
+
+    // If it has a completed checkbox [x], mark it incomplete [ ]
+    if (todo.hasCheckbox) {
+      updatedLine = markCheckboxIncomplete(updatedLine);
+    }
+
+    lines[todo.lineNumber] = updatedLine;
+    await this.app.vault.modify(todo.file, lines.join("\n"));
   }
 
   private async updateSourceFile(todo: TodoItem, date: string): Promise<void> {

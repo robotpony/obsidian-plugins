@@ -24,3 +24,15 @@ export function markCheckboxComplete(text: string): string {
 export function replaceTodoWithTodone(text: string, date: string): string {
   return text.replace(/#todo\b/, `#todone @${date}`);
 }
+
+export function replaceTodoneWithTodo(text: string): string {
+  // Replace #todone @YYYY-MM-DD with #todo
+  let result = text.replace(/#todone\s+@\d{4}-\d{2}-\d{2}/, "#todo");
+  // Also handle #todone without date
+  result = result.replace(/#todone\b/, "#todo");
+  return result;
+}
+
+export function markCheckboxIncomplete(text: string): string {
+  return text.replace(/^(-\s*\[)x(\])/i, "$1 $2");
+}

@@ -66,4 +66,4 @@ Update [CHANGELOG.md](CHANGELOG.md) with each release following the existing for
 
 ## Other rules
 
-- When clarifying requirements or approach, use AskUserQuestion
+- Use AskUserQuestion when asking questions, clarifying requirements, or asking about the approach

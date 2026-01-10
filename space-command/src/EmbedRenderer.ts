@@ -16,6 +16,9 @@ export class EmbedRenderer {
   private focusListLimit: number;
   private priorityTags: string[];
 
+  // Track active renders for event cleanup
+  private activeRenders: Map<HTMLElement, () => void> = new Map();
+
   constructor(
     app: App,
     scanner: TodoScanner,
@@ -33,6 +36,23 @@ export class EmbedRenderer {
     this.focusListLimit = focusListLimit;
     this.priorityTags = priorityTags;
     this.contextMenuHandler = new ContextMenuHandler(app, processor, priorityTags);
+  }
+
+  // Cleanup method to remove event listeners for a specific container
+  public cleanup(container: HTMLElement): void {
+    const listener = this.activeRenders.get(container);
+    if (listener) {
+      this.scanner.off("todos-updated", listener);
+      this.activeRenders.delete(container);
+    }
+  }
+
+  // Cleanup all renders (called on plugin unload)
+  public cleanupAll(): void {
+    for (const [, listener] of this.activeRenders) {
+      this.scanner.off("todos-updated", listener);
+    }
+    this.activeRenders.clear();
   }
 
   // Public helper method for code block processor
@@ -119,6 +139,22 @@ export class EmbedRenderer {
     container.empty();
     container.addClass("space-command-embed", "focus-list-embed");
 
+    // Add header with refresh button
+    const header = container.createEl("div", { cls: "embed-header" });
+
+    const refreshBtn = header.createEl("button", {
+      cls: "clickable-icon embed-refresh-btn",
+      attr: { "aria-label": "Refresh" },
+    });
+    refreshBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>';
+
+    refreshBtn.addEventListener("click", () => {
+      this.renderFocusList(container);
+    });
+
+    // Setup auto-refresh
+    this.setupFocusListAutoRefresh(container);
+
     const projects = this.projectManager.getFocusProjects(this.focusListLimit);
 
     if (projects.length === 0) {
@@ -202,6 +238,22 @@ export class EmbedRenderer {
   ): void {
     container.empty();
     container.addClass("space-command-embed");
+
+    // Add header with refresh button
+    const header = container.createEl("div", { cls: "embed-header" });
+
+    const refreshBtn = header.createEl("button", {
+      cls: "clickable-icon embed-refresh-btn",
+      attr: { "aria-label": "Refresh" },
+    });
+    refreshBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>';
+
+    refreshBtn.addEventListener("click", () => {
+      this.refreshEmbed(container, todoneFile, filterString);
+    });
+
+    // Set up auto-refresh listener
+    this.setupAutoRefresh(container, todoneFile, filterString);
 
     if (todos.length === 0) {
       container.createEl("div", {
@@ -460,6 +512,64 @@ export class EmbedRenderer {
     }
 
     return tokens;
+  }
+
+  // Setup auto-refresh for focus list embed
+  private setupFocusListAutoRefresh(container: HTMLElement): void {
+    // Clean up any existing listener for this container
+    this.cleanup(container);
+
+    // Create new listener
+    const listener = () => {
+      // Check if container is still in DOM
+      if (container.isConnected) {
+        this.renderFocusList(container);
+      } else {
+        // Container was removed, clean up
+        this.cleanup(container);
+      }
+    };
+
+    // Register listener
+    this.scanner.on("todos-updated", listener);
+    this.activeRenders.set(container, listener);
+  }
+
+  // Setup auto-refresh for this embed
+  private setupAutoRefresh(
+    container: HTMLElement,
+    todoneFile: string,
+    filterString: string
+  ): void {
+    // Clean up any existing listener for this container
+    this.cleanup(container);
+
+    // Create new listener
+    const listener = () => {
+      // Check if container is still in DOM
+      if (container.isConnected) {
+        this.refreshEmbed(container, todoneFile, filterString);
+      } else {
+        // Container was removed, clean up
+        this.cleanup(container);
+      }
+    };
+
+    // Register listener
+    this.scanner.on("todos-updated", listener);
+    this.activeRenders.set(container, listener);
+  }
+
+  // Refresh a specific embed
+  private refreshEmbed(
+    container: HTMLElement,
+    todoneFile: string,
+    filterString: string
+  ): void {
+    const filters = FilterParser.parse(filterString);
+    let todos = this.scanner.getTodos();
+    todos = FilterParser.applyFilters(todos, filters);
+    this.renderTodoList(container, todos, todoneFile, filterString);
   }
 
   private openFileAtLine(file: any, line: number): void {

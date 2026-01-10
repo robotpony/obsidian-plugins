@@ -50,6 +50,14 @@ function markCheckboxComplete(text) {
 function replaceTodoWithTodone(text, date) {
   return text.replace(/#todo\b/, `#todone @${date}`);
 }
+function replaceTodoneWithTodo(text) {
+  let result = text.replace(/#todone\s+@\d{4}-\d{2}-\d{2}/, "#todo");
+  result = result.replace(/#todone\b/, "#todo");
+  return result;
+}
+function markCheckboxIncomplete(text) {
+  return text.replace(/^(-\s*\[)x(\])/i, "$1 $2");
+}
 
 // src/TodoScanner.ts
 var TodoScanner = class extends import_obsidian2.Events {
@@ -223,6 +231,36 @@ var TodoProcessor = class {
       new import_obsidian3.Notice("Failed to complete TODO. See console for details.");
       return false;
     }
+  }
+  async uncompleteTodo(todo) {
+    try {
+      await this.revertSourceFile(todo);
+      if (this.onComplete) {
+        this.onComplete();
+      }
+      new import_obsidian3.Notice("TODO marked as incomplete!");
+      return true;
+    } catch (error) {
+      console.error("Error uncompleting TODO:", error);
+      new import_obsidian3.Notice("Failed to uncomplete TODO. See console for details.");
+      return false;
+    }
+  }
+  async revertSourceFile(todo) {
+    const content = await this.app.vault.read(todo.file);
+    const lines = content.split("\n");
+    if (todo.lineNumber >= lines.length) {
+      throw new Error(
+        `Line number ${todo.lineNumber} out of bounds for file ${todo.filePath}`
+      );
+    }
+    let updatedLine = lines[todo.lineNumber];
+    updatedLine = replaceTodoneWithTodo(updatedLine);
+    if (todo.hasCheckbox) {
+      updatedLine = markCheckboxIncomplete(updatedLine);
+    }
+    lines[todo.lineNumber] = updatedLine;
+    await this.app.vault.modify(todo.file, lines.join("\n"));
   }
   async updateSourceFile(todo, date) {
     const content = await this.app.vault.read(todo.file);
@@ -543,6 +581,8 @@ var ContextMenuHandler = class {
 // src/EmbedRenderer.ts
 var EmbedRenderer = class {
   constructor(app, scanner, processor, projectManager, defaultTodoneFile = "todos/done.md", focusListLimit = 5, priorityTags = ["#p0", "#p1", "#p2", "#p3", "#p4"]) {
+    // Track active renders for event cleanup
+    this.activeRenders = /* @__PURE__ */ new Map();
     this.app = app;
     this.scanner = scanner;
     this.processor = processor;
@@ -551,6 +591,21 @@ var EmbedRenderer = class {
     this.focusListLimit = focusListLimit;
     this.priorityTags = priorityTags;
     this.contextMenuHandler = new ContextMenuHandler(app, processor, priorityTags);
+  }
+  // Cleanup method to remove event listeners for a specific container
+  cleanup(container) {
+    const listener = this.activeRenders.get(container);
+    if (listener) {
+      this.scanner.off("todos-updated", listener);
+      this.activeRenders.delete(container);
+    }
+  }
+  // Cleanup all renders (called on plugin unload)
+  cleanupAll() {
+    for (const [, listener] of this.activeRenders) {
+      this.scanner.off("todos-updated", listener);
+    }
+    this.activeRenders.clear();
   }
   // Public helper method for code block processor
   // Renders a TODO list with filters
@@ -601,6 +656,16 @@ var EmbedRenderer = class {
   renderFocusList(container) {
     container.empty();
     container.addClass("space-command-embed", "focus-list-embed");
+    const header = container.createEl("div", { cls: "embed-header" });
+    const refreshBtn = header.createEl("button", {
+      cls: "clickable-icon embed-refresh-btn",
+      attr: { "aria-label": "Refresh" }
+    });
+    refreshBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>';
+    refreshBtn.addEventListener("click", () => {
+      this.renderFocusList(container);
+    });
+    this.setupFocusListAutoRefresh(container);
     const projects = this.projectManager.getFocusProjects(this.focusListLimit);
     if (projects.length === 0) {
       container.createEl("div", {
@@ -665,6 +730,16 @@ var EmbedRenderer = class {
   renderTodoList(container, todos, todoneFile, filterString = "") {
     container.empty();
     container.addClass("space-command-embed");
+    const header = container.createEl("div", { cls: "embed-header" });
+    const refreshBtn = header.createEl("button", {
+      cls: "clickable-icon embed-refresh-btn",
+      attr: { "aria-label": "Refresh" }
+    });
+    refreshBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>';
+    refreshBtn.addEventListener("click", () => {
+      this.refreshEmbed(container, todoneFile, filterString);
+    });
+    this.setupAutoRefresh(container, todoneFile, filterString);
     if (todos.length === 0) {
       container.createEl("div", {
         text: "No active TODOs",
@@ -849,6 +924,39 @@ var EmbedRenderer = class {
       }
     }
     return tokens;
+  }
+  // Setup auto-refresh for focus list embed
+  setupFocusListAutoRefresh(container) {
+    this.cleanup(container);
+    const listener = () => {
+      if (container.isConnected) {
+        this.renderFocusList(container);
+      } else {
+        this.cleanup(container);
+      }
+    };
+    this.scanner.on("todos-updated", listener);
+    this.activeRenders.set(container, listener);
+  }
+  // Setup auto-refresh for this embed
+  setupAutoRefresh(container, todoneFile, filterString) {
+    this.cleanup(container);
+    const listener = () => {
+      if (container.isConnected) {
+        this.refreshEmbed(container, todoneFile, filterString);
+      } else {
+        this.cleanup(container);
+      }
+    };
+    this.scanner.on("todos-updated", listener);
+    this.activeRenders.set(container, listener);
+  }
+  // Refresh a specific embed
+  refreshEmbed(container, todoneFile, filterString) {
+    const filters = FilterParser.parse(filterString);
+    let todos = this.scanner.getTodos();
+    todos = FilterParser.applyFilters(todos, filters);
+    this.renderTodoList(container, todos, todoneFile, filterString);
   }
   openFileAtLine(file, line) {
     const leaf = this.app.workspace.getLeaf(false);
@@ -1296,6 +1404,27 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       await this.scanner.scanVault();
       setTimeout(() => refreshBtn.removeClass("rotating"), 500);
     });
+    const copyBtn = buttonGroup.createEl("button", {
+      cls: "clickable-icon sidebar-copy-btn",
+      attr: { "aria-label": "Copy embed syntax" }
+    });
+    copyBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+    copyBtn.addEventListener("click", (evt) => {
+      const menu = new import_obsidian8.Menu();
+      menu.addItem((item) => {
+        item.setTitle("Embed TODOs (inline)").setIcon("brackets").onClick(() => {
+          navigator.clipboard.writeText("{{focus-todos}}");
+          new import_obsidian8.Notice("Copied inline embed syntax");
+        });
+      });
+      menu.addItem((item) => {
+        item.setTitle("Embed TODOs (code block)").setIcon("code").onClick(() => {
+          navigator.clipboard.writeText("```focus-todos\n```");
+          new import_obsidian8.Notice("Copied code block embed syntax");
+        });
+      });
+      menu.showAtMouseEvent(evt);
+    });
     this.renderProjects(container);
     this.renderActiveTodos(container);
     this.renderRecentTodones(container);
@@ -1503,10 +1632,20 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
   }
   renderTodoneItem(list, todone) {
     const item = list.createEl("li", { cls: "todo-item todone-item" });
-    item.createEl("input", {
+    const checkbox = item.createEl("input", {
       type: "checkbox",
       cls: "todo-checkbox",
-      attr: { checked: "checked", disabled: "disabled" }
+      attr: { checked: "checked" }
+    });
+    checkbox.addEventListener("change", async () => {
+      checkbox.disabled = true;
+      const success = await this.processor.uncompleteTodo(todone);
+      if (success) {
+        this.render();
+      } else {
+        checkbox.disabled = false;
+        checkbox.checked = true;
+      }
     });
     const textSpan = item.createEl("span", { cls: "todo-text todone-text" });
     const cleanText = todone.text.replace(/#todone\b/g, "").trim();
@@ -1571,13 +1710,13 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
         failed++;
       }
     }
-    const { Notice: Notice2 } = require("obsidian");
+    const { Notice: Notice3 } = require("obsidian");
     if (failed > 0) {
-      new Notice2(
+      new Notice3(
         `Completed ${completed} TODO(s), ${failed} failed. See console for details.`
       );
     } else {
-      new Notice2(`Completed all ${completed} TODO(s) for ${project.tag}!`);
+      new Notice3(`Completed all ${completed} TODO(s) for ${project.tag}!`);
     }
     this.render();
   }
@@ -1649,6 +1788,37 @@ var SpaceCommandPlugin = class extends import_obsidian9.Plugin {
     });
     await this.scanner.scanVault();
     this.scanner.watchFiles();
+    this.registerDomEvent(document, "change", async (evt) => {
+      const target = evt.target;
+      if (!target.matches('input[type="checkbox"].task-list-item-checkbox')) {
+        return;
+      }
+      if (!target.checked) {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const file = this.app.workspace.getActiveFile();
+      if (!file)
+        return;
+      const content = await this.app.vault.read(file);
+      const lines = content.split("\n");
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.includes("#todo") && !line.includes("#todone") && /^-\s*\[x\]/i.test(line.trim())) {
+          const todos = this.scanner.getTodos();
+          const todo = todos.find(
+            (t) => t.file.path === file.path && t.lineNumber === i
+          );
+          if (todo) {
+            await this.processor.completeTodo(
+              todo,
+              this.settings.defaultTodoneFile
+            );
+            break;
+          }
+        }
+      }
+    });
     this.registerView(
       VIEW_TYPE_TODO_SIDEBAR,
       (leaf) => new TodoSidebarView(

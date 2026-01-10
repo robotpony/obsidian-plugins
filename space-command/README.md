@@ -25,6 +25,7 @@ An Obsidian plugin for managing TODOs and TODONEs across your vault with live em
 - **TODO Tracking**: Automatically detect and track all `#todo` items across your vault
 - **Live Embeds**: Embed interactive TODO lists in any markdown file
 - **Interactive Sidebar**: View and manage all TODOs from a dedicated sidebar
+- **Copy Embed Syntax**: Click copy button in sidebar to copy embed syntax to clipboard
 - **Auto-Sorting**: Embedded lists sort by priority then project (v0.5.0+)
 - **Right-Click Menus**: Focus, Later, Snooze actions in both sidebar and embeds (v0.5.0+)
 - **Muted Pill Styling**: Unified visual style for tags, counts, and dates (v0.5.0+)

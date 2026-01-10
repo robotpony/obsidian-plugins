@@ -2,10 +2,48 @@
 
 All notable changes to the ⌥⌘ Space Command plugin will be documented in this file.
 
+## [0.5.1] - 2026-01-10
+
+### Added
+
+- **Un-complete TODONEs**: Click checked items in sidebar DONE section to revert
+  - Converts `#todone @date` back to `#todo`
+  - Unchecks `[x]` to `[ ]` if checkbox exists
+  - TODONE log file preserved as history
+- **Native checkbox support**: Clicking checkboxes in normal markdown lists now works
+  - `- [ ] Task #todo` → click checkbox → converts to `#todone @date`
+  - Works in Live Preview and Reading Mode
+- **Embed auto-refresh**: Embedded TODO lists now update automatically
+  - Subscribes to `todos-updated` events from scanner
+  - New TODOs appear immediately without switching tabs
+- **Embed refresh button**: Manual refresh icon in top-right of each embed
+  - Click to force refresh if needed
+  - Subtle 40% opacity, increases on hover
+
+### Fixed
+
+- **Muted tag visibility in sidebar**: Tags and dates now have visible background
+  - Changed from `--background-secondary` to `--background-primary` in sidebar
+  - Proper contrast against grey sidebar background
+- **Muted element font size**: Reduced from 0.9em to 0.8em for better visual hierarchy
+  - Applied to `.muted-pill`, `.tag`, `.todo-count`, `.project-count`
+
+### Technical
+
+- New `uncompleteTodo()` method in TodoProcessor
+- New `replaceTodoneWithTodo()` and `markCheckboxIncomplete()` utils
+- EmbedRenderer tracks active renders with `activeRenders` Map for cleanup
+- Added `setupAutoRefresh()`, `setupFocusListAutoRefresh()`, `refreshEmbed()` methods
+- DOM event listener in main.ts for native checkbox changes
+- New `.embed-header` and `.embed-refresh-btn` CSS classes
+
 ## [0.5.0] - 2026-01-10
 
 ### Added
 
+- **Copy embed syntax button**: New copy button in sidebar header
+  - Click to open menu with two options: inline or code block syntax
+  - Copies embed syntax to clipboard with confirmation notice
 - **Auto-sorting in embedded lists**: TODOs now sort by priority then project
   - Active TODOs sorted: #focus → #p0 → #p1 → #p2 → none → #p3 → #p4 → #future
   - Secondary sort by project tag alphabetically within each priority
@@ -20,7 +58,7 @@ All notable changes to the ⌥⌘ Space Command plugin will be documented in thi
   - Tags, counts, and dates use consistent pill appearance
   - 65% opacity with theme-aware background (`--background-secondary`)
   - Rounded corners for tag-like appearance
-  - Applied to: priority tags, project tags, todo counts, completion dates
+  - Applied to: priority tags, project tags, todo counts, completio1n dates
 
 ### Improved
 
