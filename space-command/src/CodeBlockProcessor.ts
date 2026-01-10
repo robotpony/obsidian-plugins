@@ -11,7 +11,8 @@ export class CodeBlockProcessor {
     private processor: TodoProcessor,
     private projectManager: ProjectManager,
     private defaultTodoneFile: string,
-    private focusListLimit: number
+    private focusListLimit: number,
+    private priorityTags: string[] = ["#p0", "#p1", "#p2", "#p3", "#p4"]
   ) {}
 
   // Register both code block processors
@@ -39,7 +40,8 @@ export class CodeBlockProcessor {
       this.processor,
       this.projectManager,
       this.defaultTodoneFile,
-      this.focusListLimit
+      this.focusListLimit,
+      this.priorityTags
     );
     embedRenderer.renderTodos(el, filterString, todoneFile);
   }
@@ -56,7 +58,8 @@ export class CodeBlockProcessor {
       this.processor,
       this.projectManager,
       this.defaultTodoneFile,
-      this.focusListLimit
+      this.focusListLimit,
+      this.priorityTags
     );
     embedRenderer.renderProjects(el);
   }

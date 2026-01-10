@@ -3,6 +3,7 @@ import { TodoScanner } from "./TodoScanner";
 import { TodoProcessor } from "./TodoProcessor";
 import { ProjectManager } from "./ProjectManager";
 import { FilterParser } from "./FilterParser";
+import { ContextMenuHandler } from "./ContextMenuHandler";
 import { TodoItem } from "./types";
 
 export class EmbedRenderer {
@@ -10,8 +11,10 @@ export class EmbedRenderer {
   private scanner: TodoScanner;
   private processor: TodoProcessor;
   private projectManager: ProjectManager;
+  private contextMenuHandler: ContextMenuHandler;
   private defaultTodoneFile: string;
   private focusListLimit: number;
+  private priorityTags: string[];
 
   constructor(
     app: App,
@@ -19,7 +22,8 @@ export class EmbedRenderer {
     processor: TodoProcessor,
     projectManager: ProjectManager,
     defaultTodoneFile: string = "todos/done.md",
-    focusListLimit: number = 5
+    focusListLimit: number = 5,
+    priorityTags: string[] = ["#p0", "#p1", "#p2", "#p3", "#p4"]
   ) {
     this.app = app;
     this.scanner = scanner;
@@ -27,6 +31,8 @@ export class EmbedRenderer {
     this.projectManager = projectManager;
     this.defaultTodoneFile = defaultTodoneFile;
     this.focusListLimit = focusListLimit;
+    this.priorityTags = priorityTags;
+    this.contextMenuHandler = new ContextMenuHandler(app, processor, priorityTags);
   }
 
   // Public helper method for code block processor
@@ -39,7 +45,7 @@ export class EmbedRenderer {
     const filters = FilterParser.parse(filterString);
     let todos = this.scanner.getTodos();
     todos = FilterParser.applyFilters(todos, filters);
-    this.renderTodoList(container, todos, todoneFile);
+    this.renderTodoList(container, todos, todoneFile, filterString);
   }
 
   // Public helper method for focus-list code blocks
@@ -106,7 +112,7 @@ export class EmbedRenderer {
     todos = FilterParser.applyFilters(todos, filters);
 
     // Render the todo list
-    this.renderTodoList(el, todos, todoneFile);
+    this.renderTodoList(el, todos, todoneFile, filterString);
   }
 
   private renderFocusList(container: HTMLElement): void {
@@ -146,10 +152,53 @@ export class EmbedRenderer {
     }
   }
 
+  private getPriorityValue(todo: TodoItem): number {
+    // Priority order: #focus=0, #p0=1, #p1=2, #p2=3, no priority=4, #p3=5, #p4=6, #future=7
+    if (todo.tags.includes("#focus")) return 0;
+    if (todo.tags.includes("#p0")) return 1;
+    if (todo.tags.includes("#p1")) return 2;
+    if (todo.tags.includes("#p2")) return 3;
+    if (todo.tags.includes("#p3")) return 5;
+    if (todo.tags.includes("#p4")) return 6;
+    if (todo.tags.includes("#future")) return 7;
+    return 4; // No priority = medium (between #p2 and #p3)
+  }
+
+  private getFirstProjectTag(todo: TodoItem): string {
+    // Return first non-priority tag for alphabetical sorting
+    const excludeTags = ['#focus', '#future', '#p0', '#p1', '#p2', '#p3', '#p4', '#todo', '#todone'];
+    const projectTag = todo.tags.find(t => !excludeTags.includes(t));
+    return projectTag || 'zzz'; // Sort items without project tags to end
+  }
+
+  private sortTodos(todos: TodoItem[]): TodoItem[] {
+    // Separate active TODOs and completed TODONEs
+    const activeTodos = todos.filter(t => t.tags.includes("#todo"));
+    const completedTodones = todos.filter(t => t.tags.includes("#todone"));
+
+    // Sort active TODOs by priority, then by project tag alphabetically
+    activeTodos.sort((a, b) => {
+      const priorityDiff = this.getPriorityValue(a) - this.getPriorityValue(b);
+      if (priorityDiff !== 0) return priorityDiff;
+      // Same priority: sort by first project tag alphabetically
+      return this.getFirstProjectTag(a).localeCompare(this.getFirstProjectTag(b));
+    });
+
+    // Append completed TODONEs at the end (unsorted)
+    return [...activeTodos, ...completedTodones];
+  }
+
+  private extractCompletionDate(text: string): string | null {
+    // Match @YYYY-MM-DD pattern
+    const match = text.match(/@(\d{4}-\d{2}-\d{2})/);
+    return match ? match[1] : null;
+  }
+
   private renderTodoList(
     container: HTMLElement,
     todos: TodoItem[],
-    todoneFile: string
+    todoneFile: string,
+    filterString: string = ""
   ): void {
     container.empty();
     container.addClass("space-command-embed");
@@ -162,10 +211,28 @@ export class EmbedRenderer {
       return;
     }
 
+    // Sort todos: active by priority/project, completed at end
+    const sortedTodos = this.sortTodos(todos);
+
     const list = container.createEl("ul", { cls: "contains-task-list" });
 
-    for (const todo of todos) {
+    for (const todo of sortedTodos) {
+      const isCompleted = todo.tags.includes("#todone");
       const item = list.createEl("li", { cls: "task-list-item" });
+
+      // Add right-click context menu for active TODOs
+      if (!isCompleted) {
+        item.addEventListener("contextmenu", (e) => {
+          e.preventDefault();
+          this.contextMenuHandler.showTodoMenu(e, todo, () => {
+            // Re-render the embed after priority change
+            const filters = FilterParser.parse(filterString);
+            let refreshedTodos = this.scanner.getTodos();
+            refreshedTodos = FilterParser.applyFilters(refreshedTodos, filters);
+            this.renderTodoList(container, refreshedTodos, todoneFile, filterString);
+          });
+        });
+      }
 
       // Create checkbox
       const checkbox = item.createEl("input", {
@@ -173,7 +240,14 @@ export class EmbedRenderer {
         cls: "task-list-item-checkbox",
       });
 
+      if (isCompleted) {
+        checkbox.checked = true;
+        checkbox.disabled = true;
+        item.addClass("todone-item");
+      }
+
       checkbox.addEventListener("change", async () => {
+        if (isCompleted) return;
         checkbox.disabled = true;
         const success = await this.processor.completeTodo(todo, todoneFile);
         if (success) {
@@ -192,11 +266,19 @@ export class EmbedRenderer {
         }
       });
 
-      // Add todo text (without the #todo tag)
+      // Add todo text (without the #todo/#todone tag)
       const textSpan = item.createEl("span", { cls: "todo-text" });
-      const cleanText = todo.text.replace(/#todo\b/g, "").trim();
+      if (isCompleted) {
+        textSpan.addClass("todone-text");
+      }
+      let cleanText = todo.text.replace(/#todo\b/g, "").replace(/#todone\b/g, "").trim();
+      // Remove completion date from display text (we'll show it separately)
+      const completionDate = isCompleted ? this.extractCompletionDate(cleanText) : null;
+      if (completionDate) {
+        cleanText = cleanText.replace(/@\d{4}-\d{2}-\d{2}/, "").trim();
+      }
       // Remove leading checkbox if present
-      let displayText = cleanText.replace(/^-\s*\[\s*\]\s*/, "");
+      let displayText = cleanText.replace(/^-\s*\[\s*\]\s*/, "").replace(/^-\s*\[x\]\s*/i, "");
       // Remove block-level markdown markers (list bullets, quotes)
       displayText = displayText
         .replace(/^[*\-+]\s+/, "")  // Remove list markers
@@ -205,6 +287,14 @@ export class EmbedRenderer {
       // Render inline markdown manually to avoid extra <p> tags
       this.renderInlineMarkdown(displayText, textSpan);
       textSpan.append(" ");
+
+      // Add completion date with muted pill style for completed items
+      if (completionDate) {
+        item.createEl("span", {
+          cls: "todo-date muted-pill",
+          text: completionDate,
+        });
+      }
 
       // Add link to source
       const link = item.createEl("a", {
@@ -229,11 +319,15 @@ export class EmbedRenderer {
     // Parse markdown tokens
     const tokens = this.parseMarkdownTokens(text);
 
+    // Priority tags that should get muted-pill styling
+    const mutedTags = ['#focus', '#future', '#p0', '#p1', '#p2', '#p3', '#p4'];
+
     // Render tokens as DOM elements
     for (const token of tokens) {
       switch (token.type) {
         case 'text':
-          container.appendText(token.content);
+          // Check for priority tags in text and style them
+          this.renderTextWithTags(token.content, container, mutedTags);
           break;
         case 'bold':
           container.createEl('strong', { text: token.content });
@@ -251,6 +345,43 @@ export class EmbedRenderer {
           });
           break;
       }
+    }
+  }
+
+  // Render text content, applying muted-pill styling to priority tags
+  private renderTextWithTags(text: string, container: HTMLElement, mutedTags: string[]): void {
+    // Regex to find tags (words starting with #)
+    const tagRegex = /(#[\w-]+)/g;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = tagRegex.exec(text)) !== null) {
+      // Add text before the tag
+      if (match.index > lastIndex) {
+        container.appendText(text.substring(lastIndex, match.index));
+      }
+
+      const tag = match[1];
+      if (mutedTags.includes(tag)) {
+        // Priority tag: use muted-pill styling
+        container.createEl('span', {
+          cls: 'tag muted-pill',
+          text: tag,
+        });
+      } else {
+        // Regular tag: still style as tag but without muted-pill
+        container.createEl('span', {
+          cls: 'tag',
+          text: tag,
+        });
+      }
+
+      lastIndex = tagRegex.lastIndex;
+    }
+
+    // Add remaining text after last tag
+    if (lastIndex < text.length) {
+      container.appendText(text.substring(lastIndex));
     }
   }
 

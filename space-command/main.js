@@ -453,15 +453,104 @@ var FilterParser = class {
   }
 };
 
+// src/ContextMenuHandler.ts
+var import_obsidian5 = require("obsidian");
+var ContextMenuHandler = class {
+  constructor(app, processor, priorityTags) {
+    this.app = app;
+    this.processor = processor;
+    this.priorityTags = priorityTags;
+  }
+  /**
+   * Show context menu for an active TODO item
+   */
+  showTodoMenu(evt, todo, onRefresh) {
+    const menu = new import_obsidian5.Menu();
+    const currentPriority = this.getCurrentPriority(todo);
+    menu.addItem((item) => {
+      item.setTitle("Focus").setIcon("zap").onClick(async () => {
+        const newPriority = this.calculateFocusPriority(currentPriority);
+        const success = await this.processor.setPriorityTag(todo, newPriority, true);
+        if (success)
+          onRefresh();
+      });
+    });
+    menu.addItem((item) => {
+      item.setTitle("Later").setIcon("clock").onClick(async () => {
+        const newPriority = this.calculateLaterPriority(currentPriority);
+        const success = await this.processor.setPriorityTag(todo, newPriority);
+        if (success)
+          onRefresh();
+      });
+    });
+    menu.addItem((item) => {
+      item.setTitle("Snooze").setIcon("moon").onClick(async () => {
+        const success = await this.processor.setPriorityTag(todo, "#future");
+        if (success)
+          onRefresh();
+      });
+    });
+    menu.showAtMouseEvent(evt);
+  }
+  /**
+   * Extract current priority tag from TODO
+   */
+  getCurrentPriority(todo) {
+    if (todo.tags.includes("#future")) {
+      return "#future";
+    }
+    for (const tag of todo.tags) {
+      if (/^#p[0-4]$/.test(tag)) {
+        return tag;
+      }
+    }
+    return null;
+  }
+  /**
+   * Calculate new priority for Focus action
+   * If no priority or #future → #p0
+   * If #pN → #p(N-1), but #p0 stays #p0
+   */
+  calculateFocusPriority(currentPriority) {
+    if (!currentPriority || currentPriority === "#future") {
+      return "#p0";
+    }
+    const match = currentPriority.match(/^#p([0-4])$/);
+    if (match) {
+      const num = parseInt(match[1]);
+      return num > 0 ? `#p${num - 1}` : "#p0";
+    }
+    return "#p0";
+  }
+  /**
+   * Calculate new priority for Later action
+   * If no priority or #future → #p4
+   * If #pN → #p(N+1), but #p4 stays #p4
+   */
+  calculateLaterPriority(currentPriority) {
+    if (!currentPriority || currentPriority === "#future") {
+      return "#p4";
+    }
+    const match = currentPriority.match(/^#p([0-4])$/);
+    if (match) {
+      const num = parseInt(match[1]);
+      return num < 4 ? `#p${num + 1}` : "#p4";
+    }
+    return "#p4";
+  }
+};
+
 // src/EmbedRenderer.ts
 var EmbedRenderer = class {
-  constructor(app, scanner, processor, projectManager, defaultTodoneFile = "todos/done.md", focusListLimit = 5) {
+  constructor(app, scanner, processor, projectManager, defaultTodoneFile = "todos/done.md", focusListLimit = 5, priorityTags = ["#p0", "#p1", "#p2", "#p3", "#p4"]) {
     this.app = app;
     this.scanner = scanner;
     this.processor = processor;
     this.projectManager = projectManager;
     this.defaultTodoneFile = defaultTodoneFile;
     this.focusListLimit = focusListLimit;
+    this.priorityTags = priorityTags;
+    this.contextMenuHandler = new ContextMenuHandler(app, processor, priorityTags);
   }
   // Public helper method for code block processor
   // Renders a TODO list with filters
@@ -469,7 +558,7 @@ var EmbedRenderer = class {
     const filters = FilterParser.parse(filterString);
     let todos = this.scanner.getTodos();
     todos = FilterParser.applyFilters(todos, filters);
-    this.renderTodoList(container, todos, todoneFile);
+    this.renderTodoList(container, todos, todoneFile, filterString);
   }
   // Public helper method for focus-list code blocks
   renderProjects(container) {
@@ -507,7 +596,7 @@ var EmbedRenderer = class {
     const filters = FilterParser.parse(filterString);
     let todos = this.scanner.getTodos();
     todos = FilterParser.applyFilters(todos, filters);
-    this.renderTodoList(el, todos, todoneFile);
+    this.renderTodoList(el, todos, todoneFile, filterString);
   }
   renderFocusList(container) {
     container.empty();
@@ -536,7 +625,44 @@ var EmbedRenderer = class {
       });
     }
   }
-  renderTodoList(container, todos, todoneFile) {
+  getPriorityValue(todo) {
+    if (todo.tags.includes("#focus"))
+      return 0;
+    if (todo.tags.includes("#p0"))
+      return 1;
+    if (todo.tags.includes("#p1"))
+      return 2;
+    if (todo.tags.includes("#p2"))
+      return 3;
+    if (todo.tags.includes("#p3"))
+      return 5;
+    if (todo.tags.includes("#p4"))
+      return 6;
+    if (todo.tags.includes("#future"))
+      return 7;
+    return 4;
+  }
+  getFirstProjectTag(todo) {
+    const excludeTags = ["#focus", "#future", "#p0", "#p1", "#p2", "#p3", "#p4", "#todo", "#todone"];
+    const projectTag = todo.tags.find((t) => !excludeTags.includes(t));
+    return projectTag || "zzz";
+  }
+  sortTodos(todos) {
+    const activeTodos = todos.filter((t) => t.tags.includes("#todo"));
+    const completedTodones = todos.filter((t) => t.tags.includes("#todone"));
+    activeTodos.sort((a, b) => {
+      const priorityDiff = this.getPriorityValue(a) - this.getPriorityValue(b);
+      if (priorityDiff !== 0)
+        return priorityDiff;
+      return this.getFirstProjectTag(a).localeCompare(this.getFirstProjectTag(b));
+    });
+    return [...activeTodos, ...completedTodones];
+  }
+  extractCompletionDate(text) {
+    const match = text.match(/@(\d{4}-\d{2}-\d{2})/);
+    return match ? match[1] : null;
+  }
+  renderTodoList(container, todos, todoneFile, filterString = "") {
     container.empty();
     container.addClass("space-command-embed");
     if (todos.length === 0) {
@@ -546,14 +672,34 @@ var EmbedRenderer = class {
       });
       return;
     }
+    const sortedTodos = this.sortTodos(todos);
     const list = container.createEl("ul", { cls: "contains-task-list" });
-    for (const todo of todos) {
+    for (const todo of sortedTodos) {
+      const isCompleted = todo.tags.includes("#todone");
       const item = list.createEl("li", { cls: "task-list-item" });
+      if (!isCompleted) {
+        item.addEventListener("contextmenu", (e) => {
+          e.preventDefault();
+          this.contextMenuHandler.showTodoMenu(e, todo, () => {
+            const filters = FilterParser.parse(filterString);
+            let refreshedTodos = this.scanner.getTodos();
+            refreshedTodos = FilterParser.applyFilters(refreshedTodos, filters);
+            this.renderTodoList(container, refreshedTodos, todoneFile, filterString);
+          });
+        });
+      }
       const checkbox = item.createEl("input", {
         type: "checkbox",
         cls: "task-list-item-checkbox"
       });
+      if (isCompleted) {
+        checkbox.checked = true;
+        checkbox.disabled = true;
+        item.addClass("todone-item");
+      }
       checkbox.addEventListener("change", async () => {
+        if (isCompleted)
+          return;
         checkbox.disabled = true;
         const success = await this.processor.completeTodo(todo, todoneFile);
         if (success) {
@@ -570,11 +716,24 @@ var EmbedRenderer = class {
         }
       });
       const textSpan = item.createEl("span", { cls: "todo-text" });
-      const cleanText = todo.text.replace(/#todo\b/g, "").trim();
-      let displayText = cleanText.replace(/^-\s*\[\s*\]\s*/, "");
+      if (isCompleted) {
+        textSpan.addClass("todone-text");
+      }
+      let cleanText = todo.text.replace(/#todo\b/g, "").replace(/#todone\b/g, "").trim();
+      const completionDate = isCompleted ? this.extractCompletionDate(cleanText) : null;
+      if (completionDate) {
+        cleanText = cleanText.replace(/@\d{4}-\d{2}-\d{2}/, "").trim();
+      }
+      let displayText = cleanText.replace(/^-\s*\[\s*\]\s*/, "").replace(/^-\s*\[x\]\s*/i, "");
       displayText = displayText.replace(/^[*\-+]\s+/, "").replace(/^>\s+/, "");
       this.renderInlineMarkdown(displayText, textSpan);
       textSpan.append(" ");
+      if (completionDate) {
+        item.createEl("span", {
+          cls: "todo-date muted-pill",
+          text: completionDate
+        });
+      }
       const link = item.createEl("a", {
         text: "\u2192",
         cls: "todo-source-link",
@@ -590,10 +749,11 @@ var EmbedRenderer = class {
   // Uses DOM methods to avoid XSS vulnerabilities
   renderInlineMarkdown(text, container) {
     const tokens = this.parseMarkdownTokens(text);
+    const mutedTags = ["#focus", "#future", "#p0", "#p1", "#p2", "#p3", "#p4"];
     for (const token of tokens) {
       switch (token.type) {
         case "text":
-          container.appendText(token.content);
+          this.renderTextWithTags(token.content, container, mutedTags);
           break;
         case "bold":
           container.createEl("strong", { text: token.content });
@@ -611,6 +771,33 @@ var EmbedRenderer = class {
           });
           break;
       }
+    }
+  }
+  // Render text content, applying muted-pill styling to priority tags
+  renderTextWithTags(text, container, mutedTags) {
+    const tagRegex = /(#[\w-]+)/g;
+    let lastIndex = 0;
+    let match;
+    while ((match = tagRegex.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        container.appendText(text.substring(lastIndex, match.index));
+      }
+      const tag = match[1];
+      if (mutedTags.includes(tag)) {
+        container.createEl("span", {
+          cls: "tag muted-pill",
+          text: tag
+        });
+      } else {
+        container.createEl("span", {
+          cls: "tag",
+          text: tag
+        });
+      }
+      lastIndex = tagRegex.lastIndex;
+    }
+    if (lastIndex < text.length) {
+      container.appendText(text.substring(lastIndex));
     }
   }
   // Parse markdown into tokens for safe rendering
@@ -692,13 +879,14 @@ var EmbedRenderer = class {
 
 // src/CodeBlockProcessor.ts
 var CodeBlockProcessor = class {
-  constructor(app, scanner, processor, projectManager, defaultTodoneFile, focusListLimit) {
+  constructor(app, scanner, processor, projectManager, defaultTodoneFile, focusListLimit, priorityTags = ["#p0", "#p1", "#p2", "#p3", "#p4"]) {
     this.app = app;
     this.scanner = scanner;
     this.processor = processor;
     this.projectManager = projectManager;
     this.defaultTodoneFile = defaultTodoneFile;
     this.focusListLimit = focusListLimit;
+    this.priorityTags = priorityTags;
   }
   // Register both code block processors
   registerProcessors(plugin) {
@@ -720,7 +908,8 @@ var CodeBlockProcessor = class {
       this.processor,
       this.projectManager,
       this.defaultTodoneFile,
-      this.focusListLimit
+      this.focusListLimit,
+      this.priorityTags
     );
     embedRenderer.renderTodos(el, filterString, todoneFile);
   }
@@ -732,7 +921,8 @@ var CodeBlockProcessor = class {
       this.processor,
       this.projectManager,
       this.defaultTodoneFile,
-      this.focusListLimit
+      this.focusListLimit,
+      this.priorityTags
     );
     embedRenderer.renderProjects(el);
   }
@@ -773,7 +963,7 @@ var CodeBlockProcessor = class {
 };
 
 // src/SlashCommandSuggest.ts
-var import_obsidian5 = require("obsidian");
+var import_obsidian6 = require("obsidian");
 var CALLOUT_TYPES = [
   { id: "info", name: "Info", icon: "\u2139\uFE0F" },
   { id: "tip", name: "Tip", icon: "\u{1F4A1}" },
@@ -788,7 +978,7 @@ var CALLOUT_TYPES = [
   { id: "question", name: "Question", icon: "\u2753" },
   { id: "failure", name: "Failure", icon: "\u274C" }
 ];
-var SlashCommandSuggest = class extends import_obsidian5.EditorSuggest {
+var SlashCommandSuggest = class extends import_obsidian6.EditorSuggest {
   constructor(app, settings) {
     super(app);
     this.inCalloutMenu = false;
@@ -917,8 +1107,8 @@ var SlashCommandSuggest = class extends import_obsidian5.EditorSuggest {
 };
 
 // src/DateSuggest.ts
-var import_obsidian6 = require("obsidian");
-var DateSuggest = class extends import_obsidian6.EditorSuggest {
+var import_obsidian7 = require("obsidian");
+var DateSuggest = class extends import_obsidian7.EditorSuggest {
   constructor(app, settings) {
     super(app);
     this.settings = settings;
@@ -1024,95 +1214,6 @@ var DateSuggest = class extends import_obsidian6.EditorSuggest {
 
 // src/SidebarView.ts
 var import_obsidian8 = require("obsidian");
-
-// src/ContextMenuHandler.ts
-var import_obsidian7 = require("obsidian");
-var ContextMenuHandler = class {
-  constructor(app, processor, priorityTags) {
-    this.app = app;
-    this.processor = processor;
-    this.priorityTags = priorityTags;
-  }
-  /**
-   * Show context menu for an active TODO item
-   */
-  showTodoMenu(evt, todo, onRefresh) {
-    const menu = new import_obsidian7.Menu();
-    const currentPriority = this.getCurrentPriority(todo);
-    menu.addItem((item) => {
-      item.setTitle("Focus").setIcon("zap").onClick(async () => {
-        const newPriority = this.calculateFocusPriority(currentPriority);
-        const success = await this.processor.setPriorityTag(todo, newPriority, true);
-        if (success)
-          onRefresh();
-      });
-    });
-    menu.addItem((item) => {
-      item.setTitle("Later").setIcon("clock").onClick(async () => {
-        const newPriority = this.calculateLaterPriority(currentPriority);
-        const success = await this.processor.setPriorityTag(todo, newPriority);
-        if (success)
-          onRefresh();
-      });
-    });
-    menu.addItem((item) => {
-      item.setTitle("Snooze").setIcon("moon").onClick(async () => {
-        const success = await this.processor.setPriorityTag(todo, "#future");
-        if (success)
-          onRefresh();
-      });
-    });
-    menu.showAtMouseEvent(evt);
-  }
-  /**
-   * Extract current priority tag from TODO
-   */
-  getCurrentPriority(todo) {
-    if (todo.tags.includes("#future")) {
-      return "#future";
-    }
-    for (const tag of todo.tags) {
-      if (/^#p[0-4]$/.test(tag)) {
-        return tag;
-      }
-    }
-    return null;
-  }
-  /**
-   * Calculate new priority for Focus action
-   * If no priority or #future → #p0
-   * If #pN → #p(N-1), but #p0 stays #p0
-   */
-  calculateFocusPriority(currentPriority) {
-    if (!currentPriority || currentPriority === "#future") {
-      return "#p0";
-    }
-    const match = currentPriority.match(/^#p([0-4])$/);
-    if (match) {
-      const num = parseInt(match[1]);
-      return num > 0 ? `#p${num - 1}` : "#p0";
-    }
-    return "#p0";
-  }
-  /**
-   * Calculate new priority for Later action
-   * If no priority or #future → #p4
-   * If #pN → #p(N+1), but #p4 stays #p4
-   */
-  calculateLaterPriority(currentPriority) {
-    if (!currentPriority || currentPriority === "#future") {
-      return "#p4";
-    }
-    const match = currentPriority.match(/^#p([0-4])$/);
-    if (match) {
-      const num = parseInt(match[1]);
-      return num < 4 ? `#p${num + 1}` : "#p4";
-    }
-    return "#p4";
-  }
-};
-
-// src/SidebarView.ts
 var VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 var TodoSidebarView = class extends import_obsidian8.ItemView {
   constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, recentTodonesLimit) {
@@ -1387,7 +1488,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     if (allTodones.length > this.recentTodonesLimit) {
       const linkDiv = section.createEl("div", { cls: "todone-view-all" });
       const link = linkDiv.createEl("a", {
-        text: `View all in ${this.defaultTodoneFile}`,
+        text: "View completed TODOs",
         cls: "todone-view-all-link",
         href: "#"
       });
@@ -1537,7 +1638,8 @@ var SpaceCommandPlugin = class extends import_obsidian9.Plugin {
       this.processor,
       this.projectManager,
       this.settings.defaultTodoneFile,
-      this.settings.focusListLimit
+      this.settings.focusListLimit,
+      this.settings.priorityTags
     );
     if (this.settings.excludeTodoneFilesFromRecent) {
       this.scanner.setExcludeFromTodones([this.settings.defaultTodoneFile]);
@@ -1579,7 +1681,8 @@ var SpaceCommandPlugin = class extends import_obsidian9.Plugin {
       this.processor,
       this.projectManager,
       this.settings.defaultTodoneFile,
-      this.settings.focusListLimit
+      this.settings.focusListLimit,
+      this.settings.priorityTags
     );
     codeBlockProcessor.registerProcessors(this);
     this.registerEditorSuggest(new SlashCommandSuggest(this.app, this.settings));

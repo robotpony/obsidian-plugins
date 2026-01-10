@@ -227,17 +227,38 @@
   color: var(--text-accent);
 }
 
-/* Count styling - lighter color */
-.todo-count,
-.project-count {
-  opacity: 0.8;
+/* Shared muted pill style for tags, counts, and dates */
+.muted-pill {
+  opacity: 0.65;
+  background-color: var(--background-secondary);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 0.9em;
 }
 
-/* Tag styling in sidebar text - lighter color */
+/* Count styling */
+.todo-count,
+.project-count {
+  opacity: 0.65;
+  background-color: var(--background-secondary);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 0.9em;
+}
+
+/* Tag styling in sidebar text */
 .todo-item .tag,
 .project-item .tag,
 .todo-text .tag {
   opacity: 0.65;
+  background-color: var(--background-secondary);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+/* Completion date styling in embeds */
+.todo-date {
+  margin-left: 6px;
 }
 
 /* Slash Command & Date Suggest Styles */

@@ -46,7 +46,8 @@ export default class SpaceCommandPlugin extends Plugin {
       this.processor,
       this.projectManager,
       this.settings.defaultTodoneFile,
-      this.settings.focusListLimit
+      this.settings.focusListLimit,
+      this.settings.priorityTags
     );
 
     // Configure scanner to exclude TODONE log file from Recent TODONEs
@@ -108,7 +109,8 @@ export default class SpaceCommandPlugin extends Plugin {
       this.processor,
       this.projectManager,
       this.settings.defaultTodoneFile,
-      this.settings.focusListLimit
+      this.settings.focusListLimit,
+      this.settings.priorityTags
     );
     codeBlockProcessor.registerProcessors(this);
 

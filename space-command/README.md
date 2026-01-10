@@ -25,6 +25,9 @@ An Obsidian plugin for managing TODOs and TODONEs across your vault with live em
 - **TODO Tracking**: Automatically detect and track all `#todo` items across your vault
 - **Live Embeds**: Embed interactive TODO lists in any markdown file
 - **Interactive Sidebar**: View and manage all TODOs from a dedicated sidebar
+- **Auto-Sorting**: Embedded lists sort by priority then project (v0.5.0+)
+- **Right-Click Menus**: Focus, Later, Snooze actions in both sidebar and embeds (v0.5.0+)
+- **Muted Pill Styling**: Unified visual style for tags, counts, and dates (v0.5.0+)
 - **Slash Commands**: `/todo`, `/callout`, `/today`, `/tomorrow` at start of line (v0.4.0+)
 - **Quick Date Insert**: `@date`, `@today`, `@tomorrow`, `@yesterday` anywhere (v0.4.0+)
 - **Code Block Syntax**: Works in both Reading Mode and Live Preview mode (v0.2.0+)
@@ -233,6 +236,7 @@ Available via Command Palette (Cmd/Ctrl+P):
 
 ## Version History
 
+- **v0.5.0** (2026-01-10) - Auto-sorting, right-click in embeds, muted pill styling
 - **v0.4.0** (2026-01-08) - Slash commands, @date quick insert, priority sorting, context menus
 - **v0.3.x** (2026-01-08) - Right-click context menus, priority tags (#p0-#p4, #focus, #future)
 - **v0.2.x** (2026-01-08) - Code block syntax, bug fixes, markdown rendering

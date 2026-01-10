@@ -2,6 +2,41 @@
 
 All notable changes to the ⌥⌘ Space Command plugin will be documented in this file.
 
+## [0.5.0] - 2026-01-10
+
+### Added
+
+- **Auto-sorting in embedded lists**: TODOs now sort by priority then project
+  - Active TODOs sorted: #focus → #p0 → #p1 → #p2 → none → #p3 → #p4 → #future
+  - Secondary sort by project tag alphabetically within each priority
+  - Completed TODONEs always appear at the end
+- **Right-click context menu in embedded lists**: Same menu as sidebar
+  - Focus, Later, and Snooze actions available on embedded TODOs
+  - Shared `ContextMenuHandler` for consistent behavior
+- **Completion date display**: TODONEs show completion date with muted pill style
+  - Parses @YYYY-MM-DD from completed items
+  - Date displayed separately with themed background styling
+- **Muted pill styling**: Unified visual style for metadata
+  - Tags, counts, and dates use consistent pill appearance
+  - 65% opacity with theme-aware background (`--background-secondary`)
+  - Rounded corners for tag-like appearance
+  - Applied to: priority tags, project tags, todo counts, completion dates
+
+### Improved
+
+- Embedded lists and sidebar now share consistent styling
+- Priority tags (#focus, #p0-#p4, #future) get muted-pill style in embeds
+- Regular project tags styled as tags without pill background
+
+### Technical
+
+- `EmbedRenderer` now accepts `priorityTags` parameter
+- Added `sortTodos()`, `getPriorityValue()`, `getFirstProjectTag()` methods
+- Added `extractCompletionDate()` for parsing completion dates
+- Added `renderTextWithTags()` for inline tag styling with pill classes
+- `CodeBlockProcessor` passes `priorityTags` to `EmbedRenderer`
+- New `.muted-pill` CSS class for shared styling
+
 ## [0.4.0] - 2026-01-08
 
 ### Added
