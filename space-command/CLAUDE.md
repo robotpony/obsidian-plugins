@@ -39,6 +39,7 @@ This is **Space Command** (`space-command`), an Obsidian plugin for tracking TOD
 | [SlashCommandSuggest.ts](src/SlashCommandSuggest.ts) | EditorSuggest for `/` commands at column 0: `/todo`, `/callout`, `/today`, `/tomorrow` |
 | [DateSuggest.ts](src/DateSuggest.ts) | EditorSuggest for `@date`, `@today`, `@tomorrow`, `@yesterday` quick insert |
 | [types.ts](src/types.ts) | TypeScript interfaces: `TodoItem`, `TodoFilters`, `ProjectInfo`, `SpaceCommandSettings` |
+| [utils.ts](src/utils.ts) | Helper functions: date formatting, tag extraction, checkbox/todo text manipulation |
 
 ### Data Flow
 
@@ -60,10 +61,14 @@ This is **Space Command** (`space-command`), an Obsidian plugin for tracking TOD
 - **Safe markdown rendering**: `EmbedRenderer.renderInlineMarkdown()` uses DOM methods to avoid XSS
 - **Code block detection**: Scanner tracks triple-backtick state and checks for inline backticks to exclude code examples
 
+### Settings Tab
+
+The `SpaceCommandSettingTab` class is defined inline in [main.ts](main.ts) (not a separate file).
+
 ## Changelog
 
 Update [CHANGELOG.md](CHANGELOG.md) with each release following the existing format.
 
-## Other rules
+## Working with Claude Code
 
 - Use AskUserQuestion when asking questions, clarifying requirements, or asking about the approach

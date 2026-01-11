@@ -14,33 +14,33 @@ An Obsidian plugin for managing TODOs and TODONEs across your vault with live em
 - [Usage](#usage)
   - [Creating TODOs](#creating-todos)
   - [Completing TODOs](#completing-todos)
+  - [Un-completing TODONEs](#un-completing-todones)
+  - [Priority System](#priority-system)
+  - [Context Menus](#context-menus)
   - [Keyboard Shortcuts](#keyboard-shortcuts)
 - [Installation](#installation)
 - [Settings](#settings)
-- [Documentation](#documentation)
 - [License](#license)
 
 ## Features
 
 - **TODO Tracking**: Automatically detect and track all `#todo` items across your vault
-- **Header TODOs**: Headers with `#todo` treat list items below as child TODOs (v0.6.0+)
-- **Focus Highlighting**: `#focus` items have accent background in sidebar (v0.6.0+)
-- **TODONE Toggle**: Show/hide completed items in embeds with button or filter (v0.6.0+)
+- **Header TODOs**: Headers with `#todo` treat list items below as child TODOs
+- **Priority System**: Tags `#focus`, `#p0`-`#p4`, `#future` with automatic sorting
+- **Focus Highlighting**: `#focus` items have accent background in sidebar
+- **TODONE Toggle**: Show/hide completed items in embeds with button or filter
 - **Live Embeds**: Embed interactive TODO lists in any markdown file
 - **Interactive Sidebar**: View and manage all TODOs from a dedicated sidebar
-- **Copy Embed Syntax**: Click copy button in sidebar to copy embed syntax to clipboard
-- **Auto-Sorting**: Embedded lists sort by priority then project (v0.5.0+)
-- **Right-Click Menus**: Toggle Focus, Later, Snooze actions in both sidebar and embeds (v0.6.2+)
-- **Muted Pill Styling**: Unified visual style for tags, counts, and dates (v0.5.0+)
-- **Slash Commands**: `/todo`, `/callout`, `/today`, `/tomorrow` at start of line (v0.4.0+)
-- **Quick Date Insert**: `@date`, `@today`, `@tomorrow`, `@yesterday` anywhere (v0.4.0+)
-- **Code Block Syntax**: Works in both Reading Mode and Live Preview mode (v0.2.0+)
-- **Flexible Filtering**: Filter TODOs by path, tags, or limit results (v0.2.1+)
-- **Markdown Rendering**: TODO text renders **bold**, *italic*, `code`, and [links](url) (v0.2.1+)
-- **Auto-Refresh**: Sidebar automatically updates when TODOs change
+- **Context Menus**: Right-click for Focus, Later, Snooze toggle actions
+- **Slash Commands**: `/todo`, `/todos`, `/callout`, `/today`, `/tomorrow` at line start
+- **Quick Date Insert**: `@date`, `@today`, `@tomorrow`, `@yesterday` anywhere
+- **Code Block Syntax**: Works in both Reading Mode and Live Preview mode
+- **Flexible Filtering**: Filter by path, tags, limit, or todone visibility
+- **Markdown Rendering**: TODO text renders **bold**, *italic*, `code`, and [links](url)
+- **Auto-Refresh**: Sidebar and embeds update automatically when TODOs change
 - **Line Highlighting**: Click `→` to jump to source with 1.5s highlight
 - **Automatic Logging**: Completed TODOs logged with completion dates
-- **Smart Code Filtering**: Automatically excludes TODOs in code blocks
+- **Smart Code Filtering**: Excludes TODOs in code blocks and inline code
 - **Keyboard Shortcuts**: Quick commands for common actions
 
 ## Quick Start
@@ -161,11 +161,6 @@ All filters work with both syntaxes:
 {{focus-todos | todone:hide}}
 ```
 
-**v0.2.1 improvements:**
-- ✅ Flexible syntax: `{{focus-todos | tags:#urgent}}` now works
-- ✅ Both colon and pipe separators supported
-- ✅ Markdown rendering in TODO text
-
 ## Usage
 
 ### Creating TODOs
@@ -178,7 +173,7 @@ Remember to call John #todo
 - [ ] Review PR #urgent #todo
 ```
 
-**Header TODOs (v0.6.0+):**
+**Header TODOs:**
 Add `#todo` to a header to treat all list items below as children:
 
 ```markdown
@@ -192,7 +187,7 @@ Add `#todo` to a header to treat all list items below as children:
 
 All three tasks become children of "My Project". Completing the header completes all children. The hierarchy ends at the next same-level or higher-level header.
 
-**Markdown support (v0.2.1+):**
+**Markdown support:**
 TODOs can include **bold**, *italic*, `code`, and [links](url):
 
 ```markdown
@@ -202,7 +197,7 @@ TODOs can include **bold**, *italic*, `code`, and [links](url):
 ```
 
 **Smart filtering:**
-TODOs in code blocks (triple backticks) or inline code (single backticks) are automatically excluded. See [docs/development/FILTERING.md](docs/development/FILTERING.md) for details.
+TODOs in code blocks (triple backticks) or inline code (single backticks) are automatically excluded.
 
 ### Completing TODOs
 
@@ -210,6 +205,46 @@ Click the checkbox in an embed or sidebar to complete a TODO. This will:
 1. Change `#todo` to `#todone @2026-01-08` in the source file
 2. Mark the checkbox `[x]` if present
 3. Log the completed item to your TODONE file
+
+### Un-completing TODONEs
+
+Changed your mind? Click a completed item in the sidebar's DONE section to revert it:
+1. Changes `#todone @date` back to `#todo`
+2. Unchecks `[x]` to `[ ]` if checkbox exists
+3. TODONE log file is preserved (keeps history)
+
+### Priority System
+
+Organize TODOs with priority tags. Items sort automatically by priority in sidebar and embeds.
+
+**Priority tags** (highest to lowest):
+
+| Tag | Purpose | Visibility |
+|-----|---------|------------|
+| `#focus` | Top priority, highlighted with accent color | Shown |
+| `#p0` | Highest priority | Shown |
+| `#p1` | High priority | Shown |
+| `#p2` | Medium priority | Shown |
+| *(none)* | Default priority (between #p2 and #p3) | Shown |
+| `#p3` | Low priority | Shown |
+| `#p4` | Lowest priority | Shown |
+| `#future` | Snoozed/deferred | Hidden from Active TODOs |
+
+**Sorting order:** `#focus` → `#p0` → `#p1` → `#p2` → (none) → `#p3` → `#p4` → `#future`
+
+Items with `#focus` are highlighted with an accent background in the sidebar. Items with `#future` are hidden from the Active TODOs list but still tracked.
+
+### Context Menus
+
+Right-click any TODO in the sidebar or embedded lists to access quick actions:
+
+| Action | Effect | Toggle behavior |
+|--------|--------|-----------------|
+| **Focus** ⚡ | Sets `#focus` + `#p0` for top priority | Removes `#focus` if already present |
+| **Later** 🕐 | Sets `#p3` or `#p4` for lower priority | Removes priority tag if already low |
+| **Snooze** 🌙 | Adds `#future` to defer the item | Removes `#future` if already snoozed |
+
+All actions are toggles - clicking the same action again will undo it.
 
 ### Keyboard Shortcuts
 
@@ -237,37 +272,28 @@ npm run build  # Production build
 
 Access via: Settings → Community Plugins → ⌥⌘ Space Command
 
-- **Default TODONE file**: Path where completed TODOs are logged (default: `todos/done.md`)
-- **Show sidebar by default**: Auto-show sidebar on startup
-- **Date format**: Format for completion dates (using moment.js format)
-- **Default projects folder**: Folder for project files (default: `projects/`)
-- **Focus list limit**: Max projects in `{{focus-list}}` (default: 5)
-
-## Documentation
-
-- **[CHANGELOG.md](CHANGELOG.md)** - Version history and release notes
+| Setting | Description | Default |
+|---------|-------------|---------|
+| **Default TODONE file** | Path where completed TODOs are logged | `todos/done.md` |
+| **Show sidebar by default** | Auto-show sidebar on startup | On |
+| **Date format** | Format for completion dates (moment.js) | `YYYY-MM-DD` |
+| **Default projects folder** | Folder for project files | `projects/` |
+| **Focus list limit** | Max projects in `{{focus-list}}` | 5 |
+| **Priority tags** | Customizable priority tag list | `#p0,#p1,#p2,#p3,#p4` |
+| **Recent TODONEs limit** | Max completed items shown in sidebar | 5 |
+| **Exclude TODONE file from recent** | Prevent duplicates in Recent TODONEs | On |
 
 ## Commands
 
 Available via Command Palette (Cmd/Ctrl+P):
 
-- **Toggle TODO Sidebar**: Show/hide the sidebar
-- **Quick Add TODO**: Insert `#todo` at cursor position
-- **Refresh TODOs**: Force rescan of all vault files
+| Command | Description |
+|---------|-------------|
+| **Toggle TODO Sidebar** | Show/hide the sidebar |
+| **Quick Add TODO** | Insert `#todo` at cursor position |
+| **Refresh TODOs** | Force rescan of all vault files |
 
-## Version History
-
-- **v0.6.2** (2026-01-10) - Toggle-able context menus, normalized tag sizes, embed icon positioning, #focus in code blocks
-- **v0.6.1** (2026-01-10) - Improved header TODO layout (vertical with children below)
-- **v0.6.0** (2026-01-10) - Header TODOs with children, focus highlighting, TODONE show/hide toggle
-- **v0.5.2** (2026-01-10) - `/todos` command, muted DONE section, tag-style counts
-- **v0.5.0** (2026-01-10) - Auto-sorting, right-click in embeds, muted pill styling
-- **v0.4.0** (2026-01-08) - Slash commands, @date quick insert, priority sorting, context menus
-- **v0.3.x** (2026-01-08) - Right-click context menus, priority tags (#p0-#p4, #focus, #future)
-- **v0.2.x** (2026-01-08) - Code block syntax, bug fixes, markdown rendering
-- **v0.1.0** (2026-01-07) - Initial release
-
-See [CHANGELOG.md](CHANGELOG.md) for detailed release notes.
+See [CHANGELOG.md](CHANGELOG.md) for version history and release notes.
 
 ## License
 

@@ -144,9 +144,9 @@ export default class SpaceCommandPlugin extends Plugin {
       for (const block of codeBlocks) {
         const text = block.textContent || "";
         if (text.includes("{{focus-todos")) {
-          this.embedRenderer.render(text, block, ctx);
+          this.embedRenderer.render(text, block);
         } else if (text.includes("{{focus-list}}")) {
-          this.embedRenderer.render(text, block, ctx);
+          this.embedRenderer.render(text, block);
         }
       }
     });

@@ -361,13 +361,6 @@ All notable changes to the ⌥⌘ Space Command plugin will be documented in thi
 - Event-driven architecture
 
 ### Documentation
-- README.md - User guide
-- INSTALL.md - Installation instructions
-- PLAN.md - Implementation plan
-- FILTERING.md - Code block filtering details
-- AUTO_REFRESH.md - Auto-refresh feature documentation
-- LINE_HIGHLIGHTING.md - Line highlighting feature documentation
-- DEDUPLICATION.md - TODONE deduplication documentation
-- QUICK_REFERENCE.md - Quick reference card
-- TEST_EXAMPLES.md - Test cases
-- IMPLEMENTATION_SUMMARY.md - Technical summary
+- README.md - User guide and feature documentation
+- CHANGELOG.md - Version history
+- CLAUDE.md - Development guidance for Claude Code

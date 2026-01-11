@@ -1,4 +1,4 @@
-import { App, MarkdownPostProcessorContext, Plugin } from "obsidian";
+import { App, Plugin } from "obsidian";
 import { TodoScanner } from "./TodoScanner";
 import { TodoProcessor } from "./TodoProcessor";
 import { ProjectManager } from "./ProjectManager";
@@ -28,11 +28,7 @@ export class CodeBlockProcessor {
   }
 
   // Handle focus-todos code blocks
-  processFocusTodos(
-    source: string,
-    el: HTMLElement,
-    ctx: MarkdownPostProcessorContext
-  ): void {
+  processFocusTodos(source: string, el: HTMLElement): void {
     const { todoneFile, filterString } = this.parseContent(source);
     const embedRenderer = new EmbedRenderer(
       this.app,
@@ -47,11 +43,7 @@ export class CodeBlockProcessor {
   }
 
   // Handle focus-list code blocks
-  processFocusList(
-    source: string,
-    el: HTMLElement,
-    ctx: MarkdownPostProcessorContext
-  ): void {
+  processFocusList(source: string, el: HTMLElement): void {
     const embedRenderer = new EmbedRenderer(
       this.app,
       this.scanner,

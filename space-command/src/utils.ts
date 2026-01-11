@@ -5,12 +5,11 @@ export function formatDate(date: Date, format: string): string {
 }
 
 export function extractTags(text: string): string[] {
+  // Remove inline code spans before extracting tags
+  // This prevents matching tags inside backticks like `#689fd6`
+  const textWithoutCode = text.replace(/`[^`]*`/g, "");
   const tagRegex = /#[\w-]+/g;
-  return text.match(tagRegex) || [];
-}
-
-export function removeTodoTag(text: string): string {
-  return text.replace(/#todo\b/g, "").trim();
+  return textWithoutCode.match(tagRegex) || [];
 }
 
 export function hasCheckboxFormat(text: string): boolean {

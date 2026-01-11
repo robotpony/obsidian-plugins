@@ -38,8 +38,9 @@ function formatDate(date, format) {
   return (0, import_obsidian.moment)(date).format(format);
 }
 function extractTags(text) {
+  const textWithoutCode = text.replace(/`[^`]*`/g, "");
   const tagRegex = /#[\w-]+/g;
-  return text.match(tagRegex) || [];
+  return textWithoutCode.match(tagRegex) || [];
 }
 function hasCheckboxFormat(text) {
   return /^-\s*\[[ x]\]/.test(text.trim());
@@ -771,7 +772,7 @@ var EmbedRenderer = class {
   renderProjects(container) {
     this.renderFocusList(container);
   }
-  async render(source, el, ctx) {
+  async render(source, el) {
     var _a;
     const focusListMatch = source.match(/\{\{focus-list\}\}/);
     if (focusListMatch) {
@@ -1198,7 +1199,7 @@ var CodeBlockProcessor = class {
     );
   }
   // Handle focus-todos code blocks
-  processFocusTodos(source, el, ctx) {
+  processFocusTodos(source, el) {
     const { todoneFile, filterString } = this.parseContent(source);
     const embedRenderer = new EmbedRenderer(
       this.app,
@@ -1212,7 +1213,7 @@ var CodeBlockProcessor = class {
     embedRenderer.renderTodos(el, filterString, todoneFile);
   }
   // Handle focus-list code blocks
-  processFocusList(source, el, ctx) {
+  processFocusList(source, el) {
     const embedRenderer = new EmbedRenderer(
       this.app,
       this.scanner,
@@ -2037,9 +2038,9 @@ var SpaceCommandPlugin = class extends import_obsidian9.Plugin {
       for (const block of codeBlocks) {
         const text = block.textContent || "";
         if (text.includes("{{focus-todos")) {
-          this.embedRenderer.render(text, block, ctx);
+          this.embedRenderer.render(text, block);
         } else if (text.includes("{{focus-list}}")) {
-          this.embedRenderer.render(text, block, ctx);
+          this.embedRenderer.render(text, block);
         }
       }
     });

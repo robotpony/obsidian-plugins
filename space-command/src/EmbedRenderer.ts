@@ -1,4 +1,4 @@
-import { App, MarkdownPostProcessorContext } from "obsidian";
+import { App } from "obsidian";
 import { TodoScanner } from "./TodoScanner";
 import { TodoProcessor } from "./TodoProcessor";
 import { ProjectManager } from "./ProjectManager";
@@ -84,11 +84,7 @@ export class EmbedRenderer {
     this.renderFocusList(container);
   }
 
-  async render(
-    source: string,
-    el: HTMLElement,
-    ctx: MarkdownPostProcessorContext
-  ): Promise<void> {
+  async render(source: string, el: HTMLElement): Promise<void> {
     // Check if this is a focus-list embed
     const focusListMatch = source.match(/\{\{focus-list\}\}/);
     if (focusListMatch) {
