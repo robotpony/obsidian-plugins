@@ -333,6 +333,7 @@
   display: flex;
   justify-content: flex-end;
   margin-bottom: 4px;
+  margin-top: -1em;
 }
 
 .embed-refresh-btn {
@@ -423,4 +424,72 @@
 .todo-header.todone-item > .todo-text {
   text-decoration: line-through;
   color: var(--text-muted);
+}
+
+/* Normalize plugin tag sizes in Obsidian editor headings */
+/* These tags should render at body text size regardless of heading level */
+.cm-header .cm-tag-todo,
+.cm-header .cm-tag-todone,
+.cm-header .cm-tag-focus,
+.cm-header .cm-tag-future,
+.cm-header .cm-tag-p0,
+.cm-header .cm-tag-p1,
+.cm-header .cm-tag-p2,
+.cm-header .cm-tag-p3,
+.cm-header .cm-tag-p4,
+.markdown-preview-view h1 .tag[href="#todo"],
+.markdown-preview-view h1 .tag[href="#todone"],
+.markdown-preview-view h1 .tag[href="#focus"],
+.markdown-preview-view h1 .tag[href="#future"],
+.markdown-preview-view h1 .tag[href="#p0"],
+.markdown-preview-view h1 .tag[href="#p1"],
+.markdown-preview-view h1 .tag[href="#p2"],
+.markdown-preview-view h1 .tag[href="#p3"],
+.markdown-preview-view h1 .tag[href="#p4"],
+.markdown-preview-view h2 .tag[href="#todo"],
+.markdown-preview-view h2 .tag[href="#todone"],
+.markdown-preview-view h2 .tag[href="#focus"],
+.markdown-preview-view h2 .tag[href="#future"],
+.markdown-preview-view h2 .tag[href="#p0"],
+.markdown-preview-view h2 .tag[href="#p1"],
+.markdown-preview-view h2 .tag[href="#p2"],
+.markdown-preview-view h2 .tag[href="#p3"],
+.markdown-preview-view h2 .tag[href="#p4"],
+.markdown-preview-view h3 .tag[href="#todo"],
+.markdown-preview-view h3 .tag[href="#todone"],
+.markdown-preview-view h3 .tag[href="#focus"],
+.markdown-preview-view h3 .tag[href="#future"],
+.markdown-preview-view h3 .tag[href="#p0"],
+.markdown-preview-view h3 .tag[href="#p1"],
+.markdown-preview-view h3 .tag[href="#p2"],
+.markdown-preview-view h3 .tag[href="#p3"],
+.markdown-preview-view h3 .tag[href="#p4"],
+.markdown-preview-view h4 .tag[href="#todo"],
+.markdown-preview-view h4 .tag[href="#todone"],
+.markdown-preview-view h4 .tag[href="#focus"],
+.markdown-preview-view h4 .tag[href="#future"],
+.markdown-preview-view h4 .tag[href="#p0"],
+.markdown-preview-view h4 .tag[href="#p1"],
+.markdown-preview-view h4 .tag[href="#p2"],
+.markdown-preview-view h4 .tag[href="#p3"],
+.markdown-preview-view h4 .tag[href="#p4"],
+.markdown-preview-view h5 .tag[href="#todo"],
+.markdown-preview-view h5 .tag[href="#todone"],
+.markdown-preview-view h5 .tag[href="#focus"],
+.markdown-preview-view h5 .tag[href="#future"],
+.markdown-preview-view h5 .tag[href="#p0"],
+.markdown-preview-view h5 .tag[href="#p1"],
+.markdown-preview-view h5 .tag[href="#p2"],
+.markdown-preview-view h5 .tag[href="#p3"],
+.markdown-preview-view h5 .tag[href="#p4"],
+.markdown-preview-view h6 .tag[href="#todo"],
+.markdown-preview-view h6 .tag[href="#todone"],
+.markdown-preview-view h6 .tag[href="#focus"],
+.markdown-preview-view h6 .tag[href="#future"],
+.markdown-preview-view h6 .tag[href="#p0"],
+.markdown-preview-view h6 .tag[href="#p1"],
+.markdown-preview-view h6 .tag[href="#p2"],
+.markdown-preview-view h6 .tag[href="#p3"],
+.markdown-preview-view h6 .tag[href="#p4"] {
+  font-size: var(--font-text-size, 16px);
 }

@@ -177,7 +177,8 @@ var TodoScanner = class extends import_obsidian2.Events {
   isInInlineCode(line) {
     const todoMatches = [...line.matchAll(/#todo\b/g)];
     const todoneMatches = [...line.matchAll(/#todone\b/g)];
-    const allMatches = [...todoMatches, ...todoneMatches];
+    const focusMatches = [...line.matchAll(/#focus\b/g)];
+    const allMatches = [...todoMatches, ...todoneMatches, ...focusMatches];
     if (allMatches.length === 0) {
       return false;
     }
@@ -436,6 +437,32 @@ ${todoneText}` : todoneText;
       return false;
     }
   }
+  async removeTag(todo, tag) {
+    try {
+      const content = await this.app.vault.read(todo.file);
+      const lines = content.split("\n");
+      if (todo.lineNumber >= lines.length) {
+        throw new Error(
+          `Line number ${todo.lineNumber} out of bounds for file ${todo.filePath}`
+        );
+      }
+      let line = lines[todo.lineNumber];
+      const tagPattern = new RegExp(`${tag}\\b\\s*`, "g");
+      line = line.replace(tagPattern, "");
+      line = line.replace(/\s+/g, " ").trim();
+      lines[todo.lineNumber] = line;
+      await this.app.vault.modify(todo.file, lines.join("\n"));
+      if (this.onComplete) {
+        this.onComplete();
+      }
+      new import_obsidian3.Notice(`Removed ${tag}`);
+      return true;
+    } catch (error) {
+      console.error("Error removing tag:", error);
+      new import_obsidian3.Notice("Failed to remove tag. See console for details.");
+      return false;
+    }
+  }
 };
 
 // src/ProjectManager.ts
@@ -606,25 +633,43 @@ var ContextMenuHandler = class {
   showTodoMenu(evt, todo, onRefresh) {
     const menu = new import_obsidian5.Menu();
     const currentPriority = this.getCurrentPriority(todo);
+    const hasFocus = todo.tags.includes("#focus");
+    const hasFuture = todo.tags.includes("#future");
+    const hasLaterPriority = currentPriority && /^#p[3-4]$/.test(currentPriority);
     menu.addItem((item) => {
-      item.setTitle("Focus").setIcon("zap").onClick(async () => {
-        const newPriority = this.calculateFocusPriority(currentPriority);
-        const success = await this.processor.setPriorityTag(todo, newPriority, true);
+      item.setTitle(hasFocus ? "Unfocus" : "Focus").setIcon("zap").onClick(async () => {
+        let success;
+        if (hasFocus) {
+          success = await this.processor.removeTag(todo, "#focus");
+        } else {
+          const newPriority = this.calculateFocusPriority(currentPriority);
+          success = await this.processor.setPriorityTag(todo, newPriority, true);
+        }
         if (success)
           onRefresh();
       });
     });
     menu.addItem((item) => {
-      item.setTitle("Later").setIcon("clock").onClick(async () => {
-        const newPriority = this.calculateLaterPriority(currentPriority);
-        const success = await this.processor.setPriorityTag(todo, newPriority);
+      item.setTitle(hasLaterPriority ? "Unlater" : "Later").setIcon("clock").onClick(async () => {
+        let success;
+        if (hasLaterPriority) {
+          success = await this.processor.removeTag(todo, currentPriority);
+        } else {
+          const newPriority = this.calculateLaterPriority(currentPriority);
+          success = await this.processor.setPriorityTag(todo, newPriority);
+        }
         if (success)
           onRefresh();
       });
     });
     menu.addItem((item) => {
-      item.setTitle("Snooze").setIcon("moon").onClick(async () => {
-        const success = await this.processor.setPriorityTag(todo, "#future");
+      item.setTitle(hasFuture ? "Unsnooze" : "Snooze").setIcon("moon").onClick(async () => {
+        let success;
+        if (hasFuture) {
+          success = await this.processor.removeTag(todo, "#future");
+        } else {
+          success = await this.processor.setPriorityTag(todo, "#future");
+        }
         if (success)
           onRefresh();
       });

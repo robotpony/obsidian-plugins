@@ -2,6 +2,30 @@
 
 All notable changes to the ⌥⌘ Space Command plugin will be documented in this file.
 
+## [0.6.2] - 2026-01-10
+
+### Improved
+
+- **Toggle-able context menu actions**: Right-click menu items now toggle on/off
+  - Focus/Unfocus: Removes `#focus` if present, adds it otherwise
+  - Later/Unlater: Removes `#p3`/`#p4` if present, lowers priority otherwise
+  - Snooze/Unsnooze: Removes `#future` if present, adds it otherwise
+- **Normalized tag sizes in headings**: Plugin tags (`#todo`, `#todone`, `#focus`, `#future`, `#p0-#p4`) now render at body text size in headings
+  - Applies to both Live Preview (CodeMirror) and Reading Mode
+  - Tags no longer scale up with heading size
+- **Embed icons positioning**: Moved embed header icons up to avoid overlap with Obsidian's view-source button
+
+### Fixed
+
+- **#focus in code blocks**: `#focus` tags inside code blocks and inline code are now ignored
+  - Consistent with existing `#todo`/`#todone` behavior
+
+### Technical
+
+- New `removeTag()` method in TodoProcessor
+- Updated `isInInlineCode()` in TodoScanner to detect `#focus`
+- CSS selectors for `.cm-header .cm-tag-*` and `.markdown-preview-view h1-h6 .tag[href="#*"]`
+
 ## [0.6.1] - 2026-01-10
 
 ### Improved

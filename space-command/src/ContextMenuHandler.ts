@@ -24,38 +24,62 @@ export class ContextMenuHandler {
     const menu = new Menu();
 
     const currentPriority = this.getCurrentPriority(todo);
+    const hasFocus = todo.tags.includes("#focus");
+    const hasFuture = todo.tags.includes("#future");
+    const hasLaterPriority = currentPriority && /^#p[3-4]$/.test(currentPriority);
 
-    // Focus - Increase priority (decrease number or set to #p0) + add #focus tag
+    // Focus - Toggle: if has #focus, remove it; otherwise add #focus + increase priority
     menu.addItem((item) => {
       item
-        .setTitle("Focus")
+        .setTitle(hasFocus ? "Unfocus" : "Focus")
         .setIcon("zap")
         .onClick(async () => {
-          const newPriority = this.calculateFocusPriority(currentPriority);
-          const success = await this.processor.setPriorityTag(todo, newPriority, true); // addFocus=true
+          let success: boolean;
+          if (hasFocus) {
+            // Remove #focus tag
+            success = await this.processor.removeTag(todo, "#focus");
+          } else {
+            // Add #focus and increase priority
+            const newPriority = this.calculateFocusPriority(currentPriority);
+            success = await this.processor.setPriorityTag(todo, newPriority, true);
+          }
           if (success) onRefresh();
         });
     });
 
-    // Later - Decrease priority (increase number or set to #p4)
+    // Later - Toggle: if has low priority (#p3/#p4), remove priority; otherwise decrease priority
     menu.addItem((item) => {
       item
-        .setTitle("Later")
+        .setTitle(hasLaterPriority ? "Unlater" : "Later")
         .setIcon("clock")
         .onClick(async () => {
-          const newPriority = this.calculateLaterPriority(currentPriority);
-          const success = await this.processor.setPriorityTag(todo, newPriority);
+          let success: boolean;
+          if (hasLaterPriority) {
+            // Remove priority tag
+            success = await this.processor.removeTag(todo, currentPriority!);
+          } else {
+            // Decrease priority
+            const newPriority = this.calculateLaterPriority(currentPriority);
+            success = await this.processor.setPriorityTag(todo, newPriority);
+          }
           if (success) onRefresh();
         });
     });
 
-    // Snooze - Set to #future
+    // Snooze - Toggle: if has #future, remove it; otherwise set to #future
     menu.addItem((item) => {
       item
-        .setTitle("Snooze")
+        .setTitle(hasFuture ? "Unsnooze" : "Snooze")
         .setIcon("moon")
         .onClick(async () => {
-          const success = await this.processor.setPriorityTag(todo, "#future");
+          let success: boolean;
+          if (hasFuture) {
+            // Remove #future tag
+            success = await this.processor.removeTag(todo, "#future");
+          } else {
+            // Set to #future
+            success = await this.processor.setPriorityTag(todo, "#future");
+          }
           if (success) onRefresh();
         });
     });

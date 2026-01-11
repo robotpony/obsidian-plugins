@@ -255,4 +255,41 @@ export class TodoProcessor {
       return false;
     }
   }
+
+  async removeTag(todo: TodoItem, tag: string): Promise<boolean> {
+    try {
+      const content = await this.app.vault.read(todo.file);
+      const lines = content.split("\n");
+
+      if (todo.lineNumber >= lines.length) {
+        throw new Error(
+          `Line number ${todo.lineNumber} out of bounds for file ${todo.filePath}`
+        );
+      }
+
+      let line = lines[todo.lineNumber];
+
+      // Remove the specified tag
+      const tagPattern = new RegExp(`${tag}\\b\\s*`, "g");
+      line = line.replace(tagPattern, "");
+
+      // Clean up extra whitespace
+      line = line.replace(/\s+/g, " ").trim();
+
+      lines[todo.lineNumber] = line;
+      await this.app.vault.modify(todo.file, lines.join("\n"));
+
+      // Trigger callback if set
+      if (this.onComplete) {
+        this.onComplete();
+      }
+
+      new Notice(`Removed ${tag}`);
+      return true;
+    } catch (error) {
+      console.error("Error removing tag:", error);
+      new Notice("Failed to remove tag. See console for details.");
+      return false;
+    }
+  }
 }

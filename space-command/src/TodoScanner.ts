@@ -165,13 +165,14 @@ export class TodoScanner extends Events {
   }
 
   private isInInlineCode(line: string): boolean {
-    // Check if #todo or #todone appears within backticks
-    // This handles inline code like `#todo` or `some code #todo here`
+    // Check if #todo, #todone, or #focus appears within backticks
+    // This handles inline code like `#todo` or `some code #focus here`
 
-    // Find all #todo and #todone positions
+    // Find all #todo, #todone, and #focus positions
     const todoMatches = [...line.matchAll(/#todo\b/g)];
     const todoneMatches = [...line.matchAll(/#todone\b/g)];
-    const allMatches = [...todoMatches, ...todoneMatches];
+    const focusMatches = [...line.matchAll(/#focus\b/g)];
+    const allMatches = [...todoMatches, ...todoneMatches, ...focusMatches];
 
     if (allMatches.length === 0) {
       return false;
@@ -190,7 +191,7 @@ export class TodoScanner extends Events {
       return false;
     }
 
-    // Check if any #todo/#todone is between backtick pairs
+    // Check if any #todo/#todone/#focus is between backtick pairs
     for (const match of allMatches) {
       const pos = match.index!;
 
