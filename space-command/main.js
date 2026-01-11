@@ -761,12 +761,13 @@ var EmbedRenderer = class {
   // Renders a TODO list with filters (includes both TODOs and TODONEs)
   renderTodos(container, filterString, todoneFile) {
     const filters = FilterParser.parse(filterString);
-    let todos = this.scanner.getTodos();
-    let todones = this.scanner.getTodones();
-    todos = FilterParser.applyFilters(todos, filters);
-    todones = FilterParser.applyFilters(todones, filters);
-    const combined = [...todos, ...todones];
-    this.renderTodoList(container, combined, todoneFile, filterString);
+    const allTodos = this.scanner.getTodos();
+    const allTodones = this.scanner.getTodones();
+    const unfiltered = [...allTodos, ...allTodones];
+    const filteredTodos = FilterParser.applyFilters(allTodos, filters);
+    const filteredTodones = FilterParser.applyFilters(allTodones, filters);
+    const combined = [...filteredTodos, ...filteredTodones];
+    this.renderTodoList(container, combined, todoneFile, filterString, unfiltered);
   }
   // Public helper method for focus-list code blocks
   renderProjects(container) {
@@ -802,12 +803,13 @@ var EmbedRenderer = class {
       filterString = afterPipe;
     }
     const filters = FilterParser.parse(filterString);
-    let todos = this.scanner.getTodos();
-    let todones = this.scanner.getTodones();
-    todos = FilterParser.applyFilters(todos, filters);
-    todones = FilterParser.applyFilters(todones, filters);
-    const combined = [...todos, ...todones];
-    this.renderTodoList(el, combined, todoneFile, filterString);
+    const allTodos = this.scanner.getTodos();
+    const allTodones = this.scanner.getTodones();
+    const unfiltered = [...allTodos, ...allTodones];
+    const filteredTodos = FilterParser.applyFilters(allTodos, filters);
+    const filteredTodones = FilterParser.applyFilters(allTodones, filters);
+    const combined = [...filteredTodos, ...filteredTodones];
+    this.renderTodoList(el, combined, todoneFile, filterString, unfiltered);
   }
   renderFocusList(container) {
     container.empty();
@@ -883,7 +885,7 @@ var EmbedRenderer = class {
     const match = text.match(/@(\d{4}-\d{2}-\d{2})/);
     return match ? match[1] : null;
   }
-  renderTodoList(container, todos, todoneFile, filterString = "") {
+  renderTodoList(container, todos, todoneFile, filterString = "", unfilteredTodos) {
     var _a;
     container.empty();
     container.addClass("space-command-embed");
@@ -923,8 +925,9 @@ var EmbedRenderer = class {
     const topLevelTodos = displayTodos.filter((t) => t.parentLineNumber === void 0);
     const sortedTodos = this.sortTodos(topLevelTodos);
     const list = container.createEl("ul", { cls: "contains-task-list" });
+    const allTodosForLookup = unfilteredTodos || todos;
     for (const todo of sortedTodos) {
-      this.renderTodoItem(list, todo, todos, showTodones, todoneFile, filterString);
+      this.renderTodoItem(list, todo, allTodosForLookup, showTodones, todoneFile, filterString);
     }
   }
   // Render a single todo item (and its children if it's a header)
@@ -1148,12 +1151,13 @@ var EmbedRenderer = class {
   // Refresh a specific embed
   refreshEmbed(container, todoneFile, filterString) {
     const filters = FilterParser.parse(filterString);
-    let todos = this.scanner.getTodos();
-    let todones = this.scanner.getTodones();
-    todos = FilterParser.applyFilters(todos, filters);
-    todones = FilterParser.applyFilters(todones, filters);
-    const combined = [...todos, ...todones];
-    this.renderTodoList(container, combined, todoneFile, filterString);
+    const allTodos = this.scanner.getTodos();
+    const allTodones = this.scanner.getTodones();
+    const unfiltered = [...allTodos, ...allTodones];
+    const filteredTodos = FilterParser.applyFilters(allTodos, filters);
+    const filteredTodones = FilterParser.applyFilters(allTodones, filters);
+    const combined = [...filteredTodos, ...filteredTodones];
+    this.renderTodoList(container, combined, todoneFile, filterString, unfiltered);
   }
   openFileAtLine(file, line) {
     const leaf = this.app.workspace.getLeaf(false);
