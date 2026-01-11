@@ -56,6 +56,8 @@ export class TodoSidebarView extends ItemView {
 
   private stripMarkdownSyntax(text: string): string {
     let cleaned = text;
+    // Remove heading markers (e.g., ####)
+    cleaned = cleaned.replace(/^#{1,6}\s+/, "");
     // Remove task list markers
     cleaned = cleaned.replace(/^-\s*\[\s*\]\s*/, "");
     cleaned = cleaned.replace(/^-\s*\[x\]\s*/, "");
@@ -308,11 +310,14 @@ export class TodoSidebarView extends ItemView {
   private renderTodoItem(list: HTMLElement, todo: TodoItem, isChild: boolean = false): void {
     const hasFocus = todo.tags.includes("#focus");
     const isHeader = todo.isHeader === true;
+    const hasChildren = isHeader && todo.childLineNumbers && todo.childLineNumbers.length > 0;
+
     const itemClasses = [
       'todo-item',
       hasFocus ? 'todo-focus' : '',
       isHeader ? 'todo-header' : '',
-      isChild ? 'todo-child' : ''
+      isChild ? 'todo-child' : '',
+      hasChildren ? 'todo-header-with-children' : ''
     ].filter(c => c).join(' ');
 
     const item = list.createEl("li", { cls: itemClasses });
@@ -323,8 +328,13 @@ export class TodoSidebarView extends ItemView {
       this.contextMenuHandler.showTodoMenu(e, todo, () => this.render());
     });
 
+    // For headers with children, create a row container for the header content
+    const rowContainer = hasChildren
+      ? item.createEl("div", { cls: "todo-header-row" })
+      : item;
+
     // Checkbox
-    const checkbox = item.createEl("input", {
+    const checkbox = rowContainer.createEl("input", {
       type: "checkbox",
       cls: "todo-checkbox",
     });
@@ -344,14 +354,21 @@ export class TodoSidebarView extends ItemView {
     });
 
     // Text content (strip markdown but keep tags)
-    const textSpan = item.createEl("span", { cls: "todo-text" });
+    const textSpan = rowContainer.createEl("span", { cls: "todo-text" });
     const cleanText = todo.text.replace(/#todo\b/g, "").trim();
     const displayText = this.stripMarkdownSyntax(cleanText);
     const displayWithStyledTags = this.wrapTagsInSpans(displayText);
-    textSpan.innerHTML = displayWithStyledTags + " ";
+
+    // For headers with children, append count inline with text
+    if (hasChildren) {
+      const childCount = todo.childLineNumbers!.length;
+      textSpan.innerHTML = displayWithStyledTags + ` <span class="todo-count">${childCount}</span> `;
+    } else {
+      textSpan.innerHTML = displayWithStyledTags + " ";
+    }
 
     // Link to source
-    const link = item.createEl("a", {
+    const link = rowContainer.createEl("a", {
       text: "→",
       cls: "todo-link",
       href: "#",
@@ -362,12 +379,12 @@ export class TodoSidebarView extends ItemView {
       this.openFileAtLine(todo.file, todo.lineNumber);
     });
 
-    // If this is a header with children, render children indented below
-    if (isHeader && todo.childLineNumbers && todo.childLineNumbers.length > 0) {
+    // If this is a header with children, render children indented below (outside the row)
+    if (hasChildren) {
       const childrenContainer = item.createEl("ul", { cls: "todo-children" });
       // Get children from scanner by line numbers
       const allTodos = this.scanner.getTodos();
-      for (const childLine of todo.childLineNumbers) {
+      for (const childLine of todo.childLineNumbers!) {
         const childTodo = allTodos.find(
           t => t.filePath === todo.filePath && t.lineNumber === childLine
         );

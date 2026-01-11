@@ -2,6 +2,15 @@
 
 All notable changes to the ⌥⌘ Space Command plugin will be documented in this file.
 
+## [0.6.1] - 2026-01-10
+
+### Improved
+
+- **Header TODO layout**: Headers with children now display vertically instead of side-by-side
+  - Header row shows: checkbox, title (without markdown), count badge, and link
+  - Children render indented below the header for better readability
+  - Markdown heading markers (`####`) stripped from display text
+
 ## [0.6.0] - 2026-01-10
 
 ### Added

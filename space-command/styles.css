@@ -383,18 +383,35 @@
 }
 
 /* Header TODO styling */
-.todo-header > .todo-text {
+.todo-header > .todo-text,
+.todo-header .todo-header-row > .todo-text {
   font-weight: 600;
+}
+
+/* Header with children - use block layout so children appear below */
+.todo-header-with-children {
+  display: block;
+}
+
+/* Header row (checkbox + text + count + link) stays as flex */
+.todo-header-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.todo-header-row > .todo-text {
+  flex: 1;
 }
 
 /* Child TODO container */
 .todo-children {
-  margin-left: 16px;
+  margin-left: 24px;
   margin-top: 4px;
   list-style: none;
   padding: 0;
   border-left: 2px solid var(--background-modifier-border);
-  padding-left: 8px;
+  padding-left: 12px;
 }
 
 /* Child TODO item styling */

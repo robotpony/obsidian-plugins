@@ -257,6 +257,7 @@ Available via Command Palette (Cmd/Ctrl+P):
 
 ## Version History
 
+- **v0.6.1** (2026-01-10) - Improved header TODO layout (vertical with children below)
 - **v0.6.0** (2026-01-10) - Header TODOs with children, focus highlighting, TODONE show/hide toggle
 - **v0.5.2** (2026-01-10) - `/todos` command, muted DONE section, tag-style counts
 - **v0.5.0** (2026-01-10) - Auto-sorting, right-click in embeds, muted pill styling
