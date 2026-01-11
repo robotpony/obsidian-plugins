@@ -392,8 +392,9 @@
 }
 
 /* Header with children - use block layout so children appear below */
-/* Higher specificity to override .space-command-embed .task-list-item flex */
-.space-command-embed .task-list-item.todo-header-with-children {
+/* Higher specificity to override flex layouts in both sidebar and embed */
+.space-command-embed .task-list-item.todo-header-with-children,
+.space-command-sidebar .todo-item.todo-header-with-children {
   display: block;
 }
 
