@@ -148,6 +148,8 @@
   list-style: none;
   padding: 0;
   margin: 0;
+  display: flex !important;
+  flex-direction: column !important;
 }
 
 .space-command-embed .task-list-item {
@@ -333,7 +335,7 @@
   display: flex;
   justify-content: flex-end;
   margin-bottom: 4px;
-  margin-top: -1em;
+  margin-right: 5em !important;
 }
 
 .embed-refresh-btn {
@@ -390,7 +392,8 @@
 }
 
 /* Header with children - use block layout so children appear below */
-.todo-header-with-children {
+/* Higher specificity to override .space-command-embed .task-list-item flex */
+.space-command-embed .task-list-item.todo-header-with-children {
   display: block;
 }
 
