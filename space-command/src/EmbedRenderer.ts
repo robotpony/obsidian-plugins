@@ -289,7 +289,7 @@ export class EmbedRenderer {
     // Set up auto-refresh listener
     this.setupAutoRefresh(container, todoneFile, filterString);
 
-    // Filter todos based on visibility setting
+    // Filter todos for display based on visibility setting
     let displayTodos = todos;
     if (!showTodones) {
       displayTodos = todos.filter(t => !t.tags.includes("#todone"));
@@ -312,7 +312,8 @@ export class EmbedRenderer {
     const list = container.createEl("ul", { cls: "contains-task-list" });
 
     for (const todo of sortedTodos) {
-      this.renderTodoItem(list, todo, displayTodos, todoneFile, filterString);
+      // Pass full todos array for child lookup, and showTodones for visibility
+      this.renderTodoItem(list, todo, todos, showTodones, todoneFile, filterString);
     }
   }
 
@@ -321,20 +322,30 @@ export class EmbedRenderer {
     list: HTMLElement,
     todo: TodoItem,
     allTodos: TodoItem[],
+    showTodones: boolean,
     todoneFile: string,
     filterString: string,
     isChild: boolean = false
   ): void {
     const isCompleted = todo.tags.includes("#todone");
     const isHeader = todo.isHeader === true;
+    const hasChildren = isHeader && todo.childLineNumbers && todo.childLineNumbers.length > 0;
+
     const itemClasses = [
       'task-list-item',
       isCompleted ? 'todone-item' : '',
       isHeader ? 'todo-header' : '',
-      isChild ? 'todo-child' : ''
+      isChild ? 'todo-child' : '',
+      hasChildren ? 'todo-header-with-children' : ''
     ].filter(c => c).join(' ');
 
     const item = list.createEl("li", { cls: itemClasses });
+
+    // For headers with children, create a row container for the header content
+    // This allows children to appear below (block layout) while header stays flex
+    const rowContainer = hasChildren
+      ? item.createEl("div", { cls: "todo-header-row" })
+      : item;
 
     // Add right-click context menu for active TODOs
     if (!isCompleted) {
@@ -348,7 +359,7 @@ export class EmbedRenderer {
     }
 
     // Create checkbox
-    const checkbox = item.createEl("input", {
+    const checkbox = rowContainer.createEl("input", {
       type: "checkbox",
       cls: "task-list-item-checkbox",
     });
@@ -374,7 +385,7 @@ export class EmbedRenderer {
     });
 
     // Add todo text (without the #todo/#todone tag)
-    const textSpan = item.createEl("span", { cls: "todo-text" });
+    const textSpan = rowContainer.createEl("span", { cls: "todo-text" });
     if (isCompleted) {
       textSpan.addClass("todone-text");
     }
@@ -397,14 +408,14 @@ export class EmbedRenderer {
 
     // Add completion date with muted pill style for completed items
     if (completionDate) {
-      item.createEl("span", {
+      rowContainer.createEl("span", {
         cls: "todo-date muted-pill",
         text: completionDate,
       });
     }
 
     // Add link to source
-    const link = item.createEl("a", {
+    const link = rowContainer.createEl("a", {
       text: "→",
       cls: "todo-source-link",
       href: "#",
@@ -423,7 +434,11 @@ export class EmbedRenderer {
           t => t.filePath === todo.filePath && t.lineNumber === childLine
         );
         if (childTodo) {
-          this.renderTodoItem(childrenContainer, childTodo, allTodos, todoneFile, filterString, true);
+          // Skip completed children if showTodones is false
+          if (!showTodones && childTodo.tags.includes("#todone")) {
+            continue;
+          }
+          this.renderTodoItem(childrenContainer, childTodo, allTodos, showTodones, todoneFile, filterString, true);
         }
       }
     }

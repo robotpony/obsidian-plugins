@@ -924,20 +924,23 @@ var EmbedRenderer = class {
     const sortedTodos = this.sortTodos(topLevelTodos);
     const list = container.createEl("ul", { cls: "contains-task-list" });
     for (const todo of sortedTodos) {
-      this.renderTodoItem(list, todo, displayTodos, todoneFile, filterString);
+      this.renderTodoItem(list, todo, todos, showTodones, todoneFile, filterString);
     }
   }
   // Render a single todo item (and its children if it's a header)
-  renderTodoItem(list, todo, allTodos, todoneFile, filterString, isChild = false) {
+  renderTodoItem(list, todo, allTodos, showTodones, todoneFile, filterString, isChild = false) {
     const isCompleted = todo.tags.includes("#todone");
     const isHeader = todo.isHeader === true;
+    const hasChildren = isHeader && todo.childLineNumbers && todo.childLineNumbers.length > 0;
     const itemClasses = [
       "task-list-item",
       isCompleted ? "todone-item" : "",
       isHeader ? "todo-header" : "",
-      isChild ? "todo-child" : ""
+      isChild ? "todo-child" : "",
+      hasChildren ? "todo-header-with-children" : ""
     ].filter((c) => c).join(" ");
     const item = list.createEl("li", { cls: itemClasses });
+    const rowContainer = hasChildren ? item.createEl("div", { cls: "todo-header-row" }) : item;
     if (!isCompleted) {
       item.addEventListener("contextmenu", (e) => {
         e.preventDefault();
@@ -946,7 +949,7 @@ var EmbedRenderer = class {
         });
       });
     }
-    const checkbox = item.createEl("input", {
+    const checkbox = rowContainer.createEl("input", {
       type: "checkbox",
       cls: "task-list-item-checkbox"
     });
@@ -968,7 +971,7 @@ var EmbedRenderer = class {
         checkbox.disabled = false;
       }
     });
-    const textSpan = item.createEl("span", { cls: "todo-text" });
+    const textSpan = rowContainer.createEl("span", { cls: "todo-text" });
     if (isCompleted) {
       textSpan.addClass("todone-text");
     }
@@ -982,12 +985,12 @@ var EmbedRenderer = class {
     this.renderInlineMarkdown(displayText, textSpan);
     textSpan.append(" ");
     if (completionDate) {
-      item.createEl("span", {
+      rowContainer.createEl("span", {
         cls: "todo-date muted-pill",
         text: completionDate
       });
     }
-    const link = item.createEl("a", {
+    const link = rowContainer.createEl("a", {
       text: "\u2192",
       cls: "todo-source-link",
       href: "#"
@@ -1003,7 +1006,10 @@ var EmbedRenderer = class {
           (t) => t.filePath === todo.filePath && t.lineNumber === childLine
         );
         if (childTodo) {
-          this.renderTodoItem(childrenContainer, childTodo, allTodos, todoneFile, filterString, true);
+          if (!showTodones && childTodo.tags.includes("#todone")) {
+            continue;
+          }
+          this.renderTodoItem(childrenContainer, childTodo, allTodos, showTodones, todoneFile, filterString, true);
         }
       }
     }

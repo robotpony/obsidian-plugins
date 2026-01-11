@@ -1,26 +1,33 @@
 # ⌥⌘ Space Command
 
-An Obsidian plugin for managing TODOs and TODONEs across your vault with live embeds and interactive sidebar.
+An Obsidian plugin for managing TODOs across your vault with live embeds and interactive sidebar.
 
 ## Table of Contents
 
-- [Features](#features)
-- [Quick Start](#quick-start)
-- [Slash Commands & Quick Insert](#slash-commands--quick-insert)
-- [Syntax](#syntax)
-  - [Inline Syntax](#inline-syntax)
-  - [Code Block Syntax](#code-block-syntax-recommended)
-  - [Filters](#filters)
-- [Usage](#usage)
-  - [Creating TODOs](#creating-todos)
-  - [Completing TODOs](#completing-todos)
-  - [Un-completing TODONEs](#un-completing-todones)
-  - [Priority System](#priority-system)
-  - [Context Menus](#context-menus)
-  - [Keyboard Shortcuts](#keyboard-shortcuts)
-- [Installation](#installation)
-- [Settings](#settings)
-- [License](#license)
+- [⌥⌘ Space Command](#-space-command)
+  - [Table of Contents](#table-of-contents)
+  - [Features](#features)
+  - [Quick Start](#quick-start)
+  - [Slash Commands \& Quick Insert](#slash-commands--quick-insert)
+    - [Slash Commands (at start of line)](#slash-commands-at-start-of-line)
+    - [@date Quick Insert (anywhere)](#date-quick-insert-anywhere)
+  - [Syntax](#syntax)
+    - [Inline Syntax](#inline-syntax)
+    - [Code Block Syntax (Recommended)](#code-block-syntax-recommended)
+    - [Filters](#filters)
+  - [Usage](#usage)
+    - [Creating TODOs](#creating-todos)
+    - [Completing TODOs](#completing-todos)
+    - [Un-completing TODONEs](#un-completing-todones)
+    - [Priority System](#priority-system)
+    - [Context Menus](#context-menus)
+    - [Keyboard Shortcuts](#keyboard-shortcuts)
+  - [Installation](#installation)
+    - [Manual Installation](#manual-installation)
+    - [Development](#development)
+  - [Settings](#settings)
+  - [Commands](#commands)
+  - [License](#license)
 
 ## Features
 
