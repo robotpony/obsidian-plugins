@@ -93,9 +93,10 @@ export class CodeBlockProcessor {
 
     if (isFilter) {
       // All content is filters, use default file
+      // Join with | since FilterParser splits by pipe
       return {
         todoneFile: this.defaultTodoneFile,
-        filterString: lines.join(" "),
+        filterString: lines.join(" | "),
       };
     }
 
@@ -109,8 +110,9 @@ export class CodeBlockProcessor {
     }
 
     // Multi-line format: first line is file, remaining lines are filters
+    // Join with | since FilterParser splits by pipe
     const todoneFile = firstLine;
-    const filterString = lines.slice(1).join(" ");
+    const filterString = lines.slice(1).join(" | ");
 
     return { todoneFile, filterString };
   }

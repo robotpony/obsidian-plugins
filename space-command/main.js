@@ -1251,7 +1251,7 @@ var CodeBlockProcessor = class {
     if (isFilter) {
       return {
         todoneFile: this.defaultTodoneFile,
-        filterString: lines.join(" ")
+        filterString: lines.join(" | ")
       };
     }
     if (firstLine.includes("|")) {
@@ -1262,7 +1262,7 @@ var CodeBlockProcessor = class {
       };
     }
     const todoneFile = firstLine;
-    const filterString = lines.slice(1).join(" ");
+    const filterString = lines.slice(1).join(" | ");
     return { todoneFile, filterString };
   }
 };
