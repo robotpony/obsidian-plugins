@@ -29,7 +29,12 @@ export class TodoProcessor {
     try {
       const today = formatDate(new Date(), this.dateFormat);
 
-      // Step 1: Update the source file
+      // If this is a header TODO with children, complete all children first
+      if (todo.isHeader && todo.childLineNumbers && todo.childLineNumbers.length > 0) {
+        await this.completeChildrenLines(todo.file, todo.childLineNumbers, today);
+      }
+
+      // Step 1: Update the source file (header or regular TODO)
       await this.updateSourceFile(todo, today);
 
       // Step 2: Append to TODONE log file
@@ -40,13 +45,49 @@ export class TodoProcessor {
         this.onComplete();
       }
 
-      new Notice("TODO marked as complete!");
+      const childCount = todo.childLineNumbers?.length || 0;
+      const message = childCount > 0
+        ? `TODO marked as complete! (including ${childCount} child item${childCount > 1 ? 's' : ''})`
+        : "TODO marked as complete!";
+      new Notice(message);
       return true;
     } catch (error) {
       console.error("Error completing TODO:", error);
       new Notice("Failed to complete TODO. See console for details.");
       return false;
     }
+  }
+
+  // Complete all child lines of a header TODO
+  private async completeChildrenLines(file: TFile, lineNumbers: number[], date: string): Promise<void> {
+    const content = await this.app.vault.read(file);
+    const lines = content.split("\n");
+
+    // Process children (modify lines in place)
+    for (const lineNum of lineNumbers) {
+      if (lineNum >= lines.length) continue;
+
+      let line = lines[lineNum];
+
+      // Add #todone @date if not already present
+      if (!line.includes('#todone')) {
+        if (line.includes('#todo')) {
+          line = replaceTodoWithTodone(line, date);
+        } else {
+          // Child item without explicit tag - add #todone @date
+          line = line.trimEnd() + ` #todone @${date}`;
+        }
+      }
+
+      // Mark checkbox if present
+      if (/\[\s*\]/.test(line)) {
+        line = markCheckboxComplete(line);
+      }
+
+      lines[lineNum] = line;
+    }
+
+    await this.app.vault.modify(file, lines.join("\n"));
   }
 
   async uncompleteTodo(todo: TodoItem): Promise<boolean> {

@@ -38,6 +38,9 @@ export class TodoScanner extends Events {
       // Track code block state
       let inCodeBlock = false;
 
+      // Track current header TODO context for parent-child relationships
+      let currentHeaderTodo: { lineNumber: number; level: number; todoItem: TodoItem } | null = null;
+
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
 
@@ -59,6 +62,56 @@ export class TodoScanner extends Events {
 
         const tags = extractTags(line);
 
+        // Check if this is a header with #todo or #todone
+        const headerInfo = this.detectHeader(line);
+
+        // If we encounter any header (with or without tags), check if it ends current header scope
+        if (headerInfo && currentHeaderTodo) {
+          if (headerInfo.level <= currentHeaderTodo.level) {
+            currentHeaderTodo = null;
+          }
+        }
+
+        // Process header with #todo tag
+        if (headerInfo && tags.includes("#todo") && !tags.includes("#todone")) {
+          const headerTodo = this.createTodoItem(file, i, line, tags);
+          headerTodo.isHeader = true;
+          headerTodo.headerLevel = headerInfo.level;
+          headerTodo.childLineNumbers = [];
+          todos.push(headerTodo);
+          currentHeaderTodo = { lineNumber: i, level: headerInfo.level, todoItem: headerTodo };
+          continue;
+        }
+
+        // Process header with #todone tag
+        if (headerInfo && tags.includes("#todone")) {
+          const headerTodone = this.createTodoItem(file, i, line, tags);
+          headerTodone.isHeader = true;
+          headerTodone.headerLevel = headerInfo.level;
+          todones.push(headerTodone);
+          // Reset header context since this header is completed
+          currentHeaderTodo = null;
+          continue;
+        }
+
+        // If we're under a header TODO and this is a list item, treat as child
+        if (currentHeaderTodo && this.isListItem(line)) {
+          const childItem = this.createTodoItem(file, i, line, tags);
+          childItem.parentLineNumber = currentHeaderTodo.lineNumber;
+          // Add this line number to parent's children
+          currentHeaderTodo.todoItem.childLineNumbers!.push(i);
+
+          // Add child to appropriate list based on its own tags
+          if (tags.includes("#todone")) {
+            todones.push(childItem);
+          } else {
+            // Child items don't need explicit #todo tag - they inherit from parent
+            todos.push(childItem);
+          }
+          continue;
+        }
+
+        // Regular TODO/TODONE processing (non-header, non-child items)
         // If line has both #todo and #todone, #todone wins and we clean up the #todo
         if (tags.includes("#todone") && tags.includes("#todo")) {
           // Queue this line for cleanup (remove #todo tag)
@@ -94,6 +147,21 @@ export class TodoScanner extends Events {
     } catch (error) {
       console.error(`Error scanning file ${file.path}:`, error);
     }
+  }
+
+  // Detect markdown header and return its level
+  private detectHeader(line: string): { level: number } | null {
+    const match = line.match(/^(#{1,6})\s+/);
+    if (match) {
+      return { level: match[1].length };
+    }
+    return null;
+  }
+
+  // Check if a line is a list item (bullet or numbered)
+  private isListItem(line: string): boolean {
+    // Match: "- ", "* ", "+ ", "1. ", "  - " (indented), etc.
+    return /^[\s]*[-*+]\s/.test(line) || /^[\s]*\d+\.\s/.test(line);
   }
 
   private isInInlineCode(line: string): boolean {

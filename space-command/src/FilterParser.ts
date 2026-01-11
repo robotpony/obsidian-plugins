@@ -32,6 +32,13 @@ export class FilterParser {
           filters.limit = limit;
         }
       }
+      // Parse todone:show|hide
+      else if (part.startsWith("todone:")) {
+        const value = part.substring(7).trim().toLowerCase();
+        if (value === 'show' || value === 'hide') {
+          filters.todone = value;
+        }
+      }
     }
 
     return filters;

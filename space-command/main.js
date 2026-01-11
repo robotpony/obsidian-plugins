@@ -87,6 +87,7 @@ var TodoScanner = class extends import_obsidian2.Events {
       const todones = [];
       const linesToCleanup = [];
       let inCodeBlock = false;
+      let currentHeaderTodo = null;
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         if (line.trim().startsWith("```")) {
@@ -100,6 +101,40 @@ var TodoScanner = class extends import_obsidian2.Events {
           continue;
         }
         const tags = extractTags(line);
+        const headerInfo = this.detectHeader(line);
+        if (headerInfo && currentHeaderTodo) {
+          if (headerInfo.level <= currentHeaderTodo.level) {
+            currentHeaderTodo = null;
+          }
+        }
+        if (headerInfo && tags.includes("#todo") && !tags.includes("#todone")) {
+          const headerTodo = this.createTodoItem(file, i, line, tags);
+          headerTodo.isHeader = true;
+          headerTodo.headerLevel = headerInfo.level;
+          headerTodo.childLineNumbers = [];
+          todos.push(headerTodo);
+          currentHeaderTodo = { lineNumber: i, level: headerInfo.level, todoItem: headerTodo };
+          continue;
+        }
+        if (headerInfo && tags.includes("#todone")) {
+          const headerTodone = this.createTodoItem(file, i, line, tags);
+          headerTodone.isHeader = true;
+          headerTodone.headerLevel = headerInfo.level;
+          todones.push(headerTodone);
+          currentHeaderTodo = null;
+          continue;
+        }
+        if (currentHeaderTodo && this.isListItem(line)) {
+          const childItem = this.createTodoItem(file, i, line, tags);
+          childItem.parentLineNumber = currentHeaderTodo.lineNumber;
+          currentHeaderTodo.todoItem.childLineNumbers.push(i);
+          if (tags.includes("#todone")) {
+            todones.push(childItem);
+          } else {
+            todos.push(childItem);
+          }
+          continue;
+        }
         if (tags.includes("#todone") && tags.includes("#todo")) {
           linesToCleanup.push(i);
           todones.push(this.createTodoItem(file, i, line, tags));
@@ -126,6 +161,18 @@ var TodoScanner = class extends import_obsidian2.Events {
     } catch (error) {
       console.error(`Error scanning file ${file.path}:`, error);
     }
+  }
+  // Detect markdown header and return its level
+  detectHeader(line) {
+    const match = line.match(/^(#{1,6})\s+/);
+    if (match) {
+      return { level: match[1].length };
+    }
+    return null;
+  }
+  // Check if a line is a list item (bullet or numbered)
+  isListItem(line) {
+    return /^[\s]*[-*+]\s/.test(line) || /^[\s]*\d+\.\s/.test(line);
   }
   isInInlineCode(line) {
     const todoMatches = [...line.matchAll(/#todo\b/g)];
@@ -238,20 +285,48 @@ var TodoProcessor = class {
     this.onComplete = callback;
   }
   async completeTodo(todo, todoneFilePath) {
+    var _a;
     try {
       const today = formatDate(/* @__PURE__ */ new Date(), this.dateFormat);
+      if (todo.isHeader && todo.childLineNumbers && todo.childLineNumbers.length > 0) {
+        await this.completeChildrenLines(todo.file, todo.childLineNumbers, today);
+      }
       await this.updateSourceFile(todo, today);
       await this.appendToTodoneFile(todo, todoneFilePath, today);
       if (this.onComplete) {
         this.onComplete();
       }
-      new import_obsidian3.Notice("TODO marked as complete!");
+      const childCount = ((_a = todo.childLineNumbers) == null ? void 0 : _a.length) || 0;
+      const message = childCount > 0 ? `TODO marked as complete! (including ${childCount} child item${childCount > 1 ? "s" : ""})` : "TODO marked as complete!";
+      new import_obsidian3.Notice(message);
       return true;
     } catch (error) {
       console.error("Error completing TODO:", error);
       new import_obsidian3.Notice("Failed to complete TODO. See console for details.");
       return false;
     }
+  }
+  // Complete all child lines of a header TODO
+  async completeChildrenLines(file, lineNumbers, date) {
+    const content = await this.app.vault.read(file);
+    const lines = content.split("\n");
+    for (const lineNum of lineNumbers) {
+      if (lineNum >= lines.length)
+        continue;
+      let line = lines[lineNum];
+      if (!line.includes("#todone")) {
+        if (line.includes("#todo")) {
+          line = replaceTodoWithTodone(line, date);
+        } else {
+          line = line.trimEnd() + ` #todone @${date}`;
+        }
+      }
+      if (/\[\s*\]/.test(line)) {
+        line = markCheckboxComplete(line);
+      }
+      lines[lineNum] = line;
+    }
+    await this.app.vault.modify(file, lines.join("\n"));
   }
   async uncompleteTodo(todo) {
     try {
@@ -485,6 +560,11 @@ var FilterParser = class {
         if (!isNaN(limit) && limit > 0) {
           filters.limit = limit;
         }
+      } else if (part.startsWith("todone:")) {
+        const value = part.substring(7).trim().toLowerCase();
+        if (value === "show" || value === "hide") {
+          filters.todone = value;
+        }
       }
     }
     return filters;
@@ -604,6 +684,8 @@ var EmbedRenderer = class {
   constructor(app, scanner, processor, projectManager, defaultTodoneFile = "todos/done.md", focusListLimit = 5, priorityTags = ["#p0", "#p1", "#p2", "#p3", "#p4"]) {
     // Track active renders for event cleanup
     this.activeRenders = /* @__PURE__ */ new Map();
+    // Track TODONE visibility state per container
+    this.todoneVisibility = /* @__PURE__ */ new Map();
     this.app = app;
     this.scanner = scanner;
     this.processor = processor;
@@ -620,6 +702,7 @@ var EmbedRenderer = class {
       this.scanner.off("todos-updated", listener);
       this.activeRenders.delete(container);
     }
+    this.todoneVisibility.delete(container);
   }
   // Cleanup all renders (called on plugin unload)
   cleanupAll() {
@@ -755,9 +838,22 @@ var EmbedRenderer = class {
     return match ? match[1] : null;
   }
   renderTodoList(container, todos, todoneFile, filterString = "") {
+    var _a;
     container.empty();
     container.addClass("space-command-embed");
+    const filters = FilterParser.parse(filterString);
+    const showTodones = (_a = this.todoneVisibility.get(container)) != null ? _a : filters.todone !== "hide";
+    this.todoneVisibility.set(container, showTodones);
     const header = container.createEl("div", { cls: "embed-header" });
+    const toggleBtn = header.createEl("button", {
+      cls: `clickable-icon embed-toggle-todone-btn${showTodones ? " active" : ""}`,
+      attr: { "aria-label": showTodones ? "Hide completed" : "Show completed" }
+    });
+    toggleBtn.innerHTML = showTodones ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>';
+    toggleBtn.addEventListener("click", () => {
+      this.todoneVisibility.set(container, !showTodones);
+      this.refreshEmbed(container, todoneFile, filterString);
+    });
     const refreshBtn = header.createEl("button", {
       cls: "clickable-icon embed-refresh-btn",
       attr: { "aria-label": "Refresh" }
@@ -767,84 +863,103 @@ var EmbedRenderer = class {
       this.refreshEmbed(container, todoneFile, filterString);
     });
     this.setupAutoRefresh(container, todoneFile, filterString);
-    if (todos.length === 0) {
+    let displayTodos = todos;
+    if (!showTodones) {
+      displayTodos = todos.filter((t) => !t.tags.includes("#todone"));
+    }
+    if (displayTodos.length === 0) {
       container.createEl("div", {
-        text: "No active TODOs",
+        text: showTodones ? "No TODOs" : "No active TODOs",
         cls: "space-command-empty"
       });
       return;
     }
-    const sortedTodos = this.sortTodos(todos);
+    const topLevelTodos = displayTodos.filter((t) => t.parentLineNumber === void 0);
+    const sortedTodos = this.sortTodos(topLevelTodos);
     const list = container.createEl("ul", { cls: "contains-task-list" });
     for (const todo of sortedTodos) {
-      const isCompleted = todo.tags.includes("#todone");
-      const item = list.createEl("li", { cls: "task-list-item" });
-      if (!isCompleted) {
-        item.addEventListener("contextmenu", (e) => {
-          e.preventDefault();
-          this.contextMenuHandler.showTodoMenu(e, todo, () => {
-            const filters = FilterParser.parse(filterString);
-            let refreshedTodos = this.scanner.getTodos();
-            refreshedTodos = FilterParser.applyFilters(refreshedTodos, filters);
-            this.renderTodoList(container, refreshedTodos, todoneFile, filterString);
-          });
-        });
-      }
-      const checkbox = item.createEl("input", {
-        type: "checkbox",
-        cls: "task-list-item-checkbox"
-      });
-      if (isCompleted) {
-        checkbox.checked = true;
-        checkbox.disabled = true;
-        item.addClass("todone-item");
-      }
-      checkbox.addEventListener("change", async () => {
-        if (isCompleted)
-          return;
-        checkbox.disabled = true;
-        const success = await this.processor.completeTodo(todo, todoneFile);
-        if (success) {
-          item.remove();
-          if (list.children.length === 0) {
-            container.empty();
-            container.createEl("div", {
-              text: "No active TODOs",
-              cls: "space-command-empty"
-            });
-          }
-        } else {
-          checkbox.disabled = false;
-        }
-      });
-      const textSpan = item.createEl("span", { cls: "todo-text" });
-      if (isCompleted) {
-        textSpan.addClass("todone-text");
-      }
-      let cleanText = todo.text.replace(/#todo\b/g, "").replace(/#todone\b/g, "").trim();
-      const completionDate = isCompleted ? this.extractCompletionDate(cleanText) : null;
-      if (completionDate) {
-        cleanText = cleanText.replace(/@\d{4}-\d{2}-\d{2}/, "").trim();
-      }
-      let displayText = cleanText.replace(/^-\s*\[\s*\]\s*/, "").replace(/^-\s*\[x\]\s*/i, "");
-      displayText = displayText.replace(/^[*\-+]\s+/, "").replace(/^>\s+/, "");
-      this.renderInlineMarkdown(displayText, textSpan);
-      textSpan.append(" ");
-      if (completionDate) {
-        item.createEl("span", {
-          cls: "todo-date muted-pill",
-          text: completionDate
-        });
-      }
-      const link = item.createEl("a", {
-        text: "\u2192",
-        cls: "todo-source-link",
-        href: "#"
-      });
-      link.addEventListener("click", (e) => {
+      this.renderTodoItem(list, todo, displayTodos, todoneFile, filterString);
+    }
+  }
+  // Render a single todo item (and its children if it's a header)
+  renderTodoItem(list, todo, allTodos, todoneFile, filterString, isChild = false) {
+    const isCompleted = todo.tags.includes("#todone");
+    const isHeader = todo.isHeader === true;
+    const itemClasses = [
+      "task-list-item",
+      isCompleted ? "todone-item" : "",
+      isHeader ? "todo-header" : "",
+      isChild ? "todo-child" : ""
+    ].filter((c) => c).join(" ");
+    const item = list.createEl("li", { cls: itemClasses });
+    if (!isCompleted) {
+      item.addEventListener("contextmenu", (e) => {
         e.preventDefault();
-        this.openFileAtLine(todo.file, todo.lineNumber);
+        this.contextMenuHandler.showTodoMenu(e, todo, () => {
+          this.refreshEmbed(list.closest(".space-command-embed"), todoneFile, filterString);
+        });
       });
+    }
+    const checkbox = item.createEl("input", {
+      type: "checkbox",
+      cls: "task-list-item-checkbox"
+    });
+    if (isCompleted) {
+      checkbox.checked = true;
+      checkbox.disabled = true;
+    }
+    checkbox.addEventListener("change", async () => {
+      if (isCompleted)
+        return;
+      checkbox.disabled = true;
+      const success = await this.processor.completeTodo(todo, todoneFile);
+      if (success) {
+        const container = list.closest(".space-command-embed");
+        if (container) {
+          this.refreshEmbed(container, todoneFile, filterString);
+        }
+      } else {
+        checkbox.disabled = false;
+      }
+    });
+    const textSpan = item.createEl("span", { cls: "todo-text" });
+    if (isCompleted) {
+      textSpan.addClass("todone-text");
+    }
+    let cleanText = todo.text.replace(/#todo\b/g, "").replace(/#todone\b/g, "").trim();
+    const completionDate = isCompleted ? this.extractCompletionDate(cleanText) : null;
+    if (completionDate) {
+      cleanText = cleanText.replace(/@\d{4}-\d{2}-\d{2}/, "").trim();
+    }
+    let displayText = cleanText.replace(/^-\s*\[\s*\]\s*/, "").replace(/^-\s*\[x\]\s*/i, "");
+    displayText = displayText.replace(/^[*\-+]\s+/, "").replace(/^>\s+/, "");
+    this.renderInlineMarkdown(displayText, textSpan);
+    textSpan.append(" ");
+    if (completionDate) {
+      item.createEl("span", {
+        cls: "todo-date muted-pill",
+        text: completionDate
+      });
+    }
+    const link = item.createEl("a", {
+      text: "\u2192",
+      cls: "todo-source-link",
+      href: "#"
+    });
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      this.openFileAtLine(todo.file, todo.lineNumber);
+    });
+    if (isHeader && todo.childLineNumbers && todo.childLineNumbers.length > 0) {
+      const childrenContainer = item.createEl("ul", { cls: "todo-children contains-task-list" });
+      for (const childLine of todo.childLineNumbers) {
+        const childTodo = allTodos.find(
+          (t) => t.filePath === todo.filePath && t.lineNumber === childLine
+        );
+        if (childTodo) {
+          this.renderTodoItem(childrenContainer, childTodo, allTodos, todoneFile, filterString, true);
+        }
+      }
     }
   }
   // Render inline markdown without creating block elements
@@ -1080,7 +1195,7 @@ var CodeBlockProcessor = class {
       };
     }
     const firstLine = lines[0];
-    const isFilter = firstLine.includes("|") || firstLine.startsWith("path:") || firstLine.startsWith("tags:") || firstLine.startsWith("limit:");
+    const isFilter = firstLine.includes("|") || firstLine.startsWith("path:") || firstLine.startsWith("tags:") || firstLine.startsWith("limit:") || firstLine.startsWith("todone:");
     if (isFilter) {
       return {
         todoneFile: this.defaultTodoneFile,
@@ -1133,6 +1248,17 @@ var SlashCommandSuggest = class extends import_obsidian6.EditorSuggest {
         action: (editor, start, end) => {
           editor.replaceRange("- [ ] #todo ", start, end);
           editor.setCursor({ line: start.line, ch: start.ch + 12 });
+        }
+      },
+      {
+        id: "todos",
+        name: "Todos",
+        description: "Insert a TODO list with heading",
+        icon: "\u2630",
+        action: (editor, start, end) => {
+          const text = "## TODOs\n\n- [ ] #todo ";
+          editor.replaceRange(text, start, end);
+          editor.setCursor({ line: start.line + 2, ch: 12 });
         }
       },
       {
@@ -1356,8 +1482,6 @@ var VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 var TodoSidebarView = class extends import_obsidian8.ItemView {
   constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, recentTodonesLimit) {
     super(leaf);
-    this.todonesCollapsed = false;
-    this.projectsCollapsed = false;
     this.updateListener = null;
     this.scanner = scanner;
     this.processor = processor;
@@ -1494,15 +1618,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       cls: "todo-section-header projects-header"
     });
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
-    const collapseIcon = this.projectsCollapsed ? "\u25B6" : "\u25BC";
-    titleSpan.innerHTML = `<span class="collapse-icon">${collapseIcon}</span> Focus <span class="project-count">(${projects.length})</span>`;
-    header.addEventListener("click", () => {
-      this.projectsCollapsed = !this.projectsCollapsed;
-      this.render();
-    });
-    if (this.projectsCollapsed) {
-      return;
-    }
+    titleSpan.innerHTML = `Focus <span class="project-count">${projects.length}</span>`;
     if (projects.length === 0) {
       section.createEl("div", {
         text: "No focus projects yet",
@@ -1522,7 +1638,8 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     }
   }
   renderProjectItem(list, project) {
-    const item = list.createEl("li", { cls: "project-item" });
+    const hasFocusItems = project.highestPriority === 0;
+    const item = list.createEl("li", { cls: `project-item${hasFocusItems ? " project-focus" : ""}` });
     const checkbox = item.createEl("input", {
       type: "checkbox",
       cls: "project-checkbox"
@@ -1535,7 +1652,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       }
     });
     const textSpan = item.createEl("span", { cls: "project-text" });
-    textSpan.innerHTML = `${project.tag} <span class="project-count">(${project.count})</span> `;
+    textSpan.innerHTML = `${project.tag} <span class="project-count">${project.count}</span> `;
     const link = item.createEl("a", {
       text: "\u2192",
       cls: "project-link",
@@ -1549,11 +1666,12 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
   renderActiveTodos(container) {
     let todos = this.scanner.getTodos();
     todos = todos.filter((todo) => !todo.tags.includes("#future"));
+    todos = todos.filter((todo) => todo.parentLineNumber === void 0);
     todos = this.sortTodosByPriority(todos);
     const section = container.createEl("div", { cls: "todo-section" });
     const header = section.createEl("div", { cls: "todo-section-header" });
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
-    titleSpan.innerHTML = `\u25BC TODO <span class="todo-count">(${todos.length})</span>`;
+    titleSpan.innerHTML = `TODO <span class="todo-count">${todos.length}</span>`;
     if (todos.length === 0) {
       section.createEl("div", {
         text: "No TODOs",
@@ -1566,8 +1684,16 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       this.renderTodoItem(list, todo);
     }
   }
-  renderTodoItem(list, todo) {
-    const item = list.createEl("li", { cls: "todo-item" });
+  renderTodoItem(list, todo, isChild = false) {
+    const hasFocus = todo.tags.includes("#focus");
+    const isHeader = todo.isHeader === true;
+    const itemClasses = [
+      "todo-item",
+      hasFocus ? "todo-focus" : "",
+      isHeader ? "todo-header" : "",
+      isChild ? "todo-child" : ""
+    ].filter((c) => c).join(" ");
+    const item = list.createEl("li", { cls: itemClasses });
     item.addEventListener("contextmenu", (e) => {
       e.preventDefault();
       this.contextMenuHandler.showTodoMenu(e, todo, () => this.render());
@@ -1602,6 +1728,18 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       e.preventDefault();
       this.openFileAtLine(todo.file, todo.lineNumber);
     });
+    if (isHeader && todo.childLineNumbers && todo.childLineNumbers.length > 0) {
+      const childrenContainer = item.createEl("ul", { cls: "todo-children" });
+      const allTodos = this.scanner.getTodos();
+      for (const childLine of todo.childLineNumbers) {
+        const childTodo = allTodos.find(
+          (t) => t.filePath === todo.filePath && t.lineNumber === childLine
+        );
+        if (childTodo) {
+          this.renderTodoItem(childrenContainer, childTodo, true);
+        }
+      }
+    }
   }
   renderRecentTodones(container) {
     const allTodones = this.scanner.getTodones(100);
@@ -1611,8 +1749,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       cls: "todo-section-header todone-header"
     });
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
-    const collapseIcon = this.todonesCollapsed ? "\u25B6" : "\u25BC";
-    titleSpan.innerHTML = `<span class="collapse-icon">${collapseIcon}</span> DONE <span class="todo-count">(${todones.length})</span>`;
+    titleSpan.textContent = "DONE";
     const fileLink = header.createEl("a", {
       text: this.defaultTodoneFile,
       cls: "done-file-link",
@@ -1620,19 +1757,11 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     });
     fileLink.addEventListener("click", async (e) => {
       e.preventDefault();
-      e.stopPropagation();
       const file = this.app.vault.getAbstractFileByPath(this.defaultTodoneFile);
       if (file instanceof import_obsidian8.TFile) {
         await this.app.workspace.getLeaf(false).openFile(file);
       }
     });
-    header.addEventListener("click", () => {
-      this.todonesCollapsed = !this.todonesCollapsed;
-      this.render();
-    });
-    if (this.todonesCollapsed) {
-      return;
-    }
     if (allTodones.length === 0) {
       section.createEl("div", {
         text: "No completed TODOs",
@@ -1643,21 +1772,6 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     const list = section.createEl("ul", { cls: "todo-list todone-list" });
     for (const todone of todones) {
       this.renderTodoneItem(list, todone);
-    }
-    if (allTodones.length > this.recentTodonesLimit) {
-      const linkDiv = section.createEl("div", { cls: "todone-view-all" });
-      const link = linkDiv.createEl("a", {
-        text: "View completed TODOs",
-        cls: "todone-view-all-link",
-        href: "#"
-      });
-      link.addEventListener("click", async (e) => {
-        e.preventDefault();
-        const file = this.app.vault.getAbstractFileByPath(this.defaultTodoneFile);
-        if (file instanceof import_obsidian8.TFile) {
-          await this.app.workspace.getLeaf(false).openFile(file);
-        }
-      });
     }
   }
   renderTodoneItem(list, todone) {

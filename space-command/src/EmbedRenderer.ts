@@ -19,6 +19,9 @@ export class EmbedRenderer {
   // Track active renders for event cleanup
   private activeRenders: Map<HTMLElement, () => void> = new Map();
 
+  // Track TODONE visibility state per container
+  private todoneVisibility: Map<HTMLElement, boolean> = new Map();
+
   constructor(
     app: App,
     scanner: TodoScanner,
@@ -45,6 +48,8 @@ export class EmbedRenderer {
       this.scanner.off("todos-updated", listener);
       this.activeRenders.delete(container);
     }
+    // Clean up visibility state
+    this.todoneVisibility.delete(container);
   }
 
   // Cleanup all renders (called on plugin unload)
@@ -248,8 +253,32 @@ export class EmbedRenderer {
     container.empty();
     container.addClass("space-command-embed");
 
-    // Add header with refresh button
+    // Parse filters to get initial todone visibility
+    const filters = FilterParser.parse(filterString);
+    // Get visibility: check stored state first, then filter setting, default to show
+    const showTodones = this.todoneVisibility.get(container) ??
+                        (filters.todone !== 'hide');
+
+    // Store current state
+    this.todoneVisibility.set(container, showTodones);
+
+    // Add header with buttons
     const header = container.createEl("div", { cls: "embed-header" });
+
+    // Add TODONE toggle button
+    const toggleBtn = header.createEl("button", {
+      cls: `clickable-icon embed-toggle-todone-btn${showTodones ? ' active' : ''}`,
+      attr: { "aria-label": showTodones ? "Hide completed" : "Show completed" },
+    });
+    // Eye icon when showing, eye-off when hiding
+    toggleBtn.innerHTML = showTodones
+      ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>'
+      : '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>';
+
+    toggleBtn.addEventListener("click", () => {
+      this.todoneVisibility.set(container, !showTodones);
+      this.refreshEmbed(container, todoneFile, filterString);
+    });
 
     const refreshBtn = header.createEl("button", {
       cls: "clickable-icon embed-refresh-btn",
@@ -264,110 +293,143 @@ export class EmbedRenderer {
     // Set up auto-refresh listener
     this.setupAutoRefresh(container, todoneFile, filterString);
 
-    if (todos.length === 0) {
+    // Filter todos based on visibility setting
+    let displayTodos = todos;
+    if (!showTodones) {
+      displayTodos = todos.filter(t => !t.tags.includes("#todone"));
+    }
+
+    if (displayTodos.length === 0) {
       container.createEl("div", {
-        text: "No active TODOs",
+        text: showTodones ? "No TODOs" : "No active TODOs",
         cls: "space-command-empty",
       });
       return;
     }
 
+    // Filter out child items (they'll be rendered under their parent header)
+    const topLevelTodos = displayTodos.filter(t => t.parentLineNumber === undefined);
+
     // Sort todos: active by priority/project, completed at end
-    const sortedTodos = this.sortTodos(todos);
+    const sortedTodos = this.sortTodos(topLevelTodos);
 
     const list = container.createEl("ul", { cls: "contains-task-list" });
 
     for (const todo of sortedTodos) {
-      const isCompleted = todo.tags.includes("#todone");
-      const item = list.createEl("li", { cls: "task-list-item" });
+      this.renderTodoItem(list, todo, displayTodos, todoneFile, filterString);
+    }
+  }
 
-      // Add right-click context menu for active TODOs
-      if (!isCompleted) {
-        item.addEventListener("contextmenu", (e) => {
-          e.preventDefault();
-          this.contextMenuHandler.showTodoMenu(e, todo, () => {
-            // Re-render the embed after priority change
-            const filters = FilterParser.parse(filterString);
-            let refreshedTodos = this.scanner.getTodos();
-            refreshedTodos = FilterParser.applyFilters(refreshedTodos, filters);
-            this.renderTodoList(container, refreshedTodos, todoneFile, filterString);
-          });
-        });
-      }
+  // Render a single todo item (and its children if it's a header)
+  private renderTodoItem(
+    list: HTMLElement,
+    todo: TodoItem,
+    allTodos: TodoItem[],
+    todoneFile: string,
+    filterString: string,
+    isChild: boolean = false
+  ): void {
+    const isCompleted = todo.tags.includes("#todone");
+    const isHeader = todo.isHeader === true;
+    const itemClasses = [
+      'task-list-item',
+      isCompleted ? 'todone-item' : '',
+      isHeader ? 'todo-header' : '',
+      isChild ? 'todo-child' : ''
+    ].filter(c => c).join(' ');
 
-      // Create checkbox
-      const checkbox = item.createEl("input", {
-        type: "checkbox",
-        cls: "task-list-item-checkbox",
-      });
+    const item = list.createEl("li", { cls: itemClasses });
 
-      if (isCompleted) {
-        checkbox.checked = true;
-        checkbox.disabled = true;
-        item.addClass("todone-item");
-      }
-
-      checkbox.addEventListener("change", async () => {
-        if (isCompleted) return;
-        checkbox.disabled = true;
-        const success = await this.processor.completeTodo(todo, todoneFile);
-        if (success) {
-          // Remove the item from the list
-          item.remove();
-          // If no more items, show empty state
-          if (list.children.length === 0) {
-            container.empty();
-            container.createEl("div", {
-              text: "No active TODOs",
-              cls: "space-command-empty",
-            });
-          }
-        } else {
-          checkbox.disabled = false;
-        }
-      });
-
-      // Add todo text (without the #todo/#todone tag)
-      const textSpan = item.createEl("span", { cls: "todo-text" });
-      if (isCompleted) {
-        textSpan.addClass("todone-text");
-      }
-      let cleanText = todo.text.replace(/#todo\b/g, "").replace(/#todone\b/g, "").trim();
-      // Remove completion date from display text (we'll show it separately)
-      const completionDate = isCompleted ? this.extractCompletionDate(cleanText) : null;
-      if (completionDate) {
-        cleanText = cleanText.replace(/@\d{4}-\d{2}-\d{2}/, "").trim();
-      }
-      // Remove leading checkbox if present
-      let displayText = cleanText.replace(/^-\s*\[\s*\]\s*/, "").replace(/^-\s*\[x\]\s*/i, "");
-      // Remove block-level markdown markers (list bullets, quotes)
-      displayText = displayText
-        .replace(/^[*\-+]\s+/, "")  // Remove list markers
-        .replace(/^>\s+/, "");       // Remove quote markers
-
-      // Render inline markdown manually to avoid extra <p> tags
-      this.renderInlineMarkdown(displayText, textSpan);
-      textSpan.append(" ");
-
-      // Add completion date with muted pill style for completed items
-      if (completionDate) {
-        item.createEl("span", {
-          cls: "todo-date muted-pill",
-          text: completionDate,
-        });
-      }
-
-      // Add link to source
-      const link = item.createEl("a", {
-        text: "→",
-        cls: "todo-source-link",
-        href: "#",
-      });
-
-      link.addEventListener("click", (e) => {
+    // Add right-click context menu for active TODOs
+    if (!isCompleted) {
+      item.addEventListener("contextmenu", (e) => {
         e.preventDefault();
-        this.openFileAtLine(todo.file, todo.lineNumber);
+        this.contextMenuHandler.showTodoMenu(e, todo, () => {
+          // Re-render the entire embed after priority change
+          this.refreshEmbed(list.closest('.space-command-embed') as HTMLElement, todoneFile, filterString);
+        });
       });
+    }
+
+    // Create checkbox
+    const checkbox = item.createEl("input", {
+      type: "checkbox",
+      cls: "task-list-item-checkbox",
+    });
+
+    if (isCompleted) {
+      checkbox.checked = true;
+      checkbox.disabled = true;
+    }
+
+    checkbox.addEventListener("change", async () => {
+      if (isCompleted) return;
+      checkbox.disabled = true;
+      const success = await this.processor.completeTodo(todo, todoneFile);
+      if (success) {
+        // Refresh the entire embed
+        const container = list.closest('.space-command-embed') as HTMLElement;
+        if (container) {
+          this.refreshEmbed(container, todoneFile, filterString);
+        }
+      } else {
+        checkbox.disabled = false;
+      }
+    });
+
+    // Add todo text (without the #todo/#todone tag)
+    const textSpan = item.createEl("span", { cls: "todo-text" });
+    if (isCompleted) {
+      textSpan.addClass("todone-text");
+    }
+    let cleanText = todo.text.replace(/#todo\b/g, "").replace(/#todone\b/g, "").trim();
+    // Remove completion date from display text (we'll show it separately)
+    const completionDate = isCompleted ? this.extractCompletionDate(cleanText) : null;
+    if (completionDate) {
+      cleanText = cleanText.replace(/@\d{4}-\d{2}-\d{2}/, "").trim();
+    }
+    // Remove leading checkbox if present
+    let displayText = cleanText.replace(/^-\s*\[\s*\]\s*/, "").replace(/^-\s*\[x\]\s*/i, "");
+    // Remove block-level markdown markers (list bullets, quotes)
+    displayText = displayText
+      .replace(/^[*\-+]\s+/, "")  // Remove list markers
+      .replace(/^>\s+/, "");       // Remove quote markers
+
+    // Render inline markdown manually to avoid extra <p> tags
+    this.renderInlineMarkdown(displayText, textSpan);
+    textSpan.append(" ");
+
+    // Add completion date with muted pill style for completed items
+    if (completionDate) {
+      item.createEl("span", {
+        cls: "todo-date muted-pill",
+        text: completionDate,
+      });
+    }
+
+    // Add link to source
+    const link = item.createEl("a", {
+      text: "→",
+      cls: "todo-source-link",
+      href: "#",
+    });
+
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      this.openFileAtLine(todo.file, todo.lineNumber);
+    });
+
+    // If this is a header with children, render children indented below
+    if (isHeader && todo.childLineNumbers && todo.childLineNumbers.length > 0) {
+      const childrenContainer = item.createEl("ul", { cls: "todo-children contains-task-list" });
+      for (const childLine of todo.childLineNumbers) {
+        const childTodo = allTodos.find(
+          t => t.filePath === todo.filePath && t.lineNumber === childLine
+        );
+        if (childTodo) {
+          this.renderTodoItem(childrenContainer, childTodo, allTodos, todoneFile, filterString, true);
+        }
+      }
     }
   }
 

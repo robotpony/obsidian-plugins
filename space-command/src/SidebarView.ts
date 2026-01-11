@@ -12,8 +12,6 @@ export class TodoSidebarView extends ItemView {
   private processor: TodoProcessor;
   private projectManager: ProjectManager;
   private defaultTodoneFile: string;
-  private todonesCollapsed: boolean = false;
-  private projectsCollapsed: boolean = false;
   private updateListener: (() => void) | null = null;
   private contextMenuHandler: ContextMenuHandler;
   private priorityTags: string[];
@@ -213,17 +211,7 @@ export class TodoSidebarView extends ItemView {
     });
 
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
-    const collapseIcon = this.projectsCollapsed ? "▶" : "▼";
-    titleSpan.innerHTML = `<span class="collapse-icon">${collapseIcon}</span> Focus <span class="project-count">(${projects.length})</span>`;
-
-    header.addEventListener("click", () => {
-      this.projectsCollapsed = !this.projectsCollapsed;
-      this.render();
-    });
-
-    if (this.projectsCollapsed) {
-      return;
-    }
+    titleSpan.innerHTML = `Focus <span class="project-count">${projects.length}</span>`;
 
     if (projects.length === 0) {
       section.createEl("div", {
@@ -249,7 +237,9 @@ export class TodoSidebarView extends ItemView {
   }
 
   private renderProjectItem(list: HTMLElement, project: any): void {
-    const item = list.createEl("li", { cls: "project-item" });
+    // Check if this project has any #focus items (priority 0 = #focus)
+    const hasFocusItems = project.highestPriority === 0;
+    const item = list.createEl("li", { cls: `project-item${hasFocusItems ? ' project-focus' : ''}` });
 
     // Checkbox for completing all project TODOs
     const checkbox = item.createEl("input", {
@@ -267,7 +257,7 @@ export class TodoSidebarView extends ItemView {
 
     // Project name and count
     const textSpan = item.createEl("span", { cls: "project-text" });
-    textSpan.innerHTML = `${project.tag} <span class="project-count">(${project.count})</span> `;
+    textSpan.innerHTML = `${project.tag} <span class="project-count">${project.count}</span> `;
 
     // Link to project file
     const link = item.createEl("a", {
@@ -288,6 +278,9 @@ export class TodoSidebarView extends ItemView {
     // Filter out #future (snoozed) TODOs
     todos = todos.filter(todo => !todo.tags.includes("#future"));
 
+    // Filter out child items (they'll be rendered under their parent header)
+    todos = todos.filter(todo => todo.parentLineNumber === undefined);
+
     // Sort by priority
     todos = this.sortTodosByPriority(todos);
 
@@ -295,7 +288,7 @@ export class TodoSidebarView extends ItemView {
 
     const header = section.createEl("div", { cls: "todo-section-header" });
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
-    titleSpan.innerHTML = `▼ TODO <span class="todo-count">(${todos.length})</span>`;
+    titleSpan.innerHTML = `TODO <span class="todo-count">${todos.length}</span>`;
 
     if (todos.length === 0) {
       section.createEl("div", {
@@ -312,8 +305,17 @@ export class TodoSidebarView extends ItemView {
     }
   }
 
-  private renderTodoItem(list: HTMLElement, todo: TodoItem): void {
-    const item = list.createEl("li", { cls: "todo-item" });
+  private renderTodoItem(list: HTMLElement, todo: TodoItem, isChild: boolean = false): void {
+    const hasFocus = todo.tags.includes("#focus");
+    const isHeader = todo.isHeader === true;
+    const itemClasses = [
+      'todo-item',
+      hasFocus ? 'todo-focus' : '',
+      isHeader ? 'todo-header' : '',
+      isChild ? 'todo-child' : ''
+    ].filter(c => c).join(' ');
+
+    const item = list.createEl("li", { cls: itemClasses });
 
     // Add right-click context menu
     item.addEventListener("contextmenu", (e) => {
@@ -359,6 +361,21 @@ export class TodoSidebarView extends ItemView {
       e.preventDefault();
       this.openFileAtLine(todo.file, todo.lineNumber);
     });
+
+    // If this is a header with children, render children indented below
+    if (isHeader && todo.childLineNumbers && todo.childLineNumbers.length > 0) {
+      const childrenContainer = item.createEl("ul", { cls: "todo-children" });
+      // Get children from scanner by line numbers
+      const allTodos = this.scanner.getTodos();
+      for (const childLine of todo.childLineNumbers) {
+        const childTodo = allTodos.find(
+          t => t.filePath === todo.filePath && t.lineNumber === childLine
+        );
+        if (childTodo) {
+          this.renderTodoItem(childrenContainer, childTodo, true);
+        }
+      }
+    }
   }
 
   private renderRecentTodones(container: HTMLElement): void {
@@ -372,8 +389,7 @@ export class TodoSidebarView extends ItemView {
     });
 
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
-    const collapseIcon = this.todonesCollapsed ? "▶" : "▼";
-    titleSpan.innerHTML = `<span class="collapse-icon">${collapseIcon}</span> DONE <span class="todo-count">(${todones.length})</span>`;
+    titleSpan.textContent = "DONE";
 
     // Add link to done file
     const fileLink = header.createEl("a", {
@@ -383,21 +399,11 @@ export class TodoSidebarView extends ItemView {
     });
     fileLink.addEventListener("click", async (e) => {
       e.preventDefault();
-      e.stopPropagation(); // Don't toggle collapse
       const file = this.app.vault.getAbstractFileByPath(this.defaultTodoneFile);
       if (file instanceof TFile) {
         await this.app.workspace.getLeaf(false).openFile(file);
       }
     });
-
-    header.addEventListener("click", () => {
-      this.todonesCollapsed = !this.todonesCollapsed;
-      this.render();
-    });
-
-    if (this.todonesCollapsed) {
-      return;
-    }
 
     if (allTodones.length === 0) {
       section.createEl("div", {
@@ -411,24 +417,6 @@ export class TodoSidebarView extends ItemView {
 
     for (const todone of todones) {
       this.renderTodoneItem(list, todone);
-    }
-
-    // Add "View all" link if there are more TODONEs than the limit
-    if (allTodones.length > this.recentTodonesLimit) {
-      const linkDiv = section.createEl("div", { cls: "todone-view-all" });
-      const link = linkDiv.createEl("a", {
-        text: "View completed TODOs",
-        cls: "todone-view-all-link",
-        href: "#",
-      });
-
-      link.addEventListener("click", async (e) => {
-        e.preventDefault();
-        const file = this.app.vault.getAbstractFileByPath(this.defaultTodoneFile);
-        if (file instanceof TFile) {
-          await this.app.workspace.getLeaf(false).openFile(file);
-        }
-      });
     }
   }
 

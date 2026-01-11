@@ -9,12 +9,18 @@ export interface TodoItem {
   hasCheckbox: boolean;
   tags: string[];
   dateCreated: number;
+  // Header hierarchy fields
+  isHeader?: boolean;           // True if this is a header line (##)
+  headerLevel?: number;         // 1-6 for header level
+  parentLineNumber?: number;    // Line number of parent header (if child)
+  childLineNumbers?: number[];  // Line numbers of child items
 }
 
 export interface TodoFilters {
   path?: string;
   tags?: string[];
   limit?: number;
+  todone?: 'show' | 'hide';
 }
 
 export interface ProjectInfo {

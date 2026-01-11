@@ -64,6 +64,18 @@ export class SlashCommandSuggest extends EditorSuggest<SuggestionItem> {
         },
       },
       {
+        id: "todos",
+        name: "Todos",
+        description: "Insert a TODO list with heading",
+        icon: "☰",
+        action: (editor, start, end) => {
+          const text = "## TODOs\n\n- [ ] #todo ";
+          editor.replaceRange(text, start, end);
+          // Position cursor after #todo on the third line
+          editor.setCursor({ line: start.line + 2, ch: 12 });
+        },
+      },
+      {
         id: "today",
         name: "Today",
         description: "Insert today's date",

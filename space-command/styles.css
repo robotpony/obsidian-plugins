@@ -66,6 +66,15 @@
   cursor: pointer;
 }
 
+/* Muted styling for DONE section to show it's less important */
+.todone-section {
+  opacity: 0.7;
+}
+
+.todone-section:hover {
+  opacity: 1;
+}
+
 .todo-section-title {
   font-weight: 600;
   color: var(--text-normal);
@@ -337,4 +346,64 @@
 
 .embed-refresh-btn:hover {
   opacity: 1;
+}
+
+/* Focus tag highlighting in sidebar */
+.space-command-sidebar .todo-focus,
+.space-command-sidebar .project-focus {
+  background-color: color-mix(in srgb, var(--interactive-accent) 15%, transparent);
+  border-radius: 4px;
+  padding: 4px 6px;
+  margin: 2px -6px;
+}
+
+.space-command-sidebar .todo-focus:hover,
+.space-command-sidebar .project-focus:hover {
+  background-color: color-mix(in srgb, var(--interactive-accent) 25%, transparent);
+}
+
+/* TODONE toggle button in embeds */
+.embed-toggle-todone-btn {
+  padding: 2px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0.4;
+  transition: opacity 0.2s;
+  margin-right: 4px;
+}
+
+.embed-toggle-todone-btn:hover {
+  opacity: 1;
+}
+
+.embed-toggle-todone-btn.active {
+  opacity: 0.7;
+  color: var(--interactive-accent);
+}
+
+/* Header TODO styling */
+.todo-header > .todo-text {
+  font-weight: 600;
+}
+
+/* Child TODO container */
+.todo-children {
+  margin-left: 16px;
+  margin-top: 4px;
+  list-style: none;
+  padding: 0;
+  border-left: 2px solid var(--background-modifier-border);
+  padding-left: 8px;
+}
+
+/* Child TODO item styling */
+.todo-child {
+  opacity: 0.9;
+}
+
+/* Completed header styling - strikethrough the header text */
+.todo-header.todone-item > .todo-text {
+  text-decoration: line-through;
+  color: var(--text-muted);
 }

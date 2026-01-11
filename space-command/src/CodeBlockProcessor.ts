@@ -96,7 +96,8 @@ export class CodeBlockProcessor {
       firstLine.includes("|") ||
       firstLine.startsWith("path:") ||
       firstLine.startsWith("tags:") ||
-      firstLine.startsWith("limit:");
+      firstLine.startsWith("limit:") ||
+      firstLine.startsWith("todone:");
 
     if (isFilter) {
       // All content is filters, use default file

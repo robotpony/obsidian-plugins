@@ -23,6 +23,9 @@ An Obsidian plugin for managing TODOs and TODONEs across your vault with live em
 ## Features
 
 - **TODO Tracking**: Automatically detect and track all `#todo` items across your vault
+- **Header TODOs**: Headers with `#todo` treat list items below as child TODOs (v0.6.0+)
+- **Focus Highlighting**: `#focus` items have accent background in sidebar (v0.6.0+)
+- **TODONE Toggle**: Show/hide completed items in embeds with button or filter (v0.6.0+)
 - **Live Embeds**: Embed interactive TODO lists in any markdown file
 - **Interactive Sidebar**: View and manage all TODOs from a dedicated sidebar
 - **Copy Embed Syntax**: Click copy button in sidebar to copy embed syntax to clipboard
@@ -66,6 +69,7 @@ Type `/` at the start of a line or `@` anywhere to quickly insert content.
 | Command | Inserts |
 |---------|---------|
 | `/todo` | `- [ ] #todo ` - a new TODO item |
+| `/todos` | `## TODOs` heading with blank TODO item |
 | `/today` | Today's date (e.g., `2026-01-08`) |
 | `/tomorrow` | Tomorrow's date |
 | `/callout` | Shows callout type menu, then inserts `> [!type]` block |
@@ -146,6 +150,7 @@ All filters work with both syntaxes:
 | **Path** | `path:folder/subfolder/` | Show only TODOs from specific path |
 | **Tags** | `tags:#tag1,#tag2` | Show only TODOs with ALL specified tags (AND logic) |
 | **Limit** | `limit:N` | Limit to first N results |
+| **TODONE** | `todone:show` or `todone:hide` | Show or hide completed items (default: show) |
 
 **Examples:**
 
@@ -153,6 +158,7 @@ All filters work with both syntaxes:
 {{focus-todos | tags:#urgent}}
 {{focus-todos | path:projects/ limit:5}}
 {{focus-todos | path:work/ tags:#urgent,#today}}
+{{focus-todos | todone:hide}}
 ```
 
 **v0.2.1 improvements:**
@@ -171,6 +177,20 @@ Just add `#todo` to any line in your vault:
 Remember to call John #todo
 - [ ] Review PR #urgent #todo
 ```
+
+**Header TODOs (v0.6.0+):**
+Add `#todo` to a header to treat all list items below as children:
+
+```markdown
+## My Project #todo
+- Task 1
+- Task 2
+- Task 3
+
+## Next Section
+```
+
+All three tasks become children of "My Project". Completing the header completes all children. The hierarchy ends at the next same-level or higher-level header.
 
 **Markdown support (v0.2.1+):**
 TODOs can include **bold**, *italic*, `code`, and [links](url):
@@ -237,6 +257,8 @@ Available via Command Palette (Cmd/Ctrl+P):
 
 ## Version History
 
+- **v0.6.0** (2026-01-10) - Header TODOs with children, focus highlighting, TODONE show/hide toggle
+- **v0.5.2** (2026-01-10) - `/todos` command, muted DONE section, tag-style counts
 - **v0.5.0** (2026-01-10) - Auto-sorting, right-click in embeds, muted pill styling
 - **v0.4.0** (2026-01-08) - Slash commands, @date quick insert, priority sorting, context menus
 - **v0.3.x** (2026-01-08) - Right-click context menus, priority tags (#p0-#p4, #focus, #future)

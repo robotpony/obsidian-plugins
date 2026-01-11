@@ -2,6 +2,61 @@
 
 All notable changes to the ⌥⌘ Space Command plugin will be documented in this file.
 
+## [0.6.0] - 2026-01-10
+
+### Added
+
+- **Header TODOs with children**: Headers with `#todo` tag now treat all list items below as child TODOs
+  - Example: `## Project X #todo` followed by `- Task 1`, `- Task 2` creates a parent-child hierarchy
+  - Children displayed indented under their parent header in sidebar and embeds
+  - Completing a header TODO automatically completes all its children
+  - Children inherit TODO status from parent (no explicit `#todo` tag needed)
+  - Hierarchy ends at next same-level or higher-level header
+- **Focus tag highlighting**: Items with `#focus` tag now have accent-colored background in sidebar
+  - Applies to both TODO items in the Active TODOs section
+  - Also highlights projects in the Focus section that contain `#focus` items
+  - Uses Obsidian's `--interactive-accent` color at 15% opacity
+  - Hover state increases to 25% opacity
+- **TODONE show/hide toggle**: New filter and UI button for controlling completed item visibility in embeds
+  - New filter syntax: `todone:show` or `todone:hide`
+  - Eye icon toggle button in embed header (next to refresh button)
+  - Default: show (displays both TODOs and TODONEs)
+  - Toggle state persists across auto-refreshes
+  - Example: `` ```focus-todos\ntodone:hide\n``` `` hides completed items
+
+### Improved
+
+- Header TODOs display with bold text styling
+- Child TODOs have subtle left border and indentation for visual hierarchy
+- Embed rendering refactored to support parent-child relationships
+
+### Technical
+
+- Extended `TodoItem` interface with `isHeader`, `headerLevel`, `parentLineNumber`, `childLineNumbers` fields
+- Extended `TodoFilters` interface with `todone` field
+- Added `detectHeader()` and `isListItem()` methods to TodoScanner
+- Added `completeChildrenLines()` method to TodoProcessor
+- Added `todoneVisibility` Map to EmbedRenderer for toggle state
+- Updated FilterParser to handle `todone:show|hide` syntax
+- New CSS classes: `.todo-header`, `.todo-children`, `.todo-child`, `.todo-focus`, `.project-focus`, `.embed-toggle-todone-btn`
+
+## [0.5.2] - 2026-01-10
+
+### Added
+
+- **`/todos` slash command**: Insert a TODO list with heading and blank item
+  - Creates `## TODOs` heading with blank `- [ ] #todo ` item
+  - Cursor positioned ready to type task description
+
+### Improved
+
+- **Muted DONE section**: DONE list now displays at 70% opacity
+  - Increases to full opacity on hover
+  - Visual hierarchy emphasizes active TODOs over completed items
+- **Tag-style counts**: TODO and project counts now styled like tags
+  - Removed parentheses around numbers (e.g., `5` instead of `(5)`)
+  - Consistent pill styling with tags
+
 ## [0.5.1] - 2026-01-10
 
 ### Added
