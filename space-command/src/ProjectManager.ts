@@ -1,45 +1,35 @@
 import { App, TFile } from "obsidian";
 import { TodoScanner } from "./TodoScanner";
-import { ProjectInfo } from "./types";
+import { ProjectInfo, TodoItem } from "./types";
 
 export class ProjectManager {
   private app: App;
   private scanner: TodoScanner;
-  private pinnedProjects: Set<string>;
   private projectsFolder: string;
+  private priorityTags: string[];
 
   constructor(
     app: App,
     scanner: TodoScanner,
     projectsFolder: string,
-    pinnedProjects: string[]
+    priorityTags: string[]
   ) {
     this.app = app;
     this.scanner = scanner;
     this.projectsFolder = projectsFolder;
-    this.pinnedProjects = new Set(pinnedProjects);
+    this.priorityTags = priorityTags;
   }
 
-  setPinnedProjects(projects: string[]): void {
-    this.pinnedProjects = new Set(projects);
-  }
-
-  getPinnedProjects(): string[] {
-    return Array.from(this.pinnedProjects);
-  }
-
-  togglePin(tag: string): boolean {
-    if (this.pinnedProjects.has(tag)) {
-      this.pinnedProjects.delete(tag);
-      return false;
-    } else {
-      this.pinnedProjects.add(tag);
-      return true;
-    }
-  }
-
-  isPinned(tag: string): boolean {
-    return this.pinnedProjects.has(tag);
+  private getPriorityValue(todo: TodoItem): number {
+    // Priority order: #focus=0, #p0=1, #p1=2, #p2=3, no priority=4, #p3=5, #p4=6, #future=7
+    if (todo.tags.includes("#focus")) return 0;
+    if (todo.tags.includes("#p0")) return 1;
+    if (todo.tags.includes("#p1")) return 2;
+    if (todo.tags.includes("#p2")) return 3;
+    if (todo.tags.includes("#p3")) return 5;
+    if (todo.tags.includes("#p4")) return 6;
+    if (todo.tags.includes("#future")) return 7;
+    return 4; // No priority = medium (between #p2 and #p3)
   }
 
   getProjects(): ProjectInfo[] {
@@ -48,10 +38,11 @@ export class ProjectManager {
 
     // Aggregate project data from all todos
     for (const todo of todos) {
-      // Extract all tags except #todo and #todone
-      const projectTags = todo.tags.filter(
-        (tag) => tag !== "#todo" && tag !== "#todone"
-      );
+      // Extract all tags except #todo, #todone, #future, #focus, and priority tags
+      const excludedTags = new Set(["#todo", "#todone", "#future", "#focus", ...this.priorityTags]);
+      const projectTags = todo.tags.filter(tag => !excludedTags.has(tag));
+
+      const todoPriority = this.getPriorityValue(todo);
 
       for (const tag of projectTags) {
         if (projectMap.has(tag)) {
@@ -62,12 +53,17 @@ export class ProjectManager {
             project.lastActivity,
             todo.dateCreated
           );
+          // Track highest priority (lowest number)
+          project.highestPriority = Math.min(
+            project.highestPriority,
+            todoPriority
+          );
         } else {
           projectMap.set(tag, {
             tag,
             count: 1,
             lastActivity: todo.dateCreated,
-            isPinned: this.pinnedProjects.has(tag),
+            highestPriority: todoPriority,
           });
         }
       }
@@ -80,13 +76,8 @@ export class ProjectManager {
   getFocusProjects(limit?: number): ProjectInfo[] {
     const projects = this.getProjects();
 
-    // Sort: pinned first, then by activity (count + recency)
+    // Sort by activity (count + recency)
     projects.sort((a, b) => {
-      // Pinned projects come first
-      if (a.isPinned && !b.isPinned) return -1;
-      if (!a.isPinned && b.isPinned) return 1;
-
-      // For non-pinned (or both pinned), sort by activity
       // Higher count = more active
       const countDiff = b.count - a.count;
       if (countDiff !== 0) return countDiff;

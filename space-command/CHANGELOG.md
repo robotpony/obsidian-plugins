@@ -1,11 +1,325 @@
 # Changelog
 
-All notable changes to the Weekly Log Helpers plugin will be documented in this file.
+All notable changes to the ⌥⌘ Space Command plugin will be documented in this file.
+
+## [0.6.2] - 2026-01-10
+
+### Improved
+
+- **Toggle-able context menu actions**: Right-click menu items now toggle on/off
+  - Focus/Unfocus: Removes `#focus` if present, adds it otherwise
+  - Later/Unlater: Removes `#p3`/`#p4` if present, lowers priority otherwise
+  - Snooze/Unsnooze: Removes `#future` if present, adds it otherwise
+- **Normalized tag sizes in headings**: Plugin tags (`#todo`, `#todone`, `#focus`, `#future`, `#p0-#p4`) now render at body text size in headings
+  - Applies to both Live Preview (CodeMirror) and Reading Mode
+  - Tags no longer scale up with heading size
+- **Embed icons positioning**: Moved embed header icons up to avoid overlap with Obsidian's view-source button
+
+### Fixed
+
+- **#focus in code blocks**: `#focus` tags inside code blocks and inline code are now ignored
+  - Consistent with existing `#todo`/`#todone` behavior
+
+### Technical
+
+- New `removeTag()` method in TodoProcessor
+- Updated `isInInlineCode()` in TodoScanner to detect `#focus`
+- CSS selectors for `.cm-header .cm-tag-*` and `.markdown-preview-view h1-h6 .tag[href="#*"]`
+
+## [0.6.1] - 2026-01-10
+
+### Improved
+
+- **Header TODO layout**: Headers with children now display vertically instead of side-by-side
+  - Header row shows: checkbox, title (without markdown), count badge, and link
+  - Children render indented below the header for better readability
+  - Markdown heading markers (`####`) stripped from display text
+
+## [0.6.0] - 2026-01-10
+
+### Added
+
+- **Header TODOs with children**: Headers with `#todo` tag now treat all list items below as child TODOs
+  - Example: `## Project X #todo` followed by `- Task 1`, `- Task 2` creates a parent-child hierarchy
+  - Children displayed indented under their parent header in sidebar and embeds
+  - Completing a header TODO automatically completes all its children
+  - Children inherit TODO status from parent (no explicit `#todo` tag needed)
+  - Hierarchy ends at next same-level or higher-level header
+- **Focus tag highlighting**: Items with `#focus` tag now have accent-colored background in sidebar
+  - Applies to both TODO items in the Active TODOs section
+  - Also highlights projects in the Focus section that contain `#focus` items
+  - Uses Obsidian's `--interactive-accent` color at 15% opacity
+  - Hover state increases to 25% opacity
+- **TODONE show/hide toggle**: New filter and UI button for controlling completed item visibility in embeds
+  - New filter syntax: `todone:show` or `todone:hide`
+  - Eye icon toggle button in embed header (next to refresh button)
+  - Default: show (displays both TODOs and TODONEs)
+  - Toggle state persists across auto-refreshes
+  - Example: `` ```focus-todos\ntodone:hide\n``` `` hides completed items
+
+### Improved
+
+- Header TODOs display with bold text styling
+- Child TODOs have subtle left border and indentation for visual hierarchy
+- Embed rendering refactored to support parent-child relationships
+
+### Technical
+
+- Extended `TodoItem` interface with `isHeader`, `headerLevel`, `parentLineNumber`, `childLineNumbers` fields
+- Extended `TodoFilters` interface with `todone` field
+- Added `detectHeader()` and `isListItem()` methods to TodoScanner
+- Added `completeChildrenLines()` method to TodoProcessor
+- Added `todoneVisibility` Map to EmbedRenderer for toggle state
+- Updated FilterParser to handle `todone:show|hide` syntax
+- New CSS classes: `.todo-header`, `.todo-children`, `.todo-child`, `.todo-focus`, `.project-focus`, `.embed-toggle-todone-btn`
+
+## [0.5.2] - 2026-01-10
+
+### Added
+
+- **`/todos` slash command**: Insert a TODO list with heading and blank item
+  - Creates `## TODOs` heading with blank `- [ ] #todo ` item
+  - Cursor positioned ready to type task description
+
+### Improved
+
+- **Muted DONE section**: DONE list now displays at 70% opacity
+  - Increases to full opacity on hover
+  - Visual hierarchy emphasizes active TODOs over completed items
+- **Tag-style counts**: TODO and project counts now styled like tags
+  - Removed parentheses around numbers (e.g., `5` instead of `(5)`)
+  - Consistent pill styling with tags
+
+## [0.5.1] - 2026-01-10
+
+### Added
+
+- **Un-complete TODONEs**: Click checked items in sidebar DONE section to revert
+  - Converts `#todone @date` back to `#todo`
+  - Unchecks `[x]` to `[ ]` if checkbox exists
+  - TODONE log file preserved as history
+- **Native checkbox support**: Clicking checkboxes in normal markdown lists now works
+  - `- [ ] Task #todo` → click checkbox → converts to `#todone @date`
+  - Works in Live Preview and Reading Mode
+- **Embed auto-refresh**: Embedded TODO lists now update automatically
+  - Subscribes to `todos-updated` events from scanner
+  - New TODOs appear immediately without switching tabs
+- **Embed refresh button**: Manual refresh icon in top-right of each embed
+  - Click to force refresh if needed
+  - Subtle 40% opacity, increases on hover
+
+### Fixed
+
+- **Embeds missing TODONEs**: Embedded lists now show both active TODOs and completed TODONEs
+  - TODONEs appear at end of list with strikethrough styling
+  - Filters apply to both TODOs and TODONEs
+- **Duplicate TODOs from lines with both tags**: Lines containing both `#todo` and `#todone` now:
+  - Treated as completed (`#todone` wins)
+  - `#todo` tag automatically removed from the line
+- **Muted tag visibility in sidebar**: Tags and dates now have visible background
+  - Changed from `--background-secondary` to `--background-primary` in sidebar
+  - Proper contrast against grey sidebar background
+- **Muted element font size**: Reduced from 0.9em to 0.8em for better visual hierarchy
+  - Applied to `.muted-pill`, `.tag`, `.todo-count`, `.project-count`
+
+### Technical
+
+- New `uncompleteTodo()` method in TodoProcessor
+- New `replaceTodoneWithTodo()` and `markCheckboxIncomplete()` utils
+- EmbedRenderer tracks active renders with `activeRenders` Map for cleanup
+- Added `setupAutoRefresh()`, `setupFocusListAutoRefresh()`, `refreshEmbed()` methods
+- DOM event listener in main.ts for native checkbox changes
+- New `.embed-header` and `.embed-refresh-btn` CSS classes
+- Scanner now detects and auto-cleans lines with both `#todo` and `#todone`
+
+## [0.5.0] - 2026-01-10
+
+### Added
+
+- **Copy embed syntax button**: New copy button in sidebar header
+  - Click to open menu with two options: inline or code block syntax
+  - Copies embed syntax to clipboard with confirmation notice
+- **Auto-sorting in embedded lists**: TODOs now sort by priority then project
+  - Active TODOs sorted: #focus → #p0 → #p1 → #p2 → none → #p3 → #p4 → #future
+  - Secondary sort by project tag alphabetically within each priority
+  - Completed TODONEs always appear at the end
+- **Right-click context menu in embedded lists**: Same menu as sidebar
+  - Focus, Later, and Snooze actions available on embedded TODOs
+  - Shared `ContextMenuHandler` for consistent behavior
+- **Completion date display**: TODONEs show completion date with muted pill style
+  - Parses @YYYY-MM-DD from completed items
+  - Date displayed separately with themed background styling
+- **Muted pill styling**: Unified visual style for metadata
+  - Tags, counts, and dates use consistent pill appearance
+  - 65% opacity with theme-aware background (`--background-secondary`)
+  - Rounded corners for tag-like appearance
+  - Applied to: priority tags, project tags, todo counts, completio1n dates
+
+### Improved
+
+- Embedded lists and sidebar now share consistent styling
+- Priority tags (#focus, #p0-#p4, #future) get muted-pill style in embeds
+- Regular project tags styled as tags without pill background
+
+### Technical
+
+- `EmbedRenderer` now accepts `priorityTags` parameter
+- Added `sortTodos()`, `getPriorityValue()`, `getFirstProjectTag()` methods
+- Added `extractCompletionDate()` for parsing completion dates
+- Added `renderTextWithTags()` for inline tag styling with pill classes
+- `CodeBlockProcessor` passes `priorityTags` to `EmbedRenderer`
+- New `.muted-pill` CSS class for shared styling
+
+## [0.4.0] - 2026-01-08
+
+### Added
+- **Slash commands**: Type `/` at start of line for quick insertions
+  - `/todo` - Insert a new TODO item (`- [ ] #todo `)
+  - `/today` - Insert today's date
+  - `/tomorrow` - Insert tomorrow's date
+  - `/callout` - Shows callout type sub-menu, inserts `> [!type]` block
+  - Callout types: info, tip, note, warning, danger, bug, example, quote, abstract, success, question, failure
+- **@date quick insert**: Type `@` anywhere for date suggestions
+  - `@date` / `@d` - Today's date
+  - `@today` / `@t` - Today's date
+  - `@tomorrow` - Tomorrow's date
+  - `@yesterday` - Yesterday's date
+  - Uses configured date format (default: YYYY-MM-DD)
+
+### Technical
+- New `SlashCommandSuggest` class using Obsidian's `EditorSuggest` API
+- New `DateSuggest` class for @-triggered date insertion
+- Slash commands only trigger at column 0 to avoid conflict with Obsidian's built-in slash commands
+- Callouts use native Obsidian callout syntax (`> [!type]`)
+
+## [0.3.1] - 2026-01-08
+
+### Added
+- **Priority-based sorting**: TODOs and Projects now sorted by priority
+  - Order: #focus, #p0, #p1, #p2, no priority, #p3, #p4
+  - Unprioritized TODOs placed between #p2 and #p3 (medium priority)
+  - Projects sorted by highest priority of their TODOs, then by TODO count
+- **#focus tag support**: Focus action now adds #focus tag in addition to setting #p0
+  - #focus tag automatically excluded from Projects list
+  - TODOs with #focus appear at the very top of the list
+- **Configurable TODONEs limit**: Control number of recent TODONEs displayed in sidebar
+  - Default: 5 recent TODONEs
+  - New setting: "Recent TODONEs limit"
+  - "View all in [filename]" link appears when limit reached
+- **#future filtering**: Snoozed TODOs (#future) now hidden from Active TODOs list
+  - Keeps Active TODOs list focused on current work
+  - #future TODOs still counted but not displayed
+
+### Improved
+- Projects list now reflects priority of associated TODOs
+- Sidebar UI is more focused with limited TODONEs display
+- Priority system is more intuitive with visible #focus tag
+- Better distinction between active work and snoozed tasks
+
+### Technical
+- Added `highestPriority` field to `ProjectInfo` interface
+- Added `recentTodonesLimit` setting to plugin settings
+- ProjectManager now tracks highest priority for each project
+- New `getPriorityValue()` helper method for consistent priority sorting
+- SidebarView filters #future before rendering Active TODOs
+
+## [0.3.0] - 2026-01-08
+
+### Added
+- **Context menu for TODO items**: Right-click TODOs in sidebar for quick actions
+  - **Focus** (⚡): Increase priority (set to #p0 or decrease priority number)
+  - **Later** (🕐): Decrease priority (set to #p4 or increase priority number)
+  - **Snooze** (🌙): Set to #future for deferred tasks
+- **Priority tag system**: Configurable priority tags (#p0-#p4 by default)
+  - #p0 = highest priority (Focus)
+  - #p4 = lowest priority (Later)
+  - #future = snoozed/deferred tasks
+  - Priority tags excluded from Projects list automatically
+- **Settings button in sidebar**: Quick access to plugin settings (⚙️ icon next to refresh)
+
+### Fixed
+- Priority tags (#p0-#p4, #future) no longer appear in Projects list
+- Projects list now correctly excludes all priority-related tags
+
+### Improved
+- Smart priority actions are idempotent (safe to repeat)
+- Context menu provides keyboard-free workflow for priority management
+- Sidebar refreshes automatically after priority changes
+- User feedback via Notice for all priority operations
+
+### Technical
+- New `ContextMenuHandler` class for managing context menus
+- New `setPriorityTag()` method in TodoProcessor for priority manipulation
+- ProjectManager now filters configurable priority tags + #future
+- Settings UI for customizing priority tags (comma-separated list)
+- Uses Obsidian's native Menu API for context menus
+
+## [0.2.1] - 2026-01-08
+
+### Fixed
+- **Filter parsing bug**: Fixed regex to support flexible filter syntax
+  - Now works: `{{focus-todos | tags:#urgent}}` (filters only with pipe)
+  - Now works: `{{focus-todos: tags:#urgent}}` (filters only with colon)
+  - Already worked: `{{focus-todos: done.md | tags:#urgent}}` (file + filters)
+  - Supports both colon and pipe separators for maximum flexibility
+- **Markdown rendering**: TODO text now renders inline markdown
+  - **Bold**, *italic*, `code`, and [links](url) now display correctly
+  - Strips block-level markers (list bullets, quotes)
+  - No extra spacing or newlines (fixed in v0.2.1)
+  - Custom inline renderer avoids block-level <p> tags
+- **XSS security vulnerability**: Replaced `innerHTML` with safe DOM methods
+  - Protects against potential XSS attacks in TODO text
+  - Uses tokenizer and DOM manipulation instead of HTML injection
+
+### Improved
+- Plugin name consistency: All docs now use "⌥⌘ Space Command"
+- Documentation reorganization: Internal docs moved to `docs/development/`
+- Comprehensive README with table of contents and v0.2.1 features
+- Installation paths corrected to `.obsidian/plugins/space-command/`
+
+### Technical
+- Updated inline syntax regex from `[^|}\s]*` to `[^|}]*` to allow spaces
+- Added smart detection to distinguish file paths from filter keywords
+- Implemented custom `renderInlineMarkdown()` with token parser
+- Safe markdown rendering using `appendText()` and `createEl()` instead of `innerHTML`
+- Supports **bold**, *italic*, `code`, and [links](url) inline syntax
+
+## [0.2.0] - 2026-01-08
+
+### Added
+- **Code block syntax support** for `focus-todos` and `focus-list`
+  - Works in **both Reading Mode and Live Preview mode**
+  - Use ````focus-todos```` for better editing experience
+  - Supports multi-line filter syntax for improved readability
+  - Example:
+    ````markdown
+    ```focus-todos
+    todos/done.md
+    path:projects/
+    tags:#urgent
+    limit:10
+    ```
+    ````
+- **Comprehensive SYNTAX_GUIDE.md** documentation
+  - Complete syntax reference for both inline and code block styles
+  - Mode compatibility matrix
+  - Migration guide from inline to code blocks
+  - Examples and best practices
+
+### Improved
+- README.md now explains mode compatibility and both syntax options
+- QUICK_REFERENCE.md includes code block examples and comparison table
+- Better documentation of inline vs code block syntax differences
+
+### Technical
+- New CodeBlockProcessor class for handling code block syntax
+- Public helper methods in EmbedRenderer for code reuse
+- Both syntaxes share the same rendering engine for consistency
 
 ## [0.1.0] - 2026-01-07
 
 ### Added
-- Initial release of Weekly Log Helpers plugin
+- Initial release of Space Command plugin
 - TODO/TODONE tracking across entire vault
 - Interactive embed syntax: `{{focus-todos: file.md}}`
 - Filter support: `path:`, `tags:`, `limit:`

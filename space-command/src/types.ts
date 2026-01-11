@@ -9,19 +9,25 @@ export interface TodoItem {
   hasCheckbox: boolean;
   tags: string[];
   dateCreated: number;
+  // Header hierarchy fields
+  isHeader?: boolean;           // True if this is a header line (##)
+  headerLevel?: number;         // 1-6 for header level
+  parentLineNumber?: number;    // Line number of parent header (if child)
+  childLineNumbers?: number[];  // Line numbers of child items
 }
 
 export interface TodoFilters {
   path?: string;
   tags?: string[];
   limit?: number;
+  todone?: 'show' | 'hide';
 }
 
 export interface ProjectInfo {
   tag: string;
   count: number;
   lastActivity: number;
-  isPinned: boolean;
+  highestPriority: number;
 }
 
 export interface SpaceCommandSettings {
@@ -31,7 +37,8 @@ export interface SpaceCommandSettings {
   excludeTodoneFilesFromRecent: boolean;
   defaultProjectsFolder: string;
   focusListLimit: number;
-  pinnedProjects: string[];
+  priorityTags: string[];
+  recentTodonesLimit: number;
 }
 
 export const DEFAULT_SETTINGS: SpaceCommandSettings = {
@@ -41,5 +48,6 @@ export const DEFAULT_SETTINGS: SpaceCommandSettings = {
   excludeTodoneFilesFromRecent: true,
   defaultProjectsFolder: "projects/",
   focusListLimit: 5,
-  pinnedProjects: [],
+  priorityTags: ["#p0", "#p1", "#p2", "#p3", "#p4"],
+  recentTodonesLimit: 5,
 };

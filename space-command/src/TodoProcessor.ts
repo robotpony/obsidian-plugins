@@ -4,6 +4,8 @@ import {
   formatDate,
   replaceTodoWithTodone,
   markCheckboxComplete,
+  replaceTodoneWithTodo,
+  markCheckboxIncomplete,
 } from "./utils";
 
 export class TodoProcessor {
@@ -27,7 +29,12 @@ export class TodoProcessor {
     try {
       const today = formatDate(new Date(), this.dateFormat);
 
-      // Step 1: Update the source file
+      // If this is a header TODO with children, complete all children first
+      if (todo.isHeader && todo.childLineNumbers && todo.childLineNumbers.length > 0) {
+        await this.completeChildrenLines(todo.file, todo.childLineNumbers, today);
+      }
+
+      // Step 1: Update the source file (header or regular TODO)
       await this.updateSourceFile(todo, today);
 
       // Step 2: Append to TODONE log file
@@ -38,13 +45,94 @@ export class TodoProcessor {
         this.onComplete();
       }
 
-      new Notice("TODO marked as complete!");
+      const childCount = todo.childLineNumbers?.length || 0;
+      const message = childCount > 0
+        ? `TODO marked as complete! (including ${childCount} child item${childCount > 1 ? 's' : ''})`
+        : "TODO marked as complete!";
+      new Notice(message);
       return true;
     } catch (error) {
       console.error("Error completing TODO:", error);
       new Notice("Failed to complete TODO. See console for details.");
       return false;
     }
+  }
+
+  // Complete all child lines of a header TODO
+  private async completeChildrenLines(file: TFile, lineNumbers: number[], date: string): Promise<void> {
+    const content = await this.app.vault.read(file);
+    const lines = content.split("\n");
+
+    // Process children (modify lines in place)
+    for (const lineNum of lineNumbers) {
+      if (lineNum >= lines.length) continue;
+
+      let line = lines[lineNum];
+
+      // Add #todone @date if not already present
+      if (!line.includes('#todone')) {
+        if (line.includes('#todo')) {
+          line = replaceTodoWithTodone(line, date);
+        } else {
+          // Child item without explicit tag - add #todone @date
+          line = line.trimEnd() + ` #todone @${date}`;
+        }
+      }
+
+      // Mark checkbox if present
+      if (/\[\s*\]/.test(line)) {
+        line = markCheckboxComplete(line);
+      }
+
+      lines[lineNum] = line;
+    }
+
+    await this.app.vault.modify(file, lines.join("\n"));
+  }
+
+  async uncompleteTodo(todo: TodoItem): Promise<boolean> {
+    try {
+      // Update the source file - revert #todone @date to #todo
+      await this.revertSourceFile(todo);
+
+      // Note: We do NOT remove from the TODONE log file as it serves as history
+
+      // Trigger callback if set
+      if (this.onComplete) {
+        this.onComplete();
+      }
+
+      new Notice("TODO marked as incomplete!");
+      return true;
+    } catch (error) {
+      console.error("Error uncompleting TODO:", error);
+      new Notice("Failed to uncomplete TODO. See console for details.");
+      return false;
+    }
+  }
+
+  private async revertSourceFile(todo: TodoItem): Promise<void> {
+    const content = await this.app.vault.read(todo.file);
+    const lines = content.split("\n");
+
+    if (todo.lineNumber >= lines.length) {
+      throw new Error(
+        `Line number ${todo.lineNumber} out of bounds for file ${todo.filePath}`
+      );
+    }
+
+    let updatedLine = lines[todo.lineNumber];
+
+    // Replace #todone (with optional @date) with #todo
+    updatedLine = replaceTodoneWithTodo(updatedLine);
+
+    // If it has a completed checkbox [x], mark it incomplete [ ]
+    if (todo.hasCheckbox) {
+      updatedLine = markCheckboxIncomplete(updatedLine);
+    }
+
+    lines[todo.lineNumber] = updatedLine;
+    await this.app.vault.modify(todo.file, lines.join("\n"));
   }
 
   private async updateSourceFile(todo: TodoItem, date: string): Promise<void> {
@@ -120,6 +208,88 @@ export class TodoProcessor {
     const folder = this.app.vault.getAbstractFileByPath(folderPath);
     if (!folder) {
       await this.app.vault.createFolder(folderPath);
+    }
+  }
+
+  async setPriorityTag(todo: TodoItem, newTag: string, addFocus: boolean = false): Promise<boolean> {
+    try {
+      const content = await this.app.vault.read(todo.file);
+      const lines = content.split("\n");
+
+      if (todo.lineNumber >= lines.length) {
+        throw new Error(
+          `Line number ${todo.lineNumber} out of bounds for file ${todo.filePath}`
+        );
+      }
+
+      let line = lines[todo.lineNumber];
+
+      // Remove existing priority tags (#p0-#p4, #future)
+      line = line.replace(/#p[0-4]\b/g, "");
+      line = line.replace(/#future\b/g, "");
+
+      // Clean up extra whitespace
+      line = line.replace(/\s+/g, " ").trim();
+
+      // Add new priority tag at end
+      line = line + ` ${newTag}`;
+
+      // Add #focus tag if requested (and not already present)
+      if (addFocus && !line.includes("#focus")) {
+        line = line + " #focus";
+      }
+
+      lines[todo.lineNumber] = line;
+      await this.app.vault.modify(todo.file, lines.join("\n"));
+
+      // Trigger callback if set
+      if (this.onComplete) {
+        this.onComplete();
+      }
+
+      new Notice(`Priority set to ${newTag}${addFocus ? " + #focus" : ""}`);
+      return true;
+    } catch (error) {
+      console.error("Error setting priority:", error);
+      new Notice("Failed to set priority. See console for details.");
+      return false;
+    }
+  }
+
+  async removeTag(todo: TodoItem, tag: string): Promise<boolean> {
+    try {
+      const content = await this.app.vault.read(todo.file);
+      const lines = content.split("\n");
+
+      if (todo.lineNumber >= lines.length) {
+        throw new Error(
+          `Line number ${todo.lineNumber} out of bounds for file ${todo.filePath}`
+        );
+      }
+
+      let line = lines[todo.lineNumber];
+
+      // Remove the specified tag
+      const tagPattern = new RegExp(`${tag}\\b\\s*`, "g");
+      line = line.replace(tagPattern, "");
+
+      // Clean up extra whitespace
+      line = line.replace(/\s+/g, " ").trim();
+
+      lines[todo.lineNumber] = line;
+      await this.app.vault.modify(todo.file, lines.join("\n"));
+
+      // Trigger callback if set
+      if (this.onComplete) {
+        this.onComplete();
+      }
+
+      new Notice(`Removed ${tag}`);
+      return true;
+    } catch (error) {
+      console.error("Error removing tag:", error);
+      new Notice("Failed to remove tag. See console for details.");
+      return false;
     }
   }
 }
