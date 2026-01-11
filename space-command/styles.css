@@ -335,7 +335,7 @@
   display: flex;
   justify-content: flex-end;
   margin-bottom: 4px;
-  margin-right: 5em !important;
+  margin-right: 1em !important;
 }
 
 .embed-refresh-btn {
