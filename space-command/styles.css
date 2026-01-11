@@ -1,7 +1,7 @@
-/* Weekly Log Helpers Plugin Styles */
+/* Space Command Plugin Styles */
 
 /* Sidebar Styles */
-.weekly-log-helpers-sidebar {
+.space-command-sidebar {
   padding: 10px;
 }
 
@@ -12,7 +12,7 @@
   margin-bottom: 15px;
 }
 
-.weekly-log-helpers-sidebar h4 {
+.space-command-sidebar h4 {
   margin: 0;
   color: var(--text-normal);
 }
@@ -129,7 +129,7 @@
 }
 
 /* Embed Styles */
-.weekly-log-helpers-embed {
+.space-command-embed {
   margin: 10px 0;
   padding: 10px;
   background-color: var(--background-secondary);
@@ -137,50 +137,50 @@
   border-left: 3px solid var(--interactive-accent);
 }
 
-.weekly-log-helpers-embed ul {
+.space-command-embed ul {
   list-style: none;
   padding: 0;
   margin: 0;
 }
 
-.weekly-log-helpers-embed .task-list-item {
+.space-command-embed .task-list-item {
   display: flex;
   align-items: flex-start;
   padding: 4px 0;
   gap: 8px;
 }
 
-.weekly-log-helpers-embed .task-list-item-checkbox {
+.space-command-embed .task-list-item-checkbox {
   margin-top: 2px;
   cursor: pointer;
   flex-shrink: 0;
 }
 
-.weekly-log-helpers-embed .todo-text {
+.space-command-embed .todo-text {
   flex: 1;
   color: var(--text-normal);
   line-height: 1.4;
 }
 
-.weekly-log-helpers-embed .todo-source-link {
+.space-command-embed .todo-source-link {
   color: var(--text-accent);
   text-decoration: none;
   font-weight: bold;
   flex-shrink: 0;
 }
 
-.weekly-log-helpers-embed .todo-source-link:hover {
+.space-command-embed .todo-source-link:hover {
   color: var(--text-accent-hover);
   text-decoration: underline;
 }
 
-.weekly-log-helpers-empty {
+.space-command-empty {
   color: var(--text-muted);
   font-style: italic;
   padding: 5px 0;
 }
 
-.weekly-log-helpers-error {
+.space-command-error {
   color: var(--text-error);
   padding: 10px;
   background-color: var(--background-modifier-error);
