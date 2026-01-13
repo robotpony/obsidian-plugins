@@ -55,7 +55,7 @@
 .sidebar-tab-btn {
   padding: 4px;
   border: none;
-  background-color: var(--background-secondary-alt);
+  background-color: transparent;
   cursor: pointer;
   transition: opacity 0.2s;
   color: var(--text-normal);
@@ -69,8 +69,7 @@
 }
 
 .sidebar-tab-btn.active {
-  opacity: 1;
-  background-color: var(--background-modifier-active-hover);
+  background-color: var(--background-secondary-alt);
 }
 
 /* Hamburger menu button */
