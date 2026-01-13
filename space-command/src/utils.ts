@@ -32,7 +32,11 @@ export function extractTags(text: string): string[] {
 }
 
 export function hasCheckboxFormat(text: string): boolean {
-  return /^-\s*\[[ x]\]/.test(text.trim());
+  return /^-\s*\[[ x]\]/i.test(text.trim());
+}
+
+export function isCheckboxChecked(text: string): boolean {
+  return /^-\s*\[x\]/i.test(text.trim());
 }
 
 export function markCheckboxComplete(text: string): string {

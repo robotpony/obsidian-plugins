@@ -2,6 +2,21 @@
 
 All notable changes to the ⌥⌘ Space Command plugin will be documented in this file.
 
+## [0.6.6] - 2026-01-12
+
+### Fixed
+
+- **Checkbox sync for child TODOs**: Native Obsidian checkbox clicks now sync with sidebar
+  - Checking `- [x]` in a header TODO's child items now automatically adds `#todone @date`
+  - Previously, checking items in the document didn't update the sidebar (only embeds/sidebar checkboxes worked)
+  - Syncs on file scan, so changes appear immediately in sidebar
+
+### Technical
+
+- New `isCheckboxChecked()` helper in `utils.ts`
+- New `syncCheckedCheckboxes()` method in `TodoScanner` adds `#todone @date` to checked items
+- Scanner detects `- [x]` without `#todone` tag and queues for sync
+
 ## [0.6.5] - 2026-01-12
 
 ### Added

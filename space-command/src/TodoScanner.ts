@@ -1,6 +1,6 @@
 import { App, TFile, Vault, Events, debounce } from "obsidian";
 import { TodoItem } from "./types";
-import { extractTags, hasCheckboxFormat } from "./utils";
+import { extractTags, hasCheckboxFormat, isCheckboxChecked } from "./utils";
 
 export class TodoScanner extends Events {
   private app: App;
@@ -44,6 +44,7 @@ export class TodoScanner extends Events {
       const todos: TodoItem[] = [];
       const todones: TodoItem[] = [];
       const linesToCleanup: number[] = [];
+      const linesToSyncTodone: number[] = [];
 
       // Track code block state
       let inCodeBlock = false;
@@ -106,6 +107,17 @@ export class TodoScanner extends Events {
 
         // If we're under a header TODO and this is a list item, treat as child
         if (currentHeaderTodo && this.isListItem(line)) {
+          // Check if checkbox is checked but missing #todone tag - sync the state
+          const isChecked = isCheckboxChecked(line);
+          const hasTodoneTag = tags.includes("#todone");
+
+          if (isChecked && !hasTodoneTag) {
+            // Queue this line to add #todone tag (sync checkbox state)
+            linesToSyncTodone.push(i);
+            // Treat as completed for this scan
+            tags.push("#todone");
+          }
+
           const childItem = this.createTodoItem(file, i, line, tags);
           childItem.parentLineNumber = currentHeaderTodo.lineNumber;
           // Add this line number to parent's children
@@ -138,6 +150,11 @@ export class TodoScanner extends Events {
       // Clean up lines that have both #todo and #todone
       if (linesToCleanup.length > 0) {
         this.cleanupDuplicateTags(file, lines, linesToCleanup);
+      }
+
+      // Sync checked checkboxes by adding #todone tag
+      if (linesToSyncTodone.length > 0) {
+        this.syncCheckedCheckboxes(file, lines, linesToSyncTodone);
       }
 
       if (todos.length > 0) {
@@ -305,6 +322,30 @@ export class TodoScanner extends Events {
     for (const lineNum of lineNumbers) {
       // Remove #todo tag from lines that also have #todone
       const newLine = lines[lineNum].replace(/#todo\b\s*/g, "");
+      if (newLine !== lines[lineNum]) {
+        lines[lineNum] = newLine;
+        modified = true;
+      }
+    }
+
+    if (modified) {
+      await this.app.vault.modify(file, lines.join("\n"));
+    }
+  }
+
+  // Sync checked checkboxes (- [x]) by adding #todone tag with date
+  private async syncCheckedCheckboxes(
+    file: TFile,
+    lines: string[],
+    lineNumbers: number[]
+  ): Promise<void> {
+    let modified = false;
+    const today = new Date().toISOString().split("T")[0];
+
+    for (const lineNum of lineNumbers) {
+      const line = lines[lineNum];
+      // Add #todone @date at end of line (before any trailing whitespace)
+      const newLine = line.trimEnd() + ` #todone @${today}`;
       if (newLine !== lines[lineNum]) {
         lines[lineNum] = newLine;
         modified = true;
