@@ -1,4 +1,4 @@
-import { TodoFilters } from "./types";
+import { TodoFilters, TodoItem } from "./types";
 
 export class FilterParser {
   static parse(filterString: string): TodoFilters {
@@ -44,7 +44,7 @@ export class FilterParser {
     return filters;
   }
 
-  static applyFilters(todos: any[], filters: TodoFilters): any[] {
+  static applyFilters(todos: TodoItem[], filters: TodoFilters): TodoItem[] {
     let filtered = [...todos];
 
     // Apply path filter
@@ -58,7 +58,7 @@ export class FilterParser {
     // Apply tags filter
     if (filters.tags && filters.tags.length > 0) {
       filtered = filtered.filter((todo) => {
-        const todoTags = todo.tags.map((t: string) => t.toLowerCase());
+        const todoTags = todo.tags.map((t) => t.toLowerCase());
         return filters.tags!.every((filterTag) =>
           todoTags.includes(filterTag.toLowerCase())
         );

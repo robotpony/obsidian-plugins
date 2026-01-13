@@ -1,6 +1,7 @@
 import { App, TFile } from "obsidian";
 import { TodoScanner } from "./TodoScanner";
 import { ProjectInfo, TodoItem } from "./types";
+import { getPriorityValue } from "./utils";
 
 export class ProjectManager {
   private app: App;
@@ -20,18 +21,6 @@ export class ProjectManager {
     this.priorityTags = priorityTags;
   }
 
-  private getPriorityValue(todo: TodoItem): number {
-    // Priority order: #focus=0, #p0=1, #p1=2, #p2=3, no priority=4, #p3=5, #p4=6, #future=7
-    if (todo.tags.includes("#focus")) return 0;
-    if (todo.tags.includes("#p0")) return 1;
-    if (todo.tags.includes("#p1")) return 2;
-    if (todo.tags.includes("#p2")) return 3;
-    if (todo.tags.includes("#p3")) return 5;
-    if (todo.tags.includes("#p4")) return 6;
-    if (todo.tags.includes("#future")) return 7;
-    return 4; // No priority = medium (between #p2 and #p3)
-  }
-
   getProjects(): ProjectInfo[] {
     const todos = this.scanner.getTodos();
     const projectMap = new Map<string, ProjectInfo>();
@@ -42,7 +31,7 @@ export class ProjectManager {
       const excludedTags = new Set(["#todo", "#todone", "#future", "#focus", ...this.priorityTags]);
       const projectTags = todo.tags.filter(tag => !excludedTags.has(tag));
 
-      const todoPriority = this.getPriorityValue(todo);
+      const todoPriority = getPriorityValue(todo.tags);
 
       for (const tag of projectTags) {
         if (projectMap.has(tag)) {

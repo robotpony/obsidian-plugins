@@ -21,7 +21,6 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
-    "slackify-markdown": "^5.0.0",
-    "hugo": "^0.0.3"
+    "slackify-markdown": "^5.0.0"
   }
 }

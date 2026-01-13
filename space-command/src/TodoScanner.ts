@@ -1,4 +1,4 @@
-import { App, TFile, Vault, Events } from "obsidian";
+import { App, TFile, Vault, Events, debounce } from "obsidian";
 import { TodoItem } from "./types";
 import { extractTags, hasCheckboxFormat } from "./utils";
 
@@ -8,9 +8,19 @@ export class TodoScanner extends Events {
   private todonesCache: Map<string, TodoItem[]> = new Map();
   private excludeFromTodones: Set<string> = new Set();
 
+  // Debounced scan function to prevent rapid re-scans on file changes
+  private debouncedScanFile: (file: TFile) => void;
+
   constructor(app: App) {
     super();
     this.app = app;
+
+    // Debounce file scans to 100ms to prevent rapid consecutive scans
+    this.debouncedScanFile = debounce(
+      (file: TFile) => this.scanFile(file),
+      100,
+      true
+    );
   }
 
   setExcludeFromTodones(filePaths: string[]): void {
@@ -251,34 +261,35 @@ export class TodoScanner extends Events {
   }
 
   watchFiles(): void {
-    // Watch for file modifications
+    // Watch for file modifications (debounced to prevent rapid re-scans)
     this.app.vault.on("modify", (file) => {
       if (file instanceof TFile && file.extension === "md") {
-        this.scanFile(file);
+        this.debouncedScanFile(file);
       }
     });
 
-    // Watch for file creation
+    // Watch for file creation (debounced)
     this.app.vault.on("create", (file) => {
       if (file instanceof TFile && file.extension === "md") {
-        this.scanFile(file);
+        this.debouncedScanFile(file);
       }
     });
 
-    // Watch for file deletion
+    // Watch for file deletion (immediate - no debounce needed)
     this.app.vault.on("delete", (file) => {
       if (file instanceof TFile) {
         this.todosCache.delete(file.path);
         this.todonesCache.delete(file.path);
+        this.trigger("todos-updated");
       }
     });
 
-    // Watch for file rename
+    // Watch for file rename (debounced scan for new path)
     this.app.vault.on("rename", (file, oldPath) => {
       if (file instanceof TFile && file.extension === "md") {
         this.todosCache.delete(oldPath);
         this.todonesCache.delete(oldPath);
-        this.scanFile(file);
+        this.debouncedScanFile(file);
       }
     });
   }

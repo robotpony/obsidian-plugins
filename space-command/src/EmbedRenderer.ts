@@ -1,10 +1,11 @@
-import { App } from "obsidian";
+import { App, MarkdownView, TFile } from "obsidian";
 import { TodoScanner } from "./TodoScanner";
 import { TodoProcessor } from "./TodoProcessor";
 import { ProjectManager } from "./ProjectManager";
 import { FilterParser } from "./FilterParser";
 import { ContextMenuHandler } from "./ContextMenuHandler";
 import { TodoItem } from "./types";
+import { getPriorityValue } from "./utils";
 
 export class EmbedRenderer {
   private app: App;
@@ -203,18 +204,6 @@ export class EmbedRenderer {
     }
   }
 
-  private getPriorityValue(todo: TodoItem): number {
-    // Priority order: #focus=0, #p0=1, #p1=2, #p2=3, no priority=4, #p3=5, #p4=6, #future=7
-    if (todo.tags.includes("#focus")) return 0;
-    if (todo.tags.includes("#p0")) return 1;
-    if (todo.tags.includes("#p1")) return 2;
-    if (todo.tags.includes("#p2")) return 3;
-    if (todo.tags.includes("#p3")) return 5;
-    if (todo.tags.includes("#p4")) return 6;
-    if (todo.tags.includes("#future")) return 7;
-    return 4; // No priority = medium (between #p2 and #p3)
-  }
-
   private getFirstProjectTag(todo: TodoItem): string {
     // Return first non-priority tag for alphabetical sorting
     const excludeTags = ['#focus', '#future', '#p0', '#p1', '#p2', '#p3', '#p4', '#todo', '#todone'];
@@ -229,7 +218,7 @@ export class EmbedRenderer {
 
     // Sort active TODOs by priority, then by project tag alphabetically
     activeTodos.sort((a, b) => {
-      const priorityDiff = this.getPriorityValue(a) - this.getPriorityValue(b);
+      const priorityDiff = getPriorityValue(a.tags) - getPriorityValue(b.tags);
       if (priorityDiff !== 0) return priorityDiff;
       // Same priority: sort by first project tag alphabetically
       return this.getFirstProjectTag(a).localeCompare(this.getFirstProjectTag(b));
@@ -670,14 +659,12 @@ export class EmbedRenderer {
     this.renderTodoList(container, combined, todoneFile, filterString, unfiltered);
   }
 
-  private openFileAtLine(file: any, line: number): void {
+  private openFileAtLine(file: TFile, line: number): void {
     const leaf = this.app.workspace.getLeaf(false);
     leaf.openFile(file, { active: true }).then(() => {
-      const view = this.app.workspace.getActiveViewOfType(
-        require("obsidian").MarkdownView
-      );
-      if (view && (view as any).editor) {
-        const editor = (view as any).editor;
+      const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+      if (view?.editor) {
+        const editor = view.editor;
 
         // Set cursor to the line
         editor.setCursor({ line, ch: 0 });
@@ -691,7 +678,7 @@ export class EmbedRenderer {
     });
   }
 
-  private highlightLine(editor: any, line: number): void {
+  private highlightLine(editor: MarkdownView["editor"], line: number): void {
     // Get the line length
     const lineText = editor.getLine(line);
     const lineLength = lineText.length;

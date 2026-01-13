@@ -4,6 +4,22 @@ export function formatDate(date: Date, format: string): string {
   return (moment as any)(date).format(format);
 }
 
+/**
+ * Get the priority value for sorting TODOs.
+ * Lower values = higher priority.
+ * Priority order: #focus=0, #p0=1, #p1=2, #p2=3, no priority=4, #p3=5, #p4=6, #future=7
+ */
+export function getPriorityValue(tags: string[]): number {
+  if (tags.includes("#focus")) return 0;
+  if (tags.includes("#p0")) return 1;
+  if (tags.includes("#p1")) return 2;
+  if (tags.includes("#p2")) return 3;
+  if (tags.includes("#p3")) return 5;
+  if (tags.includes("#p4")) return 6;
+  if (tags.includes("#future")) return 7;
+  return 4; // No priority = medium (between #p2 and #p3)
+}
+
 export function extractTags(text: string): string[] {
   // Remove inline code spans before extracting tags
   // This prevents matching tags inside backticks like `#689fd6`

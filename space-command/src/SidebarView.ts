@@ -1,9 +1,10 @@
-import { ItemView, WorkspaceLeaf, TFile, Menu, Notice } from "obsidian";
+import { ItemView, WorkspaceLeaf, TFile, Menu, Notice, Modal, MarkdownView } from "obsidian";
 import { TodoScanner } from "./TodoScanner";
 import { TodoProcessor } from "./TodoProcessor";
 import { ProjectManager } from "./ProjectManager";
-import { TodoItem } from "./types";
+import { TodoItem, ProjectInfo } from "./types";
 import { ContextMenuHandler } from "./ContextMenuHandler";
+import { getPriorityValue } from "./utils";
 
 export const VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 
@@ -14,7 +15,6 @@ export class TodoSidebarView extends ItemView {
   private defaultTodoneFile: string;
   private updateListener: (() => void) | null = null;
   private contextMenuHandler: ContextMenuHandler;
-  private priorityTags: string[];
   private recentTodonesLimit: number;
 
   constructor(
@@ -31,7 +31,6 @@ export class TodoSidebarView extends ItemView {
     this.processor = processor;
     this.projectManager = projectManager;
     this.defaultTodoneFile = defaultTodoneFile;
-    this.priorityTags = priorityTags;
     this.recentTodonesLimit = recentTodonesLimit;
 
     // Initialize context menu handler
@@ -80,9 +79,29 @@ export class TodoSidebarView extends ItemView {
     return cleaned;
   }
 
-  private wrapTagsInSpans(text: string): string {
-    // Wrap tags in spans for styling
-    return text.replace(/(#[\w-]+)/g, '<span class="tag">$1</span>');
+  // Render text with tags safely using DOM methods (avoids XSS)
+  private renderTextWithTags(text: string, container: HTMLElement): void {
+    const tagRegex = /(#[\w-]+)/g;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = tagRegex.exec(text)) !== null) {
+      // Add text before the tag
+      if (match.index > lastIndex) {
+        container.appendText(text.substring(lastIndex, match.index));
+      }
+      // Add the tag as a styled span
+      container.createEl("span", {
+        cls: "tag",
+        text: match[1],
+      });
+      lastIndex = tagRegex.lastIndex;
+    }
+
+    // Add remaining text after last tag
+    if (lastIndex < text.length) {
+      container.appendText(text.substring(lastIndex));
+    }
   }
 
   async onOpen(): Promise<void> {
@@ -178,25 +197,9 @@ export class TodoSidebarView extends ItemView {
     this.renderRecentTodones(container);
   }
 
-  private sortTodosByDate(todos: TodoItem[]): TodoItem[] {
-    return [...todos].sort((a, b) => a.dateCreated - b.dateCreated);
-  }
-
-  private getPriorityValue(todo: TodoItem): number {
-    // Priority order: #focus=0, #p0=1, #p1=2, #p2=3, no priority=4, #p3=5, #p4=6, #future=7
-    if (todo.tags.includes("#focus")) return 0;
-    if (todo.tags.includes("#p0")) return 1;
-    if (todo.tags.includes("#p1")) return 2;
-    if (todo.tags.includes("#p2")) return 3;
-    if (todo.tags.includes("#p3")) return 5;
-    if (todo.tags.includes("#p4")) return 6;
-    if (todo.tags.includes("#future")) return 7;
-    return 4; // No priority = medium (between #p2 and #p3)
-  }
-
   private sortTodosByPriority(todos: TodoItem[]): TodoItem[] {
     return [...todos].sort((a, b) => {
-      const priorityDiff = this.getPriorityValue(a) - this.getPriorityValue(b);
+      const priorityDiff = getPriorityValue(a.tags) - getPriorityValue(b.tags);
       if (priorityDiff !== 0) return priorityDiff;
       // If same priority, sort by date created
       return a.dateCreated - b.dateCreated;
@@ -238,7 +241,7 @@ export class TodoSidebarView extends ItemView {
     }
   }
 
-  private renderProjectItem(list: HTMLElement, project: any): void {
+  private renderProjectItem(list: HTMLElement, project: ProjectInfo): void {
     // Check if this project has any #focus items (priority 0 = #focus)
     const hasFocusItems = project.highestPriority === 0;
     const item = list.createEl("li", { cls: `project-item${hasFocusItems ? ' project-focus' : ''}` });
@@ -257,9 +260,11 @@ export class TodoSidebarView extends ItemView {
       }
     });
 
-    // Project name and count
+    // Project name and count (using safe DOM methods)
     const textSpan = item.createEl("span", { cls: "project-text" });
-    textSpan.innerHTML = `${project.tag} <span class="project-count">${project.count}</span> `;
+    textSpan.appendText(project.tag + " ");
+    textSpan.createEl("span", { cls: "project-count", text: String(project.count) });
+    textSpan.appendText(" ");
 
     // Link to project file
     const link = item.createEl("a", {
@@ -357,15 +362,14 @@ export class TodoSidebarView extends ItemView {
     const textSpan = rowContainer.createEl("span", { cls: "todo-text" });
     const cleanText = todo.text.replace(/#todo\b/g, "").trim();
     const displayText = this.stripMarkdownSyntax(cleanText);
-    const displayWithStyledTags = this.wrapTagsInSpans(displayText);
+    this.renderTextWithTags(displayText, textSpan);
 
     // For headers with children, append count inline with text
     if (hasChildren) {
       const childCount = todo.childLineNumbers!.length;
-      textSpan.innerHTML = displayWithStyledTags + ` <span class="todo-count">${childCount}</span> `;
-    } else {
-      textSpan.innerHTML = displayWithStyledTags + " ";
+      textSpan.createEl("span", { cls: "todo-count", text: ` ${childCount}` });
     }
+    textSpan.appendText(" ");
 
     // Link to source
     const link = rowContainer.createEl("a", {
@@ -463,8 +467,8 @@ export class TodoSidebarView extends ItemView {
     const textSpan = item.createEl("span", { cls: "todo-text todone-text" });
     const cleanText = todone.text.replace(/#todone\b/g, "").trim();
     const displayText = this.stripMarkdownSyntax(cleanText);
-    const displayWithStyledTags = this.wrapTagsInSpans(displayText);
-    textSpan.innerHTML = displayWithStyledTags + " ";
+    this.renderTextWithTags(displayText, textSpan);
+    textSpan.appendText(" ");
 
     // Link to source
     const link = item.createEl("a", {
@@ -479,9 +483,8 @@ export class TodoSidebarView extends ItemView {
     });
   }
 
-  private async confirmCompleteProject(project: any): Promise<boolean> {
+  private async confirmCompleteProject(project: ProjectInfo): Promise<boolean> {
     return new Promise((resolve) => {
-      const { Modal } = require("obsidian");
       const modal = new Modal(this.app);
       modal.titleEl.setText("Complete All Project TODOs?");
       modal.contentEl.createEl("p", {
@@ -515,7 +518,7 @@ export class TodoSidebarView extends ItemView {
     });
   }
 
-  private async completeAllProjectTodos(project: any): Promise<void> {
+  private async completeAllProjectTodos(project: ProjectInfo): Promise<void> {
     const todos = this.scanner.getTodos().filter((todo) =>
       todo.tags.includes(project.tag)
     );
@@ -535,7 +538,6 @@ export class TodoSidebarView extends ItemView {
       }
     }
 
-    const { Notice } = require("obsidian");
     if (failed > 0) {
       new Notice(
         `Completed ${completed} TODO(s), ${failed} failed. See console for details.`
@@ -547,14 +549,12 @@ export class TodoSidebarView extends ItemView {
     this.render();
   }
 
-  private openFileAtLine(file: any, line: number): void {
+  private openFileAtLine(file: TFile, line: number): void {
     const leaf = this.app.workspace.getLeaf(false);
     leaf.openFile(file, { active: true }).then(() => {
-      const view = this.app.workspace.getActiveViewOfType(
-        require("obsidian").MarkdownView
-      );
-      if (view && (view as any).editor) {
-        const editor = (view as any).editor;
+      const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+      if (view?.editor) {
+        const editor = view.editor;
 
         // Set cursor to the line
         editor.setCursor({ line, ch: 0 });

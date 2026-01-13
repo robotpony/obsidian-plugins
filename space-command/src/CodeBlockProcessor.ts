@@ -1,18 +1,10 @@
-import { App, Plugin } from "obsidian";
-import { TodoScanner } from "./TodoScanner";
-import { TodoProcessor } from "./TodoProcessor";
-import { ProjectManager } from "./ProjectManager";
+import { Plugin } from "obsidian";
 import { EmbedRenderer } from "./EmbedRenderer";
 
 export class CodeBlockProcessor {
   constructor(
-    private app: App,
-    private scanner: TodoScanner,
-    private processor: TodoProcessor,
-    private projectManager: ProjectManager,
-    private defaultTodoneFile: string,
-    private focusListLimit: number,
-    private priorityTags: string[] = ["#p0", "#p1", "#p2", "#p3", "#p4"]
+    private embedRenderer: EmbedRenderer,
+    private defaultTodoneFile: string
   ) {}
 
   // Register both code block processors
@@ -30,30 +22,12 @@ export class CodeBlockProcessor {
   // Handle focus-todos code blocks
   processFocusTodos(source: string, el: HTMLElement): void {
     const { todoneFile, filterString } = this.parseContent(source);
-    const embedRenderer = new EmbedRenderer(
-      this.app,
-      this.scanner,
-      this.processor,
-      this.projectManager,
-      this.defaultTodoneFile,
-      this.focusListLimit,
-      this.priorityTags
-    );
-    embedRenderer.renderTodos(el, filterString, todoneFile);
+    this.embedRenderer.renderTodos(el, filterString, todoneFile);
   }
 
   // Handle focus-list code blocks
   processFocusList(source: string, el: HTMLElement): void {
-    const embedRenderer = new EmbedRenderer(
-      this.app,
-      this.scanner,
-      this.processor,
-      this.projectManager,
-      this.defaultTodoneFile,
-      this.focusListLimit,
-      this.priorityTags
-    );
-    embedRenderer.renderProjects(el);
+    this.embedRenderer.renderProjects(el);
   }
 
   // Parse code block content

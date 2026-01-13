@@ -156,13 +156,8 @@ export default class SpaceCommandPlugin extends Plugin {
     // Register code block processors for focus-todos and focus-list
     // These work in BOTH Reading Mode AND Live Preview mode
     const codeBlockProcessor = new CodeBlockProcessor(
-      this.app,
-      this.scanner,
-      this.processor,
-      this.projectManager,
-      this.settings.defaultTodoneFile,
-      this.settings.focusListLimit,
-      this.settings.priorityTags
+      this.embedRenderer,
+      this.settings.defaultTodoneFile
     );
     codeBlockProcessor.registerProcessors(this);
 

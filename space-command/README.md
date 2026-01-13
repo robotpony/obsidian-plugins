@@ -87,7 +87,7 @@ limit:5
 
 ## Works With Other Tools
 
-- **Slack**: Cmd/Ctrl+Shift+C copies selection as Slack markdown
+- **Slack**: Cmd/Ctrl+Shift+C (and via the right-click menu) copies selection as Slack markdown
 - **Plain text**: `#todo` and `#todone` tags work with grep, scripts, CI checks
 - **Git-friendly**: No database, just your markdown files
 

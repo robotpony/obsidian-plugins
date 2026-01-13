@@ -131,7 +131,7 @@ __export(main_exports, {
   default: () => SpaceCommandPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian9 = require("obsidian");
+var import_obsidian10 = require("obsidian");
 
 // src/TodoScanner.ts
 var import_obsidian2 = require("obsidian");
@@ -140,6 +140,23 @@ var import_obsidian2 = require("obsidian");
 var import_obsidian = require("obsidian");
 function formatDate(date, format) {
   return (0, import_obsidian.moment)(date).format(format);
+}
+function getPriorityValue(tags) {
+  if (tags.includes("#focus"))
+    return 0;
+  if (tags.includes("#p0"))
+    return 1;
+  if (tags.includes("#p1"))
+    return 2;
+  if (tags.includes("#p2"))
+    return 3;
+  if (tags.includes("#p3"))
+    return 5;
+  if (tags.includes("#p4"))
+    return 6;
+  if (tags.includes("#future"))
+    return 7;
+  return 4;
 }
 function extractTags(text5) {
   const textWithoutCode = text5.replace(/`[^`]*`/g, "");
@@ -172,6 +189,11 @@ var TodoScanner = class extends import_obsidian2.Events {
     this.todonesCache = /* @__PURE__ */ new Map();
     this.excludeFromTodones = /* @__PURE__ */ new Set();
     this.app = app;
+    this.debouncedScanFile = (0, import_obsidian2.debounce)(
+      (file) => this.scanFile(file),
+      100,
+      true
+    );
   }
   setExcludeFromTodones(filePaths) {
     this.excludeFromTodones = new Set(filePaths);
@@ -342,25 +364,26 @@ var TodoScanner = class extends import_obsidian2.Events {
   watchFiles() {
     this.app.vault.on("modify", (file) => {
       if (file instanceof import_obsidian2.TFile && file.extension === "md") {
-        this.scanFile(file);
+        this.debouncedScanFile(file);
       }
     });
     this.app.vault.on("create", (file) => {
       if (file instanceof import_obsidian2.TFile && file.extension === "md") {
-        this.scanFile(file);
+        this.debouncedScanFile(file);
       }
     });
     this.app.vault.on("delete", (file) => {
       if (file instanceof import_obsidian2.TFile) {
         this.todosCache.delete(file.path);
         this.todonesCache.delete(file.path);
+        this.trigger("todos-updated");
       }
     });
     this.app.vault.on("rename", (file, oldPath) => {
       if (file instanceof import_obsidian2.TFile && file.extension === "md") {
         this.todosCache.delete(oldPath);
         this.todonesCache.delete(oldPath);
-        this.scanFile(file);
+        this.debouncedScanFile(file);
       }
     });
   }
@@ -457,6 +480,11 @@ var TodoProcessor = class {
       );
     }
     let updatedLine = lines[todo.lineNumber];
+    if (!updatedLine.includes("#todone")) {
+      throw new Error(
+        `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todone tag. File may have been modified.`
+      );
+    }
     updatedLine = replaceTodoneWithTodo(updatedLine);
     if (todo.hasCheckbox) {
       updatedLine = markCheckboxIncomplete(updatedLine);
@@ -473,6 +501,11 @@ var TodoProcessor = class {
       );
     }
     let updatedLine = lines[todo.lineNumber];
+    if (!updatedLine.includes("#todo") || updatedLine.includes("#todone")) {
+      throw new Error(
+        `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todo tag. File may have been modified.`
+      );
+    }
     updatedLine = replaceTodoWithTodone(updatedLine, date);
     if (todo.hasCheckbox) {
       updatedLine = markCheckboxComplete(updatedLine);
@@ -522,6 +555,11 @@ ${todoneText}` : todoneText;
         );
       }
       let line = lines[todo.lineNumber];
+      if (!line.includes("#todo") || line.includes("#todone")) {
+        throw new Error(
+          `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todo tag. File may have been modified.`
+        );
+      }
       line = line.replace(/#p[0-4]\b/g, "");
       line = line.replace(/#future\b/g, "");
       line = line.replace(/\s+/g, " ").trim();
@@ -579,30 +617,13 @@ var ProjectManager = class {
     this.projectsFolder = projectsFolder;
     this.priorityTags = priorityTags;
   }
-  getPriorityValue(todo) {
-    if (todo.tags.includes("#focus"))
-      return 0;
-    if (todo.tags.includes("#p0"))
-      return 1;
-    if (todo.tags.includes("#p1"))
-      return 2;
-    if (todo.tags.includes("#p2"))
-      return 3;
-    if (todo.tags.includes("#p3"))
-      return 5;
-    if (todo.tags.includes("#p4"))
-      return 6;
-    if (todo.tags.includes("#future"))
-      return 7;
-    return 4;
-  }
   getProjects() {
     const todos = this.scanner.getTodos();
     const projectMap = /* @__PURE__ */ new Map();
     for (const todo of todos) {
       const excludedTags = /* @__PURE__ */ new Set(["#todo", "#todone", "#future", "#focus", ...this.priorityTags]);
       const projectTags = todo.tags.filter((tag) => !excludedTags.has(tag));
-      const todoPriority = this.getPriorityValue(todo);
+      const todoPriority = getPriorityValue(todo.tags);
       for (const tag of projectTags) {
         if (projectMap.has(tag)) {
           const project = projectMap.get(tag);
@@ -671,6 +692,9 @@ ${tag}
     await leaf.openFile(file);
   }
 };
+
+// src/EmbedRenderer.ts
+var import_obsidian6 = require("obsidian");
 
 // src/FilterParser.ts
 var FilterParser = class {
@@ -952,23 +976,6 @@ var EmbedRenderer = class {
       });
     }
   }
-  getPriorityValue(todo) {
-    if (todo.tags.includes("#focus"))
-      return 0;
-    if (todo.tags.includes("#p0"))
-      return 1;
-    if (todo.tags.includes("#p1"))
-      return 2;
-    if (todo.tags.includes("#p2"))
-      return 3;
-    if (todo.tags.includes("#p3"))
-      return 5;
-    if (todo.tags.includes("#p4"))
-      return 6;
-    if (todo.tags.includes("#future"))
-      return 7;
-    return 4;
-  }
   getFirstProjectTag(todo) {
     const excludeTags = ["#focus", "#future", "#p0", "#p1", "#p2", "#p3", "#p4", "#todo", "#todone"];
     const projectTag = todo.tags.find((t) => !excludeTags.includes(t));
@@ -978,7 +985,7 @@ var EmbedRenderer = class {
     const activeTodos = todos.filter((t) => t.tags.includes("#todo"));
     const completedTodones = todos.filter((t) => t.tags.includes("#todone"));
     activeTodos.sort((a, b) => {
-      const priorityDiff = this.getPriorityValue(a) - this.getPriorityValue(b);
+      const priorityDiff = getPriorityValue(a.tags) - getPriorityValue(b.tags);
       if (priorityDiff !== 0)
         return priorityDiff;
       return this.getFirstProjectTag(a).localeCompare(this.getFirstProjectTag(b));
@@ -1266,10 +1273,8 @@ var EmbedRenderer = class {
   openFileAtLine(file, line) {
     const leaf = this.app.workspace.getLeaf(false);
     leaf.openFile(file, { active: true }).then(() => {
-      const view = this.app.workspace.getActiveViewOfType(
-        require("obsidian").MarkdownView
-      );
-      if (view && view.editor) {
+      const view = this.app.workspace.getActiveViewOfType(import_obsidian6.MarkdownView);
+      if (view == null ? void 0 : view.editor) {
         const editor = view.editor;
         editor.setCursor({ line, ch: 0 });
         editor.scrollIntoView({ from: { line, ch: 0 }, to: { line, ch: 0 } }, true);
@@ -1292,14 +1297,9 @@ var EmbedRenderer = class {
 
 // src/CodeBlockProcessor.ts
 var CodeBlockProcessor = class {
-  constructor(app, scanner, processor, projectManager, defaultTodoneFile, focusListLimit, priorityTags = ["#p0", "#p1", "#p2", "#p3", "#p4"]) {
-    this.app = app;
-    this.scanner = scanner;
-    this.processor = processor;
-    this.projectManager = projectManager;
+  constructor(embedRenderer, defaultTodoneFile) {
+    this.embedRenderer = embedRenderer;
     this.defaultTodoneFile = defaultTodoneFile;
-    this.focusListLimit = focusListLimit;
-    this.priorityTags = priorityTags;
   }
   // Register both code block processors
   registerProcessors(plugin) {
@@ -1315,29 +1315,11 @@ var CodeBlockProcessor = class {
   // Handle focus-todos code blocks
   processFocusTodos(source, el) {
     const { todoneFile, filterString } = this.parseContent(source);
-    const embedRenderer = new EmbedRenderer(
-      this.app,
-      this.scanner,
-      this.processor,
-      this.projectManager,
-      this.defaultTodoneFile,
-      this.focusListLimit,
-      this.priorityTags
-    );
-    embedRenderer.renderTodos(el, filterString, todoneFile);
+    this.embedRenderer.renderTodos(el, filterString, todoneFile);
   }
   // Handle focus-list code blocks
   processFocusList(source, el) {
-    const embedRenderer = new EmbedRenderer(
-      this.app,
-      this.scanner,
-      this.processor,
-      this.projectManager,
-      this.defaultTodoneFile,
-      this.focusListLimit,
-      this.priorityTags
-    );
-    embedRenderer.renderProjects(el);
+    this.embedRenderer.renderProjects(el);
   }
   // Parse code block content
   // Supports multiple formats:
@@ -1376,7 +1358,7 @@ var CodeBlockProcessor = class {
 };
 
 // src/SlashCommandSuggest.ts
-var import_obsidian6 = require("obsidian");
+var import_obsidian7 = require("obsidian");
 var CALLOUT_TYPES = [
   { id: "info", name: "Info", icon: "\u2139\uFE0F" },
   { id: "tip", name: "Tip", icon: "\u{1F4A1}" },
@@ -1391,7 +1373,7 @@ var CALLOUT_TYPES = [
   { id: "question", name: "Question", icon: "\u2753" },
   { id: "failure", name: "Failure", icon: "\u274C" }
 ];
-var SlashCommandSuggest = class extends import_obsidian6.EditorSuggest {
+var SlashCommandSuggest = class extends import_obsidian7.EditorSuggest {
   constructor(app, settings) {
     super(app);
     this.inCalloutMenu = false;
@@ -1531,8 +1513,8 @@ var SlashCommandSuggest = class extends import_obsidian6.EditorSuggest {
 };
 
 // src/DateSuggest.ts
-var import_obsidian7 = require("obsidian");
-var DateSuggest = class extends import_obsidian7.EditorSuggest {
+var import_obsidian8 = require("obsidian");
+var DateSuggest = class extends import_obsidian8.EditorSuggest {
   constructor(app, settings) {
     super(app);
     this.settings = settings;
@@ -1637,9 +1619,9 @@ var DateSuggest = class extends import_obsidian7.EditorSuggest {
 };
 
 // src/SidebarView.ts
-var import_obsidian8 = require("obsidian");
+var import_obsidian9 = require("obsidian");
 var VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
-var TodoSidebarView = class extends import_obsidian8.ItemView {
+var TodoSidebarView = class extends import_obsidian9.ItemView {
   constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, recentTodonesLimit) {
     super(leaf);
     this.updateListener = null;
@@ -1647,7 +1629,6 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     this.processor = processor;
     this.projectManager = projectManager;
     this.defaultTodoneFile = defaultTodoneFile;
-    this.priorityTags = priorityTags;
     this.recentTodonesLimit = recentTodonesLimit;
     this.contextMenuHandler = new ContextMenuHandler(
       this.app,
@@ -1679,8 +1660,24 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     cleaned = cleaned.replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1");
     return cleaned;
   }
-  wrapTagsInSpans(text5) {
-    return text5.replace(/(#[\w-]+)/g, '<span class="tag">$1</span>');
+  // Render text with tags safely using DOM methods (avoids XSS)
+  renderTextWithTags(text5, container) {
+    const tagRegex = /(#[\w-]+)/g;
+    let lastIndex = 0;
+    let match;
+    while ((match = tagRegex.exec(text5)) !== null) {
+      if (match.index > lastIndex) {
+        container.appendText(text5.substring(lastIndex, match.index));
+      }
+      container.createEl("span", {
+        cls: "tag",
+        text: match[1]
+      });
+      lastIndex = tagRegex.lastIndex;
+    }
+    if (lastIndex < text5.length) {
+      container.appendText(text5.substring(lastIndex));
+    }
   }
   async onOpen() {
     this.updateListener = () => this.render();
@@ -1725,17 +1722,17 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     });
     copyBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
     copyBtn.addEventListener("click", (evt) => {
-      const menu = new import_obsidian8.Menu();
+      const menu = new import_obsidian9.Menu();
       menu.addItem((item) => {
         item.setTitle("Embed TODOs (inline)").setIcon("brackets").onClick(() => {
           navigator.clipboard.writeText("{{focus-todos}}");
-          new import_obsidian8.Notice("Copied inline embed syntax");
+          new import_obsidian9.Notice("Copied inline embed syntax");
         });
       });
       menu.addItem((item) => {
         item.setTitle("Embed TODOs (code block)").setIcon("code").onClick(() => {
           navigator.clipboard.writeText("```focus-todos\n```");
-          new import_obsidian8.Notice("Copied code block embed syntax");
+          new import_obsidian9.Notice("Copied code block embed syntax");
         });
       });
       menu.showAtMouseEvent(evt);
@@ -1744,29 +1741,9 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     this.renderActiveTodos(container);
     this.renderRecentTodones(container);
   }
-  sortTodosByDate(todos) {
-    return [...todos].sort((a, b) => a.dateCreated - b.dateCreated);
-  }
-  getPriorityValue(todo) {
-    if (todo.tags.includes("#focus"))
-      return 0;
-    if (todo.tags.includes("#p0"))
-      return 1;
-    if (todo.tags.includes("#p1"))
-      return 2;
-    if (todo.tags.includes("#p2"))
-      return 3;
-    if (todo.tags.includes("#p3"))
-      return 5;
-    if (todo.tags.includes("#p4"))
-      return 6;
-    if (todo.tags.includes("#future"))
-      return 7;
-    return 4;
-  }
   sortTodosByPriority(todos) {
     return [...todos].sort((a, b) => {
-      const priorityDiff = this.getPriorityValue(a) - this.getPriorityValue(b);
+      const priorityDiff = getPriorityValue(a.tags) - getPriorityValue(b.tags);
       if (priorityDiff !== 0)
         return priorityDiff;
       return a.dateCreated - b.dateCreated;
@@ -1813,7 +1790,9 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       }
     });
     const textSpan = item.createEl("span", { cls: "project-text" });
-    textSpan.innerHTML = `${project.tag} <span class="project-count">${project.count}</span> `;
+    textSpan.appendText(project.tag + " ");
+    textSpan.createEl("span", { cls: "project-count", text: String(project.count) });
+    textSpan.appendText(" ");
     const link2 = item.createEl("a", {
       text: "\u2192",
       cls: "project-link",
@@ -1881,13 +1860,12 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     const textSpan = rowContainer.createEl("span", { cls: "todo-text" });
     const cleanText = todo.text.replace(/#todo\b/g, "").trim();
     const displayText = this.stripMarkdownSyntax(cleanText);
-    const displayWithStyledTags = this.wrapTagsInSpans(displayText);
+    this.renderTextWithTags(displayText, textSpan);
     if (hasChildren) {
       const childCount = todo.childLineNumbers.length;
-      textSpan.innerHTML = displayWithStyledTags + ` <span class="todo-count">${childCount}</span> `;
-    } else {
-      textSpan.innerHTML = displayWithStyledTags + " ";
+      textSpan.createEl("span", { cls: "todo-count", text: ` ${childCount}` });
     }
+    textSpan.appendText(" ");
     const link2 = rowContainer.createEl("a", {
       text: "\u2192",
       cls: "todo-link",
@@ -1927,7 +1905,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     fileLink.addEventListener("click", async (e) => {
       e.preventDefault();
       const file = this.app.vault.getAbstractFileByPath(this.defaultTodoneFile);
-      if (file instanceof import_obsidian8.TFile) {
+      if (file instanceof import_obsidian9.TFile) {
         await this.app.workspace.getLeaf(false).openFile(file);
       }
     });
@@ -1963,8 +1941,8 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     const textSpan = item.createEl("span", { cls: "todo-text todone-text" });
     const cleanText = todone.text.replace(/#todone\b/g, "").trim();
     const displayText = this.stripMarkdownSyntax(cleanText);
-    const displayWithStyledTags = this.wrapTagsInSpans(displayText);
-    textSpan.innerHTML = displayWithStyledTags + " ";
+    this.renderTextWithTags(displayText, textSpan);
+    textSpan.appendText(" ");
     const link2 = item.createEl("a", {
       text: "\u2192",
       cls: "todo-link",
@@ -1977,8 +1955,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
   }
   async confirmCompleteProject(project) {
     return new Promise((resolve) => {
-      const { Modal } = require("obsidian");
-      const modal = new Modal(this.app);
+      const modal = new import_obsidian9.Modal(this.app);
       modal.titleEl.setText("Complete All Project TODOs?");
       modal.contentEl.createEl("p", {
         text: `This will mark all ${project.count} TODO(s) for project ${project.tag} as complete. This action cannot be undone.`
@@ -2023,23 +2000,20 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
         failed++;
       }
     }
-    const { Notice: Notice4 } = require("obsidian");
     if (failed > 0) {
-      new Notice4(
+      new import_obsidian9.Notice(
         `Completed ${completed} TODO(s), ${failed} failed. See console for details.`
       );
     } else {
-      new Notice4(`Completed all ${completed} TODO(s) for ${project.tag}!`);
+      new import_obsidian9.Notice(`Completed all ${completed} TODO(s) for ${project.tag}!`);
     }
     this.render();
   }
   openFileAtLine(file, line) {
     const leaf = this.app.workspace.getLeaf(false);
     leaf.openFile(file, { active: true }).then(() => {
-      const view = this.app.workspace.getActiveViewOfType(
-        require("obsidian").MarkdownView
-      );
-      if (view && view.editor) {
+      const view = this.app.workspace.getActiveViewOfType(import_obsidian9.MarkdownView);
+      if (view == null ? void 0 : view.editor) {
         const editor = view.editor;
         editor.setCursor({ line, ch: 0 });
         editor.scrollIntoView({ from: { line, ch: 0 }, to: { line, ch: 0 } }, true);
@@ -12586,7 +12560,7 @@ function convertToSlackMarkdown(markdown) {
 }
 
 // main.ts
-var SpaceCommandPlugin = class extends import_obsidian9.Plugin {
+var SpaceCommandPlugin = class extends import_obsidian10.Plugin {
   async onload() {
     await this.loadSettings();
     this.scanner = new TodoScanner(this.app);
@@ -12672,13 +12646,8 @@ var SpaceCommandPlugin = class extends import_obsidian9.Plugin {
       }
     });
     const codeBlockProcessor = new CodeBlockProcessor(
-      this.app,
-      this.scanner,
-      this.processor,
-      this.projectManager,
-      this.settings.defaultTodoneFile,
-      this.settings.focusListLimit,
-      this.settings.priorityTags
+      this.embedRenderer,
+      this.settings.defaultTodoneFile
     );
     codeBlockProcessor.registerProcessors(this);
     this.registerEditorSuggest(new SlashCommandSuggest(this.app, this.settings));
@@ -12731,12 +12700,12 @@ var SpaceCommandPlugin = class extends import_obsidian9.Plugin {
       editorCallback: async (editor) => {
         const selection = editor.getSelection();
         if (!selection) {
-          new import_obsidian9.Notice("No text selected");
+          new import_obsidian10.Notice("No text selected");
           return;
         }
         const slackMd = convertToSlackMarkdown(selection);
         await navigator.clipboard.writeText(slackMd);
-        new import_obsidian9.Notice("Copied as Slack markdown");
+        new import_obsidian10.Notice("Copied as Slack markdown");
       },
       hotkeys: [
         {
@@ -12753,7 +12722,7 @@ var SpaceCommandPlugin = class extends import_obsidian9.Plugin {
             item.setTitle("Copy as Slack").setIcon("clipboard-copy").onClick(async () => {
               const slackMd = convertToSlackMarkdown(selection);
               await navigator.clipboard.writeText(slackMd);
-              new import_obsidian9.Notice("Copied as Slack markdown");
+              new import_obsidian10.Notice("Copied as Slack markdown");
             });
           });
         }
@@ -12813,7 +12782,7 @@ var SpaceCommandPlugin = class extends import_obsidian9.Plugin {
     }
   }
 };
-var SpaceCommandSettingTab = class extends import_obsidian9.PluginSettingTab {
+var SpaceCommandSettingTab = class extends import_obsidian10.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -12822,19 +12791,19 @@ var SpaceCommandSettingTab = class extends import_obsidian9.PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     containerEl.createEl("h2", { text: "\u2325\u2318 Space Command Settings" });
-    new import_obsidian9.Setting(containerEl).setName("Default TODONE file").setDesc("Default file path for logging completed TODOs").addText(
+    new import_obsidian10.Setting(containerEl).setName("Default TODONE file").setDesc("Default file path for logging completed TODOs").addText(
       (text5) => text5.setPlaceholder("todos/done.md").setValue(this.plugin.settings.defaultTodoneFile).onChange(async (value) => {
         this.plugin.settings.defaultTodoneFile = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian9.Setting(containerEl).setName("Show sidebar by default").setDesc("Show the TODO sidebar when Obsidian starts").addToggle(
+    new import_obsidian10.Setting(containerEl).setName("Show sidebar by default").setDesc("Show the TODO sidebar when Obsidian starts").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.showSidebarByDefault).onChange(async (value) => {
         this.plugin.settings.showSidebarByDefault = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian9.Setting(containerEl).setName("Date format").setDesc("Format for completion dates (using moment.js format)").addText(
+    new import_obsidian10.Setting(containerEl).setName("Date format").setDesc("Format for completion dates (using moment.js format)").addText(
       (text5) => text5.setPlaceholder("YYYY-MM-DD").setValue(this.plugin.settings.dateFormat).onChange(async (value) => {
         this.plugin.settings.dateFormat = value;
         this.plugin.processor = new TodoProcessor(
@@ -12845,13 +12814,13 @@ var SpaceCommandSettingTab = class extends import_obsidian9.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: "Projects Settings" });
-    new import_obsidian9.Setting(containerEl).setName("Default projects folder").setDesc("Folder where project files are created (e.g., projects/)").addText(
+    new import_obsidian10.Setting(containerEl).setName("Default projects folder").setDesc("Folder where project files are created (e.g., projects/)").addText(
       (text5) => text5.setPlaceholder("projects/").setValue(this.plugin.settings.defaultProjectsFolder).onChange(async (value) => {
         this.plugin.settings.defaultProjectsFolder = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian9.Setting(containerEl).setName("Focus list limit").setDesc("Maximum number of projects to show in {{focus-list}}").addText(
+    new import_obsidian10.Setting(containerEl).setName("Focus list limit").setDesc("Maximum number of projects to show in {{focus-list}}").addText(
       (text5) => text5.setPlaceholder("5").setValue(String(this.plugin.settings.focusListLimit)).onChange(async (value) => {
         const num = parseInt(value);
         if (!isNaN(num) && num > 0) {
@@ -12861,7 +12830,7 @@ var SpaceCommandSettingTab = class extends import_obsidian9.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: "Priority Settings" });
-    new import_obsidian9.Setting(containerEl).setName("Priority tags").setDesc("Comma-separated list of priority tags (e.g., #p0, #p1, #p2, #p3, #p4). These tags won't appear in the Projects list.").addText(
+    new import_obsidian10.Setting(containerEl).setName("Priority tags").setDesc("Comma-separated list of priority tags (e.g., #p0, #p1, #p2, #p3, #p4). These tags won't appear in the Projects list.").addText(
       (text5) => text5.setPlaceholder("#p0, #p1, #p2, #p3, #p4").setValue(this.plugin.settings.priorityTags.join(", ")).onChange(async (value) => {
         const tags = value.split(",").map((tag) => tag.trim()).filter((tag) => tag.length > 0).map((tag) => tag.startsWith("#") ? tag : `#${tag}`);
         this.plugin.settings.priorityTags = tags;
@@ -12874,7 +12843,7 @@ var SpaceCommandSettingTab = class extends import_obsidian9.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian9.Setting(containerEl).setName("Recent TODONEs limit").setDesc("Maximum number of recent TODONEs to show in sidebar").addText(
+    new import_obsidian10.Setting(containerEl).setName("Recent TODONEs limit").setDesc("Maximum number of recent TODONEs to show in sidebar").addText(
       (text5) => text5.setPlaceholder("5").setValue(String(this.plugin.settings.recentTodonesLimit)).onChange(async (value) => {
         const num = parseInt(value);
         if (!isNaN(num) && num > 0) {

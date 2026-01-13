@@ -123,6 +123,13 @@ export class TodoProcessor {
 
     let updatedLine = lines[todo.lineNumber];
 
+    // Validate line content hasn't changed since scan (prevents modifying wrong line)
+    if (!updatedLine.includes("#todone")) {
+      throw new Error(
+        `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todone tag. File may have been modified.`
+      );
+    }
+
     // Replace #todone (with optional @date) with #todo
     updatedLine = replaceTodoneWithTodo(updatedLine);
 
@@ -146,6 +153,13 @@ export class TodoProcessor {
     }
 
     let updatedLine = lines[todo.lineNumber];
+
+    // Validate line content hasn't changed since scan (prevents modifying wrong line)
+    if (!updatedLine.includes("#todo") || updatedLine.includes("#todone")) {
+      throw new Error(
+        `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todo tag. File may have been modified.`
+      );
+    }
 
     // Replace #todo with #todone @date
     updatedLine = replaceTodoWithTodone(updatedLine, date);
@@ -223,6 +237,13 @@ export class TodoProcessor {
       }
 
       let line = lines[todo.lineNumber];
+
+      // Validate line still contains #todo (prevents modifying wrong line)
+      if (!line.includes("#todo") || line.includes("#todone")) {
+        throw new Error(
+          `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todo tag. File may have been modified.`
+        );
+      }
 
       // Remove existing priority tags (#p0-#p4, #future)
       line = line.replace(/#p[0-4]\b/g, "");
