@@ -65,9 +65,18 @@ This is **Space Command** (`space-command`), an Obsidian plugin for tracking TOD
 
 The `SpaceCommandSettingTab` class is defined inline in [main.ts](main.ts) (not a separate file).
 
-## Changelog
+## Release Checklist
 
-Update [CHANGELOG.md](CHANGELOG.md) with each release following the existing format.
+When making changes, keep these files in sync:
+
+1. **Version numbers** - Update in all three files:
+   - `manifest.json` - Obsidian reads this
+   - `package.json` - npm/build tooling
+   - `CHANGELOG.md` - Add new version section at top
+
+2. **Documentation** - Update as features change:
+   - `CHANGELOG.md` - Document all user-facing changes
+   - `README.md` - Update if new features, settings, or syntax added
 
 ## Working with Claude Code
 

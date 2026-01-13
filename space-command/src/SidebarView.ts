@@ -128,9 +128,9 @@ export class TodoSidebarView extends ItemView {
 
     // Header with buttons
     const headerDiv = container.createEl("div", { cls: "sidebar-header" });
-    const titleEl = headerDiv.createEl("h4");
+    const titleEl = headerDiv.createEl("h4", { cls: "sidebar-title" });
     titleEl.createEl("span", { cls: "space-command-logo", text: "⌥⌘" });
-    titleEl.appendText(" Space");
+    titleEl.appendText(" Space Command");
 
     // Tab navigation
     const tabNav = headerDiv.createEl("div", { cls: "sidebar-tab-nav" });
@@ -155,61 +155,68 @@ export class TodoSidebarView extends ItemView {
       this.render();
     });
 
-    const buttonGroup = headerDiv.createEl("div", { cls: "sidebar-button-group" });
-
-    // Settings button
-    const settingsBtn = buttonGroup.createEl("button", {
-      cls: "clickable-icon sidebar-settings-btn",
-      attr: { "aria-label": "Open Settings" },
+    // Hamburger menu button (kebab style - vertical dots)
+    const menuBtn = headerDiv.createEl("button", {
+      cls: "clickable-icon sidebar-menu-btn",
+      attr: { "aria-label": "Menu" },
     });
-    settingsBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 1v6m0 6v6m9-9h-6m-6 0H3"></path></svg>';
+    menuBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>';
 
-    settingsBtn.addEventListener("click", () => {
-      // Open settings
-      (this.app as any).setting.open();
-      (this.app as any).setting.openTabById("space-command");
-    });
-
-    // Refresh button
-    const refreshBtn = buttonGroup.createEl("button", {
-      cls: "clickable-icon sidebar-refresh-btn",
-      attr: { "aria-label": "Refresh TODOs" },
-    });
-    refreshBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>';
-
-    refreshBtn.addEventListener("click", async () => {
-      refreshBtn.addClass("rotating");
-      await this.scanner.scanVault();
-      setTimeout(() => refreshBtn.removeClass("rotating"), 500);
-    });
-
-    // Copy embed button
-    const copyBtn = buttonGroup.createEl("button", {
-      cls: "clickable-icon sidebar-copy-btn",
-      attr: { "aria-label": "Copy embed syntax" },
-    });
-    copyBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
-
-    copyBtn.addEventListener("click", (evt) => {
+    menuBtn.addEventListener("click", (evt) => {
       const menu = new Menu();
+
+      // Refresh
       menu.addItem((item) => {
         item
-          .setTitle("Embed TODOs (inline)")
-          .setIcon("brackets")
-          .onClick(() => {
-            navigator.clipboard.writeText("{{focus-todos}}");
-            new Notice(`${LOGO_PREFIX} Copied inline embed syntax`);
+          .setTitle("Refresh")
+          .setIcon("refresh-cw")
+          .onClick(async () => {
+            menuBtn.addClass("rotating");
+            await this.scanner.scanVault();
+            setTimeout(() => menuBtn.removeClass("rotating"), 500);
           });
       });
+
+      // Copy embed syntax submenu
       menu.addItem((item) => {
         item
-          .setTitle("Embed TODOs (code block)")
-          .setIcon("code")
+          .setTitle("Copy embed syntax")
+          .setIcon("copy");
+
+        const submenu = (item as any).setSubmenu();
+        submenu.addItem((subItem: any) => {
+          subItem
+            .setTitle("Inline syntax")
+            .setIcon("brackets")
+            .onClick(() => {
+              navigator.clipboard.writeText("{{focus-todos}}");
+              new Notice(`${LOGO_PREFIX} Copied inline embed syntax`);
+            });
+        });
+        submenu.addItem((subItem: any) => {
+          subItem
+            .setTitle("Code block syntax")
+            .setIcon("code")
+            .onClick(() => {
+              navigator.clipboard.writeText("```focus-todos\n```");
+              new Notice(`${LOGO_PREFIX} Copied code block embed syntax`);
+            });
+        });
+      });
+
+      menu.addSeparator();
+
+      // Settings
+      menu.addItem((item) => {
+        item
+          .setTitle("Settings")
+          .setIcon("settings")
           .onClick(() => {
-            navigator.clipboard.writeText("```focus-todos\n```");
-            new Notice(`${LOGO_PREFIX} Copied code block embed syntax`);
+            (this.app as any).setting.open();
+            (this.app as any).setting.openTabById("space-command");
           });
       });
+
       menu.showAtMouseEvent(evt);
     });
 
