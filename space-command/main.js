@@ -1854,9 +1854,7 @@ var TodoSidebarView = class extends import_obsidian9.ItemView {
         todo,
         this.defaultTodoneFile
       );
-      if (success) {
-        this.render();
-      } else {
+      if (!success) {
         checkbox.disabled = false;
       }
     });
@@ -1934,9 +1932,7 @@ var TodoSidebarView = class extends import_obsidian9.ItemView {
     checkbox.addEventListener("change", async () => {
       checkbox.disabled = true;
       const success = await this.processor.uncompleteTodo(todone);
-      if (success) {
-        this.render();
-      } else {
+      if (!success) {
         checkbox.disabled = false;
         checkbox.checked = true;
       }
@@ -2010,7 +2006,6 @@ var TodoSidebarView = class extends import_obsidian9.ItemView {
     } else {
       new import_obsidian9.Notice(`${LOGO_PREFIX} Completed all ${completed} TODO(s) for ${project.tag}!`);
     }
-    this.render();
   }
   openFileAtLine(file, line) {
     const leaf = this.app.workspace.getLeaf(false);

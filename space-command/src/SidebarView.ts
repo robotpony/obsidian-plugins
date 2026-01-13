@@ -352,12 +352,10 @@ export class TodoSidebarView extends ItemView {
         todo,
         this.defaultTodoneFile
       );
-      if (success) {
-        // Re-render the entire sidebar
-        this.render();
-      } else {
+      if (!success) {
         checkbox.disabled = false;
       }
+      // Note: sidebar will auto-refresh via todos-updated event after scanner rescans
     });
 
     // Text content (strip markdown but keep tags)
@@ -456,13 +454,11 @@ export class TodoSidebarView extends ItemView {
     checkbox.addEventListener("change", async () => {
       checkbox.disabled = true;
       const success = await this.processor.uncompleteTodo(todone);
-      if (success) {
-        // Re-render the entire sidebar
-        this.render();
-      } else {
+      if (!success) {
         checkbox.disabled = false;
         checkbox.checked = true; // Revert to checked state on failure
       }
+      // Note: sidebar will auto-refresh via todos-updated event after scanner rescans
     });
 
     // Text content (strip markdown but keep tags)
@@ -547,8 +543,7 @@ export class TodoSidebarView extends ItemView {
     } else {
       new Notice(`${LOGO_PREFIX} Completed all ${completed} TODO(s) for ${project.tag}!`);
     }
-
-    this.render();
+    // Note: sidebar will auto-refresh via todos-updated event after scanner rescans
   }
 
   private openFileAtLine(file: TFile, line: number): void {
