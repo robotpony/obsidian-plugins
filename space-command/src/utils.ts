@@ -1,5 +1,8 @@
 import { moment } from "obsidian";
 
+/** Logo prefix for Notice messages */
+export const LOGO_PREFIX = "⌥⌘";
+
 export function formatDate(date: Date, format: string): string {
   return (moment as any)(date).format(format);
 }

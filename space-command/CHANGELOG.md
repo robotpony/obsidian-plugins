@@ -2,6 +2,55 @@
 
 All notable changes to the ⌥⌘ Space Command plugin will be documented in this file.
 
+## [0.6.5] - 2026-01-12
+
+### Added
+
+- **Branded logo styling**: New `⌥⌘` logo element with styled appearance
+  - Blue background (`#689fd6`), white text, rounded corners
+  - Used in sidebar header
+  - All Notice messages now prefixed with `⌥⌘` for brand consistency
+
+### Technical
+
+- New `.space-command-logo` CSS class for logo styling
+- Added `LOGO_PREFIX` constant in `utils.ts` for consistent Notice prefixes
+- Updated 13 Notice messages across `main.ts`, `SidebarView.ts`, and `TodoProcessor.ts`
+
+## [0.6.4] - 2026-01-12
+
+### Security
+
+- **Fixed XSS vulnerability**: Replaced unsafe `innerHTML` with safe DOM methods in sidebar tag rendering
+  - `wrapTagsInSpans()` rewritten as `renderTextWithTags()` using `createEl()` and `appendText()`
+  - Project item rendering now uses safe DOM methods
+
+### Fixed
+
+- **Line content validation**: TODO/TODONE modifications now verify line content before changes
+  - Prevents modifying wrong lines if file was edited externally
+  - Validates `#todo`/`#todone` tag presence before completion, revert, or priority changes
+- **Memory leak prevention**: `CodeBlockProcessor` now reuses plugin's `EmbedRenderer` instance
+  - Previously created new renderer for each code block, leaking event listeners
+
+### Improved
+
+- **Type safety**: Replaced `any` types with proper interfaces throughout codebase
+  - `FilterParser.applyFilters()` uses `TodoItem[]`
+  - `SidebarView` methods use `ProjectInfo` and `TFile`
+  - `EmbedRenderer.openFileAtLine()` uses `TFile`
+- **Debounced file scanning**: File change handlers now debounced to 100ms
+  - Prevents rapid consecutive scans during fast edits
+  - Uses Obsidian's built-in `debounce()` function
+- **Proper imports**: Replaced `require("obsidian")` with standard imports
+  - `Modal`, `MarkdownView`, `Notice` now imported at module level
+
+### Technical
+
+- Extracted `getPriorityValue()` to shared `utils.ts` (was duplicated in 3 files)
+- Removed unused `hugo` dependency from package.json
+- Build passes with no TypeScript errors
+
 ## [0.6.3] - 2026-01-12
 
 ### Added

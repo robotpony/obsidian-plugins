@@ -4,7 +4,7 @@ import { TodoProcessor } from "./TodoProcessor";
 import { ProjectManager } from "./ProjectManager";
 import { TodoItem, ProjectInfo } from "./types";
 import { ContextMenuHandler } from "./ContextMenuHandler";
-import { getPriorityValue } from "./utils";
+import { getPriorityValue, LOGO_PREFIX } from "./utils";
 
 export const VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 
@@ -127,7 +127,9 @@ export class TodoSidebarView extends ItemView {
 
     // Header with buttons
     const headerDiv = container.createEl("div", { cls: "sidebar-header" });
-    headerDiv.createEl("h4", { text: "⌥⌘ TODOs" });
+    const titleEl = headerDiv.createEl("h4");
+    titleEl.createEl("span", { cls: "space-command-logo", text: "⌥⌘" });
+    titleEl.appendText(" TODOs");
 
     const buttonGroup = headerDiv.createEl("div", { cls: "sidebar-button-group" });
 
@@ -172,7 +174,7 @@ export class TodoSidebarView extends ItemView {
           .setIcon("brackets")
           .onClick(() => {
             navigator.clipboard.writeText("{{focus-todos}}");
-            new Notice("Copied inline embed syntax");
+            new Notice(`${LOGO_PREFIX} Copied inline embed syntax`);
           });
       });
       menu.addItem((item) => {
@@ -181,7 +183,7 @@ export class TodoSidebarView extends ItemView {
           .setIcon("code")
           .onClick(() => {
             navigator.clipboard.writeText("```focus-todos\n```");
-            new Notice("Copied code block embed syntax");
+            new Notice(`${LOGO_PREFIX} Copied code block embed syntax`);
           });
       });
       menu.showAtMouseEvent(evt);
@@ -540,10 +542,10 @@ export class TodoSidebarView extends ItemView {
 
     if (failed > 0) {
       new Notice(
-        `Completed ${completed} TODO(s), ${failed} failed. See console for details.`
+        `${LOGO_PREFIX} Completed ${completed} TODO(s), ${failed} failed. See console for details.`
       );
     } else {
-      new Notice(`Completed all ${completed} TODO(s) for ${project.tag}!`);
+      new Notice(`${LOGO_PREFIX} Completed all ${completed} TODO(s) for ${project.tag}!`);
     }
 
     this.render();

@@ -138,6 +138,7 @@ var import_obsidian2 = require("obsidian");
 
 // src/utils.ts
 var import_obsidian = require("obsidian");
+var LOGO_PREFIX = "\u2325\u2318";
 function formatDate(date, format) {
   return (0, import_obsidian.moment)(date).format(format);
 }
@@ -426,12 +427,12 @@ var TodoProcessor = class {
         this.onComplete();
       }
       const childCount = ((_a = todo.childLineNumbers) == null ? void 0 : _a.length) || 0;
-      const message = childCount > 0 ? `TODO marked as complete! (including ${childCount} child item${childCount > 1 ? "s" : ""})` : "TODO marked as complete!";
+      const message = childCount > 0 ? `${LOGO_PREFIX} TODO marked as complete! (including ${childCount} child item${childCount > 1 ? "s" : ""})` : `${LOGO_PREFIX} TODO marked as complete!`;
       new import_obsidian3.Notice(message);
       return true;
     } catch (error) {
       console.error("Error completing TODO:", error);
-      new import_obsidian3.Notice("Failed to complete TODO. See console for details.");
+      new import_obsidian3.Notice(`${LOGO_PREFIX} Failed to complete TODO. See console for details.`);
       return false;
     }
   }
@@ -463,11 +464,11 @@ var TodoProcessor = class {
       if (this.onComplete) {
         this.onComplete();
       }
-      new import_obsidian3.Notice("TODO marked as incomplete!");
+      new import_obsidian3.Notice(`${LOGO_PREFIX} TODO marked as incomplete!`);
       return true;
     } catch (error) {
       console.error("Error uncompleting TODO:", error);
-      new import_obsidian3.Notice("Failed to uncomplete TODO. See console for details.");
+      new import_obsidian3.Notice(`${LOGO_PREFIX} Failed to uncomplete TODO. See console for details.`);
       return false;
     }
   }
@@ -572,11 +573,11 @@ ${todoneText}` : todoneText;
       if (this.onComplete) {
         this.onComplete();
       }
-      new import_obsidian3.Notice(`Priority set to ${newTag}${addFocus ? " + #focus" : ""}`);
+      new import_obsidian3.Notice(`${LOGO_PREFIX} Priority set to ${newTag}${addFocus ? " + #focus" : ""}`);
       return true;
     } catch (error) {
       console.error("Error setting priority:", error);
-      new import_obsidian3.Notice("Failed to set priority. See console for details.");
+      new import_obsidian3.Notice(`${LOGO_PREFIX} Failed to set priority. See console for details.`);
       return false;
     }
   }
@@ -598,11 +599,11 @@ ${todoneText}` : todoneText;
       if (this.onComplete) {
         this.onComplete();
       }
-      new import_obsidian3.Notice(`Removed ${tag}`);
+      new import_obsidian3.Notice(`${LOGO_PREFIX} Removed ${tag}`);
       return true;
     } catch (error) {
       console.error("Error removing tag:", error);
-      new import_obsidian3.Notice("Failed to remove tag. See console for details.");
+      new import_obsidian3.Notice(`${LOGO_PREFIX} Failed to remove tag. See console for details.`);
       return false;
     }
   }
@@ -1695,7 +1696,9 @@ var TodoSidebarView = class extends import_obsidian9.ItemView {
     container.empty();
     container.addClass("space-command-sidebar");
     const headerDiv = container.createEl("div", { cls: "sidebar-header" });
-    headerDiv.createEl("h4", { text: "\u2325\u2318 TODOs" });
+    const titleEl = headerDiv.createEl("h4");
+    titleEl.createEl("span", { cls: "space-command-logo", text: "\u2325\u2318" });
+    titleEl.appendText(" TODOs");
     const buttonGroup = headerDiv.createEl("div", { cls: "sidebar-button-group" });
     const settingsBtn = buttonGroup.createEl("button", {
       cls: "clickable-icon sidebar-settings-btn",
@@ -1726,13 +1729,13 @@ var TodoSidebarView = class extends import_obsidian9.ItemView {
       menu.addItem((item) => {
         item.setTitle("Embed TODOs (inline)").setIcon("brackets").onClick(() => {
           navigator.clipboard.writeText("{{focus-todos}}");
-          new import_obsidian9.Notice("Copied inline embed syntax");
+          new import_obsidian9.Notice(`${LOGO_PREFIX} Copied inline embed syntax`);
         });
       });
       menu.addItem((item) => {
         item.setTitle("Embed TODOs (code block)").setIcon("code").onClick(() => {
           navigator.clipboard.writeText("```focus-todos\n```");
-          new import_obsidian9.Notice("Copied code block embed syntax");
+          new import_obsidian9.Notice(`${LOGO_PREFIX} Copied code block embed syntax`);
         });
       });
       menu.showAtMouseEvent(evt);
@@ -2002,10 +2005,10 @@ var TodoSidebarView = class extends import_obsidian9.ItemView {
     }
     if (failed > 0) {
       new import_obsidian9.Notice(
-        `Completed ${completed} TODO(s), ${failed} failed. See console for details.`
+        `${LOGO_PREFIX} Completed ${completed} TODO(s), ${failed} failed. See console for details.`
       );
     } else {
-      new import_obsidian9.Notice(`Completed all ${completed} TODO(s) for ${project.tag}!`);
+      new import_obsidian9.Notice(`${LOGO_PREFIX} Completed all ${completed} TODO(s) for ${project.tag}!`);
     }
     this.render();
   }
@@ -12700,12 +12703,12 @@ var SpaceCommandPlugin = class extends import_obsidian10.Plugin {
       editorCallback: async (editor) => {
         const selection = editor.getSelection();
         if (!selection) {
-          new import_obsidian10.Notice("No text selected");
+          new import_obsidian10.Notice(`${LOGO_PREFIX} No text selected`);
           return;
         }
         const slackMd = convertToSlackMarkdown(selection);
         await navigator.clipboard.writeText(slackMd);
-        new import_obsidian10.Notice("Copied as Slack markdown");
+        new import_obsidian10.Notice(`${LOGO_PREFIX} Copied as Slack markdown`);
       },
       hotkeys: [
         {
@@ -12722,7 +12725,7 @@ var SpaceCommandPlugin = class extends import_obsidian10.Plugin {
             item.setTitle("Copy as Slack").setIcon("clipboard-copy").onClick(async () => {
               const slackMd = convertToSlackMarkdown(selection);
               await navigator.clipboard.writeText(slackMd);
-              new import_obsidian10.Notice("Copied as Slack markdown");
+              new import_obsidian10.Notice(`${LOGO_PREFIX} Copied as Slack markdown`);
             });
           });
         }

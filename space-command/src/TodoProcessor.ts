@@ -6,6 +6,7 @@ import {
   markCheckboxComplete,
   replaceTodoneWithTodo,
   markCheckboxIncomplete,
+  LOGO_PREFIX,
 } from "./utils";
 
 export class TodoProcessor {
@@ -47,13 +48,13 @@ export class TodoProcessor {
 
       const childCount = todo.childLineNumbers?.length || 0;
       const message = childCount > 0
-        ? `TODO marked as complete! (including ${childCount} child item${childCount > 1 ? 's' : ''})`
-        : "TODO marked as complete!";
+        ? `${LOGO_PREFIX} TODO marked as complete! (including ${childCount} child item${childCount > 1 ? 's' : ''})`
+        : `${LOGO_PREFIX} TODO marked as complete!`;
       new Notice(message);
       return true;
     } catch (error) {
       console.error("Error completing TODO:", error);
-      new Notice("Failed to complete TODO. See console for details.");
+      new Notice(`${LOGO_PREFIX} Failed to complete TODO. See console for details.`);
       return false;
     }
   }
@@ -102,11 +103,11 @@ export class TodoProcessor {
         this.onComplete();
       }
 
-      new Notice("TODO marked as incomplete!");
+      new Notice(`${LOGO_PREFIX} TODO marked as incomplete!`);
       return true;
     } catch (error) {
       console.error("Error uncompleting TODO:", error);
-      new Notice("Failed to uncomplete TODO. See console for details.");
+      new Notice(`${LOGO_PREFIX} Failed to uncomplete TODO. See console for details.`);
       return false;
     }
   }
@@ -268,11 +269,11 @@ export class TodoProcessor {
         this.onComplete();
       }
 
-      new Notice(`Priority set to ${newTag}${addFocus ? " + #focus" : ""}`);
+      new Notice(`${LOGO_PREFIX} Priority set to ${newTag}${addFocus ? " + #focus" : ""}`);
       return true;
     } catch (error) {
       console.error("Error setting priority:", error);
-      new Notice("Failed to set priority. See console for details.");
+      new Notice(`${LOGO_PREFIX} Failed to set priority. See console for details.`);
       return false;
     }
   }
@@ -305,11 +306,11 @@ export class TodoProcessor {
         this.onComplete();
       }
 
-      new Notice(`Removed ${tag}`);
+      new Notice(`${LOGO_PREFIX} Removed ${tag}`);
       return true;
     } catch (error) {
       console.error("Error removing tag:", error);
-      new Notice("Failed to remove tag. See console for details.");
+      new Notice(`${LOGO_PREFIX} Failed to remove tag. See console for details.`);
       return false;
     }
   }
