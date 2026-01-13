@@ -55,21 +55,22 @@
 .sidebar-tab-btn {
   padding: 4px;
   border: none;
-  background: transparent;
+  background-color: var(--background-secondary-alt);
   cursor: pointer;
-  opacity: 0.4;
   transition: opacity 0.2s;
   color: var(--text-normal);
-  border: none; /* Removes the border */
-  box-shadow: none; /* Removes the shadow */
+  border: none !important; /* Removes the border */
+  box-shadow: none !important; /* Removes the shadow */
 }
 
 .sidebar-tab-btn:hover {
-  opacity: 0.7;
+  opacity: .65;
+  background-color: var(--background-modifier-hover);
 }
 
 .sidebar-tab-btn.active {
   opacity: 1;
+  background-color: var(--background-modifier-active-hover);
 }
 
 /* Hamburger menu button */
