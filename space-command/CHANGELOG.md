@@ -2,6 +2,24 @@
 
 All notable changes to the ⌥⌘ Space Command plugin will be documented in this file.
 
+## [0.6.3] - 2026-01-12
+
+### Added
+
+- **Copy as Slack Markdown**: Convert and copy selected text to Slack's mrkdwn format
+  - Hotkey: `Cmd/Ctrl + Shift + C`
+  - Right-click context menu: "Copy as Slack" (appears when text is selected)
+  - Converts `**bold**` → `*bold*`, `*italic*` → `_italic_`
+  - Converts `# Heading` → `*Heading*` (bold line)
+  - Converts `[text](url)` → `<url|text>` (Slack link format)
+  - Handles lists, blockquotes, and code blocks
+
+### Technical
+
+- New `SlackConverter.ts` module wrapping `slackify-markdown` library
+- Strips zero-width spaces (U+200B) that the library inserts around formatting markers
+- Uses Obsidian's `editor-menu` event for context menu integration
+
 ## [0.6.2] - 2026-01-10
 
 ### Improved

@@ -257,6 +257,7 @@ All actions are toggles - clicking the same action again will undo it.
 
 - `Cmd/Ctrl + Shift + T` - Toggle TODO Sidebar
 - `Cmd/Ctrl + Shift + A` - Quick Add TODO at cursor
+- `Cmd/Ctrl + Shift + C` - Copy selection as Slack Markdown
 
 ## Installation
 
@@ -299,6 +300,7 @@ Available via Command Palette (Cmd/Ctrl+P):
 | **Toggle TODO Sidebar** | Show/hide the sidebar |
 | **Quick Add TODO** | Insert `#todo` at cursor position |
 | **Refresh TODOs** | Force rescan of all vault files |
+| **Copy as Slack Markdown** | Copy selection converted to Slack format |
 
 See [CHANGELOG.md](CHANGELOG.md) for version history and release notes.
 

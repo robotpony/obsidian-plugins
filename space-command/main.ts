@@ -1,5 +1,6 @@
 import {
   App,
+  Notice,
   Plugin,
   PluginSettingTab,
   Setting,
@@ -20,6 +21,7 @@ import {
   SpaceCommandSettings,
   DEFAULT_SETTINGS,
 } from "./src/types";
+import { convertToSlackMarkdown } from "./src/SlackConverter";
 
 export default class SpaceCommandPlugin extends Plugin {
   settings: SpaceCommandSettings;
@@ -216,6 +218,46 @@ export default class SpaceCommandPlugin extends Plugin {
         this.refreshSidebar();
       },
     });
+
+    this.addCommand({
+      id: "copy-as-slack",
+      name: "Copy as Slack Markdown",
+      editorCallback: async (editor) => {
+        const selection = editor.getSelection();
+        if (!selection) {
+          new Notice("No text selected");
+          return;
+        }
+        const slackMd = convertToSlackMarkdown(selection);
+        await navigator.clipboard.writeText(slackMd);
+        new Notice("Copied as Slack markdown");
+      },
+      hotkeys: [
+        {
+          modifiers: ["Mod", "Shift"],
+          key: "c",
+        },
+      ],
+    });
+
+    // Editor context menu: Copy as Slack
+    this.registerEvent(
+      this.app.workspace.on("editor-menu", (menu, editor) => {
+        const selection = editor.getSelection();
+        if (selection) {
+          menu.addItem((item) => {
+            item
+              .setTitle("Copy as Slack")
+              .setIcon("clipboard-copy")
+              .onClick(async () => {
+                const slackMd = convertToSlackMarkdown(selection);
+                await navigator.clipboard.writeText(slackMd);
+                new Notice("Copied as Slack markdown");
+              });
+          });
+        }
+      })
+    );
 
     // Add ribbon icon
     this.addRibbonIcon("checkbox-glyph", "Toggle TODO Sidebar", () => {
