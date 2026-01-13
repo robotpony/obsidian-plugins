@@ -32,18 +32,19 @@ This is **Space Command** (`space-command`), an Obsidian plugin for tracking TOD
 | [TodoProcessor.ts](src/TodoProcessor.ts) | Handles TODO completion: updates source file (`#todo` → `#todone @date`), appends to TODONE log file. Also handles priority tag changes. |
 | [EmbedRenderer.ts](src/EmbedRenderer.ts) | Renders TODO lists in embeds. Handles inline markdown parsing (bold, italic, code, links) with XSS-safe DOM methods. |
 | [CodeBlockProcessor.ts](src/CodeBlockProcessor.ts) | Processes `` ```focus-todos `` and `` ```focus-list `` code blocks for Live Preview support. |
-| [FilterParser.ts](src/FilterParser.ts) | Parses filter syntax: `path:folder/`, `tags:#tag1,#tag2`, `limit:N` |
-| [SidebarView.ts](src/SidebarView.ts) | Custom sidebar view showing Active TODOs, Projects, Recent TODONEs |
+| [FilterParser.ts](src/FilterParser.ts) | Parses filter syntax: `path:folder/`, `tags:#tag1,#tag2`, `limit:N`, `todone:show\|hide` |
+| [SidebarView.ts](src/SidebarView.ts) | Custom sidebar view with two tabs: TODOs (Active TODOs, Projects, Recent TODONEs) and Ideas (Principles, Active Ideas) |
 | [ProjectManager.ts](src/ProjectManager.ts) | Groups TODOs by project tags (excludes priority tags like #p0-#p4) |
 | [ContextMenuHandler.ts](src/ContextMenuHandler.ts) | Right-click context menu for priority actions (Focus, Later, Snooze) |
 | [SlashCommandSuggest.ts](src/SlashCommandSuggest.ts) | EditorSuggest for `/` commands at column 0: `/todo`, `/callout`, `/today`, `/tomorrow` |
 | [DateSuggest.ts](src/DateSuggest.ts) | EditorSuggest for `@date`, `@today`, `@tomorrow`, `@yesterday` quick insert |
+| [SlackConverter.ts](src/SlackConverter.ts) | Converts markdown to Slack's mrkdwn format for clipboard copy |
 | [types.ts](src/types.ts) | TypeScript interfaces: `TodoItem`, `TodoFilters`, `ProjectInfo`, `SpaceCommandSettings` |
 | [utils.ts](src/utils.ts) | Helper functions: date formatting, tag extraction, checkbox/todo text manipulation |
 
 ### Data Flow
 
-1. **Scan**: `TodoScanner` reads all markdown files, extracts lines with `#todo`/`#todone` (skipping code blocks)
+1. **Scan**: `TodoScanner` reads all markdown files, extracts lines with `#todo`/`#todone`/`#idea`/`#principle` (skipping code blocks)
 2. **Cache**: Results stored in `Map<filePath, TodoItem[]>`, emits `todos-updated` event on changes
 3. **Render**: `EmbedRenderer`/`CodeBlockProcessor` query scanner, apply filters, render interactive checkboxes
 4. **Complete**: Checkbox click → `TodoProcessor.completeTodo()` → updates source + appends to TODONE file
@@ -58,6 +59,7 @@ This is **Space Command** (`space-command`), an Obsidian plugin for tracking TOD
 
 - **Event-driven updates**: Scanner extends `Events`, sidebar/embeds listen for `todos-updated`
 - **Priority system**: Tags #p0 (highest) → #p4 (lowest), #focus for top priority, #future for snoozed
+- **Item types**: `#todo`/`#todone` for tasks, `#idea` for captured ideas, `#principle` for guiding principles
 - **Safe markdown rendering**: `EmbedRenderer.renderInlineMarkdown()` uses DOM methods to avoid XSS
 - **Code block detection**: Scanner tracks triple-backtick state and checks for inline backticks to exclude code examples
 

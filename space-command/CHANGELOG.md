@@ -8,7 +8,7 @@ All notable changes to the ⌥⌘ Space Command plugin will be documented in thi
 
 - **Ideas Tab**: New sidebar tab for capturing ideas separate from actionable TODOs
   - Toggle between TODOs (checkmark icon) and Ideas (lightbulb icon) tabs
-  - Sidebar header now shows "⌥⌘ Space" with tab navigation
+  - Sidebar header now shows "⌥⌘ Space Command" with tab navigation
 - **Idea tracking**: New `#idea` tag for capturing ideas
   - Ideas shown in Ideas tab with checkbox and link to source
   - Clicking checkbox dismisses the idea (removes `#idea` tag)

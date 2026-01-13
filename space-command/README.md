@@ -44,7 +44,7 @@ Capture ideas separately from actionable TODOs. The sidebar has two tabs:
 | Tag | Purpose |
 |-----|---------|
 | `#idea` | An idea to capture (not yet actionable) |
-| `#principle` | A guiding principle (displayed in Principles section) |
+| `#principle` | A guiding principle (displayed in italics, no actions) |
 
 ```markdown
 - What if we cached API responses? #idea #api
@@ -55,6 +55,8 @@ Capture ideas separately from actionable TODOs. The sidebar has two tabs:
 - **Checkbox**: Click to dismiss the idea (removes `#idea` tag)
 - **Right-click → Add to TODOs**: Promotes `#idea` to `#todo`
 - **Right-click → Focus**: Adds `#focus` for prioritization
+
+Principles appear at the top in italics—reference items with no checkbox or actions.
 
 ## Organize
 
