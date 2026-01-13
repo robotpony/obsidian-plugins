@@ -16,6 +16,7 @@ export class TodoSidebarView extends ItemView {
   private updateListener: (() => void) | null = null;
   private contextMenuHandler: ContextMenuHandler;
   private recentTodonesLimit: number;
+  private activeTab: 'todos' | 'ideas' = 'todos';
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -129,7 +130,30 @@ export class TodoSidebarView extends ItemView {
     const headerDiv = container.createEl("div", { cls: "sidebar-header" });
     const titleEl = headerDiv.createEl("h4");
     titleEl.createEl("span", { cls: "space-command-logo", text: "⌥⌘" });
-    titleEl.appendText(" TODOs");
+    titleEl.appendText(" Space");
+
+    // Tab navigation
+    const tabNav = headerDiv.createEl("div", { cls: "sidebar-tab-nav" });
+
+    const todosTab = tabNav.createEl("button", {
+      cls: `sidebar-tab-btn ${this.activeTab === 'todos' ? 'active' : ''}`,
+      attr: { "aria-label": "TODOs" },
+    });
+    todosTab.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>';
+    todosTab.addEventListener("click", () => {
+      this.activeTab = 'todos';
+      this.render();
+    });
+
+    const ideasTab = tabNav.createEl("button", {
+      cls: `sidebar-tab-btn ${this.activeTab === 'ideas' ? 'active' : ''}`,
+      attr: { "aria-label": "Ideas" },
+    });
+    ideasTab.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"></path><path d="M10 22h4"></path><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"></path></svg>';
+    ideasTab.addEventListener("click", () => {
+      this.activeTab = 'ideas';
+      this.render();
+    });
 
     const buttonGroup = headerDiv.createEl("div", { cls: "sidebar-button-group" });
 
@@ -189,6 +213,15 @@ export class TodoSidebarView extends ItemView {
       menu.showAtMouseEvent(evt);
     });
 
+    // Render content based on active tab
+    if (this.activeTab === 'todos') {
+      this.renderTodosContent(container);
+    } else {
+      this.renderIdeasContent(container);
+    }
+  }
+
+  private renderTodosContent(container: HTMLElement): void {
     // Projects section
     this.renderProjects(container);
 
@@ -197,6 +230,14 @@ export class TodoSidebarView extends ItemView {
 
     // Recent TODONEs section
     this.renderRecentTodones(container);
+  }
+
+  private renderIdeasContent(container: HTMLElement): void {
+    // Principles section (grouped like projects)
+    this.renderPrinciples(container);
+
+    // Active Ideas section
+    this.renderActiveIdeas(container);
   }
 
   private sortTodosByPriority(todos: TodoItem[]): TodoItem[] {
@@ -478,6 +519,132 @@ export class TodoSidebarView extends ItemView {
     link.addEventListener("click", (e) => {
       e.preventDefault();
       this.openFileAtLine(todone.file, todone.lineNumber);
+    });
+  }
+
+  private renderPrinciples(container: HTMLElement): void {
+    const principles = this.scanner.getPrinciples();
+
+    const section = container.createEl("div", { cls: "principles-section" });
+
+    const header = section.createEl("div", {
+      cls: "todo-section-header principles-header",
+    });
+
+    const titleSpan = header.createEl("span", { cls: "todo-section-title" });
+    titleSpan.innerHTML = `Principles <span class="principle-count">${principles.length}</span>`;
+
+    if (principles.length === 0) {
+      section.createEl("div", {
+        text: "No principles yet",
+        cls: "todo-empty",
+      });
+      return;
+    }
+
+    const list = section.createEl("ul", { cls: "principle-list" });
+
+    for (const principle of principles) {
+      this.renderPrincipleItem(list, principle);
+    }
+  }
+
+  private renderPrincipleItem(list: HTMLElement, principle: TodoItem): void {
+    const hasFocus = principle.tags.includes("#focus");
+    const item = list.createEl("li", { cls: `principle-item${hasFocus ? ' principle-focus' : ''}` });
+
+    // Text content (strip markdown but keep tags)
+    const textSpan = item.createEl("span", { cls: "principle-text" });
+    const cleanText = principle.text.replace(/#principle\b/g, "").trim();
+    const displayText = this.stripMarkdownSyntax(cleanText);
+    this.renderTextWithTags(displayText, textSpan);
+    textSpan.appendText(" ");
+
+    // Link to source
+    const link = item.createEl("a", {
+      text: "→",
+      cls: "principle-link",
+      href: "#",
+    });
+
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      this.openFileAtLine(principle.file, principle.lineNumber);
+    });
+  }
+
+  private renderActiveIdeas(container: HTMLElement): void {
+    let ideas = this.scanner.getIdeas();
+
+    // Filter out #future (snoozed) ideas if desired
+    ideas = ideas.filter(idea => !idea.tags.includes("#future"));
+
+    // Sort by priority (focus first)
+    ideas = this.sortTodosByPriority(ideas);
+
+    const section = container.createEl("div", { cls: "ideas-section" });
+
+    const header = section.createEl("div", { cls: "todo-section-header" });
+    const titleSpan = header.createEl("span", { cls: "todo-section-title" });
+    titleSpan.innerHTML = `Ideas <span class="idea-count">${ideas.length}</span>`;
+
+    if (ideas.length === 0) {
+      section.createEl("div", {
+        text: "No ideas yet",
+        cls: "todo-empty",
+      });
+      return;
+    }
+
+    const list = section.createEl("ul", { cls: "idea-list" });
+
+    for (const idea of ideas) {
+      this.renderIdeaItem(list, idea);
+    }
+  }
+
+  private renderIdeaItem(list: HTMLElement, idea: TodoItem): void {
+    const hasFocus = idea.tags.includes("#focus");
+    const item = list.createEl("li", { cls: `idea-item${hasFocus ? ' idea-focus' : ''}` });
+
+    // Add right-click context menu for ideas
+    item.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      this.contextMenuHandler.showIdeaMenu(e, idea, () => this.render());
+    });
+
+    // Checkbox - clicking completes (removes #idea tag)
+    const checkbox = item.createEl("input", {
+      type: "checkbox",
+      cls: "idea-checkbox",
+    });
+
+    checkbox.addEventListener("change", async () => {
+      checkbox.disabled = true;
+      const success = await this.processor.completeIdea(idea);
+      if (!success) {
+        checkbox.disabled = false;
+      }
+      // Note: sidebar will auto-refresh via todos-updated event after scanner rescans
+    });
+
+    // Text content (strip markdown but keep tags)
+    const textSpan = item.createEl("span", { cls: "idea-text" });
+    const cleanText = idea.text.replace(/#idea\b/g, "").trim();
+    const displayText = this.stripMarkdownSyntax(cleanText);
+    this.renderTextWithTags(displayText, textSpan);
+    textSpan.appendText(" ");
+
+    // Link to source
+    const link = item.createEl("a", {
+      text: "→",
+      cls: "idea-link",
+      href: "#",
+    });
+
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      this.openFileAtLine(idea.file, idea.lineNumber);
     });
   }
 

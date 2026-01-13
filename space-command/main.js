@@ -165,7 +165,10 @@ function extractTags(text5) {
   return textWithoutCode.match(tagRegex) || [];
 }
 function hasCheckboxFormat(text5) {
-  return /^-\s*\[[ x]\]/.test(text5.trim());
+  return /^-\s*\[[ x]\]/i.test(text5.trim());
+}
+function isCheckboxChecked(text5) {
+  return /^-\s*\[x\]/i.test(text5.trim());
 }
 function markCheckboxComplete(text5) {
   return text5.replace(/^(-\s*\[)[ ](\])/, "$1x$2");
@@ -181,6 +184,12 @@ function replaceTodoneWithTodo(text5) {
 function markCheckboxIncomplete(text5) {
   return text5.replace(/^(-\s*\[)x(\])/i, "$1 $2");
 }
+function removeIdeaTag(text5) {
+  return text5.replace(/#idea\b\s*/, "").trim();
+}
+function replaceIdeaWithTodo(text5) {
+  return text5.replace(/#idea\b/, "#todo");
+}
 
 // src/TodoScanner.ts
 var TodoScanner = class extends import_obsidian2.Events {
@@ -188,6 +197,8 @@ var TodoScanner = class extends import_obsidian2.Events {
     super();
     this.todosCache = /* @__PURE__ */ new Map();
     this.todonesCache = /* @__PURE__ */ new Map();
+    this.ideasCache = /* @__PURE__ */ new Map();
+    this.principlesCache = /* @__PURE__ */ new Map();
     this.excludeFromTodones = /* @__PURE__ */ new Set();
     this.app = app;
     this.debouncedScanFile = (0, import_obsidian2.debounce)(
@@ -202,6 +213,8 @@ var TodoScanner = class extends import_obsidian2.Events {
   async scanVault() {
     this.todosCache.clear();
     this.todonesCache.clear();
+    this.ideasCache.clear();
+    this.principlesCache.clear();
     const files = this.app.vault.getMarkdownFiles();
     for (const file of files) {
       await this.scanFile(file);
@@ -213,7 +226,10 @@ var TodoScanner = class extends import_obsidian2.Events {
       const lines = content3.split("\n");
       const todos = [];
       const todones = [];
+      const ideas = [];
+      const principles = [];
       const linesToCleanup = [];
+      const linesToSyncTodone = [];
       let inCodeBlock = false;
       let currentHeaderTodo = null;
       for (let i = 0; i < lines.length; i++) {
@@ -236,7 +252,7 @@ var TodoScanner = class extends import_obsidian2.Events {
           }
         }
         if (headerInfo && tags.includes("#todo") && !tags.includes("#todone")) {
-          const headerTodo = this.createTodoItem(file, i, line, tags);
+          const headerTodo = this.createTodoItem(file, i, line, tags, "todo");
           headerTodo.isHeader = true;
           headerTodo.headerLevel = headerInfo.level;
           headerTodo.childLineNumbers = [];
@@ -245,7 +261,7 @@ var TodoScanner = class extends import_obsidian2.Events {
           continue;
         }
         if (headerInfo && tags.includes("#todone")) {
-          const headerTodone = this.createTodoItem(file, i, line, tags);
+          const headerTodone = this.createTodoItem(file, i, line, tags, "todone");
           headerTodone.isHeader = true;
           headerTodone.headerLevel = headerInfo.level;
           todones.push(headerTodone);
@@ -253,7 +269,14 @@ var TodoScanner = class extends import_obsidian2.Events {
           continue;
         }
         if (currentHeaderTodo && this.isListItem(line)) {
-          const childItem = this.createTodoItem(file, i, line, tags);
+          const isChecked = isCheckboxChecked(line);
+          const hasTodoneTag = tags.includes("#todone");
+          if (isChecked && !hasTodoneTag) {
+            linesToSyncTodone.push(i);
+            tags.push("#todone");
+          }
+          const childItemType = tags.includes("#todone") ? "todone" : "todo";
+          const childItem = this.createTodoItem(file, i, line, tags, childItemType);
           childItem.parentLineNumber = currentHeaderTodo.lineNumber;
           currentHeaderTodo.todoItem.childLineNumbers.push(i);
           if (tags.includes("#todone")) {
@@ -265,15 +288,24 @@ var TodoScanner = class extends import_obsidian2.Events {
         }
         if (tags.includes("#todone") && tags.includes("#todo")) {
           linesToCleanup.push(i);
-          todones.push(this.createTodoItem(file, i, line, tags));
+          todones.push(this.createTodoItem(file, i, line, tags, "todone"));
         } else if (tags.includes("#todo")) {
-          todos.push(this.createTodoItem(file, i, line, tags));
+          todos.push(this.createTodoItem(file, i, line, tags, "todo"));
         } else if (tags.includes("#todone")) {
-          todones.push(this.createTodoItem(file, i, line, tags));
+          todones.push(this.createTodoItem(file, i, line, tags, "todone"));
+        }
+        if (tags.includes("#idea")) {
+          ideas.push(this.createTodoItem(file, i, line, tags, "idea"));
+        }
+        if (tags.includes("#principle")) {
+          principles.push(this.createTodoItem(file, i, line, tags, "principle"));
         }
       }
       if (linesToCleanup.length > 0) {
         this.cleanupDuplicateTags(file, lines, linesToCleanup);
+      }
+      if (linesToSyncTodone.length > 0) {
+        this.syncCheckedCheckboxes(file, lines, linesToSyncTodone);
       }
       if (todos.length > 0) {
         this.todosCache.set(file.path, todos);
@@ -284,6 +316,16 @@ var TodoScanner = class extends import_obsidian2.Events {
         this.todonesCache.set(file.path, todones);
       } else {
         this.todonesCache.delete(file.path);
+      }
+      if (ideas.length > 0) {
+        this.ideasCache.set(file.path, ideas);
+      } else {
+        this.ideasCache.delete(file.path);
+      }
+      if (principles.length > 0) {
+        this.principlesCache.set(file.path, principles);
+      } else {
+        this.principlesCache.delete(file.path);
       }
       this.trigger("todos-updated");
     } catch (error) {
@@ -331,7 +373,7 @@ var TodoScanner = class extends import_obsidian2.Events {
     }
     return false;
   }
-  createTodoItem(file, lineNumber, text5, tags) {
+  createTodoItem(file, lineNumber, text5, tags, itemType) {
     var _a;
     return {
       file,
@@ -341,7 +383,8 @@ var TodoScanner = class extends import_obsidian2.Events {
       text: text5.trim(),
       hasCheckbox: hasCheckboxFormat(text5),
       tags,
-      dateCreated: file.stat.mtime
+      dateCreated: file.stat.mtime,
+      itemType
     };
   }
   getTodos() {
@@ -362,6 +405,20 @@ var TodoScanner = class extends import_obsidian2.Events {
     const sorted = allTodones.sort((a, b) => b.dateCreated - a.dateCreated);
     return limit ? sorted.slice(0, limit) : sorted;
   }
+  getIdeas() {
+    const allIdeas = [];
+    for (const ideas of this.ideasCache.values()) {
+      allIdeas.push(...ideas);
+    }
+    return allIdeas.sort((a, b) => a.dateCreated - b.dateCreated);
+  }
+  getPrinciples() {
+    const allPrinciples = [];
+    for (const principles of this.principlesCache.values()) {
+      allPrinciples.push(...principles);
+    }
+    return allPrinciples.sort((a, b) => a.dateCreated - b.dateCreated);
+  }
   watchFiles() {
     this.app.vault.on("modify", (file) => {
       if (file instanceof import_obsidian2.TFile && file.extension === "md") {
@@ -377,6 +434,8 @@ var TodoScanner = class extends import_obsidian2.Events {
       if (file instanceof import_obsidian2.TFile) {
         this.todosCache.delete(file.path);
         this.todonesCache.delete(file.path);
+        this.ideasCache.delete(file.path);
+        this.principlesCache.delete(file.path);
         this.trigger("todos-updated");
       }
     });
@@ -384,6 +443,8 @@ var TodoScanner = class extends import_obsidian2.Events {
       if (file instanceof import_obsidian2.TFile && file.extension === "md") {
         this.todosCache.delete(oldPath);
         this.todonesCache.delete(oldPath);
+        this.ideasCache.delete(oldPath);
+        this.principlesCache.delete(oldPath);
         this.debouncedScanFile(file);
       }
     });
@@ -393,6 +454,22 @@ var TodoScanner = class extends import_obsidian2.Events {
     let modified = false;
     for (const lineNum of lineNumbers) {
       const newLine = lines[lineNum].replace(/#todo\b\s*/g, "");
+      if (newLine !== lines[lineNum]) {
+        lines[lineNum] = newLine;
+        modified = true;
+      }
+    }
+    if (modified) {
+      await this.app.vault.modify(file, lines.join("\n"));
+    }
+  }
+  // Sync checked checkboxes (- [x]) by adding #todone tag with date
+  async syncCheckedCheckboxes(file, lines, lineNumbers) {
+    let modified = false;
+    const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+    for (const lineNum of lineNumbers) {
+      const line = lines[lineNum];
+      const newLine = line.trimEnd() + ` #todone @${today}`;
       if (newLine !== lines[lineNum]) {
         lines[lineNum] = newLine;
         modified = true;
@@ -604,6 +681,90 @@ ${todoneText}` : todoneText;
     } catch (error) {
       console.error("Error removing tag:", error);
       new import_obsidian3.Notice(`${LOGO_PREFIX} Failed to remove tag. See console for details.`);
+      return false;
+    }
+  }
+  async completeIdea(idea) {
+    try {
+      const content3 = await this.app.vault.read(idea.file);
+      const lines = content3.split("\n");
+      if (idea.lineNumber >= lines.length) {
+        throw new Error(
+          `Line number ${idea.lineNumber} out of bounds for file ${idea.filePath}`
+        );
+      }
+      let line = lines[idea.lineNumber];
+      if (!line.includes("#idea")) {
+        throw new Error(
+          `Line ${idea.lineNumber} in ${idea.filePath} no longer contains #idea tag. File may have been modified.`
+        );
+      }
+      line = removeIdeaTag(line);
+      lines[idea.lineNumber] = line;
+      await this.app.vault.modify(idea.file, lines.join("\n"));
+      if (this.onComplete) {
+        this.onComplete();
+      }
+      new import_obsidian3.Notice(`${LOGO_PREFIX} Idea completed!`);
+      return true;
+    } catch (error) {
+      console.error("Error completing idea:", error);
+      new import_obsidian3.Notice(`${LOGO_PREFIX} Failed to complete idea. See console for details.`);
+      return false;
+    }
+  }
+  async convertIdeaToTodo(idea) {
+    try {
+      const content3 = await this.app.vault.read(idea.file);
+      const lines = content3.split("\n");
+      if (idea.lineNumber >= lines.length) {
+        throw new Error(
+          `Line number ${idea.lineNumber} out of bounds for file ${idea.filePath}`
+        );
+      }
+      let line = lines[idea.lineNumber];
+      if (!line.includes("#idea")) {
+        throw new Error(
+          `Line ${idea.lineNumber} in ${idea.filePath} no longer contains #idea tag. File may have been modified.`
+        );
+      }
+      line = replaceIdeaWithTodo(line);
+      lines[idea.lineNumber] = line;
+      await this.app.vault.modify(idea.file, lines.join("\n"));
+      if (this.onComplete) {
+        this.onComplete();
+      }
+      new import_obsidian3.Notice(`${LOGO_PREFIX} Idea promoted to TODO!`);
+      return true;
+    } catch (error) {
+      console.error("Error converting idea to TODO:", error);
+      new import_obsidian3.Notice(`${LOGO_PREFIX} Failed to convert idea. See console for details.`);
+      return false;
+    }
+  }
+  async addFocusToIdea(idea) {
+    try {
+      const content3 = await this.app.vault.read(idea.file);
+      const lines = content3.split("\n");
+      if (idea.lineNumber >= lines.length) {
+        throw new Error(
+          `Line number ${idea.lineNumber} out of bounds for file ${idea.filePath}`
+        );
+      }
+      let line = lines[idea.lineNumber];
+      if (!line.includes("#focus")) {
+        line = line.trimEnd() + " #focus";
+      }
+      lines[idea.lineNumber] = line;
+      await this.app.vault.modify(idea.file, lines.join("\n"));
+      if (this.onComplete) {
+        this.onComplete();
+      }
+      new import_obsidian3.Notice(`${LOGO_PREFIX} Idea focused!`);
+      return true;
+    } catch (error) {
+      console.error("Error focusing idea:", error);
+      new import_obsidian3.Notice(`${LOGO_PREFIX} Failed to focus idea. See console for details.`);
       return false;
     }
   }
@@ -851,6 +1012,33 @@ var ContextMenuHandler = class {
       return num < 4 ? `#p${num + 1}` : "#p4";
     }
     return "#p4";
+  }
+  /**
+   * Show context menu for an idea item
+   */
+  showIdeaMenu(evt, idea, onRefresh) {
+    const menu = new import_obsidian5.Menu();
+    const hasFocus = idea.tags.includes("#focus");
+    menu.addItem((item) => {
+      item.setTitle("Add to TODOs").setIcon("check-square").onClick(async () => {
+        const success = await this.processor.convertIdeaToTodo(idea);
+        if (success)
+          onRefresh();
+      });
+    });
+    menu.addItem((item) => {
+      item.setTitle(hasFocus ? "Unfocus" : "Focus").setIcon("zap").onClick(async () => {
+        let success;
+        if (hasFocus) {
+          success = await this.processor.removeTag(idea, "#focus");
+        } else {
+          success = await this.processor.addFocusToIdea(idea);
+        }
+        if (success)
+          onRefresh();
+      });
+    });
+    menu.showAtMouseEvent(evt);
   }
 };
 
@@ -1626,6 +1814,7 @@ var TodoSidebarView = class extends import_obsidian9.ItemView {
   constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, recentTodonesLimit) {
     super(leaf);
     this.updateListener = null;
+    this.activeTab = "todos";
     this.scanner = scanner;
     this.processor = processor;
     this.projectManager = projectManager;
@@ -1698,7 +1887,26 @@ var TodoSidebarView = class extends import_obsidian9.ItemView {
     const headerDiv = container.createEl("div", { cls: "sidebar-header" });
     const titleEl = headerDiv.createEl("h4");
     titleEl.createEl("span", { cls: "space-command-logo", text: "\u2325\u2318" });
-    titleEl.appendText(" TODOs");
+    titleEl.appendText(" Space");
+    const tabNav = headerDiv.createEl("div", { cls: "sidebar-tab-nav" });
+    const todosTab = tabNav.createEl("button", {
+      cls: `sidebar-tab-btn ${this.activeTab === "todos" ? "active" : ""}`,
+      attr: { "aria-label": "TODOs" }
+    });
+    todosTab.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>';
+    todosTab.addEventListener("click", () => {
+      this.activeTab = "todos";
+      this.render();
+    });
+    const ideasTab = tabNav.createEl("button", {
+      cls: `sidebar-tab-btn ${this.activeTab === "ideas" ? "active" : ""}`,
+      attr: { "aria-label": "Ideas" }
+    });
+    ideasTab.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"></path><path d="M10 22h4"></path><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"></path></svg>';
+    ideasTab.addEventListener("click", () => {
+      this.activeTab = "ideas";
+      this.render();
+    });
     const buttonGroup = headerDiv.createEl("div", { cls: "sidebar-button-group" });
     const settingsBtn = buttonGroup.createEl("button", {
       cls: "clickable-icon sidebar-settings-btn",
@@ -1740,9 +1948,20 @@ var TodoSidebarView = class extends import_obsidian9.ItemView {
       });
       menu.showAtMouseEvent(evt);
     });
+    if (this.activeTab === "todos") {
+      this.renderTodosContent(container);
+    } else {
+      this.renderIdeasContent(container);
+    }
+  }
+  renderTodosContent(container) {
     this.renderProjects(container);
     this.renderActiveTodos(container);
     this.renderRecentTodones(container);
+  }
+  renderIdeasContent(container) {
+    this.renderPrinciples(container);
+    this.renderActiveIdeas(container);
   }
   sortTodosByPriority(todos) {
     return [...todos].sort((a, b) => {
@@ -1950,6 +2169,97 @@ var TodoSidebarView = class extends import_obsidian9.ItemView {
     link2.addEventListener("click", (e) => {
       e.preventDefault();
       this.openFileAtLine(todone.file, todone.lineNumber);
+    });
+  }
+  renderPrinciples(container) {
+    const principles = this.scanner.getPrinciples();
+    const section = container.createEl("div", { cls: "principles-section" });
+    const header = section.createEl("div", {
+      cls: "todo-section-header principles-header"
+    });
+    const titleSpan = header.createEl("span", { cls: "todo-section-title" });
+    titleSpan.innerHTML = `Principles <span class="principle-count">${principles.length}</span>`;
+    if (principles.length === 0) {
+      section.createEl("div", {
+        text: "No principles yet",
+        cls: "todo-empty"
+      });
+      return;
+    }
+    const list4 = section.createEl("ul", { cls: "principle-list" });
+    for (const principle of principles) {
+      this.renderPrincipleItem(list4, principle);
+    }
+  }
+  renderPrincipleItem(list4, principle) {
+    const hasFocus = principle.tags.includes("#focus");
+    const item = list4.createEl("li", { cls: `principle-item${hasFocus ? " principle-focus" : ""}` });
+    const textSpan = item.createEl("span", { cls: "principle-text" });
+    const cleanText = principle.text.replace(/#principle\b/g, "").trim();
+    const displayText = this.stripMarkdownSyntax(cleanText);
+    this.renderTextWithTags(displayText, textSpan);
+    textSpan.appendText(" ");
+    const link2 = item.createEl("a", {
+      text: "\u2192",
+      cls: "principle-link",
+      href: "#"
+    });
+    link2.addEventListener("click", (e) => {
+      e.preventDefault();
+      this.openFileAtLine(principle.file, principle.lineNumber);
+    });
+  }
+  renderActiveIdeas(container) {
+    let ideas = this.scanner.getIdeas();
+    ideas = ideas.filter((idea) => !idea.tags.includes("#future"));
+    ideas = this.sortTodosByPriority(ideas);
+    const section = container.createEl("div", { cls: "ideas-section" });
+    const header = section.createEl("div", { cls: "todo-section-header" });
+    const titleSpan = header.createEl("span", { cls: "todo-section-title" });
+    titleSpan.innerHTML = `Ideas <span class="idea-count">${ideas.length}</span>`;
+    if (ideas.length === 0) {
+      section.createEl("div", {
+        text: "No ideas yet",
+        cls: "todo-empty"
+      });
+      return;
+    }
+    const list4 = section.createEl("ul", { cls: "idea-list" });
+    for (const idea of ideas) {
+      this.renderIdeaItem(list4, idea);
+    }
+  }
+  renderIdeaItem(list4, idea) {
+    const hasFocus = idea.tags.includes("#focus");
+    const item = list4.createEl("li", { cls: `idea-item${hasFocus ? " idea-focus" : ""}` });
+    item.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      this.contextMenuHandler.showIdeaMenu(e, idea, () => this.render());
+    });
+    const checkbox = item.createEl("input", {
+      type: "checkbox",
+      cls: "idea-checkbox"
+    });
+    checkbox.addEventListener("change", async () => {
+      checkbox.disabled = true;
+      const success = await this.processor.completeIdea(idea);
+      if (!success) {
+        checkbox.disabled = false;
+      }
+    });
+    const textSpan = item.createEl("span", { cls: "idea-text" });
+    const cleanText = idea.text.replace(/#idea\b/g, "").trim();
+    const displayText = this.stripMarkdownSyntax(cleanText);
+    this.renderTextWithTags(displayText, textSpan);
+    textSpan.appendText(" ");
+    const link2 = item.createEl("a", {
+      text: "\u2192",
+      cls: "idea-link",
+      href: "#"
+    });
+    link2.addEventListener("click", (e) => {
+      e.preventDefault();
+      this.openFileAtLine(idea.file, idea.lineNumber);
     });
   }
   async confirmCompleteProject(project) {

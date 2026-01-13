@@ -6,6 +6,8 @@ import {
   markCheckboxComplete,
   replaceTodoneWithTodo,
   markCheckboxIncomplete,
+  removeIdeaTag,
+  replaceIdeaWithTodo,
   LOGO_PREFIX,
 } from "./utils";
 
@@ -311,6 +313,121 @@ export class TodoProcessor {
     } catch (error) {
       console.error("Error removing tag:", error);
       new Notice(`${LOGO_PREFIX} Failed to remove tag. See console for details.`);
+      return false;
+    }
+  }
+
+  async completeIdea(idea: TodoItem): Promise<boolean> {
+    try {
+      const content = await this.app.vault.read(idea.file);
+      const lines = content.split("\n");
+
+      if (idea.lineNumber >= lines.length) {
+        throw new Error(
+          `Line number ${idea.lineNumber} out of bounds for file ${idea.filePath}`
+        );
+      }
+
+      let line = lines[idea.lineNumber];
+
+      // Validate line still contains #idea
+      if (!line.includes("#idea")) {
+        throw new Error(
+          `Line ${idea.lineNumber} in ${idea.filePath} no longer contains #idea tag. File may have been modified.`
+        );
+      }
+
+      // Remove #idea tag (idea disappears from sidebar)
+      line = removeIdeaTag(line);
+
+      lines[idea.lineNumber] = line;
+      await this.app.vault.modify(idea.file, lines.join("\n"));
+
+      // Trigger callback if set
+      if (this.onComplete) {
+        this.onComplete();
+      }
+
+      new Notice(`${LOGO_PREFIX} Idea completed!`);
+      return true;
+    } catch (error) {
+      console.error("Error completing idea:", error);
+      new Notice(`${LOGO_PREFIX} Failed to complete idea. See console for details.`);
+      return false;
+    }
+  }
+
+  async convertIdeaToTodo(idea: TodoItem): Promise<boolean> {
+    try {
+      const content = await this.app.vault.read(idea.file);
+      const lines = content.split("\n");
+
+      if (idea.lineNumber >= lines.length) {
+        throw new Error(
+          `Line number ${idea.lineNumber} out of bounds for file ${idea.filePath}`
+        );
+      }
+
+      let line = lines[idea.lineNumber];
+
+      // Validate line still contains #idea
+      if (!line.includes("#idea")) {
+        throw new Error(
+          `Line ${idea.lineNumber} in ${idea.filePath} no longer contains #idea tag. File may have been modified.`
+        );
+      }
+
+      // Replace #idea with #todo
+      line = replaceIdeaWithTodo(line);
+
+      lines[idea.lineNumber] = line;
+      await this.app.vault.modify(idea.file, lines.join("\n"));
+
+      // Trigger callback if set
+      if (this.onComplete) {
+        this.onComplete();
+      }
+
+      new Notice(`${LOGO_PREFIX} Idea promoted to TODO!`);
+      return true;
+    } catch (error) {
+      console.error("Error converting idea to TODO:", error);
+      new Notice(`${LOGO_PREFIX} Failed to convert idea. See console for details.`);
+      return false;
+    }
+  }
+
+  async addFocusToIdea(idea: TodoItem): Promise<boolean> {
+    try {
+      const content = await this.app.vault.read(idea.file);
+      const lines = content.split("\n");
+
+      if (idea.lineNumber >= lines.length) {
+        throw new Error(
+          `Line number ${idea.lineNumber} out of bounds for file ${idea.filePath}`
+        );
+      }
+
+      let line = lines[idea.lineNumber];
+
+      // Add #focus tag if not already present
+      if (!line.includes("#focus")) {
+        line = line.trimEnd() + " #focus";
+      }
+
+      lines[idea.lineNumber] = line;
+      await this.app.vault.modify(idea.file, lines.join("\n"));
+
+      // Trigger callback if set
+      if (this.onComplete) {
+        this.onComplete();
+      }
+
+      new Notice(`${LOGO_PREFIX} Idea focused!`);
+      return true;
+    } catch (error) {
+      console.error("Error focusing idea:", error);
+      new Notice(`${LOGO_PREFIX} Failed to focus idea. See console for details.`);
       return false;
     }
   }

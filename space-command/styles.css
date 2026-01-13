@@ -37,6 +37,33 @@
   align-items: center;
 }
 
+/* Tab navigation */
+.sidebar-tab-nav {
+  display: flex;
+  gap: 2px;
+  margin: 0 8px;
+}
+
+.sidebar-tab-btn {
+  padding: 4px 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0.5;
+  border-radius: 4px;
+  transition: opacity 0.2s, background-color 0.2s;
+}
+
+.sidebar-tab-btn:hover {
+  opacity: 0.8;
+  background: var(--background-modifier-hover);
+}
+
+.sidebar-tab-btn.active {
+  opacity: 1;
+  background: var(--background-modifier-active-hover);
+}
+
 .sidebar-refresh-btn {
   padding: 4px;
   border: none;
@@ -252,6 +279,128 @@
   color: var(--text-accent);
 }
 
+/* Ideas section styles */
+.ideas-section {
+  margin-bottom: 20px;
+}
+
+.idea-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.idea-item {
+  display: flex;
+  align-items: flex-start;
+  padding: 4px 0;
+  gap: 8px;
+}
+
+.idea-checkbox {
+  margin-top: 2px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.idea-text {
+  flex: 1;
+  color: var(--text-normal);
+  line-height: 1.4;
+  word-wrap: break-word;
+}
+
+.idea-link {
+  color: var(--text-muted);
+  text-decoration: none;
+  flex-shrink: 0;
+  font-size: inherit;
+  margin-left: 4px;
+}
+
+.idea-link:hover {
+  color: var(--text-accent);
+}
+
+/* Principles section styles */
+.principles-section {
+  margin-bottom: 20px;
+}
+
+.principle-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.principle-item {
+  display: flex;
+  align-items: flex-start;
+  padding: 4px 0;
+  gap: 8px;
+}
+
+.principle-text {
+  flex: 1;
+  color: var(--text-normal);
+  line-height: 1.4;
+  word-wrap: break-word;
+  font-style: italic;
+}
+
+.principle-link {
+  color: var(--text-muted);
+  text-decoration: none;
+  flex-shrink: 0;
+  font-size: inherit;
+  margin-left: 4px;
+}
+
+.principle-link:hover {
+  color: var(--text-accent);
+}
+
+/* Count styling for ideas/principles */
+.idea-count,
+.principle-count {
+  opacity: 0.65;
+  background-color: var(--background-modifier-border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 0.8em;
+}
+
+.space-command-sidebar .idea-count,
+.space-command-sidebar .principle-count {
+  background-color: var(--background-primary);
+}
+
+/* Tag styling for idea/principle items */
+.idea-item .tag,
+.principle-item .tag,
+.idea-text .tag,
+.principle-text .tag {
+  opacity: 0.65;
+  background-color: var(--background-modifier-border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 0.8em;
+}
+
+/* Focus highlighting for ideas and principles */
+.space-command-sidebar .idea-focus,
+.space-command-sidebar .principle-focus {
+  background-color: color-mix(in srgb, var(--interactive-accent) 15%, transparent);
+  border-radius: 4px;
+  padding: 4px 6px;
+  margin: 2px -6px;
+}
+
+.space-command-sidebar .idea-focus:hover,
+.space-command-sidebar .principle-focus:hover {
+  background-color: color-mix(in srgb, var(--interactive-accent) 25%, transparent);
+}
+
 /* Shared muted pill style for tags, counts, and dates */
 .muted-pill {
   opacity: 0.65;
@@ -450,6 +599,8 @@
 .cm-header .cm-tag-todone,
 .cm-header .cm-tag-focus,
 .cm-header .cm-tag-future,
+.cm-header .cm-tag-idea,
+.cm-header .cm-tag-principle,
 .cm-header .cm-tag-p0,
 .cm-header .cm-tag-p1,
 .cm-header .cm-tag-p2,

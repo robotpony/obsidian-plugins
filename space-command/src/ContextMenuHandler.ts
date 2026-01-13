@@ -145,4 +145,44 @@ export class ContextMenuHandler {
 
     return "#p4";
   }
+
+  /**
+   * Show context menu for an idea item
+   */
+  showIdeaMenu(evt: MouseEvent, idea: TodoItem, onRefresh: () => void): void {
+    const menu = new Menu();
+
+    const hasFocus = idea.tags.includes("#focus");
+
+    // Add to TODOs - converts #idea to #todo
+    menu.addItem((item) => {
+      item
+        .setTitle("Add to TODOs")
+        .setIcon("check-square")
+        .onClick(async () => {
+          const success = await this.processor.convertIdeaToTodo(idea);
+          if (success) onRefresh();
+        });
+    });
+
+    // Focus - Toggle: if has #focus, remove it; otherwise add #focus
+    menu.addItem((item) => {
+      item
+        .setTitle(hasFocus ? "Unfocus" : "Focus")
+        .setIcon("zap")
+        .onClick(async () => {
+          let success: boolean;
+          if (hasFocus) {
+            // Remove #focus tag
+            success = await this.processor.removeTag(idea, "#focus");
+          } else {
+            // Add #focus tag
+            success = await this.processor.addFocusToIdea(idea);
+          }
+          if (success) onRefresh();
+        });
+    });
+
+    menu.showAtMouseEvent(evt);
+  }
 }

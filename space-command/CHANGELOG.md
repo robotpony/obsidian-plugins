@@ -2,6 +2,33 @@
 
 All notable changes to the ⌥⌘ Space Command plugin will be documented in this file.
 
+## [0.7.0] - 2026-01-12
+
+### Added
+
+- **Ideas Tab**: New sidebar tab for capturing ideas separate from actionable TODOs
+  - Toggle between TODOs (checkmark icon) and Ideas (lightbulb icon) tabs
+  - Sidebar header now shows "⌥⌘ Space" with tab navigation
+- **Idea tracking**: New `#idea` tag for capturing ideas
+  - Ideas shown in Ideas tab with checkbox and link to source
+  - Clicking checkbox dismisses the idea (removes `#idea` tag)
+  - Right-click menu: "Add to TODOs" (converts `#idea` → `#todo`) and "Focus" toggle
+- **Principles section**: New `#principle` tag for guiding principles
+  - Displayed in italics at top of Ideas tab
+  - Principles are reference items (no checkbox action)
+- **Focus support for ideas**: `#focus` tag works on ideas for prioritization
+
+### Technical
+
+- Extended `TodoItem` interface with `itemType` discriminator field
+- Added `ideasCache` and `principlesCache` to `TodoScanner`
+- New `getIdeas()` and `getPrinciples()` methods in `TodoScanner`
+- New `completeIdea()`, `convertIdeaToTodo()`, `addFocusToIdea()` methods in `TodoProcessor`
+- New `showIdeaMenu()` method in `ContextMenuHandler`
+- New `renderIdeasContent()`, `renderPrinciples()`, `renderActiveIdeas()`, `renderIdeaItem()` in `SidebarView`
+- New utility functions: `removeIdeaTag()`, `replaceIdeaWithTodo()`
+- New CSS: `.sidebar-tab-nav`, `.sidebar-tab-btn`, `.idea-*`, `.principle-*` classes
+
 ## [0.6.6] - 2026-01-12
 
 ### Fixed

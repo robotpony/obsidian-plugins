@@ -6,6 +6,8 @@ export class TodoScanner extends Events {
   private app: App;
   private todosCache: Map<string, TodoItem[]> = new Map();
   private todonesCache: Map<string, TodoItem[]> = new Map();
+  private ideasCache: Map<string, TodoItem[]> = new Map();
+  private principlesCache: Map<string, TodoItem[]> = new Map();
   private excludeFromTodones: Set<string> = new Set();
 
   // Debounced scan function to prevent rapid re-scans on file changes
@@ -30,6 +32,8 @@ export class TodoScanner extends Events {
   async scanVault(): Promise<void> {
     this.todosCache.clear();
     this.todonesCache.clear();
+    this.ideasCache.clear();
+    this.principlesCache.clear();
 
     const files = this.app.vault.getMarkdownFiles();
     for (const file of files) {
@@ -43,6 +47,8 @@ export class TodoScanner extends Events {
       const lines = content.split("\n");
       const todos: TodoItem[] = [];
       const todones: TodoItem[] = [];
+      const ideas: TodoItem[] = [];
+      const principles: TodoItem[] = [];
       const linesToCleanup: number[] = [];
       const linesToSyncTodone: number[] = [];
 
@@ -85,7 +91,7 @@ export class TodoScanner extends Events {
 
         // Process header with #todo tag
         if (headerInfo && tags.includes("#todo") && !tags.includes("#todone")) {
-          const headerTodo = this.createTodoItem(file, i, line, tags);
+          const headerTodo = this.createTodoItem(file, i, line, tags, 'todo');
           headerTodo.isHeader = true;
           headerTodo.headerLevel = headerInfo.level;
           headerTodo.childLineNumbers = [];
@@ -96,7 +102,7 @@ export class TodoScanner extends Events {
 
         // Process header with #todone tag
         if (headerInfo && tags.includes("#todone")) {
-          const headerTodone = this.createTodoItem(file, i, line, tags);
+          const headerTodone = this.createTodoItem(file, i, line, tags, 'todone');
           headerTodone.isHeader = true;
           headerTodone.headerLevel = headerInfo.level;
           todones.push(headerTodone);
@@ -118,7 +124,8 @@ export class TodoScanner extends Events {
             tags.push("#todone");
           }
 
-          const childItem = this.createTodoItem(file, i, line, tags);
+          const childItemType = tags.includes("#todone") ? 'todone' : 'todo';
+          const childItem = this.createTodoItem(file, i, line, tags, childItemType);
           childItem.parentLineNumber = currentHeaderTodo.lineNumber;
           // Add this line number to parent's children
           currentHeaderTodo.todoItem.childLineNumbers!.push(i);
@@ -139,11 +146,19 @@ export class TodoScanner extends Events {
           // Queue this line for cleanup (remove #todo tag)
           linesToCleanup.push(i);
           // Treat as completed
-          todones.push(this.createTodoItem(file, i, line, tags));
+          todones.push(this.createTodoItem(file, i, line, tags, 'todone'));
         } else if (tags.includes("#todo")) {
-          todos.push(this.createTodoItem(file, i, line, tags));
+          todos.push(this.createTodoItem(file, i, line, tags, 'todo'));
         } else if (tags.includes("#todone")) {
-          todones.push(this.createTodoItem(file, i, line, tags));
+          todones.push(this.createTodoItem(file, i, line, tags, 'todone'));
+        }
+
+        // Idea and Principle processing (can coexist with todo/todone)
+        if (tags.includes("#idea")) {
+          ideas.push(this.createTodoItem(file, i, line, tags, 'idea'));
+        }
+        if (tags.includes("#principle")) {
+          principles.push(this.createTodoItem(file, i, line, tags, 'principle'));
         }
       }
 
@@ -167,6 +182,18 @@ export class TodoScanner extends Events {
         this.todonesCache.set(file.path, todones);
       } else {
         this.todonesCache.delete(file.path);
+      }
+
+      if (ideas.length > 0) {
+        this.ideasCache.set(file.path, ideas);
+      } else {
+        this.ideasCache.delete(file.path);
+      }
+
+      if (principles.length > 0) {
+        this.principlesCache.set(file.path, principles);
+      } else {
+        this.principlesCache.delete(file.path);
       }
 
       // Emit update event so UI can refresh
@@ -240,7 +267,8 @@ export class TodoScanner extends Events {
     file: TFile,
     lineNumber: number,
     text: string,
-    tags: string[]
+    tags: string[],
+    itemType?: 'todo' | 'todone' | 'idea' | 'principle'
   ): TodoItem {
     return {
       file,
@@ -251,6 +279,7 @@ export class TodoScanner extends Events {
       hasCheckbox: hasCheckboxFormat(text),
       tags,
       dateCreated: file.stat.mtime,
+      itemType,
     };
   }
 
@@ -277,6 +306,24 @@ export class TodoScanner extends Events {
     return limit ? sorted.slice(0, limit) : sorted;
   }
 
+  getIdeas(): TodoItem[] {
+    const allIdeas: TodoItem[] = [];
+    for (const ideas of this.ideasCache.values()) {
+      allIdeas.push(...ideas);
+    }
+    // Sort by date created (oldest first)
+    return allIdeas.sort((a, b) => a.dateCreated - b.dateCreated);
+  }
+
+  getPrinciples(): TodoItem[] {
+    const allPrinciples: TodoItem[] = [];
+    for (const principles of this.principlesCache.values()) {
+      allPrinciples.push(...principles);
+    }
+    // Sort by date created (oldest first)
+    return allPrinciples.sort((a, b) => a.dateCreated - b.dateCreated);
+  }
+
   watchFiles(): void {
     // Watch for file modifications (debounced to prevent rapid re-scans)
     this.app.vault.on("modify", (file) => {
@@ -297,6 +344,8 @@ export class TodoScanner extends Events {
       if (file instanceof TFile) {
         this.todosCache.delete(file.path);
         this.todonesCache.delete(file.path);
+        this.ideasCache.delete(file.path);
+        this.principlesCache.delete(file.path);
         this.trigger("todos-updated");
       }
     });
@@ -306,6 +355,8 @@ export class TodoScanner extends Events {
       if (file instanceof TFile && file.extension === "md") {
         this.todosCache.delete(oldPath);
         this.todonesCache.delete(oldPath);
+        this.ideasCache.delete(oldPath);
+        this.principlesCache.delete(oldPath);
         this.debouncedScanFile(file);
       }
     });

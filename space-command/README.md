@@ -32,6 +32,30 @@ Space Command isn't Todoist or Jira. It's for the TODOs that live in your notes.
 
 That's it. Everything else is optional.
 
+## Ideas Tab
+
+Capture ideas separately from actionable TODOs. The sidebar has two tabs:
+
+- **TODOs** (checkmark): Your actionable task list
+- **Ideas** (lightbulb): Ideas and guiding principles
+
+**Idea tags:**
+
+| Tag | Purpose |
+|-----|---------|
+| `#idea` | An idea to capture (not yet actionable) |
+| `#principle` | A guiding principle (displayed in Principles section) |
+
+```markdown
+- What if we cached API responses? #idea #api
+- Always validate at system boundaries #principle
+```
+
+**Idea actions:**
+- **Checkbox**: Click to dismiss the idea (removes `#idea` tag)
+- **Right-click → Add to TODOs**: Promotes `#idea` to `#todo`
+- **Right-click → Focus**: Adds `#focus` for prioritization
+
 ## Organize
 
 Use tags to prioritize and categorize:

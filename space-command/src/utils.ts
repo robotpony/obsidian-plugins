@@ -58,3 +58,12 @@ export function replaceTodoneWithTodo(text: string): string {
 export function markCheckboxIncomplete(text: string): string {
   return text.replace(/^(-\s*\[)x(\])/i, "$1 $2");
 }
+
+export function removeIdeaTag(text: string): string {
+  // Remove #idea tag and any trailing whitespace it leaves
+  return text.replace(/#idea\b\s*/, "").trim();
+}
+
+export function replaceIdeaWithTodo(text: string): string {
+  return text.replace(/#idea\b/, "#todo");
+}
