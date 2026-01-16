@@ -2,6 +2,25 @@
 
 All notable changes to the ⌥⌘ Space Command plugin will be documented in this file.
 
+## [0.7.1] - 2026-01-15
+
+### Fixed
+
+- **Sidebar empty on load**: Sidebar now populates correctly when Obsidian starts
+  - Previously required manual refresh after reboot
+  - Root cause: race condition between vault scan and sidebar activation
+  - Fix: emit `todos-updated` event after full vault scan completes
+
+- **Completing child TODOs from embeds**: Child items under header TODOs can now be completed from embeds
+  - Previously threw error: "Line X no longer contains `#todo` tag"
+  - Root cause: child items inherit TODO status from parent header (no explicit `#todo` tag)
+  - Fix: detect child items via `parentLineNumber` and append `#todone @date` directly
+
+- **Completed items not disappearing from embeds/sidebar**: Completed TODOs now immediately disappear from lists
+  - Previously, completed items remained visible until manual refresh
+  - Root cause: UI refreshed before scanner cache was updated (debounced file watcher)
+  - Fix: `TodoProcessor` now triggers immediate file rescan after modifications
+
 ## [0.7.0] - 2026-01-12
 
 ### Added

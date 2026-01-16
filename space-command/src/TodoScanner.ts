@@ -39,6 +39,10 @@ export class TodoScanner extends Events {
     for (const file of files) {
       await this.scanFile(file);
     }
+
+    // Emit final event after full scan completes, ensuring any listeners
+    // registered after scanVault() returns will have data available
+    this.trigger("todos-updated");
   }
 
   async scanFile(file: TFile): Promise<void> {

@@ -219,6 +219,7 @@ var TodoScanner = class extends import_obsidian2.Events {
     for (const file of files) {
       await this.scanFile(file);
     }
+    this.trigger("todos-updated");
   }
   async scanFile(file) {
     try {
@@ -488,6 +489,9 @@ var TodoProcessor = class {
     this.app = app;
     this.dateFormat = dateFormat;
   }
+  setScanner(scanner) {
+    this.scanner = scanner;
+  }
   setOnCompleteCallback(callback) {
     this.onComplete = callback;
   }
@@ -500,6 +504,9 @@ var TodoProcessor = class {
       }
       await this.updateSourceFile(todo, today);
       await this.appendToTodoneFile(todo, todoneFilePath, today);
+      if (this.scanner) {
+        await this.scanner.scanFile(todo.file);
+      }
       if (this.onComplete) {
         this.onComplete();
       }
@@ -538,6 +545,9 @@ var TodoProcessor = class {
   async uncompleteTodo(todo) {
     try {
       await this.revertSourceFile(todo);
+      if (this.scanner) {
+        await this.scanner.scanFile(todo.file);
+      }
       if (this.onComplete) {
         this.onComplete();
       }
@@ -579,12 +589,21 @@ var TodoProcessor = class {
       );
     }
     let updatedLine = lines[todo.lineNumber];
-    if (!updatedLine.includes("#todo") || updatedLine.includes("#todone")) {
+    if (updatedLine.includes("#todone")) {
+      throw new Error(
+        `Line ${todo.lineNumber} in ${todo.filePath} already contains #todone tag. File may have been modified.`
+      );
+    }
+    const isChildItem = todo.parentLineNumber !== void 0;
+    if (updatedLine.includes("#todo")) {
+      updatedLine = replaceTodoWithTodone(updatedLine, date);
+    } else if (isChildItem) {
+      updatedLine = updatedLine.trimEnd() + ` #todone @${date}`;
+    } else {
       throw new Error(
         `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todo tag. File may have been modified.`
       );
     }
-    updatedLine = replaceTodoWithTodone(updatedLine, date);
     if (todo.hasCheckbox) {
       updatedLine = markCheckboxComplete(updatedLine);
     }
@@ -647,6 +666,9 @@ ${todoneText}` : todoneText;
       }
       lines[todo.lineNumber] = line;
       await this.app.vault.modify(todo.file, lines.join("\n"));
+      if (this.scanner) {
+        await this.scanner.scanFile(todo.file);
+      }
       if (this.onComplete) {
         this.onComplete();
       }
@@ -673,6 +695,9 @@ ${todoneText}` : todoneText;
       line = line.replace(/\s+/g, " ").trim();
       lines[todo.lineNumber] = line;
       await this.app.vault.modify(todo.file, lines.join("\n"));
+      if (this.scanner) {
+        await this.scanner.scanFile(todo.file);
+      }
       if (this.onComplete) {
         this.onComplete();
       }
@@ -702,6 +727,9 @@ ${todoneText}` : todoneText;
       line = removeIdeaTag(line);
       lines[idea.lineNumber] = line;
       await this.app.vault.modify(idea.file, lines.join("\n"));
+      if (this.scanner) {
+        await this.scanner.scanFile(idea.file);
+      }
       if (this.onComplete) {
         this.onComplete();
       }
@@ -731,6 +759,9 @@ ${todoneText}` : todoneText;
       line = replaceIdeaWithTodo(line);
       lines[idea.lineNumber] = line;
       await this.app.vault.modify(idea.file, lines.join("\n"));
+      if (this.scanner) {
+        await this.scanner.scanFile(idea.file);
+      }
       if (this.onComplete) {
         this.onComplete();
       }
@@ -757,6 +788,9 @@ ${todoneText}` : todoneText;
       }
       lines[idea.lineNumber] = line;
       await this.app.vault.modify(idea.file, lines.join("\n"));
+      if (this.scanner) {
+        await this.scanner.scanFile(idea.file);
+      }
       if (this.onComplete) {
         this.onComplete();
       }
@@ -12871,6 +12905,7 @@ var SpaceCommandPlugin = class extends import_obsidian10.Plugin {
     await this.loadSettings();
     this.scanner = new TodoScanner(this.app);
     this.processor = new TodoProcessor(this.app, this.settings.dateFormat);
+    this.processor.setScanner(this.scanner);
     this.projectManager = new ProjectManager(
       this.app,
       this.scanner,

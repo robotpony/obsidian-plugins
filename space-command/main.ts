@@ -37,6 +37,7 @@ export default class SpaceCommandPlugin extends Plugin {
     // Initialize core components
     this.scanner = new TodoScanner(this.app);
     this.processor = new TodoProcessor(this.app, this.settings.dateFormat);
+    this.processor.setScanner(this.scanner);
     this.projectManager = new ProjectManager(
       this.app,
       this.scanner,

@@ -10,15 +10,21 @@ import {
   replaceIdeaWithTodo,
   LOGO_PREFIX,
 } from "./utils";
+import { TodoScanner } from "./TodoScanner";
 
 export class TodoProcessor {
   private app: App;
   private dateFormat: string;
   private onComplete?: () => void;
+  private scanner?: TodoScanner;
 
   constructor(app: App, dateFormat: string = "YYYY-MM-DD") {
     this.app = app;
     this.dateFormat = dateFormat;
+  }
+
+  setScanner(scanner: TodoScanner): void {
+    this.scanner = scanner;
   }
 
   setOnCompleteCallback(callback: () => void): void {
@@ -42,6 +48,11 @@ export class TodoProcessor {
 
       // Step 2: Append to TODONE log file
       await this.appendToTodoneFile(todo, todoneFilePath, today);
+
+      // Step 3: Immediately rescan the file to update cache (don't wait for debounced watcher)
+      if (this.scanner) {
+        await this.scanner.scanFile(todo.file);
+      }
 
       // Trigger callback if set
       if (this.onComplete) {
@@ -100,6 +111,11 @@ export class TodoProcessor {
 
       // Note: We do NOT remove from the TODONE log file as it serves as history
 
+      // Immediately rescan the file to update cache
+      if (this.scanner) {
+        await this.scanner.scanFile(todo.file);
+      }
+
       // Trigger callback if set
       if (this.onComplete) {
         this.onComplete();
@@ -157,15 +173,27 @@ export class TodoProcessor {
 
     let updatedLine = lines[todo.lineNumber];
 
-    // Validate line content hasn't changed since scan (prevents modifying wrong line)
-    if (!updatedLine.includes("#todo") || updatedLine.includes("#todone")) {
+    // Check if already completed
+    if (updatedLine.includes("#todone")) {
+      throw new Error(
+        `Line ${todo.lineNumber} in ${todo.filePath} already contains #todone tag. File may have been modified.`
+      );
+    }
+
+    // Handle child items that inherit from parent header (no explicit #todo tag)
+    const isChildItem = todo.parentLineNumber !== undefined;
+
+    if (updatedLine.includes("#todo")) {
+      // Regular TODO with explicit tag - replace #todo with #todone @date
+      updatedLine = replaceTodoWithTodone(updatedLine, date);
+    } else if (isChildItem) {
+      // Child item without explicit #todo tag - add #todone @date
+      updatedLine = updatedLine.trimEnd() + ` #todone @${date}`;
+    } else {
       throw new Error(
         `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todo tag. File may have been modified.`
       );
     }
-
-    // Replace #todo with #todone @date
-    updatedLine = replaceTodoWithTodone(updatedLine, date);
 
     // If it has a checkbox, mark it complete
     if (todo.hasCheckbox) {
@@ -266,6 +294,11 @@ export class TodoProcessor {
       lines[todo.lineNumber] = line;
       await this.app.vault.modify(todo.file, lines.join("\n"));
 
+      // Immediately rescan the file to update cache
+      if (this.scanner) {
+        await this.scanner.scanFile(todo.file);
+      }
+
       // Trigger callback if set
       if (this.onComplete) {
         this.onComplete();
@@ -302,6 +335,11 @@ export class TodoProcessor {
 
       lines[todo.lineNumber] = line;
       await this.app.vault.modify(todo.file, lines.join("\n"));
+
+      // Immediately rescan the file to update cache
+      if (this.scanner) {
+        await this.scanner.scanFile(todo.file);
+      }
 
       // Trigger callback if set
       if (this.onComplete) {
@@ -343,6 +381,11 @@ export class TodoProcessor {
       lines[idea.lineNumber] = line;
       await this.app.vault.modify(idea.file, lines.join("\n"));
 
+      // Immediately rescan the file to update cache
+      if (this.scanner) {
+        await this.scanner.scanFile(idea.file);
+      }
+
       // Trigger callback if set
       if (this.onComplete) {
         this.onComplete();
@@ -383,6 +426,11 @@ export class TodoProcessor {
       lines[idea.lineNumber] = line;
       await this.app.vault.modify(idea.file, lines.join("\n"));
 
+      // Immediately rescan the file to update cache
+      if (this.scanner) {
+        await this.scanner.scanFile(idea.file);
+      }
+
       // Trigger callback if set
       if (this.onComplete) {
         this.onComplete();
@@ -417,6 +465,11 @@ export class TodoProcessor {
 
       lines[idea.lineNumber] = line;
       await this.app.vault.modify(idea.file, lines.join("\n"));
+
+      // Immediately rescan the file to update cache
+      if (this.scanner) {
+        await this.scanner.scanFile(idea.file);
+      }
 
       // Trigger callback if set
       if (this.onComplete) {

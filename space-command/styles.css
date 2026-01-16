@@ -6,7 +6,7 @@
   background-color: #689fd6;
   color: white;
   border-radius: 4px;
-  padding: 2px 6px;
+  padding: 3px 3px 2px;
   font-weight: 600;
   font-size: 0.9em;
   text-align: center;
@@ -55,7 +55,7 @@
 .sidebar-tab-btn {
   padding: 4px;
   border: none;
-  background-color: transparent;
+  background-color: transparent !important;
   cursor: pointer;
   transition: opacity 0.2s;
   color: var(--text-normal);
@@ -64,12 +64,11 @@
 }
 
 .sidebar-tab-btn:hover {
-  opacity: .65;
-  background-color: var(--background-modifier-hover);
+  opacity: .5;
 }
 
 .sidebar-tab-btn.active {
-  background-color: var(--background-secondary-alt);
+  background-color: var(--background-modifier-hover) !important;
 }
 
 /* Hamburger menu button */
@@ -601,12 +600,9 @@
 
 /* Child TODO container */
 .todo-children {
-  margin-left: 24px;
-  margin-top: 4px;
   list-style: none;
   padding: 0;
-  border-left: 2px solid var(--background-modifier-border);
-  padding-left: 12px;
+  font-size: .85em;
 }
 
 /* Child TODO item styling */
