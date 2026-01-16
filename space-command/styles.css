@@ -524,7 +524,8 @@
   display: flex;
   justify-content: flex-end;
   margin-bottom: 4px;
-  margin-right: 1em !important;
+  margin-top: -2px;
+  margin-right: 22px !important;
 }
 
 .embed-refresh-btn {
