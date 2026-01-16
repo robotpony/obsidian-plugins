@@ -136,6 +136,7 @@
 /* Muted styling for DONE section to show it's less important */
 .todone-section {
   opacity: 0.7;
+  font-size: .85em;
 }
 
 .todone-section:hover {
@@ -615,6 +616,75 @@
 .todo-header.todone-item > .todo-text {
   text-decoration: line-through;
   color: var(--text-muted);
+}
+
+/* Idea header styling */
+.idea-header > .idea-text,
+.idea-header .idea-header-row > .idea-text {
+  font-weight: 600;
+}
+
+/* Idea header with children - use block layout so children appear below */
+.space-command-sidebar .idea-item.idea-header-with-children {
+  display: block;
+}
+
+/* Idea header row (checkbox + text + count + link) stays as flex */
+.idea-header-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.idea-header-row > .idea-text {
+  flex: 1;
+}
+
+/* Child idea container */
+.idea-children {
+  list-style: none;
+  padding: 0;
+  font-size: .85em;
+}
+
+/* Child idea item styling */
+.idea-child {
+  opacity: 0.9;
+}
+
+/* Principle header styling */
+.principle-header > .principle-text,
+.principle-header .principle-header-row > .principle-text {
+  font-weight: 600;
+  font-style: normal; /* Remove italic for headers */
+}
+
+/* Principle header with children - use block layout so children appear below */
+.space-command-sidebar .principle-item.principle-header-with-children {
+  display: block;
+}
+
+/* Principle header row (text + count + link) stays as flex */
+.principle-header-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.principle-header-row > .principle-text {
+  flex: 1;
+}
+
+/* Child principle container */
+.principle-children {
+  list-style: none;
+  padding: 0;
+  font-size: .85em;
+}
+
+/* Child principle item styling */
+.principle-child {
+  opacity: 0.9;
 }
 
 /* Normalize plugin tag sizes in Obsidian editor headings */

@@ -2,6 +2,30 @@
 
 All notable changes to the ⌥⌘ Space Command plugin will be documented in this file.
 
+## [0.7.2] - 2026-01-15
+
+### Changed
+
+- **Removed item counts from sidebar and embeds**: Section headers (Focus, TODO, Principles, Ideas) and project items no longer display counts
+
+### Improved
+
+- **Unified rendering for ideas and principles**: Ideas and principles now support the same header-with-children pattern as TODOs
+  - Header ideas (`## My Idea #idea`) now display child items indented below
+  - Header principles work the same way
+  - All three types (todos, ideas, principles) share a single rendering method
+- **Scanner support for idea/principle headers**: `TodoScanner` now tracks header context for `#idea` and `#principle` tags
+  - List items below a header idea/principle are captured as children
+  - Children filtered from top-level lists (rendered under their parent)
+
+### Technical
+
+- New `ItemRenderConfig` interface in `types.ts` for unified list item rendering
+- Refactored `SidebarView.ts`: consolidated `renderTodoItem`, `renderIdeaItem`, `renderPrincipleItem` into single `renderListItem` method
+- Added config constants (`todoConfig`, `ideaConfig`, `principleConfig`) for type-specific behavior
+- `TodoScanner.scanFile()` now tracks `currentHeaderIdea` and `currentHeaderPrinciple` for parent-child relationships
+- New CSS for idea/principle headers: `.idea-header`, `.idea-header-row`, `.idea-children`, `.principle-header`, `.principle-header-row`, `.principle-children`
+
 ## [0.7.1] - 2026-01-15
 
 ### Fixed

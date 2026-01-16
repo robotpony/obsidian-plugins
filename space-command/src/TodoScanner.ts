@@ -59,8 +59,10 @@ export class TodoScanner extends Events {
       // Track code block state
       let inCodeBlock = false;
 
-      // Track current header TODO context for parent-child relationships
+      // Track current header context for parent-child relationships
       let currentHeaderTodo: { lineNumber: number; level: number; todoItem: TodoItem } | null = null;
+      let currentHeaderIdea: { lineNumber: number; level: number; todoItem: TodoItem } | null = null;
+      let currentHeaderPrinciple: { lineNumber: number; level: number; todoItem: TodoItem } | null = null;
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
@@ -86,10 +88,16 @@ export class TodoScanner extends Events {
         // Check if this is a header with #todo or #todone
         const headerInfo = this.detectHeader(line);
 
-        // If we encounter any header (with or without tags), check if it ends current header scope
-        if (headerInfo && currentHeaderTodo) {
-          if (headerInfo.level <= currentHeaderTodo.level) {
+        // If we encounter any header (with or without tags), check if it ends current header scopes
+        if (headerInfo) {
+          if (currentHeaderTodo && headerInfo.level <= currentHeaderTodo.level) {
             currentHeaderTodo = null;
+          }
+          if (currentHeaderIdea && headerInfo.level <= currentHeaderIdea.level) {
+            currentHeaderIdea = null;
+          }
+          if (currentHeaderPrinciple && headerInfo.level <= currentHeaderPrinciple.level) {
+            currentHeaderPrinciple = null;
           }
         }
 
@@ -157,12 +165,48 @@ export class TodoScanner extends Events {
           todones.push(this.createTodoItem(file, i, line, tags, 'todone'));
         }
 
-        // Idea and Principle processing (can coexist with todo/todone)
+        // Idea processing - handle headers with children
         if (tags.includes("#idea")) {
-          ideas.push(this.createTodoItem(file, i, line, tags, 'idea'));
+          if (headerInfo) {
+            // Header with #idea tag
+            const headerIdea = this.createTodoItem(file, i, line, tags, 'idea');
+            headerIdea.isHeader = true;
+            headerIdea.headerLevel = headerInfo.level;
+            headerIdea.childLineNumbers = [];
+            ideas.push(headerIdea);
+            currentHeaderIdea = { lineNumber: i, level: headerInfo.level, todoItem: headerIdea };
+          } else {
+            // Regular idea (not a header)
+            ideas.push(this.createTodoItem(file, i, line, tags, 'idea'));
+          }
+        } else if (currentHeaderIdea && this.isListItem(line) && !tags.includes("#todo") && !tags.includes("#todone")) {
+          // Child item under a header idea (only if not already a todo/todone)
+          const childItem = this.createTodoItem(file, i, line, tags, 'idea');
+          childItem.parentLineNumber = currentHeaderIdea.lineNumber;
+          currentHeaderIdea.todoItem.childLineNumbers!.push(i);
+          ideas.push(childItem);
         }
+
+        // Principle processing - handle headers with children
         if (tags.includes("#principle")) {
-          principles.push(this.createTodoItem(file, i, line, tags, 'principle'));
+          if (headerInfo) {
+            // Header with #principle tag
+            const headerPrinciple = this.createTodoItem(file, i, line, tags, 'principle');
+            headerPrinciple.isHeader = true;
+            headerPrinciple.headerLevel = headerInfo.level;
+            headerPrinciple.childLineNumbers = [];
+            principles.push(headerPrinciple);
+            currentHeaderPrinciple = { lineNumber: i, level: headerInfo.level, todoItem: headerPrinciple };
+          } else {
+            // Regular principle (not a header)
+            principles.push(this.createTodoItem(file, i, line, tags, 'principle'));
+          }
+        } else if (currentHeaderPrinciple && this.isListItem(line) && !tags.includes("#todo") && !tags.includes("#todone") && !tags.includes("#idea")) {
+          // Child item under a header principle (only if not already another type)
+          const childItem = this.createTodoItem(file, i, line, tags, 'principle');
+          childItem.parentLineNumber = currentHeaderPrinciple.lineNumber;
+          currentHeaderPrinciple.todoItem.childLineNumbers!.push(i);
+          principles.push(childItem);
         }
       }
 

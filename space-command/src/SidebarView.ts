@@ -2,7 +2,7 @@ import { ItemView, WorkspaceLeaf, TFile, Menu, Notice, Modal, MarkdownView } fro
 import { TodoScanner } from "./TodoScanner";
 import { TodoProcessor } from "./TodoProcessor";
 import { ProjectManager } from "./ProjectManager";
-import { TodoItem, ProjectInfo } from "./types";
+import { TodoItem, ProjectInfo, ItemRenderConfig } from "./types";
 import { ContextMenuHandler } from "./ContextMenuHandler";
 import { getPriorityValue, LOGO_PREFIX } from "./utils";
 
@@ -80,6 +80,32 @@ export class TodoSidebarView extends ItemView {
     return cleaned;
   }
 
+  // Configuration for unified list item rendering
+  private readonly todoConfig: ItemRenderConfig = {
+    type: 'todo',
+    classPrefix: 'todo',
+    tagToStrip: /#todo\b/g,
+    showCheckbox: true,
+    onComplete: (item) => this.processor.completeTodo(item, this.defaultTodoneFile),
+    onContextMenu: (e, item) => this.contextMenuHandler.showTodoMenu(e, item, () => this.render())
+  };
+
+  private readonly ideaConfig: ItemRenderConfig = {
+    type: 'idea',
+    classPrefix: 'idea',
+    tagToStrip: /#idea\b/g,
+    showCheckbox: true,
+    onComplete: (item) => this.processor.completeIdea(item),
+    onContextMenu: (e, item) => this.contextMenuHandler.showIdeaMenu(e, item, () => this.render())
+  };
+
+  private readonly principleConfig: ItemRenderConfig = {
+    type: 'principle',
+    classPrefix: 'principle',
+    tagToStrip: /#principle\b/g,
+    showCheckbox: false
+  };
+
   // Render text with tags safely using DOM methods (avoids XSS)
   private renderTextWithTags(text: string, container: HTMLElement): void {
     const tagRegex = /(#[\w-]+)/g;
@@ -102,6 +128,106 @@ export class TodoSidebarView extends ItemView {
     // Add remaining text after last tag
     if (lastIndex < text.length) {
       container.appendText(text.substring(lastIndex));
+    }
+  }
+
+  // Unified list item renderer for todos, ideas, and principles
+  private renderListItem(
+    list: HTMLElement,
+    item: TodoItem,
+    config: ItemRenderConfig,
+    isChild: boolean = false
+  ): void {
+    const hasFocus = item.tags.includes("#focus");
+    const isHeader = item.isHeader === true;
+    const hasChildren = isHeader && item.childLineNumbers && item.childLineNumbers.length > 0;
+
+    // Build class list with type-specific prefix
+    const itemClasses = [
+      `${config.classPrefix}-item`,
+      hasFocus ? `${config.classPrefix}-focus` : '',
+      isHeader ? `${config.classPrefix}-header` : '',
+      isChild ? `${config.classPrefix}-child` : '',
+      hasChildren ? `${config.classPrefix}-header-with-children` : ''
+    ].filter(c => c).join(' ');
+
+    const listItem = list.createEl("li", { cls: itemClasses });
+
+    // Add context menu if configured
+    if (config.onContextMenu) {
+      listItem.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        config.onContextMenu!(e, item);
+      });
+    }
+
+    // For headers with children, create a row container for the header content
+    const rowContainer = hasChildren
+      ? listItem.createEl("div", { cls: `${config.classPrefix}-header-row` })
+      : listItem;
+
+    // Checkbox (if configured)
+    if (config.showCheckbox && config.onComplete) {
+      const checkbox = rowContainer.createEl("input", {
+        type: "checkbox",
+        cls: `${config.classPrefix}-checkbox`,
+      });
+
+      checkbox.addEventListener("change", async () => {
+        checkbox.disabled = true;
+        const success = await config.onComplete!(item);
+        if (!success) {
+          checkbox.disabled = false;
+        }
+      });
+    }
+
+    // Text content (strip type tag but keep other tags)
+    const textSpan = rowContainer.createEl("span", { cls: `${config.classPrefix}-text` });
+    const cleanText = item.text.replace(config.tagToStrip, "").trim();
+    const displayText = this.stripMarkdownSyntax(cleanText);
+    this.renderTextWithTags(displayText, textSpan);
+
+    // For headers with children, append count inline with text
+    if (hasChildren) {
+      const childCount = item.childLineNumbers!.length;
+      textSpan.createEl("span", { cls: `${config.classPrefix}-count`, text: ` ${childCount}` });
+    }
+    textSpan.appendText(" ");
+
+    // Link to source
+    const link = rowContainer.createEl("a", {
+      text: "→",
+      cls: `${config.classPrefix}-link`,
+      href: "#",
+    });
+
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      this.openFileAtLine(item.file, item.lineNumber);
+    });
+
+    // If this is a header with children, render children indented below
+    if (hasChildren) {
+      const childrenContainer = listItem.createEl("ul", { cls: `${config.classPrefix}-children` });
+      const allItems = this.getItemsForType(config.type);
+      for (const childLine of item.childLineNumbers!) {
+        const childItem = allItems.find(
+          t => t.filePath === item.filePath && t.lineNumber === childLine
+        );
+        if (childItem) {
+          this.renderListItem(childrenContainer, childItem, config, true);
+        }
+      }
+    }
+  }
+
+  // Get all items of a given type for child lookup
+  private getItemsForType(type: 'todo' | 'idea' | 'principle'): TodoItem[] {
+    switch (type) {
+      case 'todo': return this.scanner.getTodos();
+      case 'idea': return this.scanner.getIdeas();
+      case 'principle': return this.scanner.getPrinciples();
     }
   }
 
@@ -266,7 +392,7 @@ export class TodoSidebarView extends ItemView {
     });
 
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
-    titleSpan.innerHTML = `Focus <span class="project-count">${projects.length}</span>`;
+    titleSpan.textContent = "Focus";
 
     if (projects.length === 0) {
       section.createEl("div", {
@@ -310,11 +436,9 @@ export class TodoSidebarView extends ItemView {
       }
     });
 
-    // Project name and count (using safe DOM methods)
+    // Project name (using safe DOM methods)
     const textSpan = item.createEl("span", { cls: "project-text" });
     textSpan.appendText(project.tag + " ");
-    textSpan.createEl("span", { cls: "project-count", text: String(project.count) });
-    textSpan.appendText(" ");
 
     // Link to project file
     const link = item.createEl("a", {
@@ -345,7 +469,7 @@ export class TodoSidebarView extends ItemView {
 
     const header = section.createEl("div", { cls: "todo-section-header" });
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
-    titleSpan.innerHTML = `TODO <span class="todo-count">${todos.length}</span>`;
+    titleSpan.textContent = "TODO";
 
     if (todos.length === 0) {
       section.createEl("div", {
@@ -363,88 +487,7 @@ export class TodoSidebarView extends ItemView {
   }
 
   private renderTodoItem(list: HTMLElement, todo: TodoItem, isChild: boolean = false): void {
-    const hasFocus = todo.tags.includes("#focus");
-    const isHeader = todo.isHeader === true;
-    const hasChildren = isHeader && todo.childLineNumbers && todo.childLineNumbers.length > 0;
-
-    const itemClasses = [
-      'todo-item',
-      hasFocus ? 'todo-focus' : '',
-      isHeader ? 'todo-header' : '',
-      isChild ? 'todo-child' : '',
-      hasChildren ? 'todo-header-with-children' : ''
-    ].filter(c => c).join(' ');
-
-    const item = list.createEl("li", { cls: itemClasses });
-
-    // Add right-click context menu
-    item.addEventListener("contextmenu", (e) => {
-      e.preventDefault();
-      this.contextMenuHandler.showTodoMenu(e, todo, () => this.render());
-    });
-
-    // For headers with children, create a row container for the header content
-    const rowContainer = hasChildren
-      ? item.createEl("div", { cls: "todo-header-row" })
-      : item;
-
-    // Checkbox
-    const checkbox = rowContainer.createEl("input", {
-      type: "checkbox",
-      cls: "todo-checkbox",
-    });
-
-    checkbox.addEventListener("change", async () => {
-      checkbox.disabled = true;
-      const success = await this.processor.completeTodo(
-        todo,
-        this.defaultTodoneFile
-      );
-      if (!success) {
-        checkbox.disabled = false;
-      }
-      // Note: sidebar will auto-refresh via todos-updated event after scanner rescans
-    });
-
-    // Text content (strip markdown but keep tags)
-    const textSpan = rowContainer.createEl("span", { cls: "todo-text" });
-    const cleanText = todo.text.replace(/#todo\b/g, "").trim();
-    const displayText = this.stripMarkdownSyntax(cleanText);
-    this.renderTextWithTags(displayText, textSpan);
-
-    // For headers with children, append count inline with text
-    if (hasChildren) {
-      const childCount = todo.childLineNumbers!.length;
-      textSpan.createEl("span", { cls: "todo-count", text: ` ${childCount}` });
-    }
-    textSpan.appendText(" ");
-
-    // Link to source
-    const link = rowContainer.createEl("a", {
-      text: "→",
-      cls: "todo-link",
-      href: "#",
-    });
-
-    link.addEventListener("click", (e) => {
-      e.preventDefault();
-      this.openFileAtLine(todo.file, todo.lineNumber);
-    });
-
-    // If this is a header with children, render children indented below (outside the row)
-    if (hasChildren) {
-      const childrenContainer = item.createEl("ul", { cls: "todo-children" });
-      // Get children from scanner by line numbers
-      const allTodos = this.scanner.getTodos();
-      for (const childLine of todo.childLineNumbers!) {
-        const childTodo = allTodos.find(
-          t => t.filePath === todo.filePath && t.lineNumber === childLine
-        );
-        if (childTodo) {
-          this.renderTodoItem(childrenContainer, childTodo, true);
-        }
-      }
-    }
+    this.renderListItem(list, todo, this.todoConfig, isChild);
   }
 
   private renderRecentTodones(container: HTMLElement): void {
@@ -530,7 +573,10 @@ export class TodoSidebarView extends ItemView {
   }
 
   private renderPrinciples(container: HTMLElement): void {
-    const principles = this.scanner.getPrinciples();
+    let principles = this.scanner.getPrinciples();
+
+    // Filter out child items (they'll be rendered under their parent header)
+    principles = principles.filter(p => p.parentLineNumber === undefined);
 
     const section = container.createEl("div", { cls: "principles-section" });
 
@@ -539,7 +585,7 @@ export class TodoSidebarView extends ItemView {
     });
 
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
-    titleSpan.innerHTML = `Principles <span class="principle-count">${principles.length}</span>`;
+    titleSpan.textContent = "Principles";
 
     if (principles.length === 0) {
       section.createEl("div", {
@@ -557,34 +603,17 @@ export class TodoSidebarView extends ItemView {
   }
 
   private renderPrincipleItem(list: HTMLElement, principle: TodoItem): void {
-    const hasFocus = principle.tags.includes("#focus");
-    const item = list.createEl("li", { cls: `principle-item${hasFocus ? ' principle-focus' : ''}` });
-
-    // Text content (strip markdown but keep tags)
-    const textSpan = item.createEl("span", { cls: "principle-text" });
-    const cleanText = principle.text.replace(/#principle\b/g, "").trim();
-    const displayText = this.stripMarkdownSyntax(cleanText);
-    this.renderTextWithTags(displayText, textSpan);
-    textSpan.appendText(" ");
-
-    // Link to source
-    const link = item.createEl("a", {
-      text: "→",
-      cls: "principle-link",
-      href: "#",
-    });
-
-    link.addEventListener("click", (e) => {
-      e.preventDefault();
-      this.openFileAtLine(principle.file, principle.lineNumber);
-    });
+    this.renderListItem(list, principle, this.principleConfig);
   }
 
   private renderActiveIdeas(container: HTMLElement): void {
     let ideas = this.scanner.getIdeas();
 
-    // Filter out #future (snoozed) ideas if desired
+    // Filter out #future (snoozed) ideas
     ideas = ideas.filter(idea => !idea.tags.includes("#future"));
+
+    // Filter out child items (they'll be rendered under their parent header)
+    ideas = ideas.filter(idea => idea.parentLineNumber === undefined);
 
     // Sort by priority (focus first)
     ideas = this.sortTodosByPriority(ideas);
@@ -593,7 +622,7 @@ export class TodoSidebarView extends ItemView {
 
     const header = section.createEl("div", { cls: "todo-section-header" });
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
-    titleSpan.innerHTML = `Ideas <span class="idea-count">${ideas.length}</span>`;
+    titleSpan.textContent = "Ideas";
 
     if (ideas.length === 0) {
       section.createEl("div", {
@@ -611,48 +640,7 @@ export class TodoSidebarView extends ItemView {
   }
 
   private renderIdeaItem(list: HTMLElement, idea: TodoItem): void {
-    const hasFocus = idea.tags.includes("#focus");
-    const item = list.createEl("li", { cls: `idea-item${hasFocus ? ' idea-focus' : ''}` });
-
-    // Add right-click context menu for ideas
-    item.addEventListener("contextmenu", (e) => {
-      e.preventDefault();
-      this.contextMenuHandler.showIdeaMenu(e, idea, () => this.render());
-    });
-
-    // Checkbox - clicking completes (removes #idea tag)
-    const checkbox = item.createEl("input", {
-      type: "checkbox",
-      cls: "idea-checkbox",
-    });
-
-    checkbox.addEventListener("change", async () => {
-      checkbox.disabled = true;
-      const success = await this.processor.completeIdea(idea);
-      if (!success) {
-        checkbox.disabled = false;
-      }
-      // Note: sidebar will auto-refresh via todos-updated event after scanner rescans
-    });
-
-    // Text content (strip markdown but keep tags)
-    const textSpan = item.createEl("span", { cls: "idea-text" });
-    const cleanText = idea.text.replace(/#idea\b/g, "").trim();
-    const displayText = this.stripMarkdownSyntax(cleanText);
-    this.renderTextWithTags(displayText, textSpan);
-    textSpan.appendText(" ");
-
-    // Link to source
-    const link = item.createEl("a", {
-      text: "→",
-      cls: "idea-link",
-      href: "#",
-    });
-
-    link.addEventListener("click", (e) => {
-      e.preventDefault();
-      this.openFileAtLine(idea.file, idea.lineNumber);
-    });
+    this.renderListItem(list, idea, this.ideaConfig);
   }
 
   private async confirmCompleteProject(project: ProjectInfo): Promise<boolean> {

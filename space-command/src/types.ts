@@ -32,6 +32,16 @@ export interface ProjectInfo {
   highestPriority: number;
 }
 
+// Configuration for unified list item rendering in SidebarView
+export interface ItemRenderConfig {
+  type: 'todo' | 'idea' | 'principle';
+  classPrefix: string;
+  tagToStrip: RegExp;
+  showCheckbox: boolean;
+  onComplete?: (item: TodoItem) => Promise<boolean>;
+  onContextMenu?: (e: MouseEvent, item: TodoItem) => void;
+}
+
 export interface SpaceCommandSettings {
   defaultTodoneFile: string;
   showSidebarByDefault: boolean;

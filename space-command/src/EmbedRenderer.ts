@@ -186,9 +186,9 @@ export class EmbedRenderer {
     for (const project of projects) {
       const item = list.createEl("li", { cls: "focus-list-item" });
 
-      // Project tag with count
+      // Project tag
       const textSpan = item.createEl("span", { cls: "focus-project-text" });
-      textSpan.textContent = `${project.tag} (${project.count}) `;
+      textSpan.textContent = `${project.tag} `;
 
       // Link to project file
       const link = item.createEl("a", {

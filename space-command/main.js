@@ -233,6 +233,8 @@ var TodoScanner = class extends import_obsidian2.Events {
       const linesToSyncTodone = [];
       let inCodeBlock = false;
       let currentHeaderTodo = null;
+      let currentHeaderIdea = null;
+      let currentHeaderPrinciple = null;
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         if (line.trim().startsWith("```")) {
@@ -247,9 +249,15 @@ var TodoScanner = class extends import_obsidian2.Events {
         }
         const tags = extractTags(line);
         const headerInfo = this.detectHeader(line);
-        if (headerInfo && currentHeaderTodo) {
-          if (headerInfo.level <= currentHeaderTodo.level) {
+        if (headerInfo) {
+          if (currentHeaderTodo && headerInfo.level <= currentHeaderTodo.level) {
             currentHeaderTodo = null;
+          }
+          if (currentHeaderIdea && headerInfo.level <= currentHeaderIdea.level) {
+            currentHeaderIdea = null;
+          }
+          if (currentHeaderPrinciple && headerInfo.level <= currentHeaderPrinciple.level) {
+            currentHeaderPrinciple = null;
           }
         }
         if (headerInfo && tags.includes("#todo") && !tags.includes("#todone")) {
@@ -296,10 +304,38 @@ var TodoScanner = class extends import_obsidian2.Events {
           todones.push(this.createTodoItem(file, i, line, tags, "todone"));
         }
         if (tags.includes("#idea")) {
-          ideas.push(this.createTodoItem(file, i, line, tags, "idea"));
+          if (headerInfo) {
+            const headerIdea = this.createTodoItem(file, i, line, tags, "idea");
+            headerIdea.isHeader = true;
+            headerIdea.headerLevel = headerInfo.level;
+            headerIdea.childLineNumbers = [];
+            ideas.push(headerIdea);
+            currentHeaderIdea = { lineNumber: i, level: headerInfo.level, todoItem: headerIdea };
+          } else {
+            ideas.push(this.createTodoItem(file, i, line, tags, "idea"));
+          }
+        } else if (currentHeaderIdea && this.isListItem(line) && !tags.includes("#todo") && !tags.includes("#todone")) {
+          const childItem = this.createTodoItem(file, i, line, tags, "idea");
+          childItem.parentLineNumber = currentHeaderIdea.lineNumber;
+          currentHeaderIdea.todoItem.childLineNumbers.push(i);
+          ideas.push(childItem);
         }
         if (tags.includes("#principle")) {
-          principles.push(this.createTodoItem(file, i, line, tags, "principle"));
+          if (headerInfo) {
+            const headerPrinciple = this.createTodoItem(file, i, line, tags, "principle");
+            headerPrinciple.isHeader = true;
+            headerPrinciple.headerLevel = headerInfo.level;
+            headerPrinciple.childLineNumbers = [];
+            principles.push(headerPrinciple);
+            currentHeaderPrinciple = { lineNumber: i, level: headerInfo.level, todoItem: headerPrinciple };
+          } else {
+            principles.push(this.createTodoItem(file, i, line, tags, "principle"));
+          }
+        } else if (currentHeaderPrinciple && this.isListItem(line) && !tags.includes("#todo") && !tags.includes("#todone") && !tags.includes("#idea")) {
+          const childItem = this.createTodoItem(file, i, line, tags, "principle");
+          childItem.parentLineNumber = currentHeaderPrinciple.lineNumber;
+          currentHeaderPrinciple.todoItem.childLineNumbers.push(i);
+          principles.push(childItem);
         }
       }
       if (linesToCleanup.length > 0) {
@@ -1187,7 +1223,7 @@ var EmbedRenderer = class {
     for (const project of projects) {
       const item = list4.createEl("li", { cls: "focus-list-item" });
       const textSpan = item.createEl("span", { cls: "focus-project-text" });
-      textSpan.textContent = `${project.tag} (${project.count}) `;
+      textSpan.textContent = `${project.tag} `;
       const link2 = item.createEl("a", {
         text: "\u2192",
         cls: "focus-project-link",
@@ -1849,6 +1885,29 @@ var TodoSidebarView = class extends import_obsidian9.ItemView {
     super(leaf);
     this.updateListener = null;
     this.activeTab = "todos";
+    // Configuration for unified list item rendering
+    this.todoConfig = {
+      type: "todo",
+      classPrefix: "todo",
+      tagToStrip: /#todo\b/g,
+      showCheckbox: true,
+      onComplete: (item) => this.processor.completeTodo(item, this.defaultTodoneFile),
+      onContextMenu: (e, item) => this.contextMenuHandler.showTodoMenu(e, item, () => this.render())
+    };
+    this.ideaConfig = {
+      type: "idea",
+      classPrefix: "idea",
+      tagToStrip: /#idea\b/g,
+      showCheckbox: true,
+      onComplete: (item) => this.processor.completeIdea(item),
+      onContextMenu: (e, item) => this.contextMenuHandler.showIdeaMenu(e, item, () => this.render())
+    };
+    this.principleConfig = {
+      type: "principle",
+      classPrefix: "principle",
+      tagToStrip: /#principle\b/g,
+      showCheckbox: false
+    };
     this.scanner = scanner;
     this.processor = processor;
     this.projectManager = projectManager;
@@ -1901,6 +1960,81 @@ var TodoSidebarView = class extends import_obsidian9.ItemView {
     }
     if (lastIndex < text5.length) {
       container.appendText(text5.substring(lastIndex));
+    }
+  }
+  // Unified list item renderer for todos, ideas, and principles
+  renderListItem(list4, item, config, isChild = false) {
+    const hasFocus = item.tags.includes("#focus");
+    const isHeader = item.isHeader === true;
+    const hasChildren = isHeader && item.childLineNumbers && item.childLineNumbers.length > 0;
+    const itemClasses = [
+      `${config.classPrefix}-item`,
+      hasFocus ? `${config.classPrefix}-focus` : "",
+      isHeader ? `${config.classPrefix}-header` : "",
+      isChild ? `${config.classPrefix}-child` : "",
+      hasChildren ? `${config.classPrefix}-header-with-children` : ""
+    ].filter((c) => c).join(" ");
+    const listItem2 = list4.createEl("li", { cls: itemClasses });
+    if (config.onContextMenu) {
+      listItem2.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        config.onContextMenu(e, item);
+      });
+    }
+    const rowContainer = hasChildren ? listItem2.createEl("div", { cls: `${config.classPrefix}-header-row` }) : listItem2;
+    if (config.showCheckbox && config.onComplete) {
+      const checkbox = rowContainer.createEl("input", {
+        type: "checkbox",
+        cls: `${config.classPrefix}-checkbox`
+      });
+      checkbox.addEventListener("change", async () => {
+        checkbox.disabled = true;
+        const success = await config.onComplete(item);
+        if (!success) {
+          checkbox.disabled = false;
+        }
+      });
+    }
+    const textSpan = rowContainer.createEl("span", { cls: `${config.classPrefix}-text` });
+    const cleanText = item.text.replace(config.tagToStrip, "").trim();
+    const displayText = this.stripMarkdownSyntax(cleanText);
+    this.renderTextWithTags(displayText, textSpan);
+    if (hasChildren) {
+      const childCount = item.childLineNumbers.length;
+      textSpan.createEl("span", { cls: `${config.classPrefix}-count`, text: ` ${childCount}` });
+    }
+    textSpan.appendText(" ");
+    const link2 = rowContainer.createEl("a", {
+      text: "\u2192",
+      cls: `${config.classPrefix}-link`,
+      href: "#"
+    });
+    link2.addEventListener("click", (e) => {
+      e.preventDefault();
+      this.openFileAtLine(item.file, item.lineNumber);
+    });
+    if (hasChildren) {
+      const childrenContainer = listItem2.createEl("ul", { cls: `${config.classPrefix}-children` });
+      const allItems = this.getItemsForType(config.type);
+      for (const childLine of item.childLineNumbers) {
+        const childItem = allItems.find(
+          (t) => t.filePath === item.filePath && t.lineNumber === childLine
+        );
+        if (childItem) {
+          this.renderListItem(childrenContainer, childItem, config, true);
+        }
+      }
+    }
+  }
+  // Get all items of a given type for child lookup
+  getItemsForType(type) {
+    switch (type) {
+      case "todo":
+        return this.scanner.getTodos();
+      case "idea":
+        return this.scanner.getIdeas();
+      case "principle":
+        return this.scanner.getPrinciples();
     }
   }
   async onOpen() {
@@ -2010,7 +2144,7 @@ var TodoSidebarView = class extends import_obsidian9.ItemView {
       cls: "todo-section-header projects-header"
     });
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
-    titleSpan.innerHTML = `Focus <span class="project-count">${projects.length}</span>`;
+    titleSpan.textContent = "Focus";
     if (projects.length === 0) {
       section.createEl("div", {
         text: "No focus projects yet",
@@ -2045,8 +2179,6 @@ var TodoSidebarView = class extends import_obsidian9.ItemView {
     });
     const textSpan = item.createEl("span", { cls: "project-text" });
     textSpan.appendText(project.tag + " ");
-    textSpan.createEl("span", { cls: "project-count", text: String(project.count) });
-    textSpan.appendText(" ");
     const link2 = item.createEl("a", {
       text: "\u2192",
       cls: "project-link",
@@ -2065,7 +2197,7 @@ var TodoSidebarView = class extends import_obsidian9.ItemView {
     const section = container.createEl("div", { cls: "todo-section" });
     const header = section.createEl("div", { cls: "todo-section-header" });
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
-    titleSpan.innerHTML = `TODO <span class="todo-count">${todos.length}</span>`;
+    titleSpan.textContent = "TODO";
     if (todos.length === 0) {
       section.createEl("div", {
         text: "No TODOs",
@@ -2079,66 +2211,7 @@ var TodoSidebarView = class extends import_obsidian9.ItemView {
     }
   }
   renderTodoItem(list4, todo, isChild = false) {
-    const hasFocus = todo.tags.includes("#focus");
-    const isHeader = todo.isHeader === true;
-    const hasChildren = isHeader && todo.childLineNumbers && todo.childLineNumbers.length > 0;
-    const itemClasses = [
-      "todo-item",
-      hasFocus ? "todo-focus" : "",
-      isHeader ? "todo-header" : "",
-      isChild ? "todo-child" : "",
-      hasChildren ? "todo-header-with-children" : ""
-    ].filter((c) => c).join(" ");
-    const item = list4.createEl("li", { cls: itemClasses });
-    item.addEventListener("contextmenu", (e) => {
-      e.preventDefault();
-      this.contextMenuHandler.showTodoMenu(e, todo, () => this.render());
-    });
-    const rowContainer = hasChildren ? item.createEl("div", { cls: "todo-header-row" }) : item;
-    const checkbox = rowContainer.createEl("input", {
-      type: "checkbox",
-      cls: "todo-checkbox"
-    });
-    checkbox.addEventListener("change", async () => {
-      checkbox.disabled = true;
-      const success = await this.processor.completeTodo(
-        todo,
-        this.defaultTodoneFile
-      );
-      if (!success) {
-        checkbox.disabled = false;
-      }
-    });
-    const textSpan = rowContainer.createEl("span", { cls: "todo-text" });
-    const cleanText = todo.text.replace(/#todo\b/g, "").trim();
-    const displayText = this.stripMarkdownSyntax(cleanText);
-    this.renderTextWithTags(displayText, textSpan);
-    if (hasChildren) {
-      const childCount = todo.childLineNumbers.length;
-      textSpan.createEl("span", { cls: "todo-count", text: ` ${childCount}` });
-    }
-    textSpan.appendText(" ");
-    const link2 = rowContainer.createEl("a", {
-      text: "\u2192",
-      cls: "todo-link",
-      href: "#"
-    });
-    link2.addEventListener("click", (e) => {
-      e.preventDefault();
-      this.openFileAtLine(todo.file, todo.lineNumber);
-    });
-    if (hasChildren) {
-      const childrenContainer = item.createEl("ul", { cls: "todo-children" });
-      const allTodos = this.scanner.getTodos();
-      for (const childLine of todo.childLineNumbers) {
-        const childTodo = allTodos.find(
-          (t) => t.filePath === todo.filePath && t.lineNumber === childLine
-        );
-        if (childTodo) {
-          this.renderTodoItem(childrenContainer, childTodo, true);
-        }
-      }
-    }
+    this.renderListItem(list4, todo, this.todoConfig, isChild);
   }
   renderRecentTodones(container) {
     const allTodones = this.scanner.getTodones(100);
@@ -2204,13 +2277,14 @@ var TodoSidebarView = class extends import_obsidian9.ItemView {
     });
   }
   renderPrinciples(container) {
-    const principles = this.scanner.getPrinciples();
+    let principles = this.scanner.getPrinciples();
+    principles = principles.filter((p) => p.parentLineNumber === void 0);
     const section = container.createEl("div", { cls: "principles-section" });
     const header = section.createEl("div", {
       cls: "todo-section-header principles-header"
     });
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
-    titleSpan.innerHTML = `Principles <span class="principle-count">${principles.length}</span>`;
+    titleSpan.textContent = "Principles";
     if (principles.length === 0) {
       section.createEl("div", {
         text: "No principles yet",
@@ -2224,31 +2298,17 @@ var TodoSidebarView = class extends import_obsidian9.ItemView {
     }
   }
   renderPrincipleItem(list4, principle) {
-    const hasFocus = principle.tags.includes("#focus");
-    const item = list4.createEl("li", { cls: `principle-item${hasFocus ? " principle-focus" : ""}` });
-    const textSpan = item.createEl("span", { cls: "principle-text" });
-    const cleanText = principle.text.replace(/#principle\b/g, "").trim();
-    const displayText = this.stripMarkdownSyntax(cleanText);
-    this.renderTextWithTags(displayText, textSpan);
-    textSpan.appendText(" ");
-    const link2 = item.createEl("a", {
-      text: "\u2192",
-      cls: "principle-link",
-      href: "#"
-    });
-    link2.addEventListener("click", (e) => {
-      e.preventDefault();
-      this.openFileAtLine(principle.file, principle.lineNumber);
-    });
+    this.renderListItem(list4, principle, this.principleConfig);
   }
   renderActiveIdeas(container) {
     let ideas = this.scanner.getIdeas();
     ideas = ideas.filter((idea) => !idea.tags.includes("#future"));
+    ideas = ideas.filter((idea) => idea.parentLineNumber === void 0);
     ideas = this.sortTodosByPriority(ideas);
     const section = container.createEl("div", { cls: "ideas-section" });
     const header = section.createEl("div", { cls: "todo-section-header" });
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
-    titleSpan.innerHTML = `Ideas <span class="idea-count">${ideas.length}</span>`;
+    titleSpan.textContent = "Ideas";
     if (ideas.length === 0) {
       section.createEl("div", {
         text: "No ideas yet",
@@ -2262,37 +2322,7 @@ var TodoSidebarView = class extends import_obsidian9.ItemView {
     }
   }
   renderIdeaItem(list4, idea) {
-    const hasFocus = idea.tags.includes("#focus");
-    const item = list4.createEl("li", { cls: `idea-item${hasFocus ? " idea-focus" : ""}` });
-    item.addEventListener("contextmenu", (e) => {
-      e.preventDefault();
-      this.contextMenuHandler.showIdeaMenu(e, idea, () => this.render());
-    });
-    const checkbox = item.createEl("input", {
-      type: "checkbox",
-      cls: "idea-checkbox"
-    });
-    checkbox.addEventListener("change", async () => {
-      checkbox.disabled = true;
-      const success = await this.processor.completeIdea(idea);
-      if (!success) {
-        checkbox.disabled = false;
-      }
-    });
-    const textSpan = item.createEl("span", { cls: "idea-text" });
-    const cleanText = idea.text.replace(/#idea\b/g, "").trim();
-    const displayText = this.stripMarkdownSyntax(cleanText);
-    this.renderTextWithTags(displayText, textSpan);
-    textSpan.appendText(" ");
-    const link2 = item.createEl("a", {
-      text: "\u2192",
-      cls: "idea-link",
-      href: "#"
-    });
-    link2.addEventListener("click", (e) => {
-      e.preventDefault();
-      this.openFileAtLine(idea.file, idea.lineNumber);
-    });
+    this.renderListItem(list4, idea, this.ideaConfig);
   }
   async confirmCompleteProject(project) {
     return new Promise((resolve) => {
