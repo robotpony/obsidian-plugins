@@ -137,6 +137,12 @@ limit:10
 ```
 ````
 
+**Focus list** (shows projects with `#focus` items):
+````markdown
+```focus-list
+```
+````
+
 ### Header TODOs
 
 Add `#todo` to a header; all list items below become children:
@@ -152,21 +158,24 @@ Completing the header completes all children.
 
 ### Settings
 
-| Setting | Default |
-|---------|---------|
-| TODONE log file | `todos/done.md` |
-| Date format | `YYYY-MM-DD` |
-| Priority tags | `#p0,#p1,#p2,#p3,#p4` |
-| Recent TODONEs shown | 5 |
-| Show sidebar on startup | On |
+| Setting | Default | Description |
+|---------|---------|-------------|
+| TODONE log file | `todos/done.md` | File where completed TODOs are logged |
+| Date format | `YYYY-MM-DD` | Format for completion dates (moment.js) |
+| Default projects folder | `projects/` | Folder where new project files are created |
+| Focus list limit | `5` | Max projects shown in `{{focus-list}}` |
+| Priority tags | `#p0,#p1,#p2,#p3,#p4` | Tags excluded from Projects grouping |
+| Recent TODONEs shown | `5` | Max completed items in sidebar |
+| Show sidebar on startup | On | Open TODO sidebar when Obsidian starts |
 
-### Keyboard Shortcuts
+### Commands
 
-| Shortcut | Action |
-|----------|--------|
-| Cmd/Ctrl+Shift+T | Toggle sidebar |
-| Cmd/Ctrl+Shift+A | Add TODO at cursor |
-| Cmd/Ctrl+Shift+C | Copy as Slack markdown |
+| Command | Default Shortcut | Action |
+|---------|------------------|--------|
+| Toggle TODO Sidebar | Cmd/Ctrl+Shift+T | Show/hide the sidebar |
+| Quick Add TODO | Cmd/Ctrl+Shift+A | Insert TODO at cursor |
+| Copy as Slack Markdown | Cmd/Ctrl+Shift+C | Copy selection as Slack format |
+| Refresh TODOs | — | Manually rescan vault |
 
 ## Installation
 
