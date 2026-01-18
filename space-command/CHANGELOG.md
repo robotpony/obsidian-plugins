@@ -4,6 +4,12 @@ All notable changes to the ⌥⌘ Space Command plugin will be documented in thi
 
 ## [0.7.3] - 2026-01-18
 
+### Fixed
+
+- **Sidebar empty on startup**: Fixed race condition when Obsidian restores sidebar from previous session
+  - Sidebar now triggers vault scan if opened before plugin initialization completes
+  - Previously showed empty lists until manual refresh
+
 ### Improved
 
 - **Documentation**: Updated README with complete settings reference and commands

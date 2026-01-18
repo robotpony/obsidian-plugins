@@ -2014,7 +2014,15 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
   async onOpen() {
     this.updateListener = () => this.render();
     this.scanner.on("todos-updated", this.updateListener);
-    this.render();
+    const hasTodos = this.scanner.getTodos().length > 0;
+    const hasTodones = this.scanner.getTodones().length > 0;
+    const hasIdeas = this.scanner.getIdeas().length > 0;
+    const hasPrinciples = this.scanner.getPrinciples().length > 0;
+    if (!hasTodos && !hasTodones && !hasIdeas && !hasPrinciples) {
+      await this.scanner.scanVault();
+    } else {
+      this.render();
+    }
   }
   async onClose() {
     if (this.updateListener) {

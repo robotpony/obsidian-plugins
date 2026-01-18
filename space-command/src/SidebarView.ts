@@ -212,7 +212,21 @@ export class TodoSidebarView extends ItemView {
     this.updateListener = () => this.render();
     this.scanner.on("todos-updated", this.updateListener);
 
-    this.render();
+    // Check if scanner has data; if not, wait for initial scan to complete
+    // This handles the case where Obsidian restores the sidebar from layout
+    // before the plugin's scanVault() has finished
+    const hasTodos = this.scanner.getTodos().length > 0;
+    const hasTodones = this.scanner.getTodones().length > 0;
+    const hasIdeas = this.scanner.getIdeas().length > 0;
+    const hasPrinciples = this.scanner.getPrinciples().length > 0;
+
+    if (!hasTodos && !hasTodones && !hasIdeas && !hasPrinciples) {
+      // No data yet - scanner may still be initializing
+      // Trigger a scan and let the event listener handle the render
+      await this.scanner.scanVault();
+    } else {
+      this.render();
+    }
   }
 
   async onClose(): Promise<void> {
