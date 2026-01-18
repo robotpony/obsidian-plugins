@@ -1,4 +1,4 @@
-import { moment } from "obsidian";
+import { App, MarkdownView, TFile, WorkspaceLeaf, moment } from "obsidian";
 
 /** Logo prefix for Notice messages */
 export const LOGO_PREFIX = "⌥⌘";
@@ -66,4 +66,92 @@ export function removeIdeaTag(text: string): string {
 
 export function replaceIdeaWithTodo(text: string): string {
   return text.replace(/#idea\b/, "#todo");
+}
+
+/**
+ * Render text with tags safely using DOM methods (avoids XSS).
+ * Tags matching mutedTags get muted-pill styling; others get standard tag styling.
+ */
+export function renderTextWithTags(
+  text: string,
+  container: HTMLElement,
+  mutedTags: string[] = []
+): void {
+  const tagRegex = /(#[\w-]+)/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = tagRegex.exec(text)) !== null) {
+    // Add text before the tag
+    if (match.index > lastIndex) {
+      container.appendText(text.substring(lastIndex, match.index));
+    }
+
+    const tag = match[1];
+    if (mutedTags.length > 0 && mutedTags.includes(tag)) {
+      // Priority tag: use muted-pill styling
+      container.createEl("span", {
+        cls: "tag muted-pill",
+        text: tag,
+      });
+    } else {
+      // Regular tag: standard tag styling
+      container.createEl("span", {
+        cls: "tag",
+        text: tag,
+      });
+    }
+
+    lastIndex = tagRegex.lastIndex;
+  }
+
+  // Add remaining text after last tag
+  if (lastIndex < text.length) {
+    container.appendText(text.substring(lastIndex));
+  }
+}
+
+/**
+ * Highlight a line in the editor by selecting it temporarily.
+ */
+export function highlightLine(
+  editor: MarkdownView["editor"],
+  line: number
+): void {
+  const lineText = editor.getLine(line);
+  const lineLength = lineText.length;
+
+  // Select the entire line
+  editor.setSelection({ line, ch: 0 }, { line, ch: lineLength });
+
+  // Clear the selection after a delay to create a highlight effect
+  setTimeout(() => {
+    editor.setCursor({ line, ch: 0 });
+  }, 1500);
+}
+
+/**
+ * Open a file at a specific line and highlight it.
+ */
+export function openFileAtLine(
+  app: App,
+  file: TFile,
+  line: number
+): void {
+  const leaf = app.workspace.getLeaf(false);
+  leaf.openFile(file, { active: true }).then(() => {
+    const view = app.workspace.getActiveViewOfType(MarkdownView);
+    if (view?.editor) {
+      const editor = view.editor;
+
+      // Set cursor to the line
+      editor.setCursor({ line, ch: 0 });
+
+      // Scroll the line into view
+      editor.scrollIntoView({ from: { line, ch: 0 }, to: { line, ch: 0 } }, true);
+
+      // Highlight the line
+      highlightLine(editor, line);
+    }
+  });
 }

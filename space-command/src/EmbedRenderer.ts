@@ -1,11 +1,11 @@
-import { App, MarkdownView, TFile } from "obsidian";
+import { App, TFile } from "obsidian";
 import { TodoScanner } from "./TodoScanner";
 import { TodoProcessor } from "./TodoProcessor";
 import { ProjectManager } from "./ProjectManager";
 import { FilterParser } from "./FilterParser";
 import { ContextMenuHandler } from "./ContextMenuHandler";
 import { TodoItem } from "./types";
-import { getPriorityValue } from "./utils";
+import { getPriorityValue, renderTextWithTags, openFileAtLine } from "./utils";
 
 export class EmbedRenderer {
   private app: App;
@@ -421,7 +421,7 @@ export class EmbedRenderer {
 
     link.addEventListener("click", (e) => {
       e.preventDefault();
-      this.openFileAtLine(todo.file, todo.lineNumber);
+      openFileAtLine(this.app, todo.file, todo.lineNumber);
     });
 
     // If this is a header with children, render children indented below
@@ -459,7 +459,7 @@ export class EmbedRenderer {
       switch (token.type) {
         case 'text':
           // Check for priority tags in text and style them
-          this.renderTextWithTags(token.content, container, mutedTags);
+          renderTextWithTags(token.content, container, mutedTags);
           break;
         case 'bold':
           container.createEl('strong', { text: token.content });
@@ -480,42 +480,6 @@ export class EmbedRenderer {
     }
   }
 
-  // Render text content, applying muted-pill styling to priority tags
-  private renderTextWithTags(text: string, container: HTMLElement, mutedTags: string[]): void {
-    // Regex to find tags (words starting with #)
-    const tagRegex = /(#[\w-]+)/g;
-    let lastIndex = 0;
-    let match;
-
-    while ((match = tagRegex.exec(text)) !== null) {
-      // Add text before the tag
-      if (match.index > lastIndex) {
-        container.appendText(text.substring(lastIndex, match.index));
-      }
-
-      const tag = match[1];
-      if (mutedTags.includes(tag)) {
-        // Priority tag: use muted-pill styling
-        container.createEl('span', {
-          cls: 'tag muted-pill',
-          text: tag,
-        });
-      } else {
-        // Regular tag: still style as tag but without muted-pill
-        container.createEl('span', {
-          cls: 'tag',
-          text: tag,
-        });
-      }
-
-      lastIndex = tagRegex.lastIndex;
-    }
-
-    // Add remaining text after last tag
-    if (lastIndex < text.length) {
-      container.appendText(text.substring(lastIndex));
-    }
-  }
 
   // Parse markdown into tokens for safe rendering
   private parseMarkdownTokens(text: string): Array<{
@@ -659,39 +623,4 @@ export class EmbedRenderer {
     this.renderTodoList(container, combined, todoneFile, filterString, unfiltered);
   }
 
-  private openFileAtLine(file: TFile, line: number): void {
-    const leaf = this.app.workspace.getLeaf(false);
-    leaf.openFile(file, { active: true }).then(() => {
-      const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-      if (view?.editor) {
-        const editor = view.editor;
-
-        // Set cursor to the line
-        editor.setCursor({ line, ch: 0 });
-
-        // Scroll the line into view
-        editor.scrollIntoView({ from: { line, ch: 0 }, to: { line, ch: 0 } }, true);
-
-        // Highlight the line
-        this.highlightLine(editor, line);
-      }
-    });
-  }
-
-  private highlightLine(editor: MarkdownView["editor"], line: number): void {
-    // Get the line length
-    const lineText = editor.getLine(line);
-    const lineLength = lineText.length;
-
-    // Select the entire line
-    editor.setSelection(
-      { line, ch: 0 },
-      { line, ch: lineLength }
-    );
-
-    // Clear the selection after a delay to create a highlight effect
-    setTimeout(() => {
-      editor.setCursor({ line, ch: 0 });
-    }, 1500);
-  }
 }

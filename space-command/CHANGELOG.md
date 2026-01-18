@@ -2,6 +2,24 @@
 
 All notable changes to the ⌥⌘ Space Command plugin will be documented in this file.
 
+## [0.7.3] - 2026-01-18
+
+### Improved
+
+- **Documentation**: Updated README with complete settings reference and commands
+  - Added missing settings: Default projects folder, Focus list limit
+  - Added descriptions to all settings
+  - Documented `{{focus-list}}` embed syntax
+  - Added Refresh TODOs command to commands table
+
+### Technical
+
+- **Reduced code duplication**: Extracted shared utilities from EmbedRenderer and SidebarView
+  - `openFileAtLine()` - opens file and navigates to specific line
+  - `highlightLine()` - temporarily highlights a line in editor
+  - `renderTextWithTags()` - safely renders text with tag styling (XSS-safe)
+  - Removed ~90 lines of duplicated code
+
 ## [0.7.2] - 2026-01-15
 
 ### Changed

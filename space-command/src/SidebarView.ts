@@ -1,10 +1,10 @@
-import { ItemView, WorkspaceLeaf, TFile, Menu, Notice, Modal, MarkdownView } from "obsidian";
+import { ItemView, WorkspaceLeaf, TFile, Menu, Notice, Modal } from "obsidian";
 import { TodoScanner } from "./TodoScanner";
 import { TodoProcessor } from "./TodoProcessor";
 import { ProjectManager } from "./ProjectManager";
 import { TodoItem, ProjectInfo, ItemRenderConfig } from "./types";
 import { ContextMenuHandler } from "./ContextMenuHandler";
-import { getPriorityValue, LOGO_PREFIX } from "./utils";
+import { getPriorityValue, LOGO_PREFIX, renderTextWithTags, openFileAtLine } from "./utils";
 
 export const VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 
@@ -106,30 +106,6 @@ export class TodoSidebarView extends ItemView {
     showCheckbox: false
   };
 
-  // Render text with tags safely using DOM methods (avoids XSS)
-  private renderTextWithTags(text: string, container: HTMLElement): void {
-    const tagRegex = /(#[\w-]+)/g;
-    let lastIndex = 0;
-    let match;
-
-    while ((match = tagRegex.exec(text)) !== null) {
-      // Add text before the tag
-      if (match.index > lastIndex) {
-        container.appendText(text.substring(lastIndex, match.index));
-      }
-      // Add the tag as a styled span
-      container.createEl("span", {
-        cls: "tag",
-        text: match[1],
-      });
-      lastIndex = tagRegex.lastIndex;
-    }
-
-    // Add remaining text after last tag
-    if (lastIndex < text.length) {
-      container.appendText(text.substring(lastIndex));
-    }
-  }
 
   // Unified list item renderer for todos, ideas, and principles
   private renderListItem(
@@ -186,7 +162,7 @@ export class TodoSidebarView extends ItemView {
     const textSpan = rowContainer.createEl("span", { cls: `${config.classPrefix}-text` });
     const cleanText = item.text.replace(config.tagToStrip, "").trim();
     const displayText = this.stripMarkdownSyntax(cleanText);
-    this.renderTextWithTags(displayText, textSpan);
+    renderTextWithTags(displayText, textSpan);
 
     // For headers with children, append count inline with text
     if (hasChildren) {
@@ -204,7 +180,7 @@ export class TodoSidebarView extends ItemView {
 
     link.addEventListener("click", (e) => {
       e.preventDefault();
-      this.openFileAtLine(item.file, item.lineNumber);
+      openFileAtLine(this.app, item.file, item.lineNumber);
     });
 
     // If this is a header with children, render children indented below
@@ -556,7 +532,7 @@ export class TodoSidebarView extends ItemView {
     const textSpan = item.createEl("span", { cls: "todo-text todone-text" });
     const cleanText = todone.text.replace(/#todone\b/g, "").trim();
     const displayText = this.stripMarkdownSyntax(cleanText);
-    this.renderTextWithTags(displayText, textSpan);
+    renderTextWithTags(displayText, textSpan);
     textSpan.appendText(" ");
 
     // Link to source
@@ -568,7 +544,7 @@ export class TodoSidebarView extends ItemView {
 
     link.addEventListener("click", (e) => {
       e.preventDefault();
-      this.openFileAtLine(todone.file, todone.lineNumber);
+      openFileAtLine(this.app, todone.file, todone.lineNumber);
     });
   }
 
@@ -708,39 +684,4 @@ export class TodoSidebarView extends ItemView {
     // Note: sidebar will auto-refresh via todos-updated event after scanner rescans
   }
 
-  private openFileAtLine(file: TFile, line: number): void {
-    const leaf = this.app.workspace.getLeaf(false);
-    leaf.openFile(file, { active: true }).then(() => {
-      const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-      if (view?.editor) {
-        const editor = view.editor;
-
-        // Set cursor to the line
-        editor.setCursor({ line, ch: 0 });
-
-        // Scroll the line into view
-        editor.scrollIntoView({ from: { line, ch: 0 }, to: { line, ch: 0 } }, true);
-
-        // Highlight the line
-        this.highlightLine(editor, line);
-      }
-    });
-  }
-
-  private highlightLine(editor: any, line: number): void {
-    // Get the line length
-    const lineText = editor.getLine(line);
-    const lineLength = lineText.length;
-
-    // Select the entire line
-    editor.setSelection(
-      { line, ch: 0 },
-      { line, ch: lineLength }
-    );
-
-    // Clear the selection after a delay to create a highlight effect
-    setTimeout(() => {
-      editor.setCursor({ line, ch: 0 });
-    }, 1500);
-  }
 }
