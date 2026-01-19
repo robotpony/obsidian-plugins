@@ -903,7 +903,19 @@ var ProjectManager = class {
     const todos = this.scanner.getTodos();
     const projectMap = /* @__PURE__ */ new Map();
     for (const todo of todos) {
-      const excludedTags = /* @__PURE__ */ new Set(["#todo", "#todone", "#future", "#focus", ...this.priorityTags]);
+      const excludedTags = /* @__PURE__ */ new Set([
+        "#todo",
+        "#todos",
+        "#todone",
+        "#todones",
+        "#idea",
+        "#ideas",
+        "#principle",
+        "#principles",
+        "#future",
+        "#focus",
+        ...this.priorityTags
+      ]);
       const projectTags = todo.tags.filter((tag) => !excludedTags.has(tag));
       const todoPriority = getPriorityValue(todo.tags);
       for (const tag of projectTags) {
@@ -1925,7 +1937,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     return VIEW_TYPE_TODO_SIDEBAR;
   }
   getDisplayText() {
-    return "\u2423\u2318 TODOs";
+    return this.activeTab === "todos" ? "\u2423\u2318 TODOs" : "\u2423\u2318 IDEAs";
   }
   getIcon() {
     return "checkbox-glyph";
@@ -2107,7 +2119,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     const headerDiv = container.createEl("div", { cls: "sidebar-header" });
     const titleEl = headerDiv.createEl("h4", { cls: "sidebar-title" });
     titleEl.createEl("span", { cls: "space-command-logo", text: "\u2423\u2318" });
-    titleEl.appendText(" Space Command");
+    titleEl.appendText(this.activeTab === "todos" ? " TODOs" : " IDEAs");
     const tabNav = headerDiv.createEl("div", { cls: "sidebar-tab-nav" });
     const todosTab = tabNav.createEl("button", {
       cls: `sidebar-tab-btn ${this.activeTab === "todos" ? "active" : ""}`,
