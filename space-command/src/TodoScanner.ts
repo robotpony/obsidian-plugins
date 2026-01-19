@@ -101,8 +101,8 @@ export class TodoScanner extends Events {
           }
         }
 
-        // Process header with #todo tag
-        if (headerInfo && tags.includes("#todo") && !tags.includes("#todone")) {
+        // Process header with #todo or #todos tag
+        if (headerInfo && (tags.includes("#todo") || tags.includes("#todos")) && !tags.includes("#todone") && !tags.includes("#todones")) {
           const headerTodo = this.createTodoItem(file, i, line, tags, 'todo');
           headerTodo.isHeader = true;
           headerTodo.headerLevel = headerInfo.level;
@@ -112,8 +112,8 @@ export class TodoScanner extends Events {
           continue;
         }
 
-        // Process header with #todone tag
-        if (headerInfo && tags.includes("#todone")) {
+        // Process header with #todone or #todones tag
+        if (headerInfo && (tags.includes("#todone") || tags.includes("#todones"))) {
           const headerTodone = this.createTodoItem(file, i, line, tags, 'todone');
           headerTodone.isHeader = true;
           headerTodone.headerLevel = headerInfo.level;
@@ -154,19 +154,21 @@ export class TodoScanner extends Events {
 
         // Regular TODO/TODONE processing (non-header, non-child items)
         // If line has both #todo and #todone, #todone wins and we clean up the #todo
-        if (tags.includes("#todone") && tags.includes("#todo")) {
+        const hasTodo = tags.includes("#todo") || tags.includes("#todos");
+        const hasTodone = tags.includes("#todone") || tags.includes("#todones");
+        if (hasTodone && hasTodo) {
           // Queue this line for cleanup (remove #todo tag)
           linesToCleanup.push(i);
           // Treat as completed
           todones.push(this.createTodoItem(file, i, line, tags, 'todone'));
-        } else if (tags.includes("#todo")) {
+        } else if (hasTodo) {
           todos.push(this.createTodoItem(file, i, line, tags, 'todo'));
-        } else if (tags.includes("#todone")) {
+        } else if (hasTodone) {
           todones.push(this.createTodoItem(file, i, line, tags, 'todone'));
         }
 
         // Idea processing - handle headers with children
-        if (tags.includes("#idea")) {
+        if (tags.includes("#idea") || tags.includes("#ideas")) {
           if (headerInfo) {
             // Header with #idea tag
             const headerIdea = this.createTodoItem(file, i, line, tags, 'idea');
@@ -188,7 +190,7 @@ export class TodoScanner extends Events {
         }
 
         // Principle processing - handle headers with children
-        if (tags.includes("#principle")) {
+        if (tags.includes("#principle") || tags.includes("#principles")) {
           if (headerInfo) {
             // Header with #principle tag
             const headerPrinciple = this.createTodoItem(file, i, line, tags, 'principle');
@@ -267,14 +269,16 @@ export class TodoScanner extends Events {
   }
 
   private isInInlineCode(line: string): boolean {
-    // Check if #todo, #todone, or #focus appears within backticks
+    // Check if #todo, #todone, #idea, #principle, or #focus appears within backticks
     // This handles inline code like `#todo` or `some code #focus here`
 
-    // Find all #todo, #todone, and #focus positions
-    const todoMatches = [...line.matchAll(/#todo\b/g)];
-    const todoneMatches = [...line.matchAll(/#todone\b/g)];
+    // Find all tag positions (including plural forms)
+    const todoMatches = [...line.matchAll(/#todos?\b/g)];
+    const todoneMatches = [...line.matchAll(/#todones?\b/g)];
+    const ideaMatches = [...line.matchAll(/#ideas?\b/g)];
+    const principleMatches = [...line.matchAll(/#principles?\b/g)];
     const focusMatches = [...line.matchAll(/#focus\b/g)];
-    const allMatches = [...todoMatches, ...todoneMatches, ...focusMatches];
+    const allMatches = [...todoMatches, ...todoneMatches, ...ideaMatches, ...principleMatches, ...focusMatches];
 
     if (allMatches.length === 0) {
       return false;

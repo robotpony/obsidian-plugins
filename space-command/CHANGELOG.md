@@ -2,6 +2,14 @@
 
 All notable changes to the ⌥⌘ Space Command plugin will be documented in this file.
 
+## [0.7.6] - 2026-01-19
+
+### Added
+
+- **Plural tag variants**: `#todos`, `#ideas`, `#principles`, and `#todones` now work as synonyms for their singular forms
+  - Useful for header-block lists where plural reads more naturally (e.g., `## Project #todos`)
+  - Both forms are stripped from display in sidebar
+
 ## [0.7.5] - 2026-01-19
 
 ### Added

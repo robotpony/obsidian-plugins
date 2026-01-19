@@ -86,7 +86,7 @@ export class TodoSidebarView extends ItemView {
   private readonly todoConfig: ItemRenderConfig = {
     type: 'todo',
     classPrefix: 'todo',
-    tagToStrip: /#todo\b/g,
+    tagToStrip: /#todos?\b/g,
     showCheckbox: true,
     onComplete: (item) => this.processor.completeTodo(item, this.defaultTodoneFile),
     onContextMenu: (e, item) => this.contextMenuHandler.showTodoMenu(e, item, () => this.render())
@@ -95,7 +95,7 @@ export class TodoSidebarView extends ItemView {
   private readonly ideaConfig: ItemRenderConfig = {
     type: 'idea',
     classPrefix: 'idea',
-    tagToStrip: /#idea\b/g,
+    tagToStrip: /#ideas?\b/g,
     showCheckbox: true,
     onComplete: (item) => this.processor.completeIdea(item),
     onContextMenu: (e, item) => this.contextMenuHandler.showIdeaMenu(e, item, () => this.render())
@@ -104,7 +104,7 @@ export class TodoSidebarView extends ItemView {
   private readonly principleConfig: ItemRenderConfig = {
     type: 'principle',
     classPrefix: 'principle',
-    tagToStrip: /#principle\b/g,
+    tagToStrip: /#principles?\b/g,
     showCheckbox: false
   };
 
@@ -639,7 +639,7 @@ export class TodoSidebarView extends ItemView {
 
     // Text content (strip markdown and tags for display)
     const textSpan = item.createEl("span", { cls: "todo-text todone-text" });
-    const cleanText = todone.text.replace(/#todone\b/g, "").trim();
+    const cleanText = todone.text.replace(/#todones?\b/g, "").trim();
     const displayText = this.stripMarkdownSyntax(cleanText);
     // Strip all tags from display text (they'll be in the dropdown)
     const textWithoutTags = displayText.replace(/#[\w-]+/g, "").replace(/\s+/g, " ").trim();

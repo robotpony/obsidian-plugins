@@ -8,7 +8,7 @@ Your notes are full of TODOs—action items from meetings, tasks buried in proje
 
 **Principles:**
 
-- **Markdown-native**: Just `#todo` tags. Works with grep, git, scripts, whatever you use.
+- **Markdown-native**: Just `#todo` (or `#todos`) tags. Works with grep, git, scripts, whatever you use.
 - **Work in your notes**: TODOs stay in context, not a separate app.
 - **No lock-in**: Plain text. Stop using the plugin anytime; your notes stay unchanged.
 - **One vault, one focus**: This is your working list, not your life system.
@@ -43,8 +43,8 @@ Capture ideas separately from actionable TODOs. The sidebar has two tabs:
 
 | Tag | Purpose |
 |-----|---------|
-| `#idea` | An idea to capture (not yet actionable) |
-| `#principle` | A guiding principle (displayed in italics, no actions) |
+| `#idea` / `#ideas` | An idea to capture (not yet actionable) |
+| `#principle` / `#principles` | A guiding principle (displayed in italics, no actions) |
 
 ```markdown
 - What if we cached API responses? #idea #api
@@ -151,7 +151,7 @@ limit:10
 
 ### Header TODOs
 
-Add `#todo` to a header; all list items below become children:
+Add `#todo` (or `#todos`) to a header; all list items below become children:
 
 ```markdown
 ## Sprint 12 Tasks #todo

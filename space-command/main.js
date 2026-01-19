@@ -306,7 +306,7 @@ var TodoScanner = class extends import_obsidian2.Events {
             currentHeaderPrinciple = null;
           }
         }
-        if (headerInfo && tags.includes("#todo") && !tags.includes("#todone")) {
+        if (headerInfo && (tags.includes("#todo") || tags.includes("#todos")) && !tags.includes("#todone") && !tags.includes("#todones")) {
           const headerTodo = this.createTodoItem(file, i, line, tags, "todo");
           headerTodo.isHeader = true;
           headerTodo.headerLevel = headerInfo.level;
@@ -315,7 +315,7 @@ var TodoScanner = class extends import_obsidian2.Events {
           currentHeaderTodo = { lineNumber: i, level: headerInfo.level, todoItem: headerTodo };
           continue;
         }
-        if (headerInfo && tags.includes("#todone")) {
+        if (headerInfo && (tags.includes("#todone") || tags.includes("#todones"))) {
           const headerTodone = this.createTodoItem(file, i, line, tags, "todone");
           headerTodone.isHeader = true;
           headerTodone.headerLevel = headerInfo.level;
@@ -341,15 +341,17 @@ var TodoScanner = class extends import_obsidian2.Events {
           }
           continue;
         }
-        if (tags.includes("#todone") && tags.includes("#todo")) {
+        const hasTodo = tags.includes("#todo") || tags.includes("#todos");
+        const hasTodone = tags.includes("#todone") || tags.includes("#todones");
+        if (hasTodone && hasTodo) {
           linesToCleanup.push(i);
           todones.push(this.createTodoItem(file, i, line, tags, "todone"));
-        } else if (tags.includes("#todo")) {
+        } else if (hasTodo) {
           todos.push(this.createTodoItem(file, i, line, tags, "todo"));
-        } else if (tags.includes("#todone")) {
+        } else if (hasTodone) {
           todones.push(this.createTodoItem(file, i, line, tags, "todone"));
         }
-        if (tags.includes("#idea")) {
+        if (tags.includes("#idea") || tags.includes("#ideas")) {
           if (headerInfo) {
             const headerIdea = this.createTodoItem(file, i, line, tags, "idea");
             headerIdea.isHeader = true;
@@ -366,7 +368,7 @@ var TodoScanner = class extends import_obsidian2.Events {
           currentHeaderIdea.todoItem.childLineNumbers.push(i);
           ideas.push(childItem);
         }
-        if (tags.includes("#principle")) {
+        if (tags.includes("#principle") || tags.includes("#principles")) {
           if (headerInfo) {
             const headerPrinciple = this.createTodoItem(file, i, line, tags, "principle");
             headerPrinciple.isHeader = true;
@@ -428,10 +430,12 @@ var TodoScanner = class extends import_obsidian2.Events {
     return /^[\s]*[-*+]\s/.test(line) || /^[\s]*\d+\.\s/.test(line);
   }
   isInInlineCode(line) {
-    const todoMatches = [...line.matchAll(/#todo\b/g)];
-    const todoneMatches = [...line.matchAll(/#todone\b/g)];
+    const todoMatches = [...line.matchAll(/#todos?\b/g)];
+    const todoneMatches = [...line.matchAll(/#todones?\b/g)];
+    const ideaMatches = [...line.matchAll(/#ideas?\b/g)];
+    const principleMatches = [...line.matchAll(/#principles?\b/g)];
     const focusMatches = [...line.matchAll(/#focus\b/g)];
-    const allMatches = [...todoMatches, ...todoneMatches, ...focusMatches];
+    const allMatches = [...todoMatches, ...todoneMatches, ...ideaMatches, ...principleMatches, ...focusMatches];
     if (allMatches.length === 0) {
       return false;
     }
@@ -1887,7 +1891,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     this.todoConfig = {
       type: "todo",
       classPrefix: "todo",
-      tagToStrip: /#todo\b/g,
+      tagToStrip: /#todos?\b/g,
       showCheckbox: true,
       onComplete: (item) => this.processor.completeTodo(item, this.defaultTodoneFile),
       onContextMenu: (e, item) => this.contextMenuHandler.showTodoMenu(e, item, () => this.render())
@@ -1895,7 +1899,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     this.ideaConfig = {
       type: "idea",
       classPrefix: "idea",
-      tagToStrip: /#idea\b/g,
+      tagToStrip: /#ideas?\b/g,
       showCheckbox: true,
       onComplete: (item) => this.processor.completeIdea(item),
       onContextMenu: (e, item) => this.contextMenuHandler.showIdeaMenu(e, item, () => this.render())
@@ -1903,7 +1907,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     this.principleConfig = {
       type: "principle",
       classPrefix: "principle",
-      tagToStrip: /#principle\b/g,
+      tagToStrip: /#principles?\b/g,
       showCheckbox: false
     };
     this.scanner = scanner;
@@ -2316,7 +2320,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       }
     });
     const textSpan = item.createEl("span", { cls: "todo-text todone-text" });
-    const cleanText = todone.text.replace(/#todone\b/g, "").trim();
+    const cleanText = todone.text.replace(/#todones?\b/g, "").trim();
     const displayText = this.stripMarkdownSyntax(cleanText);
     const textWithoutTags = displayText.replace(/#[\w-]+/g, "").replace(/\s+/g, " ").trim();
     textSpan.appendText(textWithoutTags);
