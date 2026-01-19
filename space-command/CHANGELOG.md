@@ -2,6 +2,17 @@
 
 All notable changes to the ⌥⌘ Space Command plugin will be documented in this file.
 
+## [0.7.5] - 2026-01-19
+
+### Changed
+
+- **Tag dropdown trigger styled as tag**: The `#` trigger now uses Obsidian's native tag CSS variables for consistent appearance
+- **Tag dropdown flows inline**: Tag dropdown trigger now appears inline after item text instead of floating right
+
+### Removed
+
+- **Removed count badge from sidebar headers**: The child count chicklet (e.g., "16") no longer displays on header items
+
 ## [0.7.4] - 2026-01-18
 
 ### Added

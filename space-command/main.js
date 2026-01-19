@@ -1976,10 +1976,6 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     const displayText = this.stripMarkdownSyntax(cleanText);
     const textWithoutTags = displayText.replace(/#[\w-]+/g, "").replace(/\s+/g, " ").trim();
     textSpan.appendText(textWithoutTags);
-    if (hasChildren) {
-      const childCount = item.childLineNumbers.length;
-      textSpan.createEl("span", { cls: `${config.classPrefix}-count`, text: ` ${childCount}` });
-    }
     textSpan.appendText(" ");
     const tags = extractTags(cleanText).filter((tag) => !config.tagToStrip.test(tag));
     this.renderTagDropdown(tags, rowContainer);

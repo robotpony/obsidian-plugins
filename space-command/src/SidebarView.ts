@@ -168,16 +168,12 @@ export class TodoSidebarView extends ItemView {
     const textWithoutTags = displayText.replace(/#[\w-]+/g, "").replace(/\s+/g, " ").trim();
     textSpan.appendText(textWithoutTags);
 
-    // For headers with children, append count inline with text
-    if (hasChildren) {
-      const childCount = item.childLineNumbers!.length;
-      textSpan.createEl("span", { cls: `${config.classPrefix}-count`, text: ` ${childCount}` });
-    }
-    textSpan.appendText(" ");
-
-    // Get tags (excluding the type tag) and render dropdown
+    // Get tags (excluding the type tag) and render dropdown inside text span
     const tags = extractTags(cleanText).filter(tag => !config.tagToStrip.test(tag));
-    this.renderTagDropdown(tags, rowContainer);
+    if (tags.length > 0) {
+      textSpan.appendText(" ");
+      this.renderTagDropdown(tags, textSpan);
+    }
 
     // Link to source
     const link = rowContainer.createEl("a", {

@@ -673,20 +673,23 @@
   opacity: 0.9;
 }
 
-/* Tag dropdown styles */
+/* Tag dropdown styles - styled to match Obsidian's tag appearance */
 .tag-dropdown-trigger {
   cursor: pointer;
-  opacity: 0.6;
-  font-size: 0.85em;
-  padding: 1px 4px;
-  border-radius: 3px;
-  margin-right: 4px;
+  font-size: 9pt;
+  font-family: var(--font-monospace);
+  opacity: 0.85;
+  color: var(--tag-color);
+  background-color: var(--tag-background);
+  padding: var(--tag-padding-y) var(--tag-padding-x);
+  border-radius: var(--tag-radius);
   transition: opacity 0.15s, background-color 0.15s;
 }
 
 .tag-dropdown-trigger:hover {
   opacity: 1;
-  background-color: var(--background-modifier-hover);
+  color: var(--tag-color-hover);
+  background-color: var(--tag-background-hover);
 }
 
 .tag-dropdown-menu {
