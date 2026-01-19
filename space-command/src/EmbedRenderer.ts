@@ -395,10 +395,11 @@ export class EmbedRenderer {
     }
     // Remove leading checkbox if present
     let displayText = cleanText.replace(/^-\s*\[\s*\]\s*/, "").replace(/^-\s*\[x\]\s*/i, "");
-    // Remove block-level markdown markers (list bullets, quotes)
+    // Remove block-level markdown markers (headings, list bullets, quotes)
     displayText = displayText
-      .replace(/^[*\-+]\s+/, "")  // Remove list markers
-      .replace(/^>\s+/, "");       // Remove quote markers
+      .replace(/^#{1,6}\s+/, "")   // Remove heading markers
+      .replace(/^[*\-+]\s+/, "")   // Remove list markers
+      .replace(/^>\s+/, "");        // Remove quote markers
 
     // Render inline markdown manually to avoid extra <p> tags
     this.renderInlineMarkdown(displayText, textSpan);

@@ -58,9 +58,16 @@ export class FilterParser {
     // Apply tags filter
     if (filters.tags && filters.tags.length > 0) {
       filtered = filtered.filter((todo) => {
+        // Explicit tags from the item
         const todoTags = todo.tags.map((t) => t.toLowerCase());
+
+        // Add implicit file tag (filename without extension, spaces to dashes, lowercased)
+        const filename = todo.file.basename.toLowerCase().replace(/\s+/g, "-");
+        const implicitFileTag = `#${filename}`;
+        const effectiveTags = [...todoTags, implicitFileTag];
+
         return filters.tags!.every((filterTag) =>
-          todoTags.includes(filterTag.toLowerCase())
+          effectiveTags.includes(filterTag.toLowerCase())
         );
       });
     }

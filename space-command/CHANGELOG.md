@@ -4,14 +4,22 @@ All notable changes to the ⌥⌘ Space Command plugin will be documented in thi
 
 ## [0.7.5] - 2026-01-19
 
+### Added
+
+- **Implicit file tags for filtering**: TODOs in a file now implicitly match a tag derived from the filename
+  - Example: TODOs in `workflow-automation.md` match the filter `tags:#workflow-automation`
+  - Filenames with spaces are converted to dashes (e.g., `my project.md` → `#my-project`)
+  - Only affects embed filtering; explicit tags in sidebar remain unchanged
+
 ### Changed
 
 - **Tag dropdown trigger styled as tag**: The `#` trigger now uses Obsidian's native tag CSS variables for consistent appearance
 - **Tag dropdown flows inline**: Tag dropdown trigger now appears inline after item text instead of floating right
-
-### Removed
-
 - **Removed count badge from sidebar headers**: The child count chicklet (e.g., "16") no longer displays on header items
+
+### Fixed
+
+- **Header markdown in embeds**: Heading markers (`###`) now stripped from header TODO text in embedded lists
 
 ## [0.7.4] - 2026-01-18
 

@@ -1011,8 +1011,11 @@ var FilterParser = class {
     if (filters.tags && filters.tags.length > 0) {
       filtered = filtered.filter((todo) => {
         const todoTags = todo.tags.map((t) => t.toLowerCase());
+        const filename = todo.file.basename.toLowerCase().replace(/\s+/g, "-");
+        const implicitFileTag = `#${filename}`;
+        const effectiveTags = [...todoTags, implicitFileTag];
         return filters.tags.every(
-          (filterTag) => todoTags.includes(filterTag.toLowerCase())
+          (filterTag) => effectiveTags.includes(filterTag.toLowerCase())
         );
       });
     }
@@ -1397,7 +1400,7 @@ var EmbedRenderer = class {
       cleanText = cleanText.replace(/@\d{4}-\d{2}-\d{2}/, "").trim();
     }
     let displayText = cleanText.replace(/^-\s*\[\s*\]\s*/, "").replace(/^-\s*\[x\]\s*/i, "");
-    displayText = displayText.replace(/^[*\-+]\s+/, "").replace(/^>\s+/, "");
+    displayText = displayText.replace(/^#{1,6}\s+/, "").replace(/^[*\-+]\s+/, "").replace(/^>\s+/, "");
     this.renderInlineMarkdown(displayText, textSpan);
     textSpan.append(" ");
     if (completionDate) {
@@ -1976,9 +1979,11 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     const displayText = this.stripMarkdownSyntax(cleanText);
     const textWithoutTags = displayText.replace(/#[\w-]+/g, "").replace(/\s+/g, " ").trim();
     textSpan.appendText(textWithoutTags);
-    textSpan.appendText(" ");
     const tags = extractTags(cleanText).filter((tag) => !config.tagToStrip.test(tag));
-    this.renderTagDropdown(tags, rowContainer);
+    if (tags.length > 0) {
+      textSpan.appendText(" ");
+      this.renderTagDropdown(tags, textSpan);
+    }
     const link2 = rowContainer.createEl("a", {
       text: "\u2192",
       cls: `${config.classPrefix}-link`,
