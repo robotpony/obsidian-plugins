@@ -15,6 +15,9 @@ All notable changes to the ⌥⌘ Space Command plugin will be documented in thi
 - **Sidebar empty on startup**: Fixed race condition when Obsidian restores sidebar from previous session
   - Sidebar now triggers vault scan if opened before plugin initialization completes
   - Previously showed empty lists until manual refresh
+- **Copy as Slack links**: Links no longer wrapped in angle brackets
+  - `[text](url)` now copies as `text (url)` instead of `<url|text>`
+  - Bare URLs remain as plain text (Slack auto-links them)
 
 ### Improved
 

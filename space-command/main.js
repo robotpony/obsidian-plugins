@@ -12885,6 +12885,8 @@ var slackifyMarkdown = (markdown, options) => {
 function convertToSlackMarkdown(markdown) {
   let result = slackifyMarkdown(markdown);
   result = result.replace(/\u200B/g, "");
+  result = result.replace(/<([^|>]+)\|([^>]+)>/g, "$2 ($1)");
+  result = result.replace(/<(https?:\/\/[^>]+)>/g, "$1");
   return result;
 }
 

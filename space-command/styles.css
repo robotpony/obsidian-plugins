@@ -402,22 +402,14 @@
   background-color: var(--background-primary);
 }
 
-/* Unified tag styling for all plugin contexts (sidebar, embeds) */
-.idea-item .tag,
-.principle-item .tag,
-.idea-text .tag,
-.principle-text .tag,
-.todo-item .tag,
-.project-item .tag,
-.todo-text .tag,
+/* Unified tag styling for all plugin contexts (sidebar, embeds, editor, reading mode) */
 .space-command-sidebar .tag,
-.space-command-embed .tag {
+.space-command-embed .tag,
+.cm-line .cm-hashtag,
+.markdown-preview-view a.tag {
   font-size: 9pt !important;
   font-family: var(--font-monospace) !important;
   opacity: 0.85 !important;
-  background-color: var(--background-modifier-border);
-  border-radius: 4px;
-  padding: 1px 5px;
 }
 
 /* Focus highlighting for ideas and principles */
@@ -455,7 +447,6 @@
 
 /* Sidebar-specific override for better contrast on grey background */
 .space-command-sidebar .muted-pill,
-.space-command-sidebar .tag,
 .space-command-sidebar .todo-count,
 .space-command-sidebar .project-count {
   background-color: var(--background-primary);
@@ -682,48 +673,3 @@
   opacity: 0.9;
 }
 
-/* Normalize plugin tag sizes in Obsidian editor (Live Preview) and Reading Mode */
-/* These tags should render at consistent 9pt monospace regardless of context */
-.cm-header .cm-tag-todo,
-.cm-header .cm-tag-todone,
-.cm-header .cm-tag-focus,
-.cm-header .cm-tag-future,
-.cm-header .cm-tag-idea,
-.cm-header .cm-tag-principle,
-.cm-header .cm-tag-p0,
-.cm-header .cm-tag-p1,
-.cm-header .cm-tag-p2,
-.cm-header .cm-tag-p3,
-.cm-header .cm-tag-p4,
-.cm-line .cm-tag-todo,
-.cm-line .cm-tag-todone,
-.cm-line .cm-tag-focus,
-.cm-line .cm-tag-future,
-.cm-line .cm-tag-idea,
-.cm-line .cm-tag-principle,
-.cm-line .cm-tag-p0,
-.cm-line .cm-tag-p1,
-.cm-line .cm-tag-p2,
-.cm-line .cm-tag-p3,
-.cm-line .cm-tag-p4 {
-  font-size: 9pt !important;
-  font-family: var(--font-monospace) !important;
-  opacity: 0.85 !important;
-}
-
-/* Reading Mode tags - use attribute substring match to catch all hrefs containing the tag */
-.markdown-preview-view a.tag[href*="todo"],
-.markdown-preview-view a.tag[href*="todone"],
-.markdown-preview-view a.tag[href*="focus"],
-.markdown-preview-view a.tag[href*="future"],
-.markdown-preview-view a.tag[href*="idea"],
-.markdown-preview-view a.tag[href*="principle"],
-.markdown-preview-view a.tag[href*="p0"],
-.markdown-preview-view a.tag[href*="p1"],
-.markdown-preview-view a.tag[href*="p2"],
-.markdown-preview-view a.tag[href*="p3"],
-.markdown-preview-view a.tag[href*="p4"] {
-  font-size: 9pt !important;
-  font-family: var(--font-monospace) !important;
-  opacity: 0.85 !important;
-}
