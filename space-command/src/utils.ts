@@ -1,7 +1,24 @@
-import { App, MarkdownView, TFile, WorkspaceLeaf, moment } from "obsidian";
+import { App, MarkdownView, TFile, WorkspaceLeaf, moment, Notice } from "obsidian";
 
 /** Logo prefix for Notice messages */
 export const LOGO_PREFIX = "␣⌘";
+
+/**
+ * Show a notice with the styled Space Command logo badge.
+ * Uses a DocumentFragment to render the logo with CSS styling.
+ */
+export function showNotice(message: string, timeout?: number): Notice {
+  const fragment = document.createDocumentFragment();
+
+  const logo = document.createElement("span");
+  logo.className = "space-command-logo";
+  logo.textContent = LOGO_PREFIX;
+  fragment.appendChild(logo);
+
+  fragment.appendChild(document.createTextNode(" " + message));
+
+  return new Notice(fragment, timeout);
+}
 
 export function formatDate(date: Date, format: string): string {
   return (moment as any)(date).format(format);

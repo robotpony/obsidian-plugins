@@ -1,6 +1,5 @@
 import {
   App,
-  Notice,
   Plugin,
   PluginSettingTab,
   Setting,
@@ -22,7 +21,7 @@ import {
   DEFAULT_SETTINGS,
 } from "./src/types";
 import { convertToSlackMarkdown } from "./src/SlackConverter";
-import { LOGO_PREFIX } from "./src/utils";
+import { showNotice } from "./src/utils";
 
 export default class SpaceCommandPlugin extends Plugin {
   settings: SpaceCommandSettings;
@@ -222,12 +221,12 @@ export default class SpaceCommandPlugin extends Plugin {
       editorCallback: async (editor) => {
         const selection = editor.getSelection();
         if (!selection) {
-          new Notice(`${LOGO_PREFIX} No text selected`);
+          showNotice("No text selected");
           return;
         }
         const slackMd = convertToSlackMarkdown(selection);
         await navigator.clipboard.writeText(slackMd);
-        new Notice(`${LOGO_PREFIX} Copied as Slack markdown`);
+        showNotice("Copied as Slack markdown");
       },
       hotkeys: [
         {
@@ -249,7 +248,7 @@ export default class SpaceCommandPlugin extends Plugin {
               .onClick(async () => {
                 const slackMd = convertToSlackMarkdown(selection);
                 await navigator.clipboard.writeText(slackMd);
-                new Notice(`${LOGO_PREFIX} Copied as Slack markdown`);
+                showNotice("Copied as Slack markdown");
               });
           });
         }

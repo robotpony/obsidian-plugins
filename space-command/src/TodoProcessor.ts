@@ -1,4 +1,4 @@
-import { App, TFile, Notice } from "obsidian";
+import { App, TFile } from "obsidian";
 import { TodoItem } from "./types";
 import {
   formatDate,
@@ -8,7 +8,7 @@ import {
   markCheckboxIncomplete,
   removeIdeaTag,
   replaceIdeaWithTodo,
-  LOGO_PREFIX,
+  showNotice,
 } from "./utils";
 import { TodoScanner } from "./TodoScanner";
 
@@ -61,13 +61,13 @@ export class TodoProcessor {
 
       const childCount = todo.childLineNumbers?.length || 0;
       const message = childCount > 0
-        ? `${LOGO_PREFIX} TODO marked as complete! (including ${childCount} child item${childCount > 1 ? 's' : ''})`
-        : `${LOGO_PREFIX} TODO marked as complete!`;
-      new Notice(message);
+        ? `TODO marked as complete! (including ${childCount} child item${childCount > 1 ? 's' : ''})`
+        : "TODO marked as complete!";
+      showNotice(message);
       return true;
     } catch (error) {
       console.error("Error completing TODO:", error);
-      new Notice(`${LOGO_PREFIX} Failed to complete TODO. See console for details.`);
+      showNotice("Failed to complete TODO. See console for details.");
       return false;
     }
   }
@@ -121,11 +121,11 @@ export class TodoProcessor {
         this.onComplete();
       }
 
-      new Notice(`${LOGO_PREFIX} TODO marked as incomplete!`);
+      showNotice("TODO marked as incomplete!");
       return true;
     } catch (error) {
       console.error("Error uncompleting TODO:", error);
-      new Notice(`${LOGO_PREFIX} Failed to uncomplete TODO. See console for details.`);
+      showNotice("Failed to uncomplete TODO. See console for details.");
       return false;
     }
   }
@@ -304,11 +304,11 @@ export class TodoProcessor {
         this.onComplete();
       }
 
-      new Notice(`${LOGO_PREFIX} Priority set to ${newTag}${addFocus ? " + #focus" : ""}`);
+      showNotice(`Priority set to ${newTag}${addFocus ? " + #focus" : ""}`);
       return true;
     } catch (error) {
       console.error("Error setting priority:", error);
-      new Notice(`${LOGO_PREFIX} Failed to set priority. See console for details.`);
+      showNotice("Failed to set priority. See console for details.");
       return false;
     }
   }
@@ -346,11 +346,11 @@ export class TodoProcessor {
         this.onComplete();
       }
 
-      new Notice(`${LOGO_PREFIX} Removed ${tag}`);
+      showNotice(`Removed ${tag}`);
       return true;
     } catch (error) {
       console.error("Error removing tag:", error);
-      new Notice(`${LOGO_PREFIX} Failed to remove tag. See console for details.`);
+      showNotice("Failed to remove tag. See console for details.");
       return false;
     }
   }
@@ -391,11 +391,11 @@ export class TodoProcessor {
         this.onComplete();
       }
 
-      new Notice(`${LOGO_PREFIX} Idea completed!`);
+      showNotice("Idea completed!");
       return true;
     } catch (error) {
       console.error("Error completing idea:", error);
-      new Notice(`${LOGO_PREFIX} Failed to complete idea. See console for details.`);
+      showNotice("Failed to complete idea. See console for details.");
       return false;
     }
   }
@@ -436,11 +436,11 @@ export class TodoProcessor {
         this.onComplete();
       }
 
-      new Notice(`${LOGO_PREFIX} Idea promoted to TODO!`);
+      showNotice("Idea promoted to TODO!");
       return true;
     } catch (error) {
       console.error("Error converting idea to TODO:", error);
-      new Notice(`${LOGO_PREFIX} Failed to convert idea. See console for details.`);
+      showNotice("Failed to convert idea. See console for details.");
       return false;
     }
   }
@@ -476,11 +476,11 @@ export class TodoProcessor {
         this.onComplete();
       }
 
-      new Notice(`${LOGO_PREFIX} Idea focused!`);
+      showNotice("Idea focused!");
       return true;
     } catch (error) {
       console.error("Error focusing idea:", error);
-      new Notice(`${LOGO_PREFIX} Failed to focus idea. See console for details.`);
+      showNotice("Failed to focus idea. See console for details.");
       return false;
     }
   }

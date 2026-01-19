@@ -1,10 +1,10 @@
-import { ItemView, WorkspaceLeaf, TFile, Menu, Notice, Modal } from "obsidian";
+import { ItemView, WorkspaceLeaf, TFile, Menu, Modal } from "obsidian";
 import { TodoScanner } from "./TodoScanner";
 import { TodoProcessor } from "./TodoProcessor";
 import { ProjectManager } from "./ProjectManager";
 import { TodoItem, ProjectInfo, ItemRenderConfig } from "./types";
 import { ContextMenuHandler } from "./ContextMenuHandler";
-import { getPriorityValue, LOGO_PREFIX, openFileAtLine, extractTags } from "./utils";
+import { getPriorityValue, openFileAtLine, extractTags, showNotice } from "./utils";
 
 export const VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 
@@ -390,7 +390,7 @@ export class TodoSidebarView extends ItemView {
             .setIcon("brackets")
             .onClick(() => {
               navigator.clipboard.writeText("{{focus-todos}}");
-              new Notice(`${LOGO_PREFIX} Copied inline embed syntax`);
+              showNotice("Copied inline embed syntax");
             });
         });
         submenu.addItem((subItem: any) => {
@@ -399,7 +399,7 @@ export class TodoSidebarView extends ItemView {
             .setIcon("code")
             .onClick(() => {
               navigator.clipboard.writeText("```focus-todos\n```");
-              new Notice(`${LOGO_PREFIX} Copied code block embed syntax`);
+              showNotice("Copied code block embed syntax");
             });
         });
       });
@@ -800,11 +800,9 @@ export class TodoSidebarView extends ItemView {
     }
 
     if (failed > 0) {
-      new Notice(
-        `${LOGO_PREFIX} Completed ${completed} TODO(s), ${failed} failed. See console for details.`
-      );
+      showNotice(`Completed ${completed} TODO(s), ${failed} failed. See console for details.`);
     } else {
-      new Notice(`${LOGO_PREFIX} Completed all ${completed} TODO(s) for ${project.tag}!`);
+      showNotice(`Completed all ${completed} TODO(s) for ${project.tag}!`);
     }
     // Note: sidebar will auto-refresh via todos-updated event after scanner rescans
   }

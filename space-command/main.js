@@ -139,6 +139,15 @@ var import_obsidian2 = require("obsidian");
 // src/utils.ts
 var import_obsidian = require("obsidian");
 var LOGO_PREFIX = "\u2423\u2318";
+function showNotice(message, timeout) {
+  const fragment = document.createDocumentFragment();
+  const logo = document.createElement("span");
+  logo.className = "space-command-logo";
+  logo.textContent = LOGO_PREFIX;
+  fragment.appendChild(logo);
+  fragment.appendChild(document.createTextNode(" " + message));
+  return new import_obsidian.Notice(fragment, timeout);
+}
 function formatDate(date, format) {
   return (0, import_obsidian.moment)(date).format(format);
 }
@@ -597,12 +606,12 @@ var TodoProcessor = class {
         this.onComplete();
       }
       const childCount = ((_a = todo.childLineNumbers) == null ? void 0 : _a.length) || 0;
-      const message = childCount > 0 ? `${LOGO_PREFIX} TODO marked as complete! (including ${childCount} child item${childCount > 1 ? "s" : ""})` : `${LOGO_PREFIX} TODO marked as complete!`;
-      new import_obsidian3.Notice(message);
+      const message = childCount > 0 ? `TODO marked as complete! (including ${childCount} child item${childCount > 1 ? "s" : ""})` : "TODO marked as complete!";
+      showNotice(message);
       return true;
     } catch (error) {
       console.error("Error completing TODO:", error);
-      new import_obsidian3.Notice(`${LOGO_PREFIX} Failed to complete TODO. See console for details.`);
+      showNotice("Failed to complete TODO. See console for details.");
       return false;
     }
   }
@@ -637,11 +646,11 @@ var TodoProcessor = class {
       if (this.onComplete) {
         this.onComplete();
       }
-      new import_obsidian3.Notice(`${LOGO_PREFIX} TODO marked as incomplete!`);
+      showNotice("TODO marked as incomplete!");
       return true;
     } catch (error) {
       console.error("Error uncompleting TODO:", error);
-      new import_obsidian3.Notice(`${LOGO_PREFIX} Failed to uncomplete TODO. See console for details.`);
+      showNotice("Failed to uncomplete TODO. See console for details.");
       return false;
     }
   }
@@ -758,11 +767,11 @@ ${todoneText}` : todoneText;
       if (this.onComplete) {
         this.onComplete();
       }
-      new import_obsidian3.Notice(`${LOGO_PREFIX} Priority set to ${newTag}${addFocus ? " + #focus" : ""}`);
+      showNotice(`Priority set to ${newTag}${addFocus ? " + #focus" : ""}`);
       return true;
     } catch (error) {
       console.error("Error setting priority:", error);
-      new import_obsidian3.Notice(`${LOGO_PREFIX} Failed to set priority. See console for details.`);
+      showNotice("Failed to set priority. See console for details.");
       return false;
     }
   }
@@ -787,11 +796,11 @@ ${todoneText}` : todoneText;
       if (this.onComplete) {
         this.onComplete();
       }
-      new import_obsidian3.Notice(`${LOGO_PREFIX} Removed ${tag}`);
+      showNotice(`Removed ${tag}`);
       return true;
     } catch (error) {
       console.error("Error removing tag:", error);
-      new import_obsidian3.Notice(`${LOGO_PREFIX} Failed to remove tag. See console for details.`);
+      showNotice("Failed to remove tag. See console for details.");
       return false;
     }
   }
@@ -819,11 +828,11 @@ ${todoneText}` : todoneText;
       if (this.onComplete) {
         this.onComplete();
       }
-      new import_obsidian3.Notice(`${LOGO_PREFIX} Idea completed!`);
+      showNotice("Idea completed!");
       return true;
     } catch (error) {
       console.error("Error completing idea:", error);
-      new import_obsidian3.Notice(`${LOGO_PREFIX} Failed to complete idea. See console for details.`);
+      showNotice("Failed to complete idea. See console for details.");
       return false;
     }
   }
@@ -851,11 +860,11 @@ ${todoneText}` : todoneText;
       if (this.onComplete) {
         this.onComplete();
       }
-      new import_obsidian3.Notice(`${LOGO_PREFIX} Idea promoted to TODO!`);
+      showNotice("Idea promoted to TODO!");
       return true;
     } catch (error) {
       console.error("Error converting idea to TODO:", error);
-      new import_obsidian3.Notice(`${LOGO_PREFIX} Failed to convert idea. See console for details.`);
+      showNotice("Failed to convert idea. See console for details.");
       return false;
     }
   }
@@ -880,11 +889,11 @@ ${todoneText}` : todoneText;
       if (this.onComplete) {
         this.onComplete();
       }
-      new import_obsidian3.Notice(`${LOGO_PREFIX} Idea focused!`);
+      showNotice("Idea focused!");
       return true;
     } catch (error) {
       console.error("Error focusing idea:", error);
-      new import_obsidian3.Notice(`${LOGO_PREFIX} Failed to focus idea. See console for details.`);
+      showNotice("Failed to focus idea. See console for details.");
       return false;
     }
   }
@@ -2159,13 +2168,13 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
         submenu.addItem((subItem) => {
           subItem.setTitle("Inline syntax").setIcon("brackets").onClick(() => {
             navigator.clipboard.writeText("{{focus-todos}}");
-            new import_obsidian8.Notice(`${LOGO_PREFIX} Copied inline embed syntax`);
+            showNotice("Copied inline embed syntax");
           });
         });
         submenu.addItem((subItem) => {
           subItem.setTitle("Code block syntax").setIcon("code").onClick(() => {
             navigator.clipboard.writeText("```focus-todos\n```");
-            new import_obsidian8.Notice(`${LOGO_PREFIX} Copied code block embed syntax`);
+            showNotice("Copied code block embed syntax");
           });
         });
       });
@@ -2451,11 +2460,9 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       }
     }
     if (failed > 0) {
-      new import_obsidian8.Notice(
-        `${LOGO_PREFIX} Completed ${completed} TODO(s), ${failed} failed. See console for details.`
-      );
+      showNotice(`Completed ${completed} TODO(s), ${failed} failed. See console for details.`);
     } else {
-      new import_obsidian8.Notice(`${LOGO_PREFIX} Completed all ${completed} TODO(s) for ${project.tag}!`);
+      showNotice(`Completed all ${completed} TODO(s) for ${project.tag}!`);
     }
   }
 };
@@ -13129,12 +13136,12 @@ var SpaceCommandPlugin = class extends import_obsidian9.Plugin {
       editorCallback: async (editor) => {
         const selection = editor.getSelection();
         if (!selection) {
-          new import_obsidian9.Notice(`${LOGO_PREFIX} No text selected`);
+          showNotice("No text selected");
           return;
         }
         const slackMd = convertToSlackMarkdown(selection);
         await navigator.clipboard.writeText(slackMd);
-        new import_obsidian9.Notice(`${LOGO_PREFIX} Copied as Slack markdown`);
+        showNotice("Copied as Slack markdown");
       },
       hotkeys: [
         {
@@ -13151,7 +13158,7 @@ var SpaceCommandPlugin = class extends import_obsidian9.Plugin {
             item.setTitle("Copy as Slack").setIcon("clipboard-copy").onClick(async () => {
               const slackMd = convertToSlackMarkdown(selection);
               await navigator.clipboard.writeText(slackMd);
-              new import_obsidian9.Notice(`${LOGO_PREFIX} Copied as Slack markdown`);
+              showNotice("Copied as Slack markdown");
             });
           });
         }
