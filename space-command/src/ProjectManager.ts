@@ -27,8 +27,13 @@ export class ProjectManager {
 
     // Aggregate project data from all todos
     for (const todo of todos) {
-      // Extract all tags except #todo, #todone, #future, #focus, and priority tags
-      const excludedTags = new Set(["#todo", "#todone", "#future", "#focus", ...this.priorityTags]);
+      // Extract all tags except #todo(s), #todone(s), #idea(s), #principle(s), #future, #focus, and priority tags
+      const excludedTags = new Set([
+        "#todo", "#todos", "#todone", "#todones",
+        "#idea", "#ideas", "#principle", "#principles",
+        "#future", "#focus",
+        ...this.priorityTags
+      ]);
       const projectTags = todo.tags.filter(tag => !excludedTags.has(tag));
 
       const todoPriority = getPriorityValue(todo.tags);

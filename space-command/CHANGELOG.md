@@ -10,6 +10,11 @@ All notable changes to the ␣⌘ Space Command plugin will be documented in thi
   - Previously always showed "␣⌘ Space Command"
   - Tab title in Obsidian also updates to match
 
+### Fixed
+
+- **Plural tags in Focus list**: `#todos`, `#todones`, `#ideas`, and `#principles` no longer appear as projects in the Focus section
+  - These are type tags that should be excluded like their singular forms
+
 ## [0.7.6] - 2026-01-19
 
 ### Changed
