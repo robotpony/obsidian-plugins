@@ -6,7 +6,7 @@ All notable changes to the ⌥⌘ Space Command plugin will be documented in thi
 
 ### Changed
 
-- **Unified tag styling**: All plugin tags now render consistently at 11pt monospace with 0.85 opacity
+- **Unified tag styling**: All plugin tags now render consistently at 9pt monospace with 0.85 opacity
   - Applies to tags in headings, list items, paragraphs, sidebar, and embeds
   - Covers all plugin tags: `#todo`, `#todone`, `#idea`, `#principle`, `#focus`, `#future`, `#p0`-`#p4`
 
