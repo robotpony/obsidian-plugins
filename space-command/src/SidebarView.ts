@@ -4,7 +4,7 @@ import { TodoProcessor } from "./TodoProcessor";
 import { ProjectManager } from "./ProjectManager";
 import { TodoItem, ProjectInfo, ItemRenderConfig } from "./types";
 import { ContextMenuHandler } from "./ContextMenuHandler";
-import { getPriorityValue, LOGO_PREFIX, renderTextWithTags, openFileAtLine } from "./utils";
+import { getPriorityValue, LOGO_PREFIX, openFileAtLine, extractTags } from "./utils";
 
 export const VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 
@@ -17,6 +17,8 @@ export class TodoSidebarView extends ItemView {
   private contextMenuHandler: ContextMenuHandler;
   private recentTodonesLimit: number;
   private activeTab: 'todos' | 'ideas' = 'todos';
+  private activeTagFilter: string | null = null;
+  private openDropdown: HTMLElement | null = null;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -158,11 +160,13 @@ export class TodoSidebarView extends ItemView {
       });
     }
 
-    // Text content (strip type tag but keep other tags)
+    // Text content (strip type tag and all other tags for display)
     const textSpan = rowContainer.createEl("span", { cls: `${config.classPrefix}-text` });
     const cleanText = item.text.replace(config.tagToStrip, "").trim();
     const displayText = this.stripMarkdownSyntax(cleanText);
-    renderTextWithTags(displayText, textSpan);
+    // Strip all tags from display text (they'll be in the dropdown)
+    const textWithoutTags = displayText.replace(/#[\w-]+/g, "").replace(/\s+/g, " ").trim();
+    textSpan.appendText(textWithoutTags);
 
     // For headers with children, append count inline with text
     if (hasChildren) {
@@ -170,6 +174,10 @@ export class TodoSidebarView extends ItemView {
       textSpan.createEl("span", { cls: `${config.classPrefix}-count`, text: ` ${childCount}` });
     }
     textSpan.appendText(" ");
+
+    // Get tags (excluding the type tag) and render dropdown
+    const tags = extractTags(cleanText).filter(tag => !config.tagToStrip.test(tag));
+    this.renderTagDropdown(tags, rowContainer);
 
     // Link to source
     const link = rowContainer.createEl("a", {
@@ -205,6 +213,86 @@ export class TodoSidebarView extends ItemView {
       case 'idea': return this.scanner.getIdeas();
       case 'principle': return this.scanner.getPrinciples();
     }
+  }
+
+  // Close any open tag dropdown
+  private closeDropdown(): void {
+    if (this.openDropdown) {
+      this.openDropdown.remove();
+      this.openDropdown = null;
+    }
+  }
+
+  // Render collapsed tag indicator with dropdown
+  private renderTagDropdown(tags: string[], container: HTMLElement): void {
+    if (tags.length === 0) return;
+
+    const trigger = container.createEl("span", {
+      cls: "tag-dropdown-trigger",
+      text: "#",
+    });
+
+    trigger.addEventListener("click", (e) => {
+      e.stopPropagation();
+
+      // Close any existing dropdown
+      this.closeDropdown();
+
+      // Create dropdown menu
+      const dropdown = document.createElement("div");
+      dropdown.className = "tag-dropdown-menu";
+
+      // Position dropdown below the trigger
+      const rect = trigger.getBoundingClientRect();
+      dropdown.style.position = "fixed";
+      dropdown.style.left = `${rect.left}px`;
+      dropdown.style.top = `${rect.bottom + 4}px`;
+
+      // Add tags to dropdown
+      for (const tag of tags) {
+        const tagItem = dropdown.createEl("div", {
+          cls: "tag-dropdown-item",
+          text: tag,
+        });
+        tagItem.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.activeTagFilter = tag;
+          this.closeDropdown();
+          this.render();
+        });
+      }
+
+      // Add separator
+      dropdown.createEl("div", { cls: "tag-dropdown-separator" });
+
+      // Add clear filter option
+      const clearItem = dropdown.createEl("div", {
+        cls: `tag-dropdown-clear${this.activeTagFilter ? "" : " disabled"}`,
+        text: "Clear filter",
+      });
+      if (this.activeTagFilter) {
+        clearItem.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.activeTagFilter = null;
+          this.closeDropdown();
+          this.render();
+        });
+      }
+
+      // Add to document and track
+      document.body.appendChild(dropdown);
+      this.openDropdown = dropdown;
+
+      // Close on click outside
+      const closeHandler = (e: MouseEvent) => {
+        if (!dropdown.contains(e.target as Node) && e.target !== trigger) {
+          this.closeDropdown();
+          document.removeEventListener("click", closeHandler);
+        }
+      };
+      // Use setTimeout to avoid immediate trigger from current click
+      setTimeout(() => document.addEventListener("click", closeHandler), 0);
+    });
   }
 
   async onOpen(): Promise<void> {
@@ -452,6 +540,11 @@ export class TodoSidebarView extends ItemView {
     // Filter out child items (they'll be rendered under their parent header)
     todos = todos.filter(todo => todo.parentLineNumber === undefined);
 
+    // Apply tag filter if active
+    if (this.activeTagFilter) {
+      todos = todos.filter(todo => todo.tags.includes(this.activeTagFilter!));
+    }
+
     // Sort by priority
     todos = this.sortTodosByPriority(todos);
 
@@ -481,7 +574,13 @@ export class TodoSidebarView extends ItemView {
   }
 
   private renderRecentTodones(container: HTMLElement): void {
-    const allTodones = this.scanner.getTodones(100); // Get more than we need
+    let allTodones = this.scanner.getTodones(100); // Get more than we need
+
+    // Apply tag filter if active
+    if (this.activeTagFilter) {
+      allTodones = allTodones.filter(todone => todone.tags.includes(this.activeTagFilter!));
+    }
+
     const todones = allTodones.slice(0, this.recentTodonesLimit); // Limit display
 
     const section = container.createEl("div", { cls: "todone-section" });
@@ -542,12 +641,18 @@ export class TodoSidebarView extends ItemView {
       // Note: sidebar will auto-refresh via todos-updated event after scanner rescans
     });
 
-    // Text content (strip markdown but keep tags)
+    // Text content (strip markdown and tags for display)
     const textSpan = item.createEl("span", { cls: "todo-text todone-text" });
     const cleanText = todone.text.replace(/#todone\b/g, "").trim();
     const displayText = this.stripMarkdownSyntax(cleanText);
-    renderTextWithTags(displayText, textSpan);
+    // Strip all tags from display text (they'll be in the dropdown)
+    const textWithoutTags = displayText.replace(/#[\w-]+/g, "").replace(/\s+/g, " ").trim();
+    textSpan.appendText(textWithoutTags);
     textSpan.appendText(" ");
+
+    // Get tags (excluding #todone) and render dropdown
+    const tags = extractTags(cleanText);
+    this.renderTagDropdown(tags, item);
 
     // Link to source
     const link = item.createEl("a", {
@@ -567,6 +672,11 @@ export class TodoSidebarView extends ItemView {
 
     // Filter out child items (they'll be rendered under their parent header)
     principles = principles.filter(p => p.parentLineNumber === undefined);
+
+    // Apply tag filter if active
+    if (this.activeTagFilter) {
+      principles = principles.filter(p => p.tags.includes(this.activeTagFilter!));
+    }
 
     const section = container.createEl("div", { cls: "principles-section" });
 
@@ -604,6 +714,11 @@ export class TodoSidebarView extends ItemView {
 
     // Filter out child items (they'll be rendered under their parent header)
     ideas = ideas.filter(idea => idea.parentLineNumber === undefined);
+
+    // Apply tag filter if active
+    if (this.activeTagFilter) {
+      ideas = ideas.filter(idea => idea.tags.includes(this.activeTagFilter!));
+    }
 
     // Sort by priority (focus first)
     ideas = this.sortTodosByPriority(ideas);

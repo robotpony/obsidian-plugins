@@ -1878,6 +1878,8 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     super(leaf);
     this.updateListener = null;
     this.activeTab = "todos";
+    this.activeTagFilter = null;
+    this.openDropdown = null;
     // Configuration for unified list item rendering
     this.todoConfig = {
       type: "todo",
@@ -1972,12 +1974,15 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     const textSpan = rowContainer.createEl("span", { cls: `${config.classPrefix}-text` });
     const cleanText = item.text.replace(config.tagToStrip, "").trim();
     const displayText = this.stripMarkdownSyntax(cleanText);
-    renderTextWithTags(displayText, textSpan);
+    const textWithoutTags = displayText.replace(/#[\w-]+/g, "").replace(/\s+/g, " ").trim();
+    textSpan.appendText(textWithoutTags);
     if (hasChildren) {
       const childCount = item.childLineNumbers.length;
       textSpan.createEl("span", { cls: `${config.classPrefix}-count`, text: ` ${childCount}` });
     }
     textSpan.appendText(" ");
+    const tags = extractTags(cleanText).filter((tag) => !config.tagToStrip.test(tag));
+    this.renderTagDropdown(tags, rowContainer);
     const link2 = rowContainer.createEl("a", {
       text: "\u2192",
       cls: `${config.classPrefix}-link`,
@@ -2010,6 +2015,66 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       case "principle":
         return this.scanner.getPrinciples();
     }
+  }
+  // Close any open tag dropdown
+  closeDropdown() {
+    if (this.openDropdown) {
+      this.openDropdown.remove();
+      this.openDropdown = null;
+    }
+  }
+  // Render collapsed tag indicator with dropdown
+  renderTagDropdown(tags, container) {
+    if (tags.length === 0)
+      return;
+    const trigger = container.createEl("span", {
+      cls: "tag-dropdown-trigger",
+      text: "#"
+    });
+    trigger.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.closeDropdown();
+      const dropdown = document.createElement("div");
+      dropdown.className = "tag-dropdown-menu";
+      const rect = trigger.getBoundingClientRect();
+      dropdown.style.position = "fixed";
+      dropdown.style.left = `${rect.left}px`;
+      dropdown.style.top = `${rect.bottom + 4}px`;
+      for (const tag of tags) {
+        const tagItem = dropdown.createEl("div", {
+          cls: "tag-dropdown-item",
+          text: tag
+        });
+        tagItem.addEventListener("click", (e2) => {
+          e2.stopPropagation();
+          this.activeTagFilter = tag;
+          this.closeDropdown();
+          this.render();
+        });
+      }
+      dropdown.createEl("div", { cls: "tag-dropdown-separator" });
+      const clearItem = dropdown.createEl("div", {
+        cls: `tag-dropdown-clear${this.activeTagFilter ? "" : " disabled"}`,
+        text: "Clear filter"
+      });
+      if (this.activeTagFilter) {
+        clearItem.addEventListener("click", (e2) => {
+          e2.stopPropagation();
+          this.activeTagFilter = null;
+          this.closeDropdown();
+          this.render();
+        });
+      }
+      document.body.appendChild(dropdown);
+      this.openDropdown = dropdown;
+      const closeHandler = (e2) => {
+        if (!dropdown.contains(e2.target) && e2.target !== trigger) {
+          this.closeDropdown();
+          document.removeEventListener("click", closeHandler);
+        }
+      };
+      setTimeout(() => document.addEventListener("click", closeHandler), 0);
+    });
   }
   async onOpen() {
     this.updateListener = () => this.render();
@@ -2175,6 +2240,9 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     let todos = this.scanner.getTodos();
     todos = todos.filter((todo) => !todo.tags.includes("#future"));
     todos = todos.filter((todo) => todo.parentLineNumber === void 0);
+    if (this.activeTagFilter) {
+      todos = todos.filter((todo) => todo.tags.includes(this.activeTagFilter));
+    }
     todos = this.sortTodosByPriority(todos);
     const section = container.createEl("div", { cls: "todo-section" });
     const header = section.createEl("div", { cls: "todo-section-header" });
@@ -2196,7 +2264,10 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     this.renderListItem(list4, todo, this.todoConfig, isChild);
   }
   renderRecentTodones(container) {
-    const allTodones = this.scanner.getTodones(100);
+    let allTodones = this.scanner.getTodones(100);
+    if (this.activeTagFilter) {
+      allTodones = allTodones.filter((todone) => todone.tags.includes(this.activeTagFilter));
+    }
     const todones = allTodones.slice(0, this.recentTodonesLimit);
     const section = container.createEl("div", { cls: "todone-section" });
     const header = section.createEl("div", {
@@ -2246,8 +2317,11 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     const textSpan = item.createEl("span", { cls: "todo-text todone-text" });
     const cleanText = todone.text.replace(/#todone\b/g, "").trim();
     const displayText = this.stripMarkdownSyntax(cleanText);
-    renderTextWithTags(displayText, textSpan);
+    const textWithoutTags = displayText.replace(/#[\w-]+/g, "").replace(/\s+/g, " ").trim();
+    textSpan.appendText(textWithoutTags);
     textSpan.appendText(" ");
+    const tags = extractTags(cleanText);
+    this.renderTagDropdown(tags, item);
     const link2 = item.createEl("a", {
       text: "\u2192",
       cls: "todo-link",
@@ -2261,6 +2335,9 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
   renderPrinciples(container) {
     let principles = this.scanner.getPrinciples();
     principles = principles.filter((p) => p.parentLineNumber === void 0);
+    if (this.activeTagFilter) {
+      principles = principles.filter((p) => p.tags.includes(this.activeTagFilter));
+    }
     const section = container.createEl("div", { cls: "principles-section" });
     const header = section.createEl("div", {
       cls: "todo-section-header principles-header"
@@ -2286,6 +2363,9 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     let ideas = this.scanner.getIdeas();
     ideas = ideas.filter((idea) => !idea.tags.includes("#future"));
     ideas = ideas.filter((idea) => idea.parentLineNumber === void 0);
+    if (this.activeTagFilter) {
+      ideas = ideas.filter((idea) => idea.tags.includes(this.activeTagFilter));
+    }
     ideas = this.sortTodosByPriority(ideas);
     const section = container.createEl("div", { cls: "ideas-section" });
     const header = section.createEl("div", { cls: "todo-section-header" });

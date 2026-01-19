@@ -81,6 +81,12 @@ Any other tag becomes a project you can focus on. TODOs tagged `#api` or `#onboa
 
 Right-click any TODO for quick actions: Focus, Later, Snooze.
 
+**Tag filtering in sidebar:**
+
+- Click `#` next to any item to see its tags
+- Click a tag to filter the list to items with that tag
+- Use "Clear filter" at the bottom of the dropdown to remove the filter
+
 ## Filter and Embed
 
 Embed TODO lists anywhere with filters:

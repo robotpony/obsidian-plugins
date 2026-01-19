@@ -2,6 +2,24 @@
 
 All notable changes to the ⌥⌘ Space Command plugin will be documented in this file.
 
+## [0.7.4] - 2026-01-18
+
+### Added
+
+- **Collapsed tags in sidebar**: Tags now collapse into a `#` indicator
+  - Click `#` to open dropdown showing all tags on the item
+  - Click a tag to filter the sidebar to items with that tag
+  - "Clear filter" option at bottom (greyed out until filter is active)
+  - Filter applies to TODOs, TODONEs, Ideas, and Principles
+  - Dropdown closes on selection or click outside
+
+### Technical
+
+- New `renderTagDropdown()` method in SidebarView for tag dropdown UI
+- Added `activeTagFilter` state to track current filter
+- Filter logic added to `renderActiveTodos`, `renderRecentTodones`, `renderActiveIdeas`, `renderPrinciples`
+- New CSS classes: `.tag-dropdown-trigger`, `.tag-dropdown-menu`, `.tag-dropdown-item`, `.tag-dropdown-separator`, `.tag-dropdown-clear`
+
 ## [0.7.3] - 2026-01-18
 
 ### Changed
