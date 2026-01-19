@@ -402,16 +402,22 @@
   background-color: var(--background-primary);
 }
 
-/* Tag styling for idea/principle items */
+/* Unified tag styling for all plugin contexts */
 .idea-item .tag,
 .principle-item .tag,
 .idea-text .tag,
-.principle-text .tag {
-  opacity: 0.65;
+.principle-text .tag,
+.todo-item .tag,
+.project-item .tag,
+.todo-text .tag,
+.space-command-sidebar .tag,
+.space-command-embed .tag {
+  font-size: 11pt;
+  font-family: var(--font-monospace);
+  opacity: 0.85;
   background-color: var(--background-modifier-border);
   border-radius: 4px;
   padding: 1px 5px;
-  font-size: 0.8em;
 }
 
 /* Focus highlighting for ideas and principles */
@@ -440,17 +446,6 @@
 /* Count styling */
 .todo-count,
 .project-count {
-  opacity: 0.65;
-  background-color: var(--background-modifier-border);
-  border-radius: 4px;
-  padding: 1px 5px;
-  font-size: 0.8em;
-}
-
-/* Tag styling in sidebar text */
-.todo-item .tag,
-.project-item .tag,
-.todo-text .tag {
   opacity: 0.65;
   background-color: var(--background-modifier-border);
   border-radius: 4px;
@@ -687,8 +682,8 @@
   opacity: 0.9;
 }
 
-/* Normalize plugin tag sizes in Obsidian editor headings */
-/* These tags should render at body text size regardless of heading level */
+/* Normalize plugin tag sizes in Obsidian editor headings and list items */
+/* These tags should render at consistent 11pt size regardless of context */
 .cm-header .cm-tag-todo,
 .cm-header .cm-tag-todone,
 .cm-header .cm-tag-focus,
@@ -700,10 +695,23 @@
 .cm-header .cm-tag-p2,
 .cm-header .cm-tag-p3,
 .cm-header .cm-tag-p4,
+.cm-line .cm-tag-todo,
+.cm-line .cm-tag-todone,
+.cm-line .cm-tag-focus,
+.cm-line .cm-tag-future,
+.cm-line .cm-tag-idea,
+.cm-line .cm-tag-principle,
+.cm-line .cm-tag-p0,
+.cm-line .cm-tag-p1,
+.cm-line .cm-tag-p2,
+.cm-line .cm-tag-p3,
+.cm-line .cm-tag-p4,
 .markdown-preview-view h1 .tag[href="#todo"],
 .markdown-preview-view h1 .tag[href="#todone"],
 .markdown-preview-view h1 .tag[href="#focus"],
 .markdown-preview-view h1 .tag[href="#future"],
+.markdown-preview-view h1 .tag[href="#idea"],
+.markdown-preview-view h1 .tag[href="#principle"],
 .markdown-preview-view h1 .tag[href="#p0"],
 .markdown-preview-view h1 .tag[href="#p1"],
 .markdown-preview-view h1 .tag[href="#p2"],
@@ -713,6 +721,8 @@
 .markdown-preview-view h2 .tag[href="#todone"],
 .markdown-preview-view h2 .tag[href="#focus"],
 .markdown-preview-view h2 .tag[href="#future"],
+.markdown-preview-view h2 .tag[href="#idea"],
+.markdown-preview-view h2 .tag[href="#principle"],
 .markdown-preview-view h2 .tag[href="#p0"],
 .markdown-preview-view h2 .tag[href="#p1"],
 .markdown-preview-view h2 .tag[href="#p2"],
@@ -722,6 +732,8 @@
 .markdown-preview-view h3 .tag[href="#todone"],
 .markdown-preview-view h3 .tag[href="#focus"],
 .markdown-preview-view h3 .tag[href="#future"],
+.markdown-preview-view h3 .tag[href="#idea"],
+.markdown-preview-view h3 .tag[href="#principle"],
 .markdown-preview-view h3 .tag[href="#p0"],
 .markdown-preview-view h3 .tag[href="#p1"],
 .markdown-preview-view h3 .tag[href="#p2"],
@@ -731,6 +743,8 @@
 .markdown-preview-view h4 .tag[href="#todone"],
 .markdown-preview-view h4 .tag[href="#focus"],
 .markdown-preview-view h4 .tag[href="#future"],
+.markdown-preview-view h4 .tag[href="#idea"],
+.markdown-preview-view h4 .tag[href="#principle"],
 .markdown-preview-view h4 .tag[href="#p0"],
 .markdown-preview-view h4 .tag[href="#p1"],
 .markdown-preview-view h4 .tag[href="#p2"],
@@ -740,6 +754,8 @@
 .markdown-preview-view h5 .tag[href="#todone"],
 .markdown-preview-view h5 .tag[href="#focus"],
 .markdown-preview-view h5 .tag[href="#future"],
+.markdown-preview-view h5 .tag[href="#idea"],
+.markdown-preview-view h5 .tag[href="#principle"],
 .markdown-preview-view h5 .tag[href="#p0"],
 .markdown-preview-view h5 .tag[href="#p1"],
 .markdown-preview-view h5 .tag[href="#p2"],
@@ -749,10 +765,36 @@
 .markdown-preview-view h6 .tag[href="#todone"],
 .markdown-preview-view h6 .tag[href="#focus"],
 .markdown-preview-view h6 .tag[href="#future"],
+.markdown-preview-view h6 .tag[href="#idea"],
+.markdown-preview-view h6 .tag[href="#principle"],
 .markdown-preview-view h6 .tag[href="#p0"],
 .markdown-preview-view h6 .tag[href="#p1"],
 .markdown-preview-view h6 .tag[href="#p2"],
 .markdown-preview-view h6 .tag[href="#p3"],
-.markdown-preview-view h6 .tag[href="#p4"] {
-  font-size: var(--font-text-size, 16px);
+.markdown-preview-view h6 .tag[href="#p4"],
+.markdown-preview-view li .tag[href="#todo"],
+.markdown-preview-view li .tag[href="#todone"],
+.markdown-preview-view li .tag[href="#focus"],
+.markdown-preview-view li .tag[href="#future"],
+.markdown-preview-view li .tag[href="#idea"],
+.markdown-preview-view li .tag[href="#principle"],
+.markdown-preview-view li .tag[href="#p0"],
+.markdown-preview-view li .tag[href="#p1"],
+.markdown-preview-view li .tag[href="#p2"],
+.markdown-preview-view li .tag[href="#p3"],
+.markdown-preview-view li .tag[href="#p4"],
+.markdown-preview-view p .tag[href="#todo"],
+.markdown-preview-view p .tag[href="#todone"],
+.markdown-preview-view p .tag[href="#focus"],
+.markdown-preview-view p .tag[href="#future"],
+.markdown-preview-view p .tag[href="#idea"],
+.markdown-preview-view p .tag[href="#principle"],
+.markdown-preview-view p .tag[href="#p0"],
+.markdown-preview-view p .tag[href="#p1"],
+.markdown-preview-view p .tag[href="#p2"],
+.markdown-preview-view p .tag[href="#p3"],
+.markdown-preview-view p .tag[href="#p4"] {
+  font-size: 11pt;
+  font-family: var(--font-monospace);
+  opacity: 0.85;
 }
