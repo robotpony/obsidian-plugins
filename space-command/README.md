@@ -1,4 +1,4 @@
-# ⌥⌘ Space Command for Obsidian
+# ␣⌘ Space Command for Obsidian
 
 Focus on the right next task. Simple TODOs and tags in your markdown, surfaced when you need them.
 

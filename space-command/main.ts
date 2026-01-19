@@ -342,7 +342,7 @@ class SpaceCommandSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: "⌥⌘ Space Command Settings" });
+    containerEl.createEl("h2", { text: "␣⌘ Space Command Settings" });
 
     new Setting(containerEl)
       .setName("Default TODONE file")

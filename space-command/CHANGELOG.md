@@ -1,8 +1,12 @@
 # Changelog
 
-All notable changes to the ⌥⌘ Space Command plugin will be documented in this file.
+All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
 ## [0.7.6] - 2026-01-19
+
+### Changed
+
+- **Logo updated**: Changed logo from `⌥⌘` to `␣⌘` (space-command) across all UI and documentation
 
 ### Added
 
@@ -129,7 +133,7 @@ All notable changes to the ⌥⌘ Space Command plugin will be documented in thi
 
 - **Ideas Tab**: New sidebar tab for capturing ideas separate from actionable TODOs
   - Toggle between TODOs (checkmark icon) and Ideas (lightbulb icon) tabs
-  - Sidebar header now shows "⌥⌘ Space Command" with tab navigation
+  - Sidebar header now shows "␣⌘ Space Command" with tab navigation
 - **Idea tracking**: New `#idea` tag for capturing ideas
   - Ideas shown in Ideas tab with checkbox and link to source
   - Clicking checkbox dismisses the idea (removes `#idea` tag)
@@ -169,10 +173,10 @@ All notable changes to the ⌥⌘ Space Command plugin will be documented in thi
 
 ### Added
 
-- **Branded logo styling**: New `⌥⌘` logo element with styled appearance
+- **Branded logo styling**: New `␣⌘` logo element with styled appearance
   - Blue background (`#689fd6`), white text, rounded corners
   - Used in sidebar header
-  - All Notice messages now prefixed with `⌥⌘` for brand consistency
+  - All Notice messages now prefixed with `␣⌘` for brand consistency
 
 ### Technical
 
@@ -502,7 +506,7 @@ All notable changes to the ⌥⌘ Space Command plugin will be documented in thi
   - Uses tokenizer and DOM manipulation instead of HTML injection
 
 ### Improved
-- Plugin name consistency: All docs now use "⌥⌘ Space Command"
+- Plugin name consistency: All docs now use "␣⌘ Space Command"
 - Documentation reorganization: Internal docs moved to `docs/development/`
 - Comprehensive README with table of contents and v0.2.1 features
 - Installation paths corrected to `.obsidian/plugins/space-command/`
