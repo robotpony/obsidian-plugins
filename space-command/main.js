@@ -138,7 +138,7 @@ var import_obsidian2 = require("obsidian");
 
 // src/utils.ts
 var import_obsidian = require("obsidian");
-var LOGO_PREFIX = "\u2325\u2318";
+var LOGO_PREFIX = "\u2423\u2318";
 function formatDate(date, format) {
   return (0, import_obsidian.moment)(date).format(format);
 }
@@ -1398,7 +1398,7 @@ var EmbedRenderer = class {
     if (isCompleted) {
       textSpan.addClass("todone-text");
     }
-    let cleanText = todo.text.replace(/#todo\b/g, "").replace(/#todone\b/g, "").trim();
+    let cleanText = todo.text.replace(/#todos?\b/g, "").replace(/#todones?\b/g, "").trim();
     const completionDate = isCompleted ? this.extractCompletionDate(cleanText) : null;
     if (completionDate) {
       cleanText = cleanText.replace(/@\d{4}-\d{2}-\d{2}/, "").trim();
@@ -1925,7 +1925,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     return VIEW_TYPE_TODO_SIDEBAR;
   }
   getDisplayText() {
-    return "\u2325\u2318 TODOs";
+    return "\u2423\u2318 TODOs";
   }
   getIcon() {
     return "checkbox-glyph";
@@ -2106,7 +2106,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     container.addClass("space-command-sidebar");
     const headerDiv = container.createEl("div", { cls: "sidebar-header" });
     const titleEl = headerDiv.createEl("h4", { cls: "sidebar-title" });
-    titleEl.createEl("span", { cls: "space-command-logo", text: "\u2325\u2318" });
+    titleEl.createEl("span", { cls: "space-command-logo", text: "\u2423\u2318" });
     titleEl.appendText(" Space Command");
     const tabNav = headerDiv.createEl("div", { cls: "sidebar-tab-nav" });
     const todosTab = tabNav.createEl("button", {
@@ -13207,7 +13207,7 @@ var SpaceCommandSettingTab = class extends import_obsidian9.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: "\u2325\u2318 Space Command Settings" });
+    containerEl.createEl("h2", { text: "\u2423\u2318 Space Command Settings" });
     new import_obsidian9.Setting(containerEl).setName("Default TODONE file").setDesc("Default file path for logging completed TODOs").addText(
       (text5) => text5.setPlaceholder("todos/done.md").setValue(this.plugin.settings.defaultTodoneFile).onChange(async (value) => {
         this.plugin.settings.defaultTodoneFile = value;

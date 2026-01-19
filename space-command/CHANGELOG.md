@@ -2,6 +2,14 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.7.7] - 2026-01-19
+
+### Changed
+
+- **Dynamic sidebar title**: Sidebar header now shows "␣⌘ TODOs" or "␣⌘ IDEAs" based on active tab
+  - Previously always showed "␣⌘ Space Command"
+  - Tab title in Obsidian also updates to match
+
 ## [0.7.6] - 2026-01-19
 
 ### Changed
@@ -12,7 +20,7 @@ All notable changes to the ␣⌘ Space Command plugin will be documented in thi
 
 - **Plural tag variants**: `#todos`, `#ideas`, `#principles`, and `#todones` now work as synonyms for their singular forms
   - Useful for header-block lists where plural reads more naturally (e.g., `## Project #todos`)
-  - Both forms are stripped from display in sidebar
+  - Both forms are stripped from display in sidebar and embedded focus lists
 
 ## [0.7.5] - 2026-01-19
 

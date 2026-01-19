@@ -387,7 +387,7 @@ export class EmbedRenderer {
     if (isCompleted) {
       textSpan.addClass("todone-text");
     }
-    let cleanText = todo.text.replace(/#todo\b/g, "").replace(/#todone\b/g, "").trim();
+    let cleanText = todo.text.replace(/#todos?\b/g, "").replace(/#todones?\b/g, "").trim();
     // Remove completion date from display text (we'll show it separately)
     const completionDate = isCompleted ? this.extractCompletionDate(cleanText) : null;
     if (completionDate) {

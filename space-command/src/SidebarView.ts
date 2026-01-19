@@ -49,7 +49,7 @@ export class TodoSidebarView extends ItemView {
   }
 
   getDisplayText(): string {
-    return "␣⌘ TODOs";
+    return this.activeTab === 'todos' ? "␣⌘ TODOs" : "␣⌘ IDEAs";
   }
 
   getIcon(): string {
@@ -330,7 +330,7 @@ export class TodoSidebarView extends ItemView {
     const headerDiv = container.createEl("div", { cls: "sidebar-header" });
     const titleEl = headerDiv.createEl("h4", { cls: "sidebar-title" });
     titleEl.createEl("span", { cls: "space-command-logo", text: "␣⌘" });
-    titleEl.appendText(" Space Command");
+    titleEl.appendText(this.activeTab === 'todos' ? " TODOs" : " IDEAs");
 
     // Tab navigation
     const tabNav = headerDiv.createEl("div", { cls: "sidebar-tab-nav" });
