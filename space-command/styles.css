@@ -64,6 +64,78 @@
   color: var(--text-accent);
 }
 
+/* Stats Modal */
+.space-command-stats-modal {
+  text-align: center;
+  padding: 20px;
+}
+
+.space-command-stats-modal .stats-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.space-command-stats-modal .stats-logo {
+  font-size: 2em;
+  padding: 8px 10px 6px;
+}
+
+.space-command-stats-modal .stats-header h2 {
+  margin: 0;
+  font-size: 1.5em;
+}
+
+.space-command-stats-modal .stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+  text-align: left;
+}
+
+.space-command-stats-modal .stats-section {
+  background-color: var(--background-secondary);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.space-command-stats-modal .stats-section h3 {
+  margin: 0 0 12px 0;
+  font-size: 1em;
+  color: var(--text-normal);
+  border-bottom: 1px solid var(--background-modifier-border);
+  padding-bottom: 8px;
+}
+
+.space-command-stats-modal .stats-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+
+.space-command-stats-modal .stats-label {
+  color: var(--text-muted);
+}
+
+.space-command-stats-modal .stats-value {
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.space-command-stats-modal .stats-summary {
+  border-top: 1px solid var(--background-modifier-border);
+  padding-top: 16px;
+}
+
+.space-command-stats-modal .stats-total {
+  font-size: 1.1em;
+  color: var(--text-muted);
+  margin: 0;
+}
+
 /* About Section in Settings */
 .space-command-about-section {
   background-color: var(--background-secondary);

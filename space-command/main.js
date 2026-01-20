@@ -2423,7 +2423,7 @@ var DateSuggest = class extends import_obsidian7.EditorSuggest {
 var import_obsidian8 = require("obsidian");
 var VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 var TodoSidebarView = class extends import_obsidian8.ItemView {
-  constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, recentTodonesLimit, onShowAbout) {
+  constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, recentTodonesLimit, onShowAbout, onShowStats) {
     super(leaf);
     this.updateListener = null;
     this.activeTab = "todos";
@@ -2458,6 +2458,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     this.defaultTodoneFile = defaultTodoneFile;
     this.recentTodonesLimit = recentTodonesLimit;
     this.onShowAbout = onShowAbout;
+    this.onShowStats = onShowStats;
     this.contextMenuHandler = new ContextMenuHandler(
       this.app,
       processor,
@@ -2757,6 +2758,9 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
         });
       });
       menu.addSeparator();
+      menu.addItem((item) => {
+        item.setTitle("Stats").setIcon("bar-chart-2").onClick(() => this.onShowStats());
+      });
       menu.addItem((item) => {
         item.setTitle("Settings").setIcon("settings").onClick(() => {
           this.app.setting.open();
@@ -13679,7 +13683,8 @@ var SpaceCommandPlugin = class extends import_obsidian9.Plugin {
         this.settings.defaultTodoneFile,
         this.settings.priorityTags,
         this.settings.recentTodonesLimit,
-        () => this.showAboutModal()
+        () => this.showAboutModal(),
+        () => this.showStatsModal()
       )
     );
     if (this.settings.showSidebarByDefault) {
@@ -13839,6 +13844,9 @@ var SpaceCommandPlugin = class extends import_obsidian9.Plugin {
   showAboutModal() {
     new AboutModal(this.app).open();
   }
+  showStatsModal() {
+    new StatsModal(this.app, this.scanner).open();
+  }
 };
 var AboutModal = class extends import_obsidian9.Modal {
   constructor(app) {
@@ -13863,6 +13871,55 @@ var AboutModal = class extends import_obsidian9.Modal {
       text: "github.com/robotpony/obsidian-plugins",
       href: "https://github.com/robotpony/obsidian-plugins"
     });
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
+var StatsModal = class extends import_obsidian9.Modal {
+  constructor(app, scanner) {
+    super(app);
+    this.scanner = scanner;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass("space-command-stats-modal");
+    const header = contentEl.createEl("div", { cls: "stats-header" });
+    header.createEl("span", { cls: "space-command-logo stats-logo", text: "\u2423\u2318" });
+    header.createEl("h2", { text: "Vault Statistics" });
+    const todos = this.scanner.getTodos();
+    const todones = this.scanner.getTodones();
+    const ideas = this.scanner.getIdeas();
+    const principles = this.scanner.getPrinciples();
+    const focusedTodos = todos.filter((t) => t.tags.includes("#focus")).length;
+    const focusedIdeas = ideas.filter((i) => i.tags.includes("#focus")).length;
+    const snoozedTodos = todos.filter((t) => t.tags.includes("#future")).length;
+    const statsGrid = contentEl.createEl("div", { cls: "stats-grid" });
+    const todosSection = statsGrid.createEl("div", { cls: "stats-section" });
+    todosSection.createEl("h3", { text: "TODOs" });
+    this.createStatRow(todosSection, "Active", todos.length);
+    this.createStatRow(todosSection, "Focused", focusedTodos);
+    this.createStatRow(todosSection, "Snoozed", snoozedTodos);
+    this.createStatRow(todosSection, "Completed", todones.length);
+    const ideasSection = statsGrid.createEl("div", { cls: "stats-section" });
+    ideasSection.createEl("h3", { text: "Ideas" });
+    this.createStatRow(ideasSection, "Total", ideas.length);
+    this.createStatRow(ideasSection, "Focused", focusedIdeas);
+    const principlesSection = statsGrid.createEl("div", { cls: "stats-section" });
+    principlesSection.createEl("h3", { text: "Principles" });
+    this.createStatRow(principlesSection, "Total", principles.length);
+    const summarySection = contentEl.createEl("div", { cls: "stats-summary" });
+    const total = todos.length + todones.length + ideas.length + principles.length;
+    summarySection.createEl("p", {
+      text: `Total tracked items: ${total}`,
+      cls: "stats-total"
+    });
+  }
+  createStatRow(container, label, value) {
+    const row = container.createEl("div", { cls: "stats-row" });
+    row.createEl("span", { cls: "stats-label", text: label });
+    row.createEl("span", { cls: "stats-value", text: String(value) });
   }
   onClose() {
     this.contentEl.empty();

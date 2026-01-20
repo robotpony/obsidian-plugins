@@ -2,6 +2,17 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.7.26] - 2026-01-19
+
+### Added
+
+- **Vault Statistics**: New "Stats" option in the sidebar kebab menu (vertical dots)
+  - Opens a modal showing summary statistics for your vault
+  - **TODOs**: Active count, focused count, snoozed count, completed count
+  - **Ideas**: Total count, focused count
+  - **Principles**: Total count
+  - Shows grand total of all tracked items
+
 ## [0.7.25] - 2026-01-19
 
 ### Fixed

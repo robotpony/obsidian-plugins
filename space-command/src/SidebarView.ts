@@ -20,6 +20,7 @@ export class TodoSidebarView extends ItemView {
   private activeTagFilter: string | null = null;
   private openDropdown: HTMLElement | null = null;
   private onShowAbout: () => void;
+  private onShowStats: () => void;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -29,7 +30,8 @@ export class TodoSidebarView extends ItemView {
     defaultTodoneFile: string,
     priorityTags: string[],
     recentTodonesLimit: number,
-    onShowAbout: () => void
+    onShowAbout: () => void,
+    onShowStats: () => void
   ) {
     super(leaf);
     this.scanner = scanner;
@@ -38,6 +40,7 @@ export class TodoSidebarView extends ItemView {
     this.defaultTodoneFile = defaultTodoneFile;
     this.recentTodonesLimit = recentTodonesLimit;
     this.onShowAbout = onShowAbout;
+    this.onShowStats = onShowStats;
 
     // Initialize context menu handler
     this.contextMenuHandler = new ContextMenuHandler(
@@ -486,6 +489,14 @@ export class TodoSidebarView extends ItemView {
       });
 
       menu.addSeparator();
+
+      // Stats
+      menu.addItem((item) => {
+        item
+          .setTitle("Stats")
+          .setIcon("bar-chart-2")
+          .onClick(() => this.onShowStats());
+      });
 
       // Settings
       menu.addItem((item) => {

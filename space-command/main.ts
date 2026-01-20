@@ -134,7 +134,8 @@ export default class SpaceCommandPlugin extends Plugin {
           this.settings.defaultTodoneFile,
           this.settings.priorityTags,
           this.settings.recentTodonesLimit,
-          () => this.showAboutModal()
+          () => this.showAboutModal(),
+          () => this.showStatsModal()
         )
     );
 
@@ -338,6 +339,10 @@ export default class SpaceCommandPlugin extends Plugin {
   showAboutModal() {
     new AboutModal(this.app).open();
   }
+
+  showStatsModal() {
+    new StatsModal(this.app, this.scanner).open();
+  }
 }
 
 // About modal for displaying plugin information
@@ -372,6 +377,80 @@ class AboutModal extends Modal {
       text: "github.com/robotpony/obsidian-plugins",
       href: "https://github.com/robotpony/obsidian-plugins",
     });
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+  }
+}
+
+// Stats modal for displaying vault statistics
+class StatsModal extends Modal {
+  private scanner: TodoScanner;
+
+  constructor(app: App, scanner: TodoScanner) {
+    super(app);
+    this.scanner = scanner;
+  }
+
+  onOpen(): void {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass("space-command-stats-modal");
+
+    // Header
+    const header = contentEl.createEl("div", { cls: "stats-header" });
+    header.createEl("span", { cls: "space-command-logo stats-logo", text: "␣⌘" });
+    header.createEl("h2", { text: "Vault Statistics" });
+
+    // Gather stats
+    const todos = this.scanner.getTodos();
+    const todones = this.scanner.getTodones();
+    const ideas = this.scanner.getIdeas();
+    const principles = this.scanner.getPrinciples();
+
+    // Count focused items
+    const focusedTodos = todos.filter(t => t.tags.includes("#focus")).length;
+    const focusedIdeas = ideas.filter(i => i.tags.includes("#focus")).length;
+
+    // Count snoozed items
+    const snoozedTodos = todos.filter(t => t.tags.includes("#future")).length;
+
+    // Stats grid
+    const statsGrid = contentEl.createEl("div", { cls: "stats-grid" });
+
+    // TODOs section
+    const todosSection = statsGrid.createEl("div", { cls: "stats-section" });
+    todosSection.createEl("h3", { text: "TODOs" });
+    this.createStatRow(todosSection, "Active", todos.length);
+    this.createStatRow(todosSection, "Focused", focusedTodos);
+    this.createStatRow(todosSection, "Snoozed", snoozedTodos);
+    this.createStatRow(todosSection, "Completed", todones.length);
+
+    // Ideas section
+    const ideasSection = statsGrid.createEl("div", { cls: "stats-section" });
+    ideasSection.createEl("h3", { text: "Ideas" });
+    this.createStatRow(ideasSection, "Total", ideas.length);
+    this.createStatRow(ideasSection, "Focused", focusedIdeas);
+
+    // Principles section
+    const principlesSection = statsGrid.createEl("div", { cls: "stats-section" });
+    principlesSection.createEl("h3", { text: "Principles" });
+    this.createStatRow(principlesSection, "Total", principles.length);
+
+    // Summary
+    const summarySection = contentEl.createEl("div", { cls: "stats-summary" });
+    const total = todos.length + todones.length + ideas.length + principles.length;
+    summarySection.createEl("p", {
+      text: `Total tracked items: ${total}`,
+      cls: "stats-total"
+    });
+  }
+
+  private createStatRow(container: HTMLElement, label: string, value: number): void {
+    const row = container.createEl("div", { cls: "stats-row" });
+    row.createEl("span", { cls: "stats-label", text: label });
+    row.createEl("span", { cls: "stats-value", text: String(value) });
   }
 
   onClose(): void {
