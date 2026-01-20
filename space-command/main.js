@@ -1242,6 +1242,20 @@ var EmbedRenderer = class {
   renderProjects(container) {
     this.renderFocusList(container);
   }
+  // Public helper method for focus-ideas code blocks
+  renderIdeas(container, filterString) {
+    const filters = FilterParser.parse(filterString);
+    const allIdeas = this.scanner.getIdeas();
+    const filteredIdeas = FilterParser.applyFilters(allIdeas, filters);
+    this.renderIdeaList(container, filteredIdeas, filterString, allIdeas);
+  }
+  // Public helper method for focus-principles code blocks
+  renderPrinciples(container, filterString) {
+    const filters = FilterParser.parse(filterString);
+    const allPrinciples = this.scanner.getPrinciples();
+    const filteredPrinciples = FilterParser.applyFilters(allPrinciples, filters);
+    this.renderPrincipleList(container, filteredPrinciples, filterString, allPrinciples);
+  }
   async render(source, el) {
     var _a;
     const focusListMatch = source.match(/\{\{focus-list\}\}/);
@@ -1469,6 +1483,140 @@ var EmbedRenderer = class {
       }
     }
   }
+  // Render ideas list (similar to renderTodoList but for ideas)
+  renderIdeaList(container, ideas, filterString = "", unfilteredIdeas) {
+    container.empty();
+    container.addClass("space-command-embed", "focus-ideas-embed");
+    const header = container.createEl("div", { cls: "embed-header" });
+    const refreshBtn = header.createEl("button", {
+      cls: "clickable-icon embed-refresh-btn",
+      attr: { "aria-label": "Refresh" }
+    });
+    refreshBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>';
+    refreshBtn.addEventListener("click", () => {
+      this.refreshIdeaEmbed(container, filterString);
+    });
+    this.setupIdeaAutoRefresh(container, filterString);
+    if (ideas.length === 0) {
+      container.createEl("div", {
+        text: "No ideas",
+        cls: "space-command-empty"
+      });
+      return;
+    }
+    const topLevelIdeas = ideas.filter((i) => i.parentLineNumber === void 0);
+    const list4 = container.createEl("ul", { cls: "idea-list" });
+    const allIdeasForLookup = unfilteredIdeas || ideas;
+    for (const idea of topLevelIdeas) {
+      this.renderIdeaItem(list4, idea, allIdeasForLookup, filterString);
+    }
+  }
+  // Render a single idea item (and its children if it's a header)
+  renderIdeaItem(list4, idea, allIdeas, filterString, isChild = false) {
+    const isHeader = idea.isHeader === true;
+    const hasChildren = isHeader && idea.childLineNumbers && idea.childLineNumbers.length > 0;
+    const itemClasses = [
+      "idea-item",
+      isHeader ? "idea-header" : "",
+      isChild ? "idea-child" : "",
+      hasChildren ? "idea-header-with-children" : ""
+    ].filter((c) => c).join(" ");
+    const item = list4.createEl("li", { cls: itemClasses });
+    const rowContainer = hasChildren ? item.createEl("div", { cls: "idea-header-row" }) : item;
+    const textSpan = rowContainer.createEl("span", { cls: "idea-text" });
+    let cleanText = idea.text.replace(/#ideas?\b/g, "").trim();
+    let displayText = cleanText.replace(/^-\s*\[\s*\]\s*/, "").replace(/^-\s*\[x\]\s*/i, "");
+    displayText = displayText.replace(/^#{1,6}\s+/, "").replace(/^[*\-+]\s+/, "").replace(/^>\s+/, "");
+    this.renderInlineMarkdown(displayText, textSpan);
+    textSpan.append(" ");
+    const link2 = rowContainer.createEl("a", {
+      text: "\u2192",
+      cls: "idea-source-link",
+      href: "#"
+    });
+    link2.addEventListener("click", (e) => {
+      e.preventDefault();
+      openFileAtLine(this.app, idea.file, idea.lineNumber);
+    });
+    if (isHeader && idea.childLineNumbers && idea.childLineNumbers.length > 0) {
+      const childrenContainer = item.createEl("ul", { cls: "idea-children" });
+      for (const childLine of idea.childLineNumbers) {
+        const childIdea = allIdeas.find(
+          (i) => i.filePath === idea.filePath && i.lineNumber === childLine
+        );
+        if (childIdea) {
+          this.renderIdeaItem(childrenContainer, childIdea, allIdeas, filterString, true);
+        }
+      }
+    }
+  }
+  // Render principles list
+  renderPrincipleList(container, principles, filterString = "", unfilteredPrinciples) {
+    container.empty();
+    container.addClass("space-command-embed", "focus-principles-embed");
+    const header = container.createEl("div", { cls: "embed-header" });
+    const refreshBtn = header.createEl("button", {
+      cls: "clickable-icon embed-refresh-btn",
+      attr: { "aria-label": "Refresh" }
+    });
+    refreshBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>';
+    refreshBtn.addEventListener("click", () => {
+      this.refreshPrincipleEmbed(container, filterString);
+    });
+    this.setupPrincipleAutoRefresh(container, filterString);
+    if (principles.length === 0) {
+      container.createEl("div", {
+        text: "No principles",
+        cls: "space-command-empty"
+      });
+      return;
+    }
+    const topLevelPrinciples = principles.filter((p) => p.parentLineNumber === void 0);
+    const list4 = container.createEl("ul", { cls: "principle-list" });
+    const allPrinciplesForLookup = unfilteredPrinciples || principles;
+    for (const principle of topLevelPrinciples) {
+      this.renderPrincipleItem(list4, principle, allPrinciplesForLookup, filterString);
+    }
+  }
+  // Render a single principle item (and its children if it's a header)
+  renderPrincipleItem(list4, principle, allPrinciples, filterString, isChild = false) {
+    const isHeader = principle.isHeader === true;
+    const hasChildren = isHeader && principle.childLineNumbers && principle.childLineNumbers.length > 0;
+    const itemClasses = [
+      "principle-item",
+      isHeader ? "principle-header" : "",
+      isChild ? "principle-child" : "",
+      hasChildren ? "principle-header-with-children" : ""
+    ].filter((c) => c).join(" ");
+    const item = list4.createEl("li", { cls: itemClasses });
+    const rowContainer = hasChildren ? item.createEl("div", { cls: "principle-header-row" }) : item;
+    const textSpan = rowContainer.createEl("span", { cls: "principle-text" });
+    let cleanText = principle.text.replace(/#principles?\b/g, "").trim();
+    let displayText = cleanText.replace(/^-\s*\[\s*\]\s*/, "").replace(/^-\s*\[x\]\s*/i, "");
+    displayText = displayText.replace(/^#{1,6}\s+/, "").replace(/^[*\-+]\s+/, "").replace(/^>\s+/, "");
+    this.renderInlineMarkdown(displayText, textSpan);
+    textSpan.append(" ");
+    const link2 = rowContainer.createEl("a", {
+      text: "\u2192",
+      cls: "principle-source-link",
+      href: "#"
+    });
+    link2.addEventListener("click", (e) => {
+      e.preventDefault();
+      openFileAtLine(this.app, principle.file, principle.lineNumber);
+    });
+    if (isHeader && principle.childLineNumbers && principle.childLineNumbers.length > 0) {
+      const childrenContainer = item.createEl("ul", { cls: "principle-children" });
+      for (const childLine of principle.childLineNumbers) {
+        const childPrinciple = allPrinciples.find(
+          (p) => p.filePath === principle.filePath && p.lineNumber === childLine
+        );
+        if (childPrinciple) {
+          this.renderPrincipleItem(childrenContainer, childPrinciple, allPrinciples, filterString, true);
+        }
+      }
+    }
+  }
   // Render inline markdown without creating block elements
   // Uses DOM methods to avoid XSS vulnerabilities
   renderInlineMarkdown(text5, container) {
@@ -1584,6 +1732,46 @@ var EmbedRenderer = class {
     const combined = [...filteredTodos, ...filteredTodones];
     this.renderTodoList(container, combined, todoneFile, filterString, unfiltered);
   }
+  // Setup auto-refresh for idea embeds
+  setupIdeaAutoRefresh(container, filterString) {
+    this.cleanup(container);
+    const listener = () => {
+      if (container.isConnected) {
+        this.refreshIdeaEmbed(container, filterString);
+      } else {
+        this.cleanup(container);
+      }
+    };
+    this.scanner.on("todos-updated", listener);
+    this.activeRenders.set(container, listener);
+  }
+  // Refresh idea embed
+  refreshIdeaEmbed(container, filterString) {
+    const filters = FilterParser.parse(filterString);
+    const allIdeas = this.scanner.getIdeas();
+    const filteredIdeas = FilterParser.applyFilters(allIdeas, filters);
+    this.renderIdeaList(container, filteredIdeas, filterString, allIdeas);
+  }
+  // Setup auto-refresh for principle embeds
+  setupPrincipleAutoRefresh(container, filterString) {
+    this.cleanup(container);
+    const listener = () => {
+      if (container.isConnected) {
+        this.refreshPrincipleEmbed(container, filterString);
+      } else {
+        this.cleanup(container);
+      }
+    };
+    this.scanner.on("todos-updated", listener);
+    this.activeRenders.set(container, listener);
+  }
+  // Refresh principle embed
+  refreshPrincipleEmbed(container, filterString) {
+    const filters = FilterParser.parse(filterString);
+    const allPrinciples = this.scanner.getPrinciples();
+    const filteredPrinciples = FilterParser.applyFilters(allPrinciples, filters);
+    this.renderPrincipleList(container, filteredPrinciples, filterString, allPrinciples);
+  }
 };
 
 // src/CodeBlockProcessor.ts
@@ -1592,7 +1780,7 @@ var CodeBlockProcessor = class {
     this.embedRenderer = embedRenderer;
     this.defaultTodoneFile = defaultTodoneFile;
   }
-  // Register both code block processors
+  // Register all code block processors
   registerProcessors(plugin) {
     plugin.registerMarkdownCodeBlockProcessor(
       "focus-todos",
@@ -1601,6 +1789,14 @@ var CodeBlockProcessor = class {
     plugin.registerMarkdownCodeBlockProcessor(
       "focus-list",
       this.processFocusList.bind(this)
+    );
+    plugin.registerMarkdownCodeBlockProcessor(
+      "focus-ideas",
+      this.processFocusIdeas.bind(this)
+    );
+    plugin.registerMarkdownCodeBlockProcessor(
+      "focus-principles",
+      this.processFocusPrinciples.bind(this)
     );
   }
   // Handle focus-todos code blocks
@@ -1611,6 +1807,16 @@ var CodeBlockProcessor = class {
   // Handle focus-list code blocks
   processFocusList(source, el) {
     this.embedRenderer.renderProjects(el);
+  }
+  // Handle focus-ideas code blocks
+  processFocusIdeas(source, el) {
+    const { filterString } = this.parseContent(source);
+    this.embedRenderer.renderIdeas(el, filterString);
+  }
+  // Handle focus-principles code blocks
+  processFocusPrinciples(source, el) {
+    const { filterString } = this.parseContent(source);
+    this.embedRenderer.renderPrinciples(el, filterString);
   }
   // Parse code block content
   // Supports multiple formats:

@@ -2,6 +2,24 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.7.12] - 2026-01-19
+
+### Added
+
+- **`focus-ideas` code block support**: Embed ideas with filtering
+  - Syntax: `` ```focus-ideas `` with optional `tags:`, `path:`, `limit:` filters
+  - Supports header ideas with children (same as todos)
+  - Auto-refreshes when ideas change
+- **`focus-principles` code block support**: Embed principles with filtering
+  - Same filter syntax as `focus-ideas`
+  - Supports header principles with children
+
+### Technical
+
+- New `renderIdeas()` and `renderPrinciples()` public methods in `EmbedRenderer`
+- New `processFocusIdeas()` and `processFocusPrinciples()` methods in `CodeBlockProcessor`
+- Registered `focus-ideas` and `focus-principles` as markdown code block processors
+
 ## [0.7.11] - 2026-01-19
 
 ### Fixed

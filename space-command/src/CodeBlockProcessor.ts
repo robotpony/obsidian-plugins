@@ -7,7 +7,7 @@ export class CodeBlockProcessor {
     private defaultTodoneFile: string
   ) {}
 
-  // Register both code block processors
+  // Register all code block processors
   registerProcessors(plugin: Plugin): void {
     plugin.registerMarkdownCodeBlockProcessor(
       "focus-todos",
@@ -16,6 +16,14 @@ export class CodeBlockProcessor {
     plugin.registerMarkdownCodeBlockProcessor(
       "focus-list",
       this.processFocusList.bind(this)
+    );
+    plugin.registerMarkdownCodeBlockProcessor(
+      "focus-ideas",
+      this.processFocusIdeas.bind(this)
+    );
+    plugin.registerMarkdownCodeBlockProcessor(
+      "focus-principles",
+      this.processFocusPrinciples.bind(this)
     );
   }
 
@@ -28,6 +36,18 @@ export class CodeBlockProcessor {
   // Handle focus-list code blocks
   processFocusList(source: string, el: HTMLElement): void {
     this.embedRenderer.renderProjects(el);
+  }
+
+  // Handle focus-ideas code blocks
+  processFocusIdeas(source: string, el: HTMLElement): void {
+    const { filterString } = this.parseContent(source);
+    this.embedRenderer.renderIdeas(el, filterString);
+  }
+
+  // Handle focus-principles code blocks
+  processFocusPrinciples(source: string, el: HTMLElement): void {
+    const { filterString } = this.parseContent(source);
+    this.embedRenderer.renderPrinciples(el, filterString);
   }
 
   // Parse code block content

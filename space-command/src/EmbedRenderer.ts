@@ -87,6 +87,28 @@ export class EmbedRenderer {
     this.renderFocusList(container);
   }
 
+  // Public helper method for focus-ideas code blocks
+  public renderIdeas(
+    container: HTMLElement,
+    filterString: string
+  ): void {
+    const filters = FilterParser.parse(filterString);
+    const allIdeas = this.scanner.getIdeas();
+    const filteredIdeas = FilterParser.applyFilters(allIdeas, filters);
+    this.renderIdeaList(container, filteredIdeas, filterString, allIdeas);
+  }
+
+  // Public helper method for focus-principles code blocks
+  public renderPrinciples(
+    container: HTMLElement,
+    filterString: string
+  ): void {
+    const filters = FilterParser.parse(filterString);
+    const allPrinciples = this.scanner.getPrinciples();
+    const filteredPrinciples = FilterParser.applyFilters(allPrinciples, filters);
+    this.renderPrincipleList(container, filteredPrinciples, filterString, allPrinciples);
+  }
+
   async render(source: string, el: HTMLElement): Promise<void> {
     // Check if this is a focus-list embed
     const focusListMatch = source.match(/\{\{focus-list\}\}/);
@@ -443,6 +465,230 @@ export class EmbedRenderer {
     }
   }
 
+  // Render ideas list (similar to renderTodoList but for ideas)
+  private renderIdeaList(
+    container: HTMLElement,
+    ideas: TodoItem[],
+    filterString: string = "",
+    unfilteredIdeas?: TodoItem[]
+  ): void {
+    container.empty();
+    container.addClass("space-command-embed", "focus-ideas-embed");
+
+    // Add header with refresh button
+    const header = container.createEl("div", { cls: "embed-header" });
+
+    const refreshBtn = header.createEl("button", {
+      cls: "clickable-icon embed-refresh-btn",
+      attr: { "aria-label": "Refresh" },
+    });
+    refreshBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>';
+
+    refreshBtn.addEventListener("click", () => {
+      this.refreshIdeaEmbed(container, filterString);
+    });
+
+    // Set up auto-refresh listener
+    this.setupIdeaAutoRefresh(container, filterString);
+
+    if (ideas.length === 0) {
+      container.createEl("div", {
+        text: "No ideas",
+        cls: "space-command-empty",
+      });
+      return;
+    }
+
+    // Filter out child items (they'll be rendered under their parent header)
+    const topLevelIdeas = ideas.filter(i => i.parentLineNumber === undefined);
+
+    const list = container.createEl("ul", { cls: "idea-list" });
+
+    // Use unfiltered ideas for child lookup
+    const allIdeasForLookup = unfilteredIdeas || ideas;
+
+    for (const idea of topLevelIdeas) {
+      this.renderIdeaItem(list, idea, allIdeasForLookup, filterString);
+    }
+  }
+
+  // Render a single idea item (and its children if it's a header)
+  private renderIdeaItem(
+    list: HTMLElement,
+    idea: TodoItem,
+    allIdeas: TodoItem[],
+    filterString: string,
+    isChild: boolean = false
+  ): void {
+    const isHeader = idea.isHeader === true;
+    const hasChildren = isHeader && idea.childLineNumbers && idea.childLineNumbers.length > 0;
+
+    const itemClasses = [
+      'idea-item',
+      isHeader ? 'idea-header' : '',
+      isChild ? 'idea-child' : '',
+      hasChildren ? 'idea-header-with-children' : ''
+    ].filter(c => c).join(' ');
+
+    const item = list.createEl("li", { cls: itemClasses });
+
+    // For headers with children, create a row container
+    const rowContainer = hasChildren
+      ? item.createEl("div", { cls: "idea-header-row" })
+      : item;
+
+    // Add idea text (without the #idea tag)
+    const textSpan = rowContainer.createEl("span", { cls: "idea-text" });
+    let cleanText = idea.text.replace(/#ideas?\b/g, "").trim();
+    // Remove leading checkbox if present
+    let displayText = cleanText.replace(/^-\s*\[\s*\]\s*/, "").replace(/^-\s*\[x\]\s*/i, "");
+    // Remove block-level markdown markers
+    displayText = displayText
+      .replace(/^#{1,6}\s+/, "")
+      .replace(/^[*\-+]\s+/, "")
+      .replace(/^>\s+/, "");
+
+    this.renderInlineMarkdown(displayText, textSpan);
+    textSpan.append(" ");
+
+    // Add link to source
+    const link = rowContainer.createEl("a", {
+      text: "→",
+      cls: "idea-source-link",
+      href: "#",
+    });
+
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      openFileAtLine(this.app, idea.file, idea.lineNumber);
+    });
+
+    // If this is a header with children, render children indented below
+    if (isHeader && idea.childLineNumbers && idea.childLineNumbers.length > 0) {
+      const childrenContainer = item.createEl("ul", { cls: "idea-children" });
+      for (const childLine of idea.childLineNumbers) {
+        const childIdea = allIdeas.find(
+          i => i.filePath === idea.filePath && i.lineNumber === childLine
+        );
+        if (childIdea) {
+          this.renderIdeaItem(childrenContainer, childIdea, allIdeas, filterString, true);
+        }
+      }
+    }
+  }
+
+  // Render principles list
+  private renderPrincipleList(
+    container: HTMLElement,
+    principles: TodoItem[],
+    filterString: string = "",
+    unfilteredPrinciples?: TodoItem[]
+  ): void {
+    container.empty();
+    container.addClass("space-command-embed", "focus-principles-embed");
+
+    // Add header with refresh button
+    const header = container.createEl("div", { cls: "embed-header" });
+
+    const refreshBtn = header.createEl("button", {
+      cls: "clickable-icon embed-refresh-btn",
+      attr: { "aria-label": "Refresh" },
+    });
+    refreshBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>';
+
+    refreshBtn.addEventListener("click", () => {
+      this.refreshPrincipleEmbed(container, filterString);
+    });
+
+    // Set up auto-refresh listener
+    this.setupPrincipleAutoRefresh(container, filterString);
+
+    if (principles.length === 0) {
+      container.createEl("div", {
+        text: "No principles",
+        cls: "space-command-empty",
+      });
+      return;
+    }
+
+    // Filter out child items
+    const topLevelPrinciples = principles.filter(p => p.parentLineNumber === undefined);
+
+    const list = container.createEl("ul", { cls: "principle-list" });
+
+    // Use unfiltered principles for child lookup
+    const allPrinciplesForLookup = unfilteredPrinciples || principles;
+
+    for (const principle of topLevelPrinciples) {
+      this.renderPrincipleItem(list, principle, allPrinciplesForLookup, filterString);
+    }
+  }
+
+  // Render a single principle item (and its children if it's a header)
+  private renderPrincipleItem(
+    list: HTMLElement,
+    principle: TodoItem,
+    allPrinciples: TodoItem[],
+    filterString: string,
+    isChild: boolean = false
+  ): void {
+    const isHeader = principle.isHeader === true;
+    const hasChildren = isHeader && principle.childLineNumbers && principle.childLineNumbers.length > 0;
+
+    const itemClasses = [
+      'principle-item',
+      isHeader ? 'principle-header' : '',
+      isChild ? 'principle-child' : '',
+      hasChildren ? 'principle-header-with-children' : ''
+    ].filter(c => c).join(' ');
+
+    const item = list.createEl("li", { cls: itemClasses });
+
+    // For headers with children, create a row container
+    const rowContainer = hasChildren
+      ? item.createEl("div", { cls: "principle-header-row" })
+      : item;
+
+    // Add principle text (without the #principle tag)
+    const textSpan = rowContainer.createEl("span", { cls: "principle-text" });
+    let cleanText = principle.text.replace(/#principles?\b/g, "").trim();
+    // Remove leading checkbox if present
+    let displayText = cleanText.replace(/^-\s*\[\s*\]\s*/, "").replace(/^-\s*\[x\]\s*/i, "");
+    // Remove block-level markdown markers
+    displayText = displayText
+      .replace(/^#{1,6}\s+/, "")
+      .replace(/^[*\-+]\s+/, "")
+      .replace(/^>\s+/, "");
+
+    this.renderInlineMarkdown(displayText, textSpan);
+    textSpan.append(" ");
+
+    // Add link to source
+    const link = rowContainer.createEl("a", {
+      text: "→",
+      cls: "principle-source-link",
+      href: "#",
+    });
+
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      openFileAtLine(this.app, principle.file, principle.lineNumber);
+    });
+
+    // If this is a header with children, render children indented below
+    if (isHeader && principle.childLineNumbers && principle.childLineNumbers.length > 0) {
+      const childrenContainer = item.createEl("ul", { cls: "principle-children" });
+      for (const childLine of principle.childLineNumbers) {
+        const childPrinciple = allPrinciples.find(
+          p => p.filePath === principle.filePath && p.lineNumber === childLine
+        );
+        if (childPrinciple) {
+          this.renderPrincipleItem(childrenContainer, childPrinciple, allPrinciples, filterString, true);
+        }
+      }
+    }
+  }
+
   // Render inline markdown without creating block elements
   // Uses DOM methods to avoid XSS vulnerabilities
   private renderInlineMarkdown(text: string, container: HTMLElement): void {
@@ -622,6 +868,66 @@ export class EmbedRenderer {
     const filteredTodones = FilterParser.applyFilters(allTodones, filters);
     const combined = [...filteredTodos, ...filteredTodones];
     this.renderTodoList(container, combined, todoneFile, filterString, unfiltered);
+  }
+
+  // Setup auto-refresh for idea embeds
+  private setupIdeaAutoRefresh(
+    container: HTMLElement,
+    filterString: string
+  ): void {
+    this.cleanup(container);
+
+    const listener = () => {
+      if (container.isConnected) {
+        this.refreshIdeaEmbed(container, filterString);
+      } else {
+        this.cleanup(container);
+      }
+    };
+
+    this.scanner.on("todos-updated", listener);
+    this.activeRenders.set(container, listener);
+  }
+
+  // Refresh idea embed
+  private refreshIdeaEmbed(
+    container: HTMLElement,
+    filterString: string
+  ): void {
+    const filters = FilterParser.parse(filterString);
+    const allIdeas = this.scanner.getIdeas();
+    const filteredIdeas = FilterParser.applyFilters(allIdeas, filters);
+    this.renderIdeaList(container, filteredIdeas, filterString, allIdeas);
+  }
+
+  // Setup auto-refresh for principle embeds
+  private setupPrincipleAutoRefresh(
+    container: HTMLElement,
+    filterString: string
+  ): void {
+    this.cleanup(container);
+
+    const listener = () => {
+      if (container.isConnected) {
+        this.refreshPrincipleEmbed(container, filterString);
+      } else {
+        this.cleanup(container);
+      }
+    };
+
+    this.scanner.on("todos-updated", listener);
+    this.activeRenders.set(container, listener);
+  }
+
+  // Refresh principle embed
+  private refreshPrincipleEmbed(
+    container: HTMLElement,
+    filterString: string
+  ): void {
+    const filters = FilterParser.parse(filterString);
+    const allPrinciples = this.scanner.getPrinciples();
+    const filteredPrinciples = FilterParser.applyFilters(allPrinciples, filters);
+    this.renderPrincipleList(container, filteredPrinciples, filterString, allPrinciples);
   }
 
 }
