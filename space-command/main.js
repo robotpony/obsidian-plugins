@@ -169,8 +169,9 @@ function getPriorityValue(tags) {
   return 4;
 }
 function extractTags(text5) {
+  const textWithoutCode = text5.replace(/`[^`]*`/g, "");
   const tagRegex = /#[\w-]+/g;
-  return text5.match(tagRegex) || [];
+  return textWithoutCode.match(tagRegex) || [];
 }
 function filenameToTag(basename2) {
   return "#" + basename2.toLowerCase().replace(/\s+/g, "-");
@@ -2555,10 +2556,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     this.renderListItem(list4, todo, this.todoConfig, isChild);
   }
   renderRecentTodones(container) {
-    let allTodones = this.scanner.getTodones(100);
-    if (this.activeTagFilter) {
-      allTodones = allTodones.filter((todone) => todone.tags.includes(this.activeTagFilter));
-    }
+    const allTodones = this.scanner.getTodones(100);
     const todones = allTodones.slice(0, this.recentTodonesLimit);
     const section = container.createEl("div", { cls: "todone-section" });
     const header = section.createEl("div", {
@@ -2566,7 +2564,6 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     });
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
     titleSpan.textContent = "DONE";
-    this.renderFilterIndicator(header);
     const fileLink = header.createEl("a", {
       text: this.defaultTodoneFile,
       cls: "done-file-link",

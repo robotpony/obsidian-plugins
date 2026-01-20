@@ -2,22 +2,28 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.7.19] - 2026-01-19
+
+### Changed
+
+- **DONE section no longer filtered**: The DONE section always shows recent completions regardless of active tag filter
+  - Filter indicator button removed from DONE header
+  - Completed items represent history and should always be visible
+
+### Fixed
+
+- **Tags in inline code excluded from sidebar**: Tags inside backticks (e.g., `` `#ideation` ``) are now correctly excluded from the sidebar tag dropdown
+  - Inline code tags are for documentation purposes, not actual tags
+  - Reverts unintended behavior from 0.7.17
+
 ## [0.7.18] - 2026-01-19
 
 ### Added
 
 - **Filter indicator button in section headers**: When a tag filter is active, a clickable badge showing the filter (e.g., `#project ×`) appears after each section title
   - Click the badge to clear the filter instantly
-  - Appears in all sections: Focus, TODO, DONE, Principles, Ideas
+  - Appears in sections: Focus, TODO, Principles, Ideas (not DONE)
   - Empty state messages now indicate the active filter (e.g., "No TODOs matching #project")
-
-## [0.7.17] - 2026-01-19
-
-### Fixed
-
-- **Tags in inline code now visible in sidebar**: Tags inside backticks (e.g., `` `#ideation` ``) now appear in the sidebar tag dropdown
-  - Previously, tags in inline code were filtered out entirely
-  - Useful when documenting tags in examples like "Consider using a `#ideation` tag"
 
 ## [0.7.16] - 2026-01-19
 

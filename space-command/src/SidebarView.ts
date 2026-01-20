@@ -623,13 +623,9 @@ export class TodoSidebarView extends ItemView {
   }
 
   private renderRecentTodones(container: HTMLElement): void {
-    let allTodones = this.scanner.getTodones(100); // Get more than we need
+    const allTodones = this.scanner.getTodones(100); // Get more than we need
 
-    // Apply tag filter if active
-    if (this.activeTagFilter) {
-      allTodones = allTodones.filter(todone => todone.tags.includes(this.activeTagFilter!));
-    }
-
+    // DONE section is never filtered - always shows recent completions
     const todones = allTodones.slice(0, this.recentTodonesLimit); // Limit display
 
     const section = container.createEl("div", { cls: "todone-section" });
@@ -640,7 +636,7 @@ export class TodoSidebarView extends ItemView {
 
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
     titleSpan.textContent = "DONE";
-    this.renderFilterIndicator(header);
+    // No filter indicator for DONE section
 
     // Add link to done file
     const fileLink = header.createEl("a", {
