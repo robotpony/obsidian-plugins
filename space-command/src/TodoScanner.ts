@@ -414,7 +414,7 @@ export class TodoScanner extends Events {
     });
   }
 
-  // Clean up lines that have both #todo and #todone (remove #todo)
+  // Clean up lines that have both #todo/#todos and #todone/#todones (remove #todo/#todos)
   private async cleanupDuplicateTags(
     file: TFile,
     lines: string[],
@@ -423,8 +423,9 @@ export class TodoScanner extends Events {
     let modified = false;
 
     for (const lineNum of lineNumbers) {
-      // Remove #todo tag from lines that also have #todone
-      const newLine = lines[lineNum].replace(/#todo\b\s*/g, "");
+      // Remove #todo or #todos tag from lines that also have #todone/#todones
+      // Use #todos? to match both singular and plural forms
+      const newLine = lines[lineNum].replace(/#todos?\b\s*/g, "");
       if (newLine !== lines[lineNum]) {
         lines[lineNum] = newLine;
         modified = true;

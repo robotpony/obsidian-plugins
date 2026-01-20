@@ -2,6 +2,20 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.7.11] - 2026-01-19
+
+### Fixed
+
+- **Plural tag completion bug**: Header TODOs using `#todos` (plural) now properly marked as complete
+  - Previously, completing a header with `#todos` would add it to the TODONE file but not update the source file
+  - Root cause: regex `/#todo\b/` didn't match `#todos` (the 's' prevented word boundary match)
+  - Fix: `replaceTodoWithTodone()` now converts `#todos` → `#todones` and `#todo` → `#todone`
+- **TODONE file re-inclusion bug**: Completed items in TODONE file no longer re-appear in sidebar
+  - Previously, items with `#todos` tag would match as TODOs even after completion
+  - Fix: `cleanupDuplicateTags()` now removes both `#todo` and `#todos` when `#todone`/`#todones` present
+- **Reverse operation consistency**: `replaceTodoneWithTodo()` now handles plural forms
+  - `#todones` → `#todos`, `#todone` → `#todo`
+
 ## [0.7.10] - 2026-01-19
 
 ### Fixed

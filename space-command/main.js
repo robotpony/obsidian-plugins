@@ -183,9 +183,17 @@ function markCheckboxComplete(text5) {
   return text5.replace(/^(-\s*\[)[ ](\])/, "$1x$2");
 }
 function replaceTodoWithTodone(text5, date) {
+  if (text5.includes("#todos")) {
+    return text5.replace(/#todos\b/, `#todones @${date}`);
+  }
   return text5.replace(/#todo\b/, `#todone @${date}`);
 }
 function replaceTodoneWithTodo(text5) {
+  if (text5.includes("#todones")) {
+    let result2 = text5.replace(/#todones\s+@\d{4}-\d{2}-\d{2}/, "#todos");
+    result2 = result2.replace(/#todones\b/, "#todos");
+    return result2;
+  }
   let result = text5.replace(/#todone\s+@\d{4}-\d{2}-\d{2}/, "#todo");
   result = result.replace(/#todone\b/, "#todo");
   return result;
@@ -545,11 +553,11 @@ var TodoScanner = class extends import_obsidian2.Events {
       }
     });
   }
-  // Clean up lines that have both #todo and #todone (remove #todo)
+  // Clean up lines that have both #todo/#todos and #todone/#todones (remove #todo/#todos)
   async cleanupDuplicateTags(file, lines, lineNumbers) {
     let modified = false;
     for (const lineNum of lineNumbers) {
-      const newLine = lines[lineNum].replace(/#todo\b\s*/g, "");
+      const newLine = lines[lineNum].replace(/#todos?\b\s*/g, "");
       if (newLine !== lines[lineNum]) {
         lines[lineNum] = newLine;
         modified = true;

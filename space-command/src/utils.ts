@@ -61,10 +61,22 @@ export function markCheckboxComplete(text: string): string {
 }
 
 export function replaceTodoWithTodone(text: string, date: string): string {
+  // Handle both singular #todo and plural #todos
+  // #todos -> #todones, #todo -> #todone
+  if (text.includes('#todos')) {
+    return text.replace(/#todos\b/, `#todones @${date}`);
+  }
   return text.replace(/#todo\b/, `#todone @${date}`);
 }
 
 export function replaceTodoneWithTodo(text: string): string {
+  // Handle both singular #todone and plural #todones
+  // #todones -> #todos, #todone -> #todo
+  if (text.includes('#todones')) {
+    let result = text.replace(/#todones\s+@\d{4}-\d{2}-\d{2}/, "#todos");
+    result = result.replace(/#todones\b/, "#todos");
+    return result;
+  }
   // Replace #todone @YYYY-MM-DD with #todo
   let result = text.replace(/#todone\s+@\d{4}-\d{2}-\d{2}/, "#todo");
   // Also handle #todone without date
