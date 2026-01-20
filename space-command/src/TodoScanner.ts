@@ -1,6 +1,6 @@
 import { App, TFile, Vault, Events, debounce } from "obsidian";
 import { TodoItem } from "./types";
-import { extractTags, hasCheckboxFormat, isCheckboxChecked } from "./utils";
+import { extractTags, filenameToTag, hasCheckboxFormat, isCheckboxChecked } from "./utils";
 
 export class TodoScanner extends Events {
   private app: App;
@@ -332,6 +332,7 @@ export class TodoScanner extends Events {
       tags,
       dateCreated: file.stat.mtime,
       itemType,
+      inferredFileTag: filenameToTag(file.basename),
     };
   }
 

@@ -1,7 +1,7 @@
 {
   "id": "space-command",
   "name": "␣⌘ Space Command",
-  "version": "0.7.13",
+  "version": "0.7.14",
   "minAppVersion": "0.15.0",
   "description": "␣⌘ Space Command: Tools for managing TODOs, TODONEs, and workflows across your vault with live embeds and interactive sidebar. Features ␣⌘ TODOs for task management.",
   "author": "Bruce Alderson",

@@ -47,6 +47,8 @@ That's it. Everything else is optional.
 - [ ] Update welcome email #todo #onboarding
 ```
 
+**Automatic file tags**: TODOs without explicit project tags are automatically grouped by filename. A TODO in `api-tasks.md` appears under `#api-tasks` in the Focus section. Explicit tags always win—add a project tag to override the automatic grouping.
+
 Right-click any TODO for quick actions: Focus, Later, Snooze.
 
 ## Ideas Tab

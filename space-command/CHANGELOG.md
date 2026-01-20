@@ -2,6 +2,24 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.7.14] - 2026-01-19
+
+### Added
+
+- **Automatic file-level project tags**: TODOs and ideas without explicit project tags now automatically inherit a project tag from their filename
+  - Example: TODOs in `api-tasks.md` are grouped under `#api-tasks` in the Focus section
+  - Filenames with spaces are converted to dashes (e.g., `My Project.md` → `#my-project`)
+  - **Manual tags win**: If a TODO has an explicit project tag (e.g., `#backend`), the file-level tag is not applied
+  - Works at display time (no file modifications)—existing markdown is unchanged
+
+### Technical
+
+- New `filenameToTag()` utility function in `utils.ts`
+- New `inferredFileTag` field on `TodoItem` interface
+- `TodoScanner.createTodoItem()` now populates `inferredFileTag` from filename
+- `ProjectManager.getProjects()` uses `inferredFileTag` as fallback when no explicit project tags exist
+- `FilterParser.applyFilters()` now uses `inferredFileTag` for tag filtering
+
 ## [0.7.13] - 2026-01-19
 
 ### Added

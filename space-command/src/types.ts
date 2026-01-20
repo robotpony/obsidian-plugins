@@ -16,6 +16,8 @@ export interface TodoItem {
   childLineNumbers?: number[];  // Line numbers of child items
   // Item type discriminator
   itemType?: 'todo' | 'todone' | 'idea' | 'principle';
+  // Inferred file-level tag derived from filename (e.g., "api-tasks.md" → "#api-tasks")
+  inferredFileTag?: string;
 }
 
 export interface TodoFilters {

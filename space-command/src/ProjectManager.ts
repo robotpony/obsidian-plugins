@@ -34,7 +34,13 @@ export class ProjectManager {
         "#future", "#focus",
         ...this.priorityTags
       ]);
-      const projectTags = todo.tags.filter(tag => !excludedTags.has(tag));
+      const explicitProjectTags = todo.tags.filter(tag => !excludedTags.has(tag));
+
+      // Use explicit project tags if present, otherwise fall back to inferred file tag
+      // This implements "manual tags win" - items with explicit project tags won't get file-level grouping
+      const projectTags = explicitProjectTags.length > 0
+        ? explicitProjectTags
+        : (todo.inferredFileTag ? [todo.inferredFileTag] : []);
 
       const todoPriority = getPriorityValue(todo.tags);
 

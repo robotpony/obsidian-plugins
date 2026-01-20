@@ -173,6 +173,9 @@ function extractTags(text5) {
   const tagRegex = /#[\w-]+/g;
   return textWithoutCode.match(tagRegex) || [];
 }
+function filenameToTag(basename2) {
+  return "#" + basename2.toLowerCase().replace(/\s+/g, "-");
+}
 function hasCheckboxFormat(text5) {
   return /^-\s*\[[ x]\]/i.test(text5.trim());
 }
@@ -488,7 +491,8 @@ var TodoScanner = class extends import_obsidian2.Events {
       hasCheckbox: hasCheckboxFormat(text5),
       tags,
       dateCreated: file.stat.mtime,
-      itemType
+      itemType,
+      inferredFileTag: filenameToTag(file.basename)
     };
   }
   getTodos() {
@@ -936,7 +940,8 @@ var ProjectManager = class {
         "#focus",
         ...this.priorityTags
       ]);
-      const projectTags = todo.tags.filter((tag) => !excludedTags.has(tag));
+      const explicitProjectTags = todo.tags.filter((tag) => !excludedTags.has(tag));
+      const projectTags = explicitProjectTags.length > 0 ? explicitProjectTags : todo.inferredFileTag ? [todo.inferredFileTag] : [];
       const todoPriority = getPriorityValue(todo.tags);
       for (const tag of projectTags) {
         if (projectMap.has(tag)) {
@@ -1047,9 +1052,7 @@ var FilterParser = class {
     if (filters.tags && filters.tags.length > 0) {
       filtered = filtered.filter((todo) => {
         const todoTags = todo.tags.map((t) => t.toLowerCase());
-        const filename = todo.file.basename.toLowerCase().replace(/\s+/g, "-");
-        const implicitFileTag = `#${filename}`;
-        const effectiveTags = [...todoTags, implicitFileTag];
+        const effectiveTags = todo.inferredFileTag ? [...todoTags, todo.inferredFileTag.toLowerCase()] : todoTags;
         return filters.tags.every(
           (filterTag) => effectiveTags.includes(filterTag.toLowerCase())
         );

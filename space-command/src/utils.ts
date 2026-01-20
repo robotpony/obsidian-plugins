@@ -48,6 +48,15 @@ export function extractTags(text: string): string[] {
   return textWithoutCode.match(tagRegex) || [];
 }
 
+/**
+ * Convert a filename (without extension) to a tag format.
+ * "API Tasks" → "#api-tasks"
+ * "my-project" → "#my-project"
+ */
+export function filenameToTag(basename: string): string {
+  return "#" + basename.toLowerCase().replace(/\s+/g, "-");
+}
+
 export function hasCheckboxFormat(text: string): boolean {
   return /^-\s*\[[ x]\]/i.test(text.trim());
 }
