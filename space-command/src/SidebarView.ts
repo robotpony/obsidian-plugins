@@ -78,11 +78,32 @@ export class TodoSidebarView extends ItemView {
     cleaned = cleaned.replace(/_(.+?)_/g, "$1");
     // Remove strikethrough
     cleaned = cleaned.replace(/~~(.+?)~~/g, "$1");
-    // Remove inline code entirely (backticks and content) - sidebar shows plain text
-    cleaned = cleaned.replace(/`[^`]+`/g, "");
+    // Remove inline code backticks but keep the content
+    cleaned = cleaned.replace(/`(.+?)`/g, "$1");
     // Remove links but keep the text
     cleaned = cleaned.replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1");
     return cleaned;
+  }
+
+  // Strip tags from text but preserve tags inside backticks (inline code)
+  private stripTagsPreservingCode(text: string): string {
+    // Strategy: temporarily replace inline code blocks, strip tags, then restore
+    const codeBlocks: string[] = [];
+    const placeholder = '\u0000CODE\u0000';
+
+    // Extract and replace inline code blocks
+    const textWithPlaceholders = text.replace(/`[^`]+`/g, (match) => {
+      codeBlocks.push(match);
+      return placeholder + (codeBlocks.length - 1) + placeholder;
+    });
+
+    // Strip tags from the text (now safe since code blocks are placeholders)
+    const textWithoutTags = textWithPlaceholders.replace(/#[\w-]+/g, "");
+
+    // Restore code blocks
+    return textWithoutTags.replace(new RegExp(placeholder + '(\\d+)' + placeholder, 'g'), (_, index) => {
+      return codeBlocks[parseInt(index)];
+    });
   }
 
   // Configuration for unified list item rendering
@@ -166,10 +187,11 @@ export class TodoSidebarView extends ItemView {
     // Text content (strip type tag and all other tags for display)
     const textSpan = rowContainer.createEl("span", { cls: `${config.classPrefix}-text` });
     const cleanText = item.text.replace(config.tagToStrip, "").trim();
-    const displayText = this.stripMarkdownSyntax(cleanText);
-    // Strip all tags from display text (they'll be in the dropdown)
-    const textWithoutTags = displayText.replace(/#[\w-]+/g, "").replace(/\s+/g, " ").trim();
-    textSpan.appendText(textWithoutTags);
+    // Strip tags BEFORE markdown processing, but preserve tags inside backticks
+    const textWithoutTags = this.stripTagsPreservingCode(cleanText);
+    const displayText = this.stripMarkdownSyntax(textWithoutTags);
+    const finalText = displayText.replace(/\s+/g, " ").trim();
+    textSpan.appendText(finalText);
 
     // Get tags (excluding the type tag) and render dropdown inside text span
     const tags = extractTags(cleanText).filter(tag => !config.tagToStrip.test(tag));

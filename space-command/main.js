@@ -2191,9 +2191,22 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     cleaned = cleaned.replace(/__(.+?)__/g, "$1");
     cleaned = cleaned.replace(/_(.+?)_/g, "$1");
     cleaned = cleaned.replace(/~~(.+?)~~/g, "$1");
-    cleaned = cleaned.replace(/`[^`]+`/g, "");
+    cleaned = cleaned.replace(/`(.+?)`/g, "$1");
     cleaned = cleaned.replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1");
     return cleaned;
+  }
+  // Strip tags from text but preserve tags inside backticks (inline code)
+  stripTagsPreservingCode(text5) {
+    const codeBlocks = [];
+    const placeholder = "\0CODE\0";
+    const textWithPlaceholders = text5.replace(/`[^`]+`/g, (match) => {
+      codeBlocks.push(match);
+      return placeholder + (codeBlocks.length - 1) + placeholder;
+    });
+    const textWithoutTags = textWithPlaceholders.replace(/#[\w-]+/g, "");
+    return textWithoutTags.replace(new RegExp(placeholder + "(\\d+)" + placeholder, "g"), (_, index2) => {
+      return codeBlocks[parseInt(index2)];
+    });
   }
   // Unified list item renderer for todos, ideas, and principles
   renderListItem(list4, item, config, isChild = false) {
@@ -2230,9 +2243,10 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     }
     const textSpan = rowContainer.createEl("span", { cls: `${config.classPrefix}-text` });
     const cleanText = item.text.replace(config.tagToStrip, "").trim();
-    const displayText = this.stripMarkdownSyntax(cleanText);
-    const textWithoutTags = displayText.replace(/#[\w-]+/g, "").replace(/\s+/g, " ").trim();
-    textSpan.appendText(textWithoutTags);
+    const textWithoutTags = this.stripTagsPreservingCode(cleanText);
+    const displayText = this.stripMarkdownSyntax(textWithoutTags);
+    const finalText = displayText.replace(/\s+/g, " ").trim();
+    textSpan.appendText(finalText);
     const tags = extractTags(cleanText).filter((tag) => !config.tagToStrip.test(tag));
     if (tags.length > 0) {
       textSpan.appendText(" ");
