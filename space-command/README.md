@@ -53,10 +53,10 @@ Right-click any TODO for quick actions: Focus, Later, Snooze.
 
 Capture ideas separately from actionable TODOs. The sidebar has two tabs—TODOs and Ideas.
 
-| Tag          | Purpose                                   |
-|--------------|-------------------------------------------|
-| `#idea`      | Something to capture (not yet actionable) |
-| `#principle` | A guiding principle (reference only)      |
+| Tag                              | Purpose                                   |
+|----------------------------------|-------------------------------------------|
+| `#idea` / `#ideas` / `#ideation` | Something to capture (not yet actionable) |
+| `#principle`                     | A guiding principle (reference only)      |
 
 Click an idea's checkbox to dismiss it. Right-click to promote it to a TODO.
 

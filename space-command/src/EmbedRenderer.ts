@@ -548,9 +548,9 @@ export class EmbedRenderer {
       ? item.createEl("div", { cls: "idea-header-row" })
       : item;
 
-    // Add idea text (without the #idea tag)
+    // Add idea text (without the #idea/#ideas/#ideation tag)
     const textSpan = rowContainer.createEl("span", { cls: "idea-text" });
-    let cleanText = idea.text.replace(/#ideas?\b/g, "").trim();
+    let cleanText = idea.text.replace(/#idea(?:s|tion)?\b/g, "").trim();
     // Remove leading checkbox if present
     let displayText = cleanText.replace(/^-\s*\[\s*\]\s*/, "").replace(/^-\s*\[x\]\s*/i, "");
     // Remove block-level markdown markers

@@ -205,10 +205,10 @@ function markCheckboxIncomplete(text5) {
   return text5.replace(/^(-\s*\[)x(\])/i, "$1 $2");
 }
 function removeIdeaTag(text5) {
-  return text5.replace(/#idea\b\s*/, "").trim();
+  return text5.replace(/#idea(?:s|tion)?\b\s*/, "").trim();
 }
 function replaceIdeaWithTodo(text5) {
-  return text5.replace(/#idea\b/, "#todo");
+  return text5.replace(/#idea(?:s|tion)?\b/, "#todo");
 }
 function renderTextWithTags(text5, container, mutedTags = []) {
   const tagRegex = /(#[\w-]+)/g;
@@ -371,7 +371,7 @@ var TodoScanner = class extends import_obsidian2.Events {
         } else if (hasTodone) {
           todones.push(this.createTodoItem(file, i, line, tags, "todone"));
         }
-        if (tags.includes("#idea") || tags.includes("#ideas")) {
+        if (tags.includes("#idea") || tags.includes("#ideas") || tags.includes("#ideation")) {
           if (headerInfo) {
             const headerIdea = this.createTodoItem(file, i, line, tags, "idea");
             headerIdea.isHeader = true;
@@ -399,7 +399,7 @@ var TodoScanner = class extends import_obsidian2.Events {
           } else {
             principles.push(this.createTodoItem(file, i, line, tags, "principle"));
           }
-        } else if (currentHeaderPrinciple && this.isListItem(line) && !tags.includes("#todo") && !tags.includes("#todone") && !tags.includes("#idea")) {
+        } else if (currentHeaderPrinciple && this.isListItem(line) && !tags.includes("#todo") && !tags.includes("#todone") && !tags.includes("#idea") && !tags.includes("#ideas") && !tags.includes("#ideation")) {
           const childItem = this.createTodoItem(file, i, line, tags, "principle");
           childItem.parentLineNumber = currentHeaderPrinciple.lineNumber;
           currentHeaderPrinciple.todoItem.childLineNumbers.push(i);
@@ -452,7 +452,7 @@ var TodoScanner = class extends import_obsidian2.Events {
   isInInlineCode(line) {
     const todoMatches = [...line.matchAll(/#todos?\b/g)];
     const todoneMatches = [...line.matchAll(/#todones?\b/g)];
-    const ideaMatches = [...line.matchAll(/#ideas?\b/g)];
+    const ideaMatches = [...line.matchAll(/#idea(?:s|tion)?\b/g)];
     const principleMatches = [...line.matchAll(/#principles?\b/g)];
     const focusMatches = [...line.matchAll(/#focus\b/g)];
     const allMatches = [...todoMatches, ...todoneMatches, ...ideaMatches, ...principleMatches, ...focusMatches];
@@ -829,9 +829,9 @@ ${todoneText}` : todoneText;
         );
       }
       let line = lines[idea.lineNumber];
-      if (!line.includes("#idea")) {
+      if (!/#idea(?:s|tion)?\b/.test(line)) {
         throw new Error(
-          `Line ${idea.lineNumber} in ${idea.filePath} no longer contains #idea tag. File may have been modified.`
+          `Line ${idea.lineNumber} in ${idea.filePath} no longer contains #idea/#ideas/#ideation tag. File may have been modified.`
         );
       }
       line = removeIdeaTag(line);
@@ -861,9 +861,9 @@ ${todoneText}` : todoneText;
         );
       }
       let line = lines[idea.lineNumber];
-      if (!line.includes("#idea")) {
+      if (!/#idea(?:s|tion)?\b/.test(line)) {
         throw new Error(
-          `Line ${idea.lineNumber} in ${idea.filePath} no longer contains #idea tag. File may have been modified.`
+          `Line ${idea.lineNumber} in ${idea.filePath} no longer contains #idea/#ideas/#ideation tag. File may have been modified.`
         );
       }
       line = replaceIdeaWithTodo(line);
@@ -934,6 +934,7 @@ var ProjectManager = class {
         "#todones",
         "#idea",
         "#ideas",
+        "#ideation",
         "#principle",
         "#principles",
         "#future",
@@ -1535,7 +1536,7 @@ var EmbedRenderer = class {
     const item = list4.createEl("li", { cls: itemClasses });
     const rowContainer = hasChildren ? item.createEl("div", { cls: "idea-header-row" }) : item;
     const textSpan = rowContainer.createEl("span", { cls: "idea-text" });
-    let cleanText = idea.text.replace(/#ideas?\b/g, "").trim();
+    let cleanText = idea.text.replace(/#idea(?:s|tion)?\b/g, "").trim();
     let displayText = cleanText.replace(/^-\s*\[\s*\]\s*/, "").replace(/^-\s*\[x\]\s*/i, "");
     displayText = displayText.replace(/^#{1,6}\s+/, "").replace(/^[*\-+]\s+/, "").replace(/^>\s+/, "");
     this.renderInlineMarkdown(displayText, textSpan);
@@ -2148,7 +2149,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     this.ideaConfig = {
       type: "idea",
       classPrefix: "idea",
-      tagToStrip: /#ideas?\b/g,
+      tagToStrip: /#idea(?:s|tion)?\b/g,
       showCheckbox: true,
       onComplete: (item) => this.processor.completeIdea(item),
       onContextMenu: (e, item) => this.contextMenuHandler.showIdeaMenu(e, item, () => this.render())

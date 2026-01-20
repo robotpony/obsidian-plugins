@@ -374,14 +374,14 @@ export class TodoProcessor {
 
       let line = lines[idea.lineNumber];
 
-      // Validate line still contains #idea
-      if (!line.includes("#idea")) {
+      // Validate line still contains #idea, #ideas, or #ideation
+      if (!/#idea(?:s|tion)?\b/.test(line)) {
         throw new Error(
-          `Line ${idea.lineNumber} in ${idea.filePath} no longer contains #idea tag. File may have been modified.`
+          `Line ${idea.lineNumber} in ${idea.filePath} no longer contains #idea/#ideas/#ideation tag. File may have been modified.`
         );
       }
 
-      // Remove #idea tag (idea disappears from sidebar)
+      // Remove #idea/#ideas/#ideation tag (idea disappears from sidebar)
       line = removeIdeaTag(line);
 
       lines[idea.lineNumber] = line;
@@ -419,14 +419,14 @@ export class TodoProcessor {
 
       let line = lines[idea.lineNumber];
 
-      // Validate line still contains #idea
-      if (!line.includes("#idea")) {
+      // Validate line still contains #idea, #ideas, or #ideation
+      if (!/#idea(?:s|tion)?\b/.test(line)) {
         throw new Error(
-          `Line ${idea.lineNumber} in ${idea.filePath} no longer contains #idea tag. File may have been modified.`
+          `Line ${idea.lineNumber} in ${idea.filePath} no longer contains #idea/#ideas/#ideation tag. File may have been modified.`
         );
       }
 
-      // Replace #idea with #todo
+      // Replace #idea/#ideas/#ideation with #todo
       line = replaceIdeaWithTodo(line);
 
       lines[idea.lineNumber] = line;

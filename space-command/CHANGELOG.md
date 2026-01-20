@@ -2,6 +2,16 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.7.22] - 2026-01-19
+
+### Added
+
+- **`#ideation` tag alias**: `#ideation` now works as an alias for `#idea` and `#ideas`
+  - Appears in the Ideas tab alongside other ideas
+  - Supports all idea operations: complete, convert to TODO, focus
+  - Works with header ideas and children
+  - Excluded from project tags in Focus section
+
 ## [0.7.21] - 2026-01-19
 
 ### Fixed

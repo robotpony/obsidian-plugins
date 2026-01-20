@@ -98,12 +98,12 @@ export function markCheckboxIncomplete(text: string): string {
 }
 
 export function removeIdeaTag(text: string): string {
-  // Remove #idea tag and any trailing whitespace it leaves
-  return text.replace(/#idea\b\s*/, "").trim();
+  // Remove #idea, #ideas, or #ideation tag and any trailing whitespace it leaves
+  return text.replace(/#idea(?:s|tion)?\b\s*/, "").trim();
 }
 
 export function replaceIdeaWithTodo(text: string): string {
-  return text.replace(/#idea\b/, "#todo");
+  return text.replace(/#idea(?:s|tion)?\b/, "#todo");
 }
 
 /**

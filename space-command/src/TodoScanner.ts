@@ -168,7 +168,7 @@ export class TodoScanner extends Events {
         }
 
         // Idea processing - handle headers with children
-        if (tags.includes("#idea") || tags.includes("#ideas")) {
+        if (tags.includes("#idea") || tags.includes("#ideas") || tags.includes("#ideation")) {
           if (headerInfo) {
             // Header with #idea tag
             const headerIdea = this.createTodoItem(file, i, line, tags, 'idea');
@@ -203,7 +203,7 @@ export class TodoScanner extends Events {
             // Regular principle (not a header)
             principles.push(this.createTodoItem(file, i, line, tags, 'principle'));
           }
-        } else if (currentHeaderPrinciple && this.isListItem(line) && !tags.includes("#todo") && !tags.includes("#todone") && !tags.includes("#idea")) {
+        } else if (currentHeaderPrinciple && this.isListItem(line) && !tags.includes("#todo") && !tags.includes("#todone") && !tags.includes("#idea") && !tags.includes("#ideas") && !tags.includes("#ideation")) {
           // Child item under a header principle (only if not already another type)
           const childItem = this.createTodoItem(file, i, line, tags, 'principle');
           childItem.parentLineNumber = currentHeaderPrinciple.lineNumber;
@@ -275,7 +275,7 @@ export class TodoScanner extends Events {
     // Find all tag positions (including plural forms)
     const todoMatches = [...line.matchAll(/#todos?\b/g)];
     const todoneMatches = [...line.matchAll(/#todones?\b/g)];
-    const ideaMatches = [...line.matchAll(/#ideas?\b/g)];
+    const ideaMatches = [...line.matchAll(/#idea(?:s|tion)?\b/g)];
     const principleMatches = [...line.matchAll(/#principles?\b/g)];
     const focusMatches = [...line.matchAll(/#focus\b/g)];
     const allMatches = [...todoMatches, ...todoneMatches, ...ideaMatches, ...principleMatches, ...focusMatches];

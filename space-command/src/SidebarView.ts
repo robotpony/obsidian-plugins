@@ -119,7 +119,7 @@ export class TodoSidebarView extends ItemView {
   private readonly ideaConfig: ItemRenderConfig = {
     type: 'idea',
     classPrefix: 'idea',
-    tagToStrip: /#ideas?\b/g,
+    tagToStrip: /#idea(?:s|tion)?\b/g,
     showCheckbox: true,
     onComplete: (item) => this.processor.completeIdea(item),
     onContextMenu: (e, item) => this.contextMenuHandler.showIdeaMenu(e, item, () => this.render())
