@@ -2,6 +2,12 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.7.16] - 2026-01-19
+
+### Fixed
+
+- **Embed list children now flush with header**: Child items in embedded TODO/idea/principle lists are no longer indented—they align with the parent header
+
 ## [0.7.15] - 2026-01-19
 
 ### Added

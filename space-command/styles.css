@@ -315,6 +315,7 @@
   align-items: flex-start;
   padding: 4px 0;
   gap: 8px;
+  margin-inline-start: 3ch;
 }
 
 .space-command-embed .task-list-item-checkbox {
@@ -353,6 +354,7 @@
   align-items: flex-start;
   padding: 4px 0;
   gap: 8px;
+  margin-left: 0;
 }
 
 .space-command-embed .idea-text {
@@ -743,7 +745,25 @@
 .todo-children {
   list-style: none;
   padding: 0;
+  margin: 0;
   font-size: .85em;
+}
+
+/* Embed children flush with header (override Obsidian defaults) */
+.space-command-embed .todo-children,
+.space-command-embed .idea-children,
+.space-command-embed .principle-children {
+  padding-left: 0 !important;
+  margin-left: 0 !important;
+  padding-inline-start: 0 !important;
+}
+
+/* Override Obsidian's contains-task-list nesting indentation */
+.space-command-embed ul.contains-task-list ul.contains-task-list,
+.space-command-embed .task-list-item ul {
+  padding-left: 0 !important;
+  margin-left: 0 !important;
+  padding-inline-start: 0 !important;
 }
 
 /* Child TODO item styling */
@@ -783,6 +803,7 @@
 .idea-children {
   list-style: none;
   padding: 0;
+  margin: 0;
   font-size: .85em;
 }
 
@@ -818,6 +839,7 @@
 .principle-children {
   list-style: none;
   padding: 0;
+  margin: 0;
   font-size: .85em;
 }
 
