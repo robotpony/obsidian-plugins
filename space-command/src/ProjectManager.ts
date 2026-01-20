@@ -8,17 +8,20 @@ export class ProjectManager {
   private scanner: TodoScanner;
   private projectsFolder: string;
   private priorityTags: string[];
+  private excludeFolders: string[];
 
   constructor(
     app: App,
     scanner: TodoScanner,
     projectsFolder: string,
-    priorityTags: string[]
+    priorityTags: string[],
+    excludeFolders: string[] = []
   ) {
     this.app = app;
     this.scanner = scanner;
     this.projectsFolder = projectsFolder;
     this.priorityTags = priorityTags;
+    this.excludeFolders = excludeFolders;
   }
 
   getProjects(): ProjectInfo[] {
@@ -38,9 +41,17 @@ export class ProjectManager {
 
       // Use explicit project tags if present, otherwise fall back to inferred file tag
       // This implements "manual tags win" - items with explicit project tags won't get file-level grouping
-      const projectTags = explicitProjectTags.length > 0
-        ? explicitProjectTags
-        : (todo.inferredFileTag ? [todo.inferredFileTag] : []);
+      // Only use inferred tags for files in the projects folder and not in excluded folders
+      let projectTags = explicitProjectTags;
+      if (projectTags.length === 0 && todo.inferredFileTag) {
+        const isInProjectsFolder = todo.folder.startsWith(this.projectsFolder.replace(/\/$/, ""));
+        const isInExcludedFolder = this.excludeFolders.some(folder =>
+          todo.folder === folder || todo.folder.startsWith(folder + "/")
+        );
+        if (isInProjectsFolder && !isInExcludedFolder) {
+          projectTags = [todo.inferredFileTag];
+        }
+      }
 
       const todoPriority = getPriorityValue(todo.tags);
 

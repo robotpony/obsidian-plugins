@@ -102,15 +102,15 @@ Completing the header completes all children.
 
 ## Automatic File Tags
 
-TODOs (including header block TODOs) without explicit project tags are grouped by filename:
+TODOs in your projects folder without explicit project tags are grouped by filename:
 
 ```markdown
-<!-- In api-tasks.md -->
+<!-- In projects/api-tasks.md -->
 - [ ] Fix rate limiting #todo       → grouped under #api-tasks
 - [ ] Add caching #todo #backend    → grouped under #backend (explicit wins)
 ```
 
-Add an explicit project tag to override.
+Add an explicit project tag to override. Files outside the projects folder don't get inferred tags. Configure excluded folders (like `log`) in Settings.
 
 ## Installation
 

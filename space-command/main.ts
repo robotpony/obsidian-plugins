@@ -42,7 +42,8 @@ export default class SpaceCommandPlugin extends Plugin {
       this.app,
       this.scanner,
       this.settings.defaultProjectsFolder,
-      this.settings.priorityTags
+      this.settings.priorityTags,
+      this.settings.excludeFoldersFromProjects
     );
     this.embedRenderer = new EmbedRenderer(
       this.app,
@@ -564,6 +565,34 @@ class SpaceCommandSettingTab extends PluginSettingTab {
           })
       );
 
+    new Setting(containerEl)
+      .setName("Exclude folders from projects")
+      .setDesc("Comma-separated folders to exclude from inferred project tags (e.g., log, archive)")
+      .addText((text) =>
+        text
+          .setPlaceholder("log")
+          .setValue(this.plugin.settings.excludeFoldersFromProjects.join(", "))
+          .onChange(async (value) => {
+            const folders = value
+              .split(",")
+              .map(f => f.trim())
+              .filter(f => f.length > 0);
+
+            this.plugin.settings.excludeFoldersFromProjects = folders;
+
+            // Update ProjectManager with new exclude folders
+            this.plugin.projectManager = new ProjectManager(
+              this.app,
+              this.plugin.scanner,
+              this.plugin.settings.defaultProjectsFolder,
+              this.plugin.settings.priorityTags,
+              folders
+            );
+
+            await this.plugin.saveSettings();
+          })
+      );
+
     containerEl.createEl("h3", { text: "Priority Settings" });
 
     new Setting(containerEl)
@@ -588,7 +617,8 @@ class SpaceCommandSettingTab extends PluginSettingTab {
               this.app,
               this.plugin.scanner,
               this.plugin.settings.defaultProjectsFolder,
-              tags
+              tags,
+              this.plugin.settings.excludeFoldersFromProjects
             );
 
             await this.plugin.saveSettings();

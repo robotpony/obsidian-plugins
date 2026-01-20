@@ -174,7 +174,7 @@ function extractTags(text5) {
   return textWithoutCode.match(tagRegex) || [];
 }
 function filenameToTag(basename2) {
-  return "#" + basename2.toLowerCase().replace(/\s+/g, "-");
+  return "#" + basename2.toLowerCase().replace(/\s+/g, "-").replace(/[^\w-]/g, "").replace(/-+/g, "-").replace(/^-|-$/g, "");
 }
 function hasCheckboxFormat(text5) {
   return /^-\s*\[[ x]\]/i.test(text5.trim());
@@ -1133,11 +1133,12 @@ ${todoneText}` : todoneText;
 // src/ProjectManager.ts
 var import_obsidian4 = require("obsidian");
 var ProjectManager = class {
-  constructor(app, scanner, projectsFolder, priorityTags) {
+  constructor(app, scanner, projectsFolder, priorityTags, excludeFolders = []) {
     this.app = app;
     this.scanner = scanner;
     this.projectsFolder = projectsFolder;
     this.priorityTags = priorityTags;
+    this.excludeFolders = excludeFolders;
   }
   getProjects() {
     const todos = this.scanner.getTodos();
@@ -1158,7 +1159,16 @@ var ProjectManager = class {
         ...this.priorityTags
       ]);
       const explicitProjectTags = todo.tags.filter((tag) => !excludedTags.has(tag));
-      const projectTags = explicitProjectTags.length > 0 ? explicitProjectTags : todo.inferredFileTag ? [todo.inferredFileTag] : [];
+      let projectTags = explicitProjectTags;
+      if (projectTags.length === 0 && todo.inferredFileTag) {
+        const isInProjectsFolder = todo.folder.startsWith(this.projectsFolder.replace(/\/$/, ""));
+        const isInExcludedFolder = this.excludeFolders.some(
+          (folder) => todo.folder === folder || todo.folder.startsWith(folder + "/")
+        );
+        if (isInProjectsFolder && !isInExcludedFolder) {
+          projectTags = [todo.inferredFileTag];
+        }
+      }
       const todoPriority = getPriorityValue(todo.tags);
       for (const tag of projectTags) {
         if (projectMap.has(tag)) {
@@ -3129,7 +3139,8 @@ var DEFAULT_SETTINGS = {
   defaultProjectsFolder: "projects/",
   focusListLimit: 5,
   priorityTags: ["#p0", "#p1", "#p2", "#p3", "#p4"],
-  recentTodonesLimit: 5
+  recentTodonesLimit: 5,
+  excludeFoldersFromProjects: ["log"]
 };
 
 // node_modules/bail/index.js
@@ -13658,7 +13669,8 @@ var SpaceCommandPlugin = class extends import_obsidian9.Plugin {
       this.app,
       this.scanner,
       this.settings.defaultProjectsFolder,
-      this.settings.priorityTags
+      this.settings.priorityTags,
+      this.settings.excludeFoldersFromProjects
     );
     this.embedRenderer = new EmbedRenderer(
       this.app,
@@ -14022,6 +14034,20 @@ var SpaceCommandSettingTab = class extends import_obsidian9.PluginSettingTab {
         }
       })
     );
+    new import_obsidian9.Setting(containerEl).setName("Exclude folders from projects").setDesc("Comma-separated folders to exclude from inferred project tags (e.g., log, archive)").addText(
+      (text5) => text5.setPlaceholder("log").setValue(this.plugin.settings.excludeFoldersFromProjects.join(", ")).onChange(async (value) => {
+        const folders = value.split(",").map((f) => f.trim()).filter((f) => f.length > 0);
+        this.plugin.settings.excludeFoldersFromProjects = folders;
+        this.plugin.projectManager = new ProjectManager(
+          this.app,
+          this.plugin.scanner,
+          this.plugin.settings.defaultProjectsFolder,
+          this.plugin.settings.priorityTags,
+          folders
+        );
+        await this.plugin.saveSettings();
+      })
+    );
     containerEl.createEl("h3", { text: "Priority Settings" });
     new import_obsidian9.Setting(containerEl).setName("Priority tags").setDesc("Comma-separated list of priority tags (e.g., #p0, #p1, #p2, #p3, #p4). These tags won't appear in the Projects list.").addText(
       (text5) => text5.setPlaceholder("#p0, #p1, #p2, #p3, #p4").setValue(this.plugin.settings.priorityTags.join(", ")).onChange(async (value) => {
@@ -14031,7 +14057,8 @@ var SpaceCommandSettingTab = class extends import_obsidian9.PluginSettingTab {
           this.app,
           this.plugin.scanner,
           this.plugin.settings.defaultProjectsFolder,
-          tags
+          tags,
+          this.plugin.settings.excludeFoldersFromProjects
         );
         await this.plugin.saveSettings();
       })

@@ -2,6 +2,28 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.7.29] - 2026-01-19
+
+### Added
+
+- **Exclude folders from projects setting**: New setting to exclude specific folders from inferred project tags
+  - Default: `log` folder excluded
+  - Prevents journal/log files from generating spurious project tags
+  - Comma-separated list in Settings → Projects Settings → "Exclude folders from projects"
+
+### Fixed
+
+- **Invalid characters in inferred project tags**: `filenameToTag()` now sanitizes filenames properly
+  - Removes commas, parentheses, and other invalid tag characters
+  - Example: "Week of January 12th, 2026.md" → `#week-of-january-12th-2026` (was `#week-of-january-12th,-2026`)
+  - Collapses multiple hyphens and trims leading/trailing hyphens
+
+### Changed
+
+- **Inferred project tags only apply to projects folder**: Files outside the configured projects folder no longer generate inferred project tags
+  - TODOs without explicit tags in non-project files are simply untagged (not grouped under filename)
+  - Explicit project tags (e.g., `#myproject`) still work anywhere in the vault
+
 ## [0.7.28] - 2026-01-19
 
 ### Improved

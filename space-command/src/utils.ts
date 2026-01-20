@@ -52,9 +52,17 @@ export function extractTags(text: string): string[] {
  * Convert a filename (without extension) to a tag format.
  * "API Tasks" → "#api-tasks"
  * "my-project" → "#my-project"
+ * "Week of January 12th, 2026" → "#week-of-january-12th-2026"
+ *
+ * Only keeps characters valid in Obsidian tags: letters, numbers, hyphens, underscores.
  */
 export function filenameToTag(basename: string): string {
-  return "#" + basename.toLowerCase().replace(/\s+/g, "-");
+  return "#" + basename
+    .toLowerCase()
+    .replace(/\s+/g, "-")           // spaces → hyphens
+    .replace(/[^\w-]/g, "")         // remove invalid characters
+    .replace(/-+/g, "-")            // collapse multiple hyphens
+    .replace(/^-|-$/g, "");         // trim leading/trailing hyphens
 }
 
 export function hasCheckboxFormat(text: string): boolean {

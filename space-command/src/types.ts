@@ -53,6 +53,7 @@ export interface SpaceCommandSettings {
   focusListLimit: number;
   priorityTags: string[];
   recentTodonesLimit: number;
+  excludeFoldersFromProjects: string[];
 }
 
 export const DEFAULT_SETTINGS: SpaceCommandSettings = {
@@ -64,4 +65,5 @@ export const DEFAULT_SETTINGS: SpaceCommandSettings = {
   focusListLimit: 5,
   priorityTags: ["#p0", "#p1", "#p2", "#p3", "#p4"],
   recentTodonesLimit: 5,
+  excludeFoldersFromProjects: ["log"],
 };
