@@ -2,6 +2,28 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.7.9] - 2026-01-19
+
+### Fixed
+
+- **Sidebar activation error on startup**: Fixed `TypeError: Cannot read properties of null (reading 'children')` when "Show sidebar by default" is enabled
+  - Root cause: `workspace.getRightLeaf()` called before Obsidian workspace layout was ready
+  - Fix: Defer sidebar activation using `workspace.onLayoutReady()` callback
+
+## [0.7.8] - 2026-01-19
+
+### Fixed
+
+- **Styled logo in notifications**: Notice popups now display the ␣⌘ logo with the blue badge background
+  - Previously, notifications showed plain text without the styled logo appearance
+  - Now uses the same `.space-command-logo` CSS styling as the sidebar header
+  - Applies to all plugin notifications (completions, errors, copy confirmations, etc.)
+
+### Technical
+
+- New `showNotice()` helper function in `utils.ts` creates styled notices using `DocumentFragment`
+- Replaced 19 `new Notice()` calls across `main.ts`, `SidebarView.ts`, and `TodoProcessor.ts`
+
 ## [0.7.7] - 2026-01-19
 
 ### Changed

@@ -13068,7 +13068,9 @@ var SpaceCommandPlugin = class extends import_obsidian9.Plugin {
       )
     );
     if (this.settings.showSidebarByDefault) {
-      this.activateSidebar();
+      this.app.workspace.onLayoutReady(() => {
+        this.activateSidebar();
+      });
     }
     this.registerMarkdownPostProcessor((el, ctx) => {
       const codeBlocks = el.findAll("p, div");

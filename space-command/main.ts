@@ -137,8 +137,11 @@ export default class SpaceCommandPlugin extends Plugin {
     );
 
     // Show sidebar by default if setting is enabled
+    // Wait for workspace layout to be ready to avoid null reference errors
     if (this.settings.showSidebarByDefault) {
-      this.activateSidebar();
+      this.app.workspace.onLayoutReady(() => {
+        this.activateSidebar();
+      });
     }
 
     // Register markdown post processor for {{focus-todos}} and {{focus-list}} syntax
