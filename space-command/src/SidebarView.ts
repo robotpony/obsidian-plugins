@@ -78,8 +78,8 @@ export class TodoSidebarView extends ItemView {
     cleaned = cleaned.replace(/_(.+?)_/g, "$1");
     // Remove strikethrough
     cleaned = cleaned.replace(/~~(.+?)~~/g, "$1");
-    // Remove inline code
-    cleaned = cleaned.replace(/`(.+?)`/g, "$1");
+    // Remove inline code entirely (backticks and content) - sidebar shows plain text
+    cleaned = cleaned.replace(/`[^`]+`/g, "");
     // Remove links but keep the text
     cleaned = cleaned.replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1");
     return cleaned;

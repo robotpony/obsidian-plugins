@@ -2,6 +2,12 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.7.21] - 2026-01-19
+
+### Fixed
+
+- **Inline code fully removed from sidebar text**: Tags inside backticks (e.g., `` `#ideation` ``) are now completely removed from sidebar display, rather than having backticks stripped and content retained
+
 ## [0.7.20] - 2026-01-19
 
 ### Changed

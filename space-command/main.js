@@ -2191,7 +2191,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     cleaned = cleaned.replace(/__(.+?)__/g, "$1");
     cleaned = cleaned.replace(/_(.+?)_/g, "$1");
     cleaned = cleaned.replace(/~~(.+?)~~/g, "$1");
-    cleaned = cleaned.replace(/`(.+?)`/g, "$1");
+    cleaned = cleaned.replace(/`[^`]+`/g, "");
     cleaned = cleaned.replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1");
     return cleaned;
   }
