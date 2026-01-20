@@ -146,12 +146,14 @@ export default class SpaceCommandPlugin extends Plugin {
       });
     }
 
-    // Register markdown post processor for {{focus-todos}} and {{focus-list}} syntax
+    // Register markdown post processor for {{focus-todos}}, {{focus-ideas}}, and {{focus-list}} syntax
     this.registerMarkdownPostProcessor((el, ctx) => {
       const codeBlocks = el.findAll("p, div");
       for (const block of codeBlocks) {
         const text = block.textContent || "";
         if (text.includes("{{focus-todos")) {
+          this.embedRenderer.render(text, block);
+        } else if (text.includes("{{focus-ideas")) {
           this.embedRenderer.render(text, block);
         } else if (text.includes("{{focus-list}}")) {
           this.embedRenderer.render(text, block);

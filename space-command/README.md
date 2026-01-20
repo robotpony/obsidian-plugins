@@ -62,7 +62,7 @@ Click an idea's checkbox to dismiss it. Right-click to promote it to a TODO.
 
 ## Embed and Filter
 
-Embed TODO lists anywhere:
+Embed TODO or idea lists anywhere:
 
 ````markdown
 ```focus-todos
@@ -72,7 +72,21 @@ limit:5
 ```
 ````
 
+````markdown
+```focus-ideas
+tags:#ux
+```
+````
+
 Filters: `path:` (folder), `tags:` (require tags), `limit:` (cap list), `todone:hide` (hide completed).
+
+**Inline syntax** (Reading Mode only):
+
+```markdown
+{{focus-todos}}
+{{focus-ideas}}
+{{focus-ideas | tags:#project path:notes/}}
+```
 
 ## Header TODOs
 

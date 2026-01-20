@@ -381,29 +381,47 @@ export class TodoSidebarView extends ItemView {
           });
       });
 
-      // Copy embed syntax submenu
+      // Embed Syntax submenu
       menu.addItem((item) => {
         item
-          .setTitle("Copy embed syntax")
+          .setTitle("Embed Syntax")
           .setIcon("copy");
 
         const submenu = (item as any).setSubmenu();
         submenu.addItem((subItem: any) => {
           subItem
-            .setTitle("Inline syntax")
-            .setIcon("brackets")
+            .setTitle("TODO code block")
+            .setIcon("code")
             .onClick(() => {
-              navigator.clipboard.writeText("{{focus-todos}}");
-              showNotice("Copied inline embed syntax");
+              navigator.clipboard.writeText("```focus-todos\n```");
+              showNotice("Copied TODO code block syntax");
             });
         });
         submenu.addItem((subItem: any) => {
           subItem
-            .setTitle("Code block syntax")
+            .setTitle("TODO inline")
+            .setIcon("brackets")
+            .onClick(() => {
+              navigator.clipboard.writeText("{{focus-todos}}");
+              showNotice("Copied TODO inline syntax");
+            });
+        });
+        submenu.addItem((subItem: any) => {
+          subItem
+            .setTitle("IDEA code block")
             .setIcon("code")
             .onClick(() => {
-              navigator.clipboard.writeText("```focus-todos\n```");
-              showNotice("Copied code block embed syntax");
+              navigator.clipboard.writeText("```focus-ideas\n```");
+              showNotice("Copied IDEA code block syntax");
+            });
+        });
+        submenu.addItem((subItem: any) => {
+          subItem
+            .setTitle("IDEA inline")
+            .setIcon("brackets")
+            .onClick(() => {
+              navigator.clipboard.writeText("{{focus-ideas}}");
+              showNotice("Copied IDEA inline syntax");
             });
         });
       });

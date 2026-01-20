@@ -117,6 +117,17 @@ export class EmbedRenderer {
       return;
     }
 
+    // Check if this is a focus-ideas embed
+    // Supports: {{focus-ideas}}, {{focus-ideas | filters}}
+    const ideasMatch = source.match(
+      /\{\{focus-ideas(?:\s*\|\s*(.+))?\}\}/
+    );
+    if (ideasMatch) {
+      const filterString = ideasMatch[1] || "";
+      this.renderIdeas(el, filterString);
+      return;
+    }
+
     // Parse the embed syntax: {{focus-todos: [todone-file] | [filters]}}
     // Supports: {{focus-todos}}, {{focus-todos | filters}}, {{focus-todos: file | filters}}
     // Both todone-file and filters are optional
@@ -126,7 +137,7 @@ export class EmbedRenderer {
 
     if (!match) {
       el.createEl("div", {
-        text: "Invalid syntax (use {{focus-todos}} or {{focus-list}})",
+        text: "Invalid syntax (use {{focus-todos}}, {{focus-ideas}}, or {{focus-list}})",
         cls: "space-command-error",
       });
       return;

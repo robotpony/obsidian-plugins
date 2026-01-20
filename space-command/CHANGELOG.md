@@ -2,6 +2,22 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.7.15] - 2026-01-19
+
+### Added
+
+- **Inline `{{focus-ideas}}` embed syntax**: Ideas can now be embedded inline (Reading Mode only)
+  - Same filter support as code blocks: `{{focus-ideas | tags:#project path:notes/}}`
+
+### Changed
+
+- **Renamed "Copy embed syntax" menu to "Embed Syntax"**: Clearer menu title
+- **Reorganized embed menu items**: Now shows all four embed options
+  - TODO code block (`` ```focus-todos`` ``)
+  - TODO inline (`{{focus-todos}}`)
+  - IDEA code block (`` ```focus-ideas`` ``)
+  - IDEA inline (`{{focus-ideas}}`)
+
 ## [0.7.14] - 2026-01-19
 
 ### Added

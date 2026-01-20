@@ -1266,12 +1266,20 @@ var EmbedRenderer = class {
       this.renderFocusList(el);
       return;
     }
+    const ideasMatch = source.match(
+      /\{\{focus-ideas(?:\s*\|\s*(.+))?\}\}/
+    );
+    if (ideasMatch) {
+      const filterString2 = ideasMatch[1] || "";
+      this.renderIdeas(el, filterString2);
+      return;
+    }
     const match = source.match(
       /\{\{focus-todos:?\s*([^|}]*)(?:\s*\|\s*(.+))?\}\}/
     );
     if (!match) {
       el.createEl("div", {
-        text: "Invalid syntax (use {{focus-todos}} or {{focus-list}})",
+        text: "Invalid syntax (use {{focus-todos}}, {{focus-ideas}}, or {{focus-list}})",
         cls: "space-command-error"
       });
       return;
@@ -2385,18 +2393,30 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
         });
       });
       menu.addItem((item) => {
-        item.setTitle("Copy embed syntax").setIcon("copy");
+        item.setTitle("Embed Syntax").setIcon("copy");
         const submenu = item.setSubmenu();
         submenu.addItem((subItem) => {
-          subItem.setTitle("Inline syntax").setIcon("brackets").onClick(() => {
-            navigator.clipboard.writeText("{{focus-todos}}");
-            showNotice("Copied inline embed syntax");
+          subItem.setTitle("TODO code block").setIcon("code").onClick(() => {
+            navigator.clipboard.writeText("```focus-todos\n```");
+            showNotice("Copied TODO code block syntax");
           });
         });
         submenu.addItem((subItem) => {
-          subItem.setTitle("Code block syntax").setIcon("code").onClick(() => {
-            navigator.clipboard.writeText("```focus-todos\n```");
-            showNotice("Copied code block embed syntax");
+          subItem.setTitle("TODO inline").setIcon("brackets").onClick(() => {
+            navigator.clipboard.writeText("{{focus-todos}}");
+            showNotice("Copied TODO inline syntax");
+          });
+        });
+        submenu.addItem((subItem) => {
+          subItem.setTitle("IDEA code block").setIcon("code").onClick(() => {
+            navigator.clipboard.writeText("```focus-ideas\n```");
+            showNotice("Copied IDEA code block syntax");
+          });
+        });
+        submenu.addItem((subItem) => {
+          subItem.setTitle("IDEA inline").setIcon("brackets").onClick(() => {
+            navigator.clipboard.writeText("{{focus-ideas}}");
+            showNotice("Copied IDEA inline syntax");
           });
         });
       });
@@ -13303,6 +13323,8 @@ var SpaceCommandPlugin = class extends import_obsidian9.Plugin {
       for (const block of codeBlocks) {
         const text5 = block.textContent || "";
         if (text5.includes("{{focus-todos")) {
+          this.embedRenderer.render(text5, block);
+        } else if (text5.includes("{{focus-ideas")) {
           this.embedRenderer.render(text5, block);
         } else if (text5.includes("{{focus-list}}")) {
           this.embedRenderer.render(text5, block);
