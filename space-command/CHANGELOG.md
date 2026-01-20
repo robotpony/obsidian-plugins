@@ -2,6 +2,12 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.7.23] - 2026-01-19
+
+### Fixed
+
+- **Embed list alignment**: Removed extra left margin from task list items in embeds so all items align flush left with the embed container
+
 ## [0.7.22] - 2026-01-19
 
 ### Added

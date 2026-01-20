@@ -350,7 +350,10 @@
   align-items: flex-start;
   padding: 4px 0;
   gap: 8px;
-  margin-inline-start: 3ch;
+}
+
+.space-command-embed .task-list-item.todo-header-with-children {
+  margin-inline-start: .5ch;
 }
 
 .space-command-embed .task-list-item-checkbox {
@@ -799,6 +802,7 @@
   padding-left: 0 !important;
   margin-left: 0 !important;
   padding-inline-start: 0 !important;
+  margin-inline-start: 0 !important;
 }
 
 /* Child TODO item styling */
