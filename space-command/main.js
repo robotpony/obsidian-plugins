@@ -1337,6 +1337,11 @@ var ContextMenuHandler = class {
           onRefresh();
       });
     });
+    menu.addItem((item) => {
+      item.setTitle("Copy").setIcon("copy").onClick(async () => {
+        await navigator.clipboard.writeText(todo.text);
+      });
+    });
     menu.showAtMouseEvent(evt);
   }
   /**
@@ -1472,6 +1477,23 @@ var ContextMenuHandler = class {
         }
         if (success)
           onRefresh();
+      });
+    });
+    menu.addItem((item) => {
+      item.setTitle("Copy").setIcon("copy").onClick(async () => {
+        await navigator.clipboard.writeText(idea.text);
+      });
+    });
+    menu.showAtMouseEvent(evt);
+  }
+  /**
+   * Show context menu for a principle item
+   */
+  showPrincipleMenu(evt, principle) {
+    const menu = new import_obsidian5.Menu();
+    menu.addItem((item) => {
+      item.setTitle("Copy").setIcon("copy").onClick(async () => {
+        await navigator.clipboard.writeText(principle.text);
       });
     });
     menu.showAtMouseEvent(evt);
@@ -2450,7 +2472,8 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       type: "principle",
       classPrefix: "principle",
       tagToStrip: /#principles?\b/g,
-      showCheckbox: false
+      showCheckbox: false,
+      onContextMenu: (e, item) => this.contextMenuHandler.showPrincipleMenu(e, item)
     };
     this.scanner = scanner;
     this.processor = processor;

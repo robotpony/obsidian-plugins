@@ -85,6 +85,16 @@ export class ContextMenuHandler {
         });
     });
 
+    // Copy - copies the full line text to clipboard
+    menu.addItem((item) => {
+      item
+        .setTitle("Copy")
+        .setIcon("copy")
+        .onClick(async () => {
+          await navigator.clipboard.writeText(todo.text);
+        });
+    });
+
     menu.showAtMouseEvent(evt);
   }
 
@@ -281,6 +291,35 @@ export class ContextMenuHandler {
             success = await this.processor.addFocusToIdea(idea);
           }
           if (success) onRefresh();
+        });
+    });
+
+    // Copy - copies the full line text to clipboard
+    menu.addItem((item) => {
+      item
+        .setTitle("Copy")
+        .setIcon("copy")
+        .onClick(async () => {
+          await navigator.clipboard.writeText(idea.text);
+        });
+    });
+
+    menu.showAtMouseEvent(evt);
+  }
+
+  /**
+   * Show context menu for a principle item
+   */
+  showPrincipleMenu(evt: MouseEvent, principle: TodoItem): void {
+    const menu = new Menu();
+
+    // Copy - copies the full line text to clipboard
+    menu.addItem((item) => {
+      item
+        .setTitle("Copy")
+        .setIcon("copy")
+        .onClick(async () => {
+          await navigator.clipboard.writeText(principle.text);
         });
     });
 

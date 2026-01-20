@@ -132,7 +132,8 @@ export class TodoSidebarView extends ItemView {
     type: 'principle',
     classPrefix: 'principle',
     tagToStrip: /#principles?\b/g,
-    showCheckbox: false
+    showCheckbox: false,
+    onContextMenu: (e, item) => this.contextMenuHandler.showPrincipleMenu(e, item)
   };
 
 

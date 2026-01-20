@@ -2,6 +2,14 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.7.27] - 2026-01-19
+
+### Added
+
+- **Copy to clipboard**: Right-click any sidebar item (TODO, idea, or principle) and select "Copy" to copy the full line text to clipboard
+  - Available on TODOs, ideas, and principles
+  - Principles now have a context menu (previously had none)
+
 ## [0.7.26] - 2026-01-19
 
 ### Added

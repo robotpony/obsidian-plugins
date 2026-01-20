@@ -47,7 +47,7 @@ That's it. Everything else is optional.
 - [ ] Update welcome email #todo #onboarding
 ```
 
-Right-click any TODO for quick actions: Focus, Later, Snooze.
+Right-click any TODO for quick actions: Focus, Later, Snooze, Copy.
 
 ## Ideas Tab
 
