@@ -169,9 +169,8 @@ function getPriorityValue(tags) {
   return 4;
 }
 function extractTags(text5) {
-  const textWithoutCode = text5.replace(/`[^`]*`/g, "");
   const tagRegex = /#[\w-]+/g;
-  return textWithoutCode.match(tagRegex) || [];
+  return text5.match(tagRegex) || [];
 }
 function filenameToTag(basename2) {
   return "#" + basename2.toLowerCase().replace(/\s+/g, "-");

@@ -41,11 +41,10 @@ export function getPriorityValue(tags: string[]): number {
 }
 
 export function extractTags(text: string): string[] {
-  // Remove inline code spans before extracting tags
-  // This prevents matching tags inside backticks like `#689fd6`
-  const textWithoutCode = text.replace(/`[^`]*`/g, "");
+  // Extract tags from the entire text, including inline code spans
+  // This allows tags like `#ideation` in code examples to appear in the sidebar
   const tagRegex = /#[\w-]+/g;
-  return textWithoutCode.match(tagRegex) || [];
+  return text.match(tagRegex) || [];
 }
 
 /**

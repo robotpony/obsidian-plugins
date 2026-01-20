@@ -2,6 +2,14 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.7.17] - 2026-01-19
+
+### Fixed
+
+- **Tags in inline code now visible in sidebar**: Tags inside backticks (e.g., `` `#ideation` ``) now appear in the sidebar tag dropdown
+  - Previously, tags in inline code were filtered out entirely
+  - Useful when documenting tags in examples like "Consider using a `#ideation` tag"
+
 ## [0.7.16] - 2026-01-19
 
 ### Fixed
