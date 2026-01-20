@@ -19,6 +19,7 @@ export class TodoSidebarView extends ItemView {
   private activeTab: 'todos' | 'ideas' = 'todos';
   private activeTagFilter: string | null = null;
   private openDropdown: HTMLElement | null = null;
+  private onShowAbout: () => void;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -27,7 +28,8 @@ export class TodoSidebarView extends ItemView {
     projectManager: ProjectManager,
     defaultTodoneFile: string,
     priorityTags: string[],
-    recentTodonesLimit: number
+    recentTodonesLimit: number,
+    onShowAbout: () => void
   ) {
     super(leaf);
     this.scanner = scanner;
@@ -35,6 +37,7 @@ export class TodoSidebarView extends ItemView {
     this.projectManager = projectManager;
     this.defaultTodoneFile = defaultTodoneFile;
     this.recentTodonesLimit = recentTodonesLimit;
+    this.onShowAbout = onShowAbout;
 
     // Initialize context menu handler
     this.contextMenuHandler = new ContextMenuHandler(
@@ -329,7 +332,8 @@ export class TodoSidebarView extends ItemView {
     // Header with buttons
     const headerDiv = container.createEl("div", { cls: "sidebar-header" });
     const titleEl = headerDiv.createEl("h4", { cls: "sidebar-title" });
-    titleEl.createEl("span", { cls: "space-command-logo", text: "␣⌘" });
+    const logoEl = titleEl.createEl("span", { cls: "space-command-logo clickable-logo", text: "␣⌘" });
+    logoEl.addEventListener("click", () => this.onShowAbout());
     titleEl.appendText(this.activeTab === 'todos' ? " TODOs" : " IDEAs");
 
     // Tab navigation
@@ -415,6 +419,14 @@ export class TodoSidebarView extends ItemView {
             (this.app as any).setting.open();
             (this.app as any).setting.openTabById("space-command");
           });
+      });
+
+      // About
+      menu.addItem((item) => {
+        item
+          .setTitle("About")
+          .setIcon("info")
+          .onClick(() => this.onShowAbout());
       });
 
       menu.showAtMouseEvent(evt);

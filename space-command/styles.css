@@ -14,6 +14,96 @@
   vertical-align: middle;
 }
 
+/* Clickable logo in sidebar */
+.space-command-logo.clickable-logo {
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+.space-command-logo.clickable-logo:hover {
+  opacity: 0.85;
+  transform: scale(1.05);
+}
+
+/* About Modal */
+.space-command-about-modal {
+  text-align: center;
+  padding: 20px;
+}
+
+.space-command-about-modal .about-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.space-command-about-modal .about-logo {
+  font-size: 2em;
+  padding: 8px 10px 6px;
+}
+
+.space-command-about-modal .about-header h2 {
+  margin: 0;
+  font-size: 1.5em;
+}
+
+.space-command-about-modal .about-blurb {
+  color: var(--text-muted);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.space-command-about-modal .about-details {
+  font-size: 0.9em;
+  color: var(--text-muted);
+}
+
+.space-command-about-modal .about-details a {
+  color: var(--text-accent);
+}
+
+/* About Section in Settings */
+.space-command-about-section {
+  background-color: var(--background-secondary);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 24px;
+}
+
+.space-command-about-section .about-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.space-command-about-section .about-logo {
+  font-size: 1.2em;
+}
+
+.space-command-about-section .about-title {
+  font-weight: 600;
+  font-size: 1.1em;
+}
+
+.space-command-about-section .about-blurb {
+  color: var(--text-muted);
+  margin: 0 0 12px 0;
+  font-size: 0.95em;
+  line-height: 1.4;
+}
+
+.space-command-about-section .about-details {
+  font-size: 0.85em;
+  color: var(--text-muted);
+}
+
+.space-command-about-section .about-details a {
+  color: var(--text-accent);
+}
+
 /* Sidebar Styles */
 .space-command-sidebar {
   padding: 10px;

@@ -2119,7 +2119,7 @@ var DateSuggest = class extends import_obsidian7.EditorSuggest {
 var import_obsidian8 = require("obsidian");
 var VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 var TodoSidebarView = class extends import_obsidian8.ItemView {
-  constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, recentTodonesLimit) {
+  constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, recentTodonesLimit, onShowAbout) {
     super(leaf);
     this.updateListener = null;
     this.activeTab = "todos";
@@ -2153,6 +2153,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     this.projectManager = projectManager;
     this.defaultTodoneFile = defaultTodoneFile;
     this.recentTodonesLimit = recentTodonesLimit;
+    this.onShowAbout = onShowAbout;
     this.contextMenuHandler = new ContextMenuHandler(
       this.app,
       processor,
@@ -2344,7 +2345,8 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     container.addClass("space-command-sidebar");
     const headerDiv = container.createEl("div", { cls: "sidebar-header" });
     const titleEl = headerDiv.createEl("h4", { cls: "sidebar-title" });
-    titleEl.createEl("span", { cls: "space-command-logo", text: "\u2423\u2318" });
+    const logoEl = titleEl.createEl("span", { cls: "space-command-logo clickable-logo", text: "\u2423\u2318" });
+    logoEl.addEventListener("click", () => this.onShowAbout());
     titleEl.appendText(this.activeTab === "todos" ? " TODOs" : " IDEAs");
     const tabNav = headerDiv.createEl("div", { cls: "sidebar-tab-nav" });
     const todosTab = tabNav.createEl("button", {
@@ -2401,6 +2403,9 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
           this.app.setting.open();
           this.app.setting.openTabById("space-command");
         });
+      });
+      menu.addItem((item) => {
+        item.setTitle("About").setIcon("info").onClick(() => this.onShowAbout());
       });
       menu.showAtMouseEvent(evt);
     });
@@ -13281,7 +13286,8 @@ var SpaceCommandPlugin = class extends import_obsidian9.Plugin {
         this.projectManager,
         this.settings.defaultTodoneFile,
         this.settings.priorityTags,
-        this.settings.recentTodonesLimit
+        this.settings.recentTodonesLimit,
+        () => this.showAboutModal()
       )
     );
     if (this.settings.showSidebarByDefault) {
@@ -13436,6 +13442,37 @@ var SpaceCommandPlugin = class extends import_obsidian9.Plugin {
       }
     }
   }
+  showAboutModal() {
+    new AboutModal(this.app).open();
+  }
+};
+var AboutModal = class extends import_obsidian9.Modal {
+  constructor(app) {
+    super(app);
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass("space-command-about-modal");
+    const header = contentEl.createEl("div", { cls: "about-header" });
+    header.createEl("span", { cls: "space-command-logo about-logo", text: "\u2423\u2318" });
+    header.createEl("h2", { text: "Space Command" });
+    contentEl.createEl("p", {
+      cls: "about-blurb",
+      text: "Focus on the right next task. Simple TODOs and tags in your markdown, surfaced when you need them."
+    });
+    const details = contentEl.createEl("div", { cls: "about-details" });
+    details.createEl("p", { text: "Author: Bruce Alderson" });
+    const repoLink = details.createEl("p");
+    repoLink.appendText("Repository: ");
+    repoLink.createEl("a", {
+      text: "github.com/robotpony/obsidian-plugins",
+      href: "https://github.com/robotpony/obsidian-plugins"
+    });
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
 };
 var SpaceCommandSettingTab = class extends import_obsidian9.PluginSettingTab {
   constructor(app, plugin) {
@@ -13446,6 +13483,21 @@ var SpaceCommandSettingTab = class extends import_obsidian9.PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     containerEl.createEl("h2", { text: "\u2423\u2318 Space Command Settings" });
+    const aboutSection = containerEl.createEl("div", { cls: "space-command-about-section" });
+    const aboutHeader = aboutSection.createEl("div", { cls: "about-header" });
+    aboutHeader.createEl("span", { cls: "space-command-logo about-logo", text: "\u2423\u2318" });
+    aboutHeader.createEl("span", { cls: "about-title", text: "Space Command" });
+    aboutSection.createEl("p", {
+      cls: "about-blurb",
+      text: "Focus on the right next task. Simple TODOs and tags in your markdown, surfaced when you need them."
+    });
+    const aboutDetails = aboutSection.createEl("div", { cls: "about-details" });
+    aboutDetails.createEl("span", { text: "By Bruce Alderson" });
+    aboutDetails.appendText(" \xB7 ");
+    aboutDetails.createEl("a", {
+      text: "GitHub",
+      href: "https://github.com/robotpony/obsidian-plugins"
+    });
     new import_obsidian9.Setting(containerEl).setName("Default TODONE file").setDesc("Default file path for logging completed TODOs").addText(
       (text5) => text5.setPlaceholder("todos/done.md").setValue(this.plugin.settings.defaultTodoneFile).onChange(async (value) => {
         this.plugin.settings.defaultTodoneFile = value;

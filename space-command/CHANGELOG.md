@@ -2,6 +2,23 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.7.13] - 2026-01-19
+
+### Added
+
+- **About section**: New About information accessible from multiple locations
+  - Click the ␣⌘ logo in the sidebar header to open About modal
+  - Menu item "About" added to sidebar hamburger menu
+  - About section at top of Settings page with logo, blurb, author, and repo link
+- **Clickable sidebar logo**: The ␣⌘ logo now has hover effects and opens About modal on click
+
+### Technical
+
+- New `AboutModal` class extending Obsidian's Modal
+- New `showAboutModal()` method on plugin class
+- SidebarView now accepts `onShowAbout` callback
+- New CSS classes: `.clickable-logo`, `.space-command-about-modal`, `.space-command-about-section`
+
 ## [0.7.12] - 2026-01-19
 
 ### Added

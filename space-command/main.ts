@@ -1,5 +1,6 @@
 import {
   App,
+  Modal,
   Plugin,
   PluginSettingTab,
   Setting,
@@ -132,7 +133,8 @@ export default class SpaceCommandPlugin extends Plugin {
           this.projectManager,
           this.settings.defaultTodoneFile,
           this.settings.priorityTags,
-          this.settings.recentTodonesLimit
+          this.settings.recentTodonesLimit,
+          () => this.showAboutModal()
         )
     );
 
@@ -330,6 +332,49 @@ export default class SpaceCommandPlugin extends Plugin {
       }
     }
   }
+
+  showAboutModal() {
+    new AboutModal(this.app).open();
+  }
+}
+
+// About modal for displaying plugin information
+class AboutModal extends Modal {
+  constructor(app: App) {
+    super(app);
+  }
+
+  onOpen(): void {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass("space-command-about-modal");
+
+    // Logo and title
+    const header = contentEl.createEl("div", { cls: "about-header" });
+    header.createEl("span", { cls: "space-command-logo about-logo", text: "␣⌘" });
+    header.createEl("h2", { text: "Space Command" });
+
+    // Blurb
+    contentEl.createEl("p", {
+      cls: "about-blurb",
+      text: "Focus on the right next task. Simple TODOs and tags in your markdown, surfaced when you need them.",
+    });
+
+    // Details
+    const details = contentEl.createEl("div", { cls: "about-details" });
+    details.createEl("p", { text: "Author: Bruce Alderson" });
+
+    const repoLink = details.createEl("p");
+    repoLink.appendText("Repository: ");
+    repoLink.createEl("a", {
+      text: "github.com/robotpony/obsidian-plugins",
+      href: "https://github.com/robotpony/obsidian-plugins",
+    });
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+  }
 }
 
 class SpaceCommandSettingTab extends PluginSettingTab {
@@ -345,6 +390,25 @@ class SpaceCommandSettingTab extends PluginSettingTab {
     containerEl.empty();
 
     containerEl.createEl("h2", { text: "␣⌘ Space Command Settings" });
+
+    // About section
+    const aboutSection = containerEl.createEl("div", { cls: "space-command-about-section" });
+    const aboutHeader = aboutSection.createEl("div", { cls: "about-header" });
+    aboutHeader.createEl("span", { cls: "space-command-logo about-logo", text: "␣⌘" });
+    aboutHeader.createEl("span", { cls: "about-title", text: "Space Command" });
+
+    aboutSection.createEl("p", {
+      cls: "about-blurb",
+      text: "Focus on the right next task. Simple TODOs and tags in your markdown, surfaced when you need them.",
+    });
+
+    const aboutDetails = aboutSection.createEl("div", { cls: "about-details" });
+    aboutDetails.createEl("span", { text: "By Bruce Alderson" });
+    aboutDetails.appendText(" · ");
+    aboutDetails.createEl("a", {
+      text: "GitHub",
+      href: "https://github.com/robotpony/obsidian-plugins",
+    });
 
     new Setting(containerEl)
       .setName("Default TODONE file")
