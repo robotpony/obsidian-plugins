@@ -2,6 +2,23 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.7.24] - 2026-01-19
+
+### Added
+
+- **Focus list context menu**: Right-click projects in the Focus section for batch operations
+  - **Filter by**: Sets the sidebar tag filter to show only items with that project tag
+  - **Focus/Unfocus**: Add or remove `#focus` from all TODOs with that project tag
+  - **Later/Unlater**: Decrease or restore priority for all matching TODOs
+  - **Snooze/Unsnooze**: Add or remove `#future` from all matching TODOs
+  - Works in both sidebar and embedded `{{focus-list}}` blocks
+
+### Technical
+
+- New batch operation methods in `TodoProcessor`: `focusAllWithTag()`, `unfocusAllWithTag()`, `laterAllWithTag()`, `unlaterAllWithTag()`, `snoozeAllWithTag()`, `unsnoozeAllWithTag()`
+- New `showProjectMenu()` method in `ContextMenuHandler`
+- Silent versions of tag operations for batch use (no individual notices)
+
 ## [0.7.23] - 2026-01-19
 
 ### Fixed

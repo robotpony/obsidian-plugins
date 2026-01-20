@@ -219,6 +219,18 @@ export class EmbedRenderer {
     for (const project of projects) {
       const item = list.createEl("li", { cls: "focus-list-item" });
 
+      // Add context menu for project operations
+      item.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        this.contextMenuHandler.showProjectMenu(
+          e,
+          project,
+          this.scanner,
+          () => this.renderFocusList(container),
+          () => {} // No filter action for embeds
+        );
+      });
+
       // Project tag
       const textSpan = item.createEl("span", { cls: "focus-project-text" });
       textSpan.textContent = `${project.tag} `;

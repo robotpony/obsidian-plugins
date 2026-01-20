@@ -1,6 +1,7 @@
 import { App, Menu } from "obsidian";
-import { TodoItem } from "./types";
+import { TodoItem, ProjectInfo } from "./types";
 import { TodoProcessor } from "./TodoProcessor";
+import { TodoScanner } from "./TodoScanner";
 
 export class ContextMenuHandler {
   private app: App;
@@ -144,6 +145,106 @@ export class ContextMenuHandler {
     }
 
     return "#p4";
+  }
+
+  /**
+   * Show context menu for a project (focus list item)
+   * Operations apply to all TODOs matching the project tag
+   */
+  showProjectMenu(
+    evt: MouseEvent,
+    project: ProjectInfo,
+    scanner: TodoScanner,
+    onRefresh: () => void,
+    onFilterByTag: (tag: string) => void
+  ): void {
+    const menu = new Menu();
+
+    // Get all TODOs with this project tag
+    const getTodosForProject = (): TodoItem[] => {
+      return scanner.getTodos().filter(todo => todo.tags.includes(project.tag));
+    };
+
+    const todos = getTodosForProject();
+
+    // Determine current state of project items
+    const anyHasFocus = todos.some(t => t.tags.includes("#focus"));
+    const anyHasFuture = todos.some(t => t.tags.includes("#future"));
+    const anyHasLaterPriority = todos.some(t => {
+      for (const tag of t.tags) {
+        if (/^#p[3-4]$/.test(tag)) return true;
+      }
+      return false;
+    });
+
+    // Tag submenu with Filter by option
+    menu.addItem((item) => {
+      item
+        .setTitle(project.tag)
+        .setIcon("tag");
+
+      const submenu = (item as any).setSubmenu();
+      submenu.addItem((subItem: any) => {
+        subItem
+          .setTitle("Filter by")
+          .setIcon("filter")
+          .onClick(() => {
+            onFilterByTag(project.tag);
+          });
+      });
+    });
+
+    menu.addSeparator();
+
+    // Focus/Unfocus - applies to all matching TODOs
+    menu.addItem((item) => {
+      item
+        .setTitle(anyHasFocus ? "Unfocus" : "Focus")
+        .setIcon("zap")
+        .onClick(async () => {
+          const currentTodos = getTodosForProject();
+          if (anyHasFocus) {
+            await this.processor.unfocusAllWithTag(currentTodos);
+          } else {
+            await this.processor.focusAllWithTag(currentTodos);
+          }
+          onRefresh();
+        });
+    });
+
+    // Later/Unlater - applies to all matching TODOs
+    menu.addItem((item) => {
+      item
+        .setTitle(anyHasLaterPriority ? "Unlater" : "Later")
+        .setIcon("clock")
+        .onClick(async () => {
+          const currentTodos = getTodosForProject();
+          if (anyHasLaterPriority) {
+            await this.processor.unlaterAllWithTag(currentTodos);
+          } else {
+            await this.processor.laterAllWithTag(currentTodos);
+          }
+          onRefresh();
+        });
+    });
+
+    // Snooze/Unsnooze - applies to all matching TODOs
+    menu.addItem((item) => {
+      item
+        .setTitle(anyHasFuture ? "Unsnooze" : "Snooze")
+        .setIcon("moon")
+        .onClick(async () => {
+          const currentTodos = getTodosForProject();
+          if (anyHasFuture) {
+            await this.processor.unsnoozeAllWithTag(currentTodos);
+          } else {
+            await this.processor.snoozeAllWithTag(currentTodos);
+          }
+          onRefresh();
+        });
+    });
+
+    menu.showAtMouseEvent(evt);
   }
 
   /**

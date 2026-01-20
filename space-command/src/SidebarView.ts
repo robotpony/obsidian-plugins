@@ -607,6 +607,21 @@ export class TodoSidebarView extends ItemView {
     const hasFocusItems = project.highestPriority === 0;
     const item = list.createEl("li", { cls: `project-item${hasFocusItems ? ' project-focus' : ''}` });
 
+    // Add context menu for project operations
+    item.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      this.contextMenuHandler.showProjectMenu(
+        e,
+        project,
+        this.scanner,
+        () => this.render(),
+        (tag) => {
+          this.activeTagFilter = tag;
+          this.render();
+        }
+      );
+    });
+
     // Checkbox for completing all project TODOs
     const checkbox = item.createEl("input", {
       type: "checkbox",

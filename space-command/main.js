@@ -912,6 +912,216 @@ ${todoneText}` : todoneText;
       return false;
     }
   }
+  // ========== Batch operations for project tags ==========
+  /**
+   * Focus all TODOs with the given tag: add #focus and increase priority
+   */
+  async focusAllWithTag(todos) {
+    let success = 0;
+    let failed = 0;
+    for (const todo of todos) {
+      if (todo.tags.includes("#focus"))
+        continue;
+      const currentPriority = this.getCurrentPriorityTag(todo);
+      const newPriority = this.calculateFocusPriority(currentPriority);
+      const result = await this.setPriorityTagSilent(todo, newPriority, true);
+      if (result)
+        success++;
+      else
+        failed++;
+    }
+    if (success > 0) {
+      showNotice(`Focused ${success} TODO${success > 1 ? "s" : ""}`);
+    }
+    return { success, failed };
+  }
+  /**
+   * Unfocus all TODOs with the given tag: remove #focus
+   */
+  async unfocusAllWithTag(todos) {
+    let success = 0;
+    let failed = 0;
+    for (const todo of todos) {
+      if (!todo.tags.includes("#focus"))
+        continue;
+      const result = await this.removeTagSilent(todo, "#focus");
+      if (result)
+        success++;
+      else
+        failed++;
+    }
+    if (success > 0) {
+      showNotice(`Unfocused ${success} TODO${success > 1 ? "s" : ""}`);
+    }
+    return { success, failed };
+  }
+  /**
+   * Later all TODOs with the given tag: decrease priority
+   */
+  async laterAllWithTag(todos) {
+    let success = 0;
+    let failed = 0;
+    for (const todo of todos) {
+      const currentPriority = this.getCurrentPriorityTag(todo);
+      if (currentPriority && /^#p[3-4]$/.test(currentPriority))
+        continue;
+      const newPriority = this.calculateLaterPriority(currentPriority);
+      const result = await this.setPriorityTagSilent(todo, newPriority, false);
+      if (result)
+        success++;
+      else
+        failed++;
+    }
+    if (success > 0) {
+      showNotice(`Set ${success} TODO${success > 1 ? "s" : ""} to later`);
+    }
+    return { success, failed };
+  }
+  /**
+   * Unlater all TODOs with the given tag: remove low priority tags
+   */
+  async unlaterAllWithTag(todos) {
+    let success = 0;
+    let failed = 0;
+    for (const todo of todos) {
+      const currentPriority = this.getCurrentPriorityTag(todo);
+      if (!currentPriority || !/^#p[3-4]$/.test(currentPriority))
+        continue;
+      const result = await this.removeTagSilent(todo, currentPriority);
+      if (result)
+        success++;
+      else
+        failed++;
+    }
+    if (success > 0) {
+      showNotice(`Unlatered ${success} TODO${success > 1 ? "s" : ""}`);
+    }
+    return { success, failed };
+  }
+  /**
+   * Snooze all TODOs with the given tag: add #future
+   */
+  async snoozeAllWithTag(todos) {
+    let success = 0;
+    let failed = 0;
+    for (const todo of todos) {
+      if (todo.tags.includes("#future"))
+        continue;
+      const result = await this.setPriorityTagSilent(todo, "#future", false);
+      if (result)
+        success++;
+      else
+        failed++;
+    }
+    if (success > 0) {
+      showNotice(`Snoozed ${success} TODO${success > 1 ? "s" : ""}`);
+    }
+    return { success, failed };
+  }
+  /**
+   * Unsnooze all TODOs with the given tag: remove #future
+   */
+  async unsnoozeAllWithTag(todos) {
+    let success = 0;
+    let failed = 0;
+    for (const todo of todos) {
+      if (!todo.tags.includes("#future"))
+        continue;
+      const result = await this.removeTagSilent(todo, "#future");
+      if (result)
+        success++;
+      else
+        failed++;
+    }
+    if (success > 0) {
+      showNotice(`Unsnoozed ${success} TODO${success > 1 ? "s" : ""}`);
+    }
+    return { success, failed };
+  }
+  // ========== Helper methods for batch operations ==========
+  getCurrentPriorityTag(todo) {
+    if (todo.tags.includes("#future"))
+      return "#future";
+    for (const tag of todo.tags) {
+      if (/^#p[0-4]$/.test(tag))
+        return tag;
+    }
+    return null;
+  }
+  calculateFocusPriority(currentPriority) {
+    if (!currentPriority || currentPriority === "#future")
+      return "#p0";
+    const match = currentPriority.match(/^#p([0-4])$/);
+    if (match) {
+      const num = parseInt(match[1]);
+      return num > 0 ? `#p${num - 1}` : "#p0";
+    }
+    return "#p0";
+  }
+  calculateLaterPriority(currentPriority) {
+    if (!currentPriority || currentPriority === "#future")
+      return "#p4";
+    const match = currentPriority.match(/^#p([0-4])$/);
+    if (match) {
+      const num = parseInt(match[1]);
+      return num < 4 ? `#p${num + 1}` : "#p4";
+    }
+    return "#p4";
+  }
+  /**
+   * Set priority tag without showing notice (for batch operations)
+   */
+  async setPriorityTagSilent(todo, newTag, addFocus) {
+    try {
+      const content3 = await this.app.vault.read(todo.file);
+      const lines = content3.split("\n");
+      if (todo.lineNumber >= lines.length)
+        return false;
+      let line = lines[todo.lineNumber];
+      if (!line.includes("#todo") || line.includes("#todone"))
+        return false;
+      line = line.replace(/#p[0-4]\b/g, "");
+      line = line.replace(/#future\b/g, "");
+      line = line.replace(/\s+/g, " ").trim();
+      line = line + ` ${newTag}`;
+      if (addFocus && !line.includes("#focus")) {
+        line = line + " #focus";
+      }
+      lines[todo.lineNumber] = line;
+      await this.app.vault.modify(todo.file, lines.join("\n"));
+      if (this.scanner) {
+        await this.scanner.scanFile(todo.file);
+      }
+      return true;
+    } catch (error) {
+      console.error("Error setting priority:", error);
+      return false;
+    }
+  }
+  /**
+   * Remove tag without showing notice (for batch operations)
+   */
+  async removeTagSilent(todo, tag) {
+    try {
+      const content3 = await this.app.vault.read(todo.file);
+      const lines = content3.split("\n");
+      if (todo.lineNumber >= lines.length)
+        return false;
+      let line = lines[todo.lineNumber];
+      const tagPattern = new RegExp(`${tag}\\b\\s*`, "g");
+      line = line.replace(tagPattern, "");
+      line = line.replace(/\s+/g, " ").trim();
+      lines[todo.lineNumber] = line;
+      await this.app.vault.modify(todo.file, lines.join("\n"));
+      if (this.scanner) {
+        await this.scanner.scanFile(todo.file);
+      }
+      return true;
+    } catch (error) {
+      console.error("Error removing tag:", error);
+      return false;
+    }
+  }
 };
 
 // src/ProjectManager.ts
@@ -1170,6 +1380,70 @@ var ContextMenuHandler = class {
     return "#p4";
   }
   /**
+   * Show context menu for a project (focus list item)
+   * Operations apply to all TODOs matching the project tag
+   */
+  showProjectMenu(evt, project, scanner, onRefresh, onFilterByTag) {
+    const menu = new import_obsidian5.Menu();
+    const getTodosForProject = () => {
+      return scanner.getTodos().filter((todo) => todo.tags.includes(project.tag));
+    };
+    const todos = getTodosForProject();
+    const anyHasFocus = todos.some((t) => t.tags.includes("#focus"));
+    const anyHasFuture = todos.some((t) => t.tags.includes("#future"));
+    const anyHasLaterPriority = todos.some((t) => {
+      for (const tag of t.tags) {
+        if (/^#p[3-4]$/.test(tag))
+          return true;
+      }
+      return false;
+    });
+    menu.addItem((item) => {
+      item.setTitle(project.tag).setIcon("tag");
+      const submenu = item.setSubmenu();
+      submenu.addItem((subItem) => {
+        subItem.setTitle("Filter by").setIcon("filter").onClick(() => {
+          onFilterByTag(project.tag);
+        });
+      });
+    });
+    menu.addSeparator();
+    menu.addItem((item) => {
+      item.setTitle(anyHasFocus ? "Unfocus" : "Focus").setIcon("zap").onClick(async () => {
+        const currentTodos = getTodosForProject();
+        if (anyHasFocus) {
+          await this.processor.unfocusAllWithTag(currentTodos);
+        } else {
+          await this.processor.focusAllWithTag(currentTodos);
+        }
+        onRefresh();
+      });
+    });
+    menu.addItem((item) => {
+      item.setTitle(anyHasLaterPriority ? "Unlater" : "Later").setIcon("clock").onClick(async () => {
+        const currentTodos = getTodosForProject();
+        if (anyHasLaterPriority) {
+          await this.processor.unlaterAllWithTag(currentTodos);
+        } else {
+          await this.processor.laterAllWithTag(currentTodos);
+        }
+        onRefresh();
+      });
+    });
+    menu.addItem((item) => {
+      item.setTitle(anyHasFuture ? "Unsnooze" : "Snooze").setIcon("moon").onClick(async () => {
+        const currentTodos = getTodosForProject();
+        if (anyHasFuture) {
+          await this.processor.unsnoozeAllWithTag(currentTodos);
+        } else {
+          await this.processor.snoozeAllWithTag(currentTodos);
+        }
+        onRefresh();
+      });
+    });
+    menu.showAtMouseEvent(evt);
+  }
+  /**
    * Show context menu for an idea item
    */
   showIdeaMenu(evt, idea, onRefresh) {
@@ -1330,6 +1604,18 @@ var EmbedRenderer = class {
     const list4 = container.createEl("ul", { cls: "focus-list" });
     for (const project of projects) {
       const item = list4.createEl("li", { cls: "focus-list-item" });
+      item.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        this.contextMenuHandler.showProjectMenu(
+          e,
+          project,
+          this.scanner,
+          () => this.renderFocusList(container),
+          () => {
+          }
+          // No filter action for embeds
+        );
+      });
       const textSpan = item.createEl("span", { cls: "focus-project-text" });
       textSpan.textContent = `${project.tag} `;
       const link2 = item.createEl("a", {
@@ -2548,6 +2834,19 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
   renderProjectItem(list4, project) {
     const hasFocusItems = project.highestPriority === 0;
     const item = list4.createEl("li", { cls: `project-item${hasFocusItems ? " project-focus" : ""}` });
+    item.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      this.contextMenuHandler.showProjectMenu(
+        e,
+        project,
+        this.scanner,
+        () => this.render(),
+        (tag) => {
+          this.activeTagFilter = tag;
+          this.render();
+        }
+      );
+    });
     const checkbox = item.createEl("input", {
       type: "checkbox",
       cls: "project-checkbox"
