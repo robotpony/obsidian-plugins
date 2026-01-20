@@ -486,6 +486,27 @@ export class TodoSidebarView extends ItemView {
     });
   }
 
+  /**
+   * Render filter indicator button after section title if a filter is active.
+   * Clicking the button clears the filter.
+   */
+  private renderFilterIndicator(header: HTMLElement): void {
+    if (!this.activeTagFilter) return;
+
+    const filterBtn = header.createEl("button", {
+      cls: "filter-indicator-btn",
+      attr: { "aria-label": `Clear filter: ${this.activeTagFilter}` },
+    });
+    filterBtn.createEl("span", { cls: "filter-indicator-tag", text: this.activeTagFilter });
+    filterBtn.createEl("span", { cls: "filter-indicator-x", text: "×" });
+
+    filterBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.activeTagFilter = null;
+      this.render();
+    });
+  }
+
   private renderProjects(container: HTMLElement): void {
     const projects = this.projectManager.getProjects();
 
@@ -497,6 +518,7 @@ export class TodoSidebarView extends ItemView {
 
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
     titleSpan.textContent = "Focus";
+    this.renderFilterIndicator(header);
 
     if (projects.length === 0) {
       section.createEl("div", {
@@ -579,10 +601,11 @@ export class TodoSidebarView extends ItemView {
     const header = section.createEl("div", { cls: "todo-section-header" });
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
     titleSpan.textContent = "TODO";
+    this.renderFilterIndicator(header);
 
     if (todos.length === 0) {
       section.createEl("div", {
-        text: "No TODOs",
+        text: this.activeTagFilter ? `No TODOs matching ${this.activeTagFilter}` : "No TODOs",
         cls: "todo-empty",
       });
       return;
@@ -617,6 +640,7 @@ export class TodoSidebarView extends ItemView {
 
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
     titleSpan.textContent = "DONE";
+    this.renderFilterIndicator(header);
 
     // Add link to done file
     const fileLink = header.createEl("a", {
@@ -712,10 +736,11 @@ export class TodoSidebarView extends ItemView {
 
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
     titleSpan.textContent = "Principles";
+    this.renderFilterIndicator(header);
 
     if (principles.length === 0) {
       section.createEl("div", {
-        text: "No principles yet",
+        text: this.activeTagFilter ? `No principles matching ${this.activeTagFilter}` : "No principles yet",
         cls: "todo-empty",
       });
       return;
@@ -754,10 +779,11 @@ export class TodoSidebarView extends ItemView {
     const header = section.createEl("div", { cls: "todo-section-header" });
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
     titleSpan.textContent = "Ideas";
+    this.renderFilterIndicator(header);
 
     if (ideas.length === 0) {
       section.createEl("div", {
-        text: "No ideas yet",
+        text: this.activeTagFilter ? `No ideas matching ${this.activeTagFilter}` : "No ideas yet",
         cls: "todo-empty",
       });
       return;

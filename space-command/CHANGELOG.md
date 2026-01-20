@@ -2,6 +2,15 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.7.18] - 2026-01-19
+
+### Added
+
+- **Filter indicator button in section headers**: When a tag filter is active, a clickable badge showing the filter (e.g., `#project ×`) appears after each section title
+  - Click the badge to clear the filter instantly
+  - Appears in all sections: Focus, TODO, DONE, Principles, Ideas
+  - Empty state messages now indicate the active filter (e.g., "No TODOs matching #project")
+
 ## [0.7.17] - 2026-01-19
 
 ### Fixed
