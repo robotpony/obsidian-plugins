@@ -175,7 +175,7 @@ export class TodoSidebarView extends ItemView {
     const tags = extractTags(cleanText).filter(tag => !config.tagToStrip.test(tag));
     if (tags.length > 0) {
       textSpan.appendText(" ");
-      this.renderTagDropdown(tags, textSpan);
+      this.renderTagDropdown(tags, textSpan, item);
     }
 
     // Link to source
@@ -223,7 +223,8 @@ export class TodoSidebarView extends ItemView {
   }
 
   // Render collapsed tag indicator with dropdown
-  private renderTagDropdown(tags: string[], container: HTMLElement): void {
+  // If item is provided, "Clear tag" option will be available to remove tags from the item
+  private renderTagDropdown(tags: string[], container: HTMLElement, item?: TodoItem): void {
     if (tags.length === 0) return;
 
     const trigger = container.createEl("span", {
@@ -247,18 +248,54 @@ export class TodoSidebarView extends ItemView {
       dropdown.style.left = `${rect.left}px`;
       dropdown.style.top = `${rect.bottom + 4}px`;
 
-      // Add tags to dropdown
+      // Add tags to dropdown with submenus
       for (const tag of tags) {
         const tagItem = dropdown.createEl("div", {
-          cls: "tag-dropdown-item",
+          cls: "tag-dropdown-item tag-dropdown-item-with-submenu",
+        });
+
+        const tagLabel = tagItem.createEl("span", {
+          cls: "tag-dropdown-item-label",
           text: tag,
         });
-        tagItem.addEventListener("click", (e) => {
+
+        const arrow = tagItem.createEl("span", {
+          cls: "tag-dropdown-item-arrow",
+          text: "›",
+        });
+
+        // Create submenu
+        const submenu = tagItem.createEl("div", {
+          cls: "tag-dropdown-submenu",
+        });
+
+        // Filter by option
+        const filterOption = submenu.createEl("div", {
+          cls: "tag-dropdown-submenu-item",
+          text: "Filter by",
+        });
+        filterOption.addEventListener("click", (e) => {
           e.stopPropagation();
           this.activeTagFilter = tag;
           this.closeDropdown();
           this.render();
         });
+
+        // Clear tag option (only if item is provided)
+        if (item) {
+          const clearTagOption = submenu.createEl("div", {
+            cls: "tag-dropdown-submenu-item",
+            text: "Clear tag",
+          });
+          clearTagOption.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            this.closeDropdown();
+            const success = await this.processor.removeTag(item, tag);
+            if (success) {
+              this.render();
+            }
+          });
+        }
       }
 
       // Add separator
@@ -698,7 +735,7 @@ export class TodoSidebarView extends ItemView {
 
     // Get tags (excluding #todone) and render dropdown
     const tags = extractTags(cleanText);
-    this.renderTagDropdown(tags, item);
+    this.renderTagDropdown(tags, item, todone);
 
     // Link to source
     const link = item.createEl("a", {

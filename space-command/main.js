@@ -2236,7 +2236,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     const tags = extractTags(cleanText).filter((tag) => !config.tagToStrip.test(tag));
     if (tags.length > 0) {
       textSpan.appendText(" ");
-      this.renderTagDropdown(tags, textSpan);
+      this.renderTagDropdown(tags, textSpan, item);
     }
     const link2 = rowContainer.createEl("a", {
       text: "\u2192",
@@ -2279,7 +2279,8 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     }
   }
   // Render collapsed tag indicator with dropdown
-  renderTagDropdown(tags, container) {
+  // If item is provided, "Clear tag" option will be available to remove tags from the item
+  renderTagDropdown(tags, container, item) {
     if (tags.length === 0)
       return;
     const trigger = container.createEl("span", {
@@ -2297,15 +2298,43 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       dropdown.style.top = `${rect.bottom + 4}px`;
       for (const tag of tags) {
         const tagItem = dropdown.createEl("div", {
-          cls: "tag-dropdown-item",
+          cls: "tag-dropdown-item tag-dropdown-item-with-submenu"
+        });
+        const tagLabel = tagItem.createEl("span", {
+          cls: "tag-dropdown-item-label",
           text: tag
         });
-        tagItem.addEventListener("click", (e2) => {
+        const arrow = tagItem.createEl("span", {
+          cls: "tag-dropdown-item-arrow",
+          text: "\u203A"
+        });
+        const submenu = tagItem.createEl("div", {
+          cls: "tag-dropdown-submenu"
+        });
+        const filterOption = submenu.createEl("div", {
+          cls: "tag-dropdown-submenu-item",
+          text: "Filter by"
+        });
+        filterOption.addEventListener("click", (e2) => {
           e2.stopPropagation();
           this.activeTagFilter = tag;
           this.closeDropdown();
           this.render();
         });
+        if (item) {
+          const clearTagOption = submenu.createEl("div", {
+            cls: "tag-dropdown-submenu-item",
+            text: "Clear tag"
+          });
+          clearTagOption.addEventListener("click", async (e2) => {
+            e2.stopPropagation();
+            this.closeDropdown();
+            const success = await this.processor.removeTag(item, tag);
+            if (success) {
+              this.render();
+            }
+          });
+        }
       }
       dropdown.createEl("div", { cls: "tag-dropdown-separator" });
       const clearItem = dropdown.createEl("div", {
@@ -2610,7 +2639,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     textSpan.appendText(textWithoutTags);
     textSpan.appendText(" ");
     const tags = extractTags(cleanText);
-    this.renderTagDropdown(tags, item);
+    this.renderTagDropdown(tags, item, todone);
     const link2 = item.createEl("a", {
       text: "\u2192",
       cls: "todo-link",

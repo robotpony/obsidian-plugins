@@ -2,6 +2,14 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.7.20] - 2026-01-19
+
+### Changed
+
+- **Tag dropdown now has submenus**: Each tag in the `#` dropdown menu shows a submenu with:
+  - **Filter by**: Filters the sidebar to show only items with that tag (previous behavior)
+  - **Clear tag**: Removes the tag from that TODO/idea/principle item
+
 ## [0.7.19] - 2026-01-19
 
 ### Changed
