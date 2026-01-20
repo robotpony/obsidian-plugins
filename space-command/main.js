@@ -720,6 +720,9 @@ var TodoProcessor = class {
       throw new Error(`${todoneFilePath} is not a file`);
     }
     let todoneText = todo.text;
+    if (todo.isHeader) {
+      todoneText = todoneText.replace(/^#{1,6}\s+/, "");
+    }
     todoneText = replaceTodoWithTodone(todoneText, date);
     if (todo.hasCheckbox) {
       todoneText = markCheckboxComplete(todoneText);

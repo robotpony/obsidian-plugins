@@ -231,6 +231,12 @@ export class TodoProcessor {
 
     // Format the TODONE entry
     let todoneText = todo.text;
+
+    // Strip heading markers from header TODOs (e.g., "## Task" -> "Task")
+    if (todo.isHeader) {
+      todoneText = todoneText.replace(/^#{1,6}\s+/, "");
+    }
+
     todoneText = replaceTodoWithTodone(todoneText, date);
 
     // Ensure it has the completed checkbox format

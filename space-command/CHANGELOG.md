@@ -2,6 +2,15 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.7.10] - 2026-01-19
+
+### Fixed
+
+- **Header TODO completion creates duplicate entries**: Completing a header TODO (e.g., `## Task #todo`) no longer creates malformed entries in the TODONE log
+  - Previously, heading markers (`##`) were included when writing to the done file, creating entries like `- [x] ## Task #todone`
+  - The scanner would then pick this up as a separate item, causing duplicates in the sidebar
+  - Fix: Strip heading markers from header TODOs before appending to the TODONE file
+
 ## [0.7.9] - 2026-01-19
 
 ### Fixed
