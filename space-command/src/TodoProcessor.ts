@@ -275,8 +275,17 @@ export class TodoProcessor {
 
       let line = lines[todo.lineNumber];
 
+      // Handle child items that inherit from parent header (no explicit #todo tag)
+      const isChildItem = todo.parentLineNumber !== undefined;
+
       // Validate line still contains #todo (prevents modifying wrong line)
-      if (!line.includes("#todo") || line.includes("#todone")) {
+      // Child items don't need explicit #todo tag - they inherit from parent
+      if (line.includes("#todone")) {
+        throw new Error(
+          `Line ${todo.lineNumber} in ${todo.filePath} contains #todone tag. Item is already completed.`
+        );
+      }
+      if (!line.includes("#todo") && !isChildItem) {
         throw new Error(
           `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todo tag. File may have been modified.`
         );

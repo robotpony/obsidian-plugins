@@ -2,6 +2,14 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.7.25] - 2026-01-19
+
+### Fixed
+
+- **Priority context menu on child TODOs**: Right-clicking a TODO item in a block-tagged list (list items under a header with `#todo`) no longer throws "no longer contains #todo tag" error
+  - Child items inherit TODO status from parent header and don't need explicit `#todo` tag
+  - Priority operations (set priority, add focus) now work correctly on these items
+
 ## [0.7.24] - 2026-01-19
 
 ### Added

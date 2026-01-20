@@ -762,7 +762,13 @@ ${todoneText}` : todoneText;
         );
       }
       let line = lines[todo.lineNumber];
-      if (!line.includes("#todo") || line.includes("#todone")) {
+      const isChildItem = todo.parentLineNumber !== void 0;
+      if (line.includes("#todone")) {
+        throw new Error(
+          `Line ${todo.lineNumber} in ${todo.filePath} contains #todone tag. Item is already completed.`
+        );
+      }
+      if (!line.includes("#todo") && !isChildItem) {
         throw new Error(
           `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todo tag. File may have been modified.`
         );
