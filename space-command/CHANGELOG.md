@@ -2,6 +2,15 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.7.28] - 2026-01-19
+
+### Improved
+
+- **Sidebar date styling**: Completion dates on done items (DONE section) now display with muted-pill styling
+  - Matches the visual style used for priority tags (`#focus`, `#p0`-`#p4`, `#future`)
+  - Date is extracted from text and rendered as a separate styled element
+  - Consistent with how dates are displayed in embed blocks
+
 ## [0.7.27] - 2026-01-19
 
 ### Added

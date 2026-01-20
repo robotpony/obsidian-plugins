@@ -2512,6 +2512,11 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     cleaned = cleaned.replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1");
     return cleaned;
   }
+  // Extract completion date from text (@YYYY-MM-DD pattern)
+  extractCompletionDate(text5) {
+    const match = text5.match(/@(\d{4}-\d{2}-\d{2})/);
+    return match ? match[1] : null;
+  }
   // Strip tags from text but preserve tags inside backticks (inline code)
   stripTagsPreservingCode(text5) {
     const codeBlocks = [];
@@ -2981,12 +2986,19 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     });
     const textSpan = item.createEl("span", { cls: "todo-text todone-text" });
     const cleanText = todone.text.replace(/#todones?\b/g, "").trim();
+    const completionDate = this.extractCompletionDate(cleanText);
     const displayText = this.stripMarkdownSyntax(cleanText);
-    const textWithoutTags = displayText.replace(/#[\w-]+/g, "").replace(/\s+/g, " ").trim();
+    const textWithoutTags = displayText.replace(/#[\w-]+/g, "").replace(/@\d{4}-\d{2}-\d{2}/g, "").replace(/\s+/g, " ").trim();
     textSpan.appendText(textWithoutTags);
     textSpan.appendText(" ");
     const tags = extractTags(cleanText);
     this.renderTagDropdown(tags, item, todone);
+    if (completionDate) {
+      item.createEl("span", {
+        cls: "todo-date muted-pill",
+        text: completionDate
+      });
+    }
     const link2 = item.createEl("a", {
       text: "\u2192",
       cls: "todo-link",

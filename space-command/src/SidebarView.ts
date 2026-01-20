@@ -88,6 +88,12 @@ export class TodoSidebarView extends ItemView {
     return cleaned;
   }
 
+  // Extract completion date from text (@YYYY-MM-DD pattern)
+  private extractCompletionDate(text: string): string | null {
+    const match = text.match(/@(\d{4}-\d{2}-\d{2})/);
+    return match ? match[1] : null;
+  }
+
   // Strip tags from text but preserve tags inside backticks (inline code)
   private stripTagsPreservingCode(text: string): string {
     // Strategy: temporarily replace inline code blocks, strip tags, then restore
@@ -773,18 +779,31 @@ export class TodoSidebarView extends ItemView {
       // Note: sidebar will auto-refresh via todos-updated event after scanner rescans
     });
 
-    // Text content (strip markdown and tags for display)
+    // Text content (strip markdown, tags, and date for display)
     const textSpan = item.createEl("span", { cls: "todo-text todone-text" });
     const cleanText = todone.text.replace(/#todones?\b/g, "").trim();
+    const completionDate = this.extractCompletionDate(cleanText);
     const displayText = this.stripMarkdownSyntax(cleanText);
-    // Strip all tags from display text (they'll be in the dropdown)
-    const textWithoutTags = displayText.replace(/#[\w-]+/g, "").replace(/\s+/g, " ").trim();
+    // Strip all tags and date from display text (they'll be rendered separately)
+    const textWithoutTags = displayText
+      .replace(/#[\w-]+/g, "")
+      .replace(/@\d{4}-\d{2}-\d{2}/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
     textSpan.appendText(textWithoutTags);
     textSpan.appendText(" ");
 
     // Get tags (excluding #todone) and render dropdown
     const tags = extractTags(cleanText);
     this.renderTagDropdown(tags, item, todone);
+
+    // Add completion date with muted pill style
+    if (completionDate) {
+      item.createEl("span", {
+        cls: "todo-date muted-pill",
+        text: completionDate,
+      });
+    }
 
     // Link to source
     const link = item.createEl("a", {
