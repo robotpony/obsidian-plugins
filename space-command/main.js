@@ -14572,7 +14572,7 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
     }
   }
   showAboutModal() {
-    new AboutModal(this.app).open();
+    new AboutModal(this.app, this.manifest.version).open();
   }
   showStatsModal() {
     new StatsModal(this.app, this.scanner).open();
@@ -14583,8 +14583,9 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
   }
 };
 var AboutModal = class extends import_obsidian11.Modal {
-  constructor(app) {
+  constructor(app, version) {
     super(app);
+    this.version = version;
   }
   onOpen() {
     const { contentEl } = this;
@@ -14593,6 +14594,7 @@ var AboutModal = class extends import_obsidian11.Modal {
     const header = contentEl.createEl("div", { cls: "about-header" });
     header.createEl("span", { cls: "space-command-logo about-logo", text: "\u2423\u2318" });
     header.createEl("h2", { text: "Space Command" });
+    contentEl.createEl("p", { cls: "about-version", text: `Version ${this.version}` });
     contentEl.createEl("p", {
       cls: "about-blurb",
       text: "Focus on the right next task. Simple TODOs and tags in your markdown, surfaced when you need them."
@@ -14676,6 +14678,7 @@ var SpaceCommandSettingTab = class extends import_obsidian11.PluginSettingTab {
       cls: "about-blurb",
       text: "Focus on the right next task. Simple TODOs and tags in your markdown, surfaced when you need them."
     });
+    aboutSection.createEl("p", { cls: "about-version", text: `Version ${this.plugin.manifest.version}` });
     const aboutDetails = aboutSection.createEl("div", { cls: "about-details" });
     aboutDetails.createEl("span", { text: "By Bruce Alderson" });
     aboutDetails.appendText(" \xB7 ");

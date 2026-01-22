@@ -2,6 +2,15 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.7] - 2026-01-21
+
+### Added
+
+- **Version display**: Plugin version now shown in both About modal and Settings page
+  - About modal shows version below the title
+  - Settings page shows version in the about section
+  - Version pulled from plugin manifest (always accurate)
+
 ## [0.9.6] - 2026-01-21
 
 ### Improved

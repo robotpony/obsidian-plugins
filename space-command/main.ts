@@ -452,7 +452,7 @@ export default class SpaceCommandPlugin extends Plugin {
   }
 
   showAboutModal() {
-    new AboutModal(this.app).open();
+    new AboutModal(this.app, this.manifest.version).open();
   }
 
   showStatsModal() {
@@ -468,8 +468,11 @@ export default class SpaceCommandPlugin extends Plugin {
 
 // About modal for displaying plugin information
 class AboutModal extends Modal {
-  constructor(app: App) {
+  private version: string;
+
+  constructor(app: App, version: string) {
     super(app);
+    this.version = version;
   }
 
   onOpen(): void {
@@ -481,6 +484,9 @@ class AboutModal extends Modal {
     const header = contentEl.createEl("div", { cls: "about-header" });
     header.createEl("span", { cls: "space-command-logo about-logo", text: "␣⌘" });
     header.createEl("h2", { text: "Space Command" });
+
+    // Version
+    contentEl.createEl("p", { cls: "about-version", text: `Version ${this.version}` });
 
     // Blurb
     contentEl.createEl("p", {
@@ -603,6 +609,8 @@ class SpaceCommandSettingTab extends PluginSettingTab {
       cls: "about-blurb",
       text: "Focus on the right next task. Simple TODOs and tags in your markdown, surfaced when you need them.",
     });
+
+    aboutSection.createEl("p", { cls: "about-version", text: `Version ${this.plugin.manifest.version}` });
 
     const aboutDetails = aboutSection.createEl("div", { cls: "about-details" });
     aboutDetails.createEl("span", { text: "By Bruce Alderson" });
