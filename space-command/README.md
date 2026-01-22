@@ -49,13 +49,20 @@ That's it. Everything else is optional.
 
 Right-click any TODO for quick actions: Focus, Later, Snooze, Copy.
 
-## Define with LLM
+## LLM Tools (Define, Rewrite, Review)
 
-Select any text, right-click, and choose **Define** to get a contextual explanation from a local LLM.
+Select any text, right-click, and choose from three LLM-powered tools:
+
+| Command     | Purpose                                                    |
+|-------------|------------------------------------------------------------|
+| **Define**  | Get a contextual explanation of the selected text          |
+| **Rewrite** | Improve clarity, accuracy, and brevity (with Apply button) |
+| **Review**  | Get editorial suggestions for improvement                  |
 
 - Requires [Ollama](https://ollama.ai) running locally (default: `http://localhost:11434`)
-- Definition appears in an inline tooltip near your selection
-- Customize the model, prompt, and timeout in Settings → Define (LLM) Settings
+- Results appear in an inline tooltip near your selection
+- Rewrite includes Copy and Apply buttons—Apply replaces your selection
+- Customize prompts in Settings → LLM Settings
 
 ## Ideas Tab
 

@@ -59,11 +59,13 @@ export default class SpaceCommandPlugin extends Plugin {
       this.settings.priorityTags
     );
 
-    // Initialize LLM client for Define feature
+    // Initialize LLM client for Define/Rewrite/Review features
     this.llmClient = new LLMClient({
       url: this.settings.llmUrl,
       model: this.settings.llmModel,
       prompt: this.settings.llmPrompt,
+      rewritePrompt: this.settings.llmRewritePrompt,
+      reviewPrompt: this.settings.llmReviewPrompt,
       timeout: this.settings.llmTimeout,
     });
     this.defineTooltip = new DefineTooltip();
@@ -282,7 +284,9 @@ export default class SpaceCommandPlugin extends Plugin {
                 .setIcon("book-open")
                 .onClick(async () => {
                   // Show loading tooltip with the selected term
-                  this.defineTooltip.show(editor, "", true, selection);
+                  this.defineTooltip.show(editor, "", true, selection, {
+                    loadingText: "Defining...",
+                  });
 
                   // Request definition from LLM
                   const result = await this.llmClient.define(selection);
@@ -294,6 +298,73 @@ export default class SpaceCommandPlugin extends Plugin {
                       `Error: ${result.error || "Failed to get definition"}`
                     );
                     showNotice(`Define failed: ${result.error}`);
+                  }
+                });
+            });
+
+            // Rewrite menu item (LLM rewrite for clarity/brevity)
+            menu.addItem((item) => {
+              item
+                .setTitle("Rewrite...")
+                .setIcon("pencil")
+                .onClick(async () => {
+                  // Store the current selection range for Apply
+                  const from = editor.getCursor("from");
+                  const to = editor.getCursor("to");
+
+                  // Show loading tooltip
+                  this.defineTooltip.show(editor, "", true, "", {
+                    loadingText: "Rewriting...",
+                    onApply: (content: string) => {
+                      // Replace the original selection with the rewritten content
+                      editor.replaceRange(content, from, to);
+                      showNotice("Text replaced");
+                    },
+                  });
+
+                  // Request rewrite from LLM
+                  const result = await this.llmClient.rewrite(selection);
+
+                  if (result.success && result.result) {
+                    this.defineTooltip.updateContent(result.result, {
+                      onApply: (content: string) => {
+                        editor.replaceRange(content, from, to);
+                        showNotice("Text replaced");
+                      },
+                    });
+                  } else {
+                    this.defineTooltip.updateContent(
+                      `Error: ${result.error || "Failed to rewrite"}`
+                    );
+                    showNotice(`Rewrite failed: ${result.error}`);
+                  }
+                });
+            });
+
+            // Review menu item (LLM suggestions)
+            menu.addItem((item) => {
+              item
+                .setTitle("Review...")
+                .setIcon("message-square")
+                .onClick(async () => {
+                  // Show loading tooltip
+                  this.defineTooltip.show(editor, "", true, "", {
+                    loadingText: "Reviewing...",
+                    showApply: true,
+                  });
+
+                  // Request review from LLM
+                  const result = await this.llmClient.review(selection);
+
+                  if (result.success && result.result) {
+                    this.defineTooltip.updateContent(result.result, {
+                      showApply: true,
+                    });
+                  } else {
+                    this.defineTooltip.updateContent(
+                      `Error: ${result.error || "Failed to review"}`
+                    );
+                    showNotice(`Review failed: ${result.error}`);
                   }
                 });
             });
@@ -681,8 +752,8 @@ class SpaceCommandSettingTab extends PluginSettingTab {
           })
       );
 
-    // LLM/Define Settings
-    containerEl.createEl("h3", { text: "Define (LLM) Settings" });
+    // LLM/Define/Rewrite/Review Settings
+    containerEl.createEl("h3", { text: "LLM Settings (Define, Rewrite, Review)" });
 
     new Setting(containerEl)
       .setName("Enable Define feature")
@@ -726,7 +797,7 @@ class SpaceCommandSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Definition prompt")
-      .setDesc("Prompt prepended to the selected text")
+      .setDesc("Prompt prepended to the selected text for Define")
       .addTextArea((text) => {
         text
           .setPlaceholder("Explain what this means...")
@@ -736,7 +807,39 @@ class SpaceCommandSettingTab extends PluginSettingTab {
             this.plugin.llmClient.updateConfig({ prompt: value });
             await this.plugin.saveSettings();
           });
-        text.inputEl.rows = 4;
+        text.inputEl.rows = 3;
+        text.inputEl.style.width = "100%";
+      });
+
+    new Setting(containerEl)
+      .setName("Rewrite prompt")
+      .setDesc("Prompt prepended to the selected text for Rewrite")
+      .addTextArea((text) => {
+        text
+          .setPlaceholder("Rewrite for clarity and brevity...")
+          .setValue(this.plugin.settings.llmRewritePrompt)
+          .onChange(async (value) => {
+            this.plugin.settings.llmRewritePrompt = value;
+            this.plugin.llmClient.updateConfig({ rewritePrompt: value });
+            await this.plugin.saveSettings();
+          });
+        text.inputEl.rows = 3;
+        text.inputEl.style.width = "100%";
+      });
+
+    new Setting(containerEl)
+      .setName("Review prompt")
+      .setDesc("Prompt prepended to the selected text for Review")
+      .addTextArea((text) => {
+        text
+          .setPlaceholder("Review and suggest improvements...")
+          .setValue(this.plugin.settings.llmReviewPrompt)
+          .onChange(async (value) => {
+            this.plugin.settings.llmReviewPrompt = value;
+            this.plugin.llmClient.updateConfig({ reviewPrompt: value });
+            await this.plugin.saveSettings();
+          });
+        text.inputEl.rows = 3;
         text.inputEl.style.width = "100%";
       });
 

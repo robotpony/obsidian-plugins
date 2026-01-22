@@ -2,6 +2,51 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.2] - 2026-01-21
+
+### Fixed
+
+- **Logo stretching in LLM tooltips**: The ␣⌘ logo no longer stretches to full container width
+  - Changed from float to absolute positioning
+  - Added left padding to tooltip for logo space
+
+## [0.9.1] - 2026-01-21
+
+### Fixed
+
+- **LLM tooltips now scrollable**: Define, Rewrite, and Review tooltips now scroll when content exceeds viewport
+  - Added `max-height: 60vh` to tooltip container
+  - Content area uses flexbox with `overflow-y: auto`
+  - Actions bar stays fixed at bottom while content scrolls
+
+## [0.9.0] - 2026-01-21
+
+### Added
+
+- **Rewrite command**: Select text, right-click, choose "Rewrite..." to get an LLM-powered rewrite
+  - Suggests changes for clarity, accuracy, and brevity
+  - Shows result in tooltip with Copy and Apply buttons
+  - Apply button replaces the selected text with the rewritten version
+  - Customizable prompt in settings
+
+- **Review command**: Select text, right-click, choose "Review..." for editorial feedback
+  - Provides specific suggestions for improvement
+  - Shows result in tooltip with Copy button
+  - Customizable prompt in settings
+
+### Improved
+
+- **Define tooltip**: Now shows "Defining..." during loading (was generic "Loading...")
+- **Settings organization**: LLM settings section renamed to "LLM Settings (Define, Rewrite, Review)"
+- **Tooltip actions**: New actions bar with Copy/Apply buttons for rewrite results
+
+### Technical
+
+- Extended `LLMClient` with `rewrite()` and `review()` methods
+- Extended `DefineTooltip` with optional `onApply` callback and actions bar
+- New settings: `llmRewritePrompt`, `llmReviewPrompt`
+- New CSS classes: `.define-tooltip-actions`, `.define-tooltip-btn`, `.define-tooltip-copy-btn`, `.define-tooltip-apply-btn`
+
 ## [0.8.6] - 2026-01-21
 
 ### Fixed

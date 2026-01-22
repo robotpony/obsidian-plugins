@@ -1226,17 +1226,21 @@
   border-radius: 8px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
   padding: 12px 16px;
+  padding-left: 44px;
   max-width: 400px;
   min-width: 200px;
+  max-height: 60vh;
   z-index: 1000;
   font-size: 0.9em;
   line-height: 1.5;
+  display: flex;
+  flex-direction: column;
 }
 
 .define-tooltip-logo {
-  float: left;
-  margin-right: 12px;
-  margin-bottom: 4px;
+  position: absolute;
+  top: 12px;
+  left: 12px;
   font-size: 0.85em;
 }
 
@@ -1244,6 +1248,9 @@
   color: var(--text-normal);
   white-space: pre-wrap;
   word-wrap: break-word;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .define-tooltip-loading .define-tooltip-content {
@@ -1292,5 +1299,42 @@
   color: inherit;
   padding: 0 2px;
   border-radius: 2px;
+}
+
+/* Tooltip Actions Bar */
+.define-tooltip-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.define-tooltip-btn {
+  padding: 4px 12px;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.85em;
+  cursor: pointer;
+  transition: background-color 0.15s, opacity 0.15s;
+}
+
+.define-tooltip-copy-btn {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.define-tooltip-copy-btn:hover {
+  background-color: var(--background-modifier-border);
+}
+
+.define-tooltip-apply-btn {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.define-tooltip-apply-btn:hover {
+  background-color: var(--interactive-accent-hover);
 }
 

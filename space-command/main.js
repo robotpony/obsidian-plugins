@@ -3360,6 +3360,8 @@ var DEFAULT_SETTINGS = {
   llmUrl: "http://localhost:11434",
   llmModel: "llama3.2",
   llmPrompt: "Explain what this means in plain language, providing context if it's a technical term:",
+  llmRewritePrompt: "Rewrite the following text to improve clarity, accuracy, and brevity. Keep the same tone and intent. Avoid clich\xE9s and filler words. Output only the rewritten text, nothing else:",
+  llmReviewPrompt: "Review the following text and provide specific suggestions for improvement. Focus on clarity, accuracy, structure, and style. Be concise and actionable:",
   llmTimeout: 3e4
 };
 
@@ -13924,6 +13926,80 @@ var LLMClient = class {
       };
     }
   }
+  async rewrite(text5) {
+    var _a;
+    const fullPrompt = `${this.config.rewritePrompt}
+
+${text5}`;
+    try {
+      const response = await (0, import_obsidian9.requestUrl)({
+        url: `${this.config.url}/api/generate`,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: this.config.model,
+          prompt: fullPrompt,
+          stream: false
+        }),
+        throw: false
+      });
+      if (response.status !== 200) {
+        return {
+          success: false,
+          error: `LLM request failed: ${response.status}`
+        };
+      }
+      const data = response.json;
+      return {
+        success: true,
+        result: ((_a = data.response) == null ? void 0 : _a.trim()) || "No response received"
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error"
+      };
+    }
+  }
+  async review(text5) {
+    var _a;
+    const fullPrompt = `${this.config.reviewPrompt}
+
+${text5}`;
+    try {
+      const response = await (0, import_obsidian9.requestUrl)({
+        url: `${this.config.url}/api/generate`,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: this.config.model,
+          prompt: fullPrompt,
+          stream: false
+        }),
+        throw: false
+      });
+      if (response.status !== 200) {
+        return {
+          success: false,
+          error: `LLM request failed: ${response.status}`
+        };
+      }
+      const data = response.json;
+      return {
+        success: true,
+        result: ((_a = data.response) == null ? void 0 : _a.trim()) || "No response received"
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error"
+      };
+    }
+  }
 };
 
 // src/DefineTooltip.ts
@@ -13933,10 +14009,14 @@ var DefineTooltip = class {
     this.closeHandler = null;
     this.escapeHandler = null;
     this.searchTerm = "";
+    this.currentContent = "";
+    this.options = {};
   }
-  show(editor, content3, isLoading = false, term = "") {
+  show(editor, content3, isLoading = false, term = "", options = {}) {
     this.close();
     this.searchTerm = term;
+    this.currentContent = content3;
+    this.options = options;
     const cm = editor.cm;
     if (!cm)
       return;
@@ -13966,15 +14046,43 @@ var DefineTooltip = class {
     const contentEl = this.tooltip.createEl("div", { cls: "define-tooltip-content" });
     if (isLoading) {
       contentEl.createEl("span", { cls: "define-tooltip-spinner" });
-      contentEl.createSpan({ text: "Defining..." });
+      contentEl.createSpan({ text: options.loadingText || "Loading..." });
     } else {
       this.renderContentWithHighlight(contentEl, content3);
+    }
+    if (!isLoading && (options.showApply || options.onApply)) {
+      this.createActionsBar();
     }
     this.tooltip.style.position = "fixed";
     this.tooltip.style.top = `${coords.bottom + 8}px`;
     this.tooltip.style.left = `${coords.left}px`;
     document.body.appendChild(this.tooltip);
     this.adjustPosition(coords);
+  }
+  createActionsBar() {
+    if (!this.tooltip)
+      return;
+    const actionsEl = this.tooltip.createEl("div", { cls: "define-tooltip-actions" });
+    const copyBtn = actionsEl.createEl("button", {
+      cls: "define-tooltip-btn define-tooltip-copy-btn",
+      text: "Copy"
+    });
+    copyBtn.addEventListener("click", async () => {
+      await navigator.clipboard.writeText(this.currentContent);
+      showNotice("Copied to clipboard");
+    });
+    if (this.options.onApply) {
+      const applyBtn = actionsEl.createEl("button", {
+        cls: "define-tooltip-btn define-tooltip-apply-btn",
+        text: "Apply"
+      });
+      applyBtn.addEventListener("click", () => {
+        if (this.options.onApply) {
+          this.options.onApply(this.currentContent);
+        }
+        this.close();
+      });
+    }
   }
   adjustPosition(coords) {
     if (!this.tooltip)
@@ -14034,14 +14142,22 @@ var DefineTooltip = class {
   escapeRegex(str) {
     return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
-  updateContent(content3) {
+  updateContent(content3, options) {
     if (!this.tooltip)
       return;
+    this.currentContent = content3;
+    if (options) {
+      this.options = { ...this.options, ...options };
+    }
     this.tooltip.classList.remove("define-tooltip-loading");
     const contentEl = this.tooltip.querySelector(".define-tooltip-content");
     if (contentEl) {
       contentEl.empty();
       this.renderContentWithHighlight(contentEl, content3);
+    }
+    const existingActions = this.tooltip.querySelector(".define-tooltip-actions");
+    if (!existingActions && (this.options.showApply || this.options.onApply)) {
+      this.createActionsBar();
     }
   }
   close() {
@@ -14058,6 +14174,8 @@ var DefineTooltip = class {
       this.escapeHandler = null;
     }
     this.searchTerm = "";
+    this.currentContent = "";
+    this.options = {};
   }
 };
 
@@ -14088,6 +14206,8 @@ var SpaceCommandPlugin = class extends import_obsidian10.Plugin {
       url: this.settings.llmUrl,
       model: this.settings.llmModel,
       prompt: this.settings.llmPrompt,
+      rewritePrompt: this.settings.llmRewritePrompt,
+      reviewPrompt: this.settings.llmReviewPrompt,
       timeout: this.settings.llmTimeout
     });
     this.defineTooltip = new DefineTooltip();
@@ -14245,7 +14365,9 @@ var SpaceCommandPlugin = class extends import_obsidian10.Plugin {
           if (this.settings.llmEnabled) {
             menu.addItem((item) => {
               item.setTitle("Define term...").setIcon("book-open").onClick(async () => {
-                this.defineTooltip.show(editor, "", true, selection);
+                this.defineTooltip.show(editor, "", true, selection, {
+                  loadingText: "Defining..."
+                });
                 const result = await this.llmClient.define(selection);
                 if (result.success && result.definition) {
                   this.defineTooltip.updateContent(result.definition);
@@ -14254,6 +14376,52 @@ var SpaceCommandPlugin = class extends import_obsidian10.Plugin {
                     `Error: ${result.error || "Failed to get definition"}`
                   );
                   showNotice(`Define failed: ${result.error}`);
+                }
+              });
+            });
+            menu.addItem((item) => {
+              item.setTitle("Rewrite...").setIcon("pencil").onClick(async () => {
+                const from = editor.getCursor("from");
+                const to = editor.getCursor("to");
+                this.defineTooltip.show(editor, "", true, "", {
+                  loadingText: "Rewriting...",
+                  onApply: (content3) => {
+                    editor.replaceRange(content3, from, to);
+                    showNotice("Text replaced");
+                  }
+                });
+                const result = await this.llmClient.rewrite(selection);
+                if (result.success && result.result) {
+                  this.defineTooltip.updateContent(result.result, {
+                    onApply: (content3) => {
+                      editor.replaceRange(content3, from, to);
+                      showNotice("Text replaced");
+                    }
+                  });
+                } else {
+                  this.defineTooltip.updateContent(
+                    `Error: ${result.error || "Failed to rewrite"}`
+                  );
+                  showNotice(`Rewrite failed: ${result.error}`);
+                }
+              });
+            });
+            menu.addItem((item) => {
+              item.setTitle("Review...").setIcon("message-square").onClick(async () => {
+                this.defineTooltip.show(editor, "", true, "", {
+                  loadingText: "Reviewing...",
+                  showApply: true
+                });
+                const result = await this.llmClient.review(selection);
+                if (result.success && result.result) {
+                  this.defineTooltip.updateContent(result.result, {
+                    showApply: true
+                  });
+                } else {
+                  this.defineTooltip.updateContent(
+                    `Error: ${result.error || "Failed to review"}`
+                  );
+                  showNotice(`Review failed: ${result.error}`);
                 }
               });
             });
@@ -14499,7 +14667,7 @@ var SpaceCommandSettingTab = class extends import_obsidian10.PluginSettingTab {
         }
       })
     );
-    containerEl.createEl("h3", { text: "Define (LLM) Settings" });
+    containerEl.createEl("h3", { text: "LLM Settings (Define, Rewrite, Review)" });
     new import_obsidian10.Setting(containerEl).setName("Enable Define feature").setDesc("Show 'Define' option in context menu to look up definitions via LLM").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.llmEnabled).onChange(async (value) => {
         this.plugin.settings.llmEnabled = value;
@@ -14520,13 +14688,31 @@ var SpaceCommandSettingTab = class extends import_obsidian10.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian10.Setting(containerEl).setName("Definition prompt").setDesc("Prompt prepended to the selected text").addTextArea((text5) => {
+    new import_obsidian10.Setting(containerEl).setName("Definition prompt").setDesc("Prompt prepended to the selected text for Define").addTextArea((text5) => {
       text5.setPlaceholder("Explain what this means...").setValue(this.plugin.settings.llmPrompt).onChange(async (value) => {
         this.plugin.settings.llmPrompt = value;
         this.plugin.llmClient.updateConfig({ prompt: value });
         await this.plugin.saveSettings();
       });
-      text5.inputEl.rows = 4;
+      text5.inputEl.rows = 3;
+      text5.inputEl.style.width = "100%";
+    });
+    new import_obsidian10.Setting(containerEl).setName("Rewrite prompt").setDesc("Prompt prepended to the selected text for Rewrite").addTextArea((text5) => {
+      text5.setPlaceholder("Rewrite for clarity and brevity...").setValue(this.plugin.settings.llmRewritePrompt).onChange(async (value) => {
+        this.plugin.settings.llmRewritePrompt = value;
+        this.plugin.llmClient.updateConfig({ rewritePrompt: value });
+        await this.plugin.saveSettings();
+      });
+      text5.inputEl.rows = 3;
+      text5.inputEl.style.width = "100%";
+    });
+    new import_obsidian10.Setting(containerEl).setName("Review prompt").setDesc("Prompt prepended to the selected text for Review").addTextArea((text5) => {
+      text5.setPlaceholder("Review and suggest improvements...").setValue(this.plugin.settings.llmReviewPrompt).onChange(async (value) => {
+        this.plugin.settings.llmReviewPrompt = value;
+        this.plugin.llmClient.updateConfig({ reviewPrompt: value });
+        await this.plugin.saveSettings();
+      });
+      text5.inputEl.rows = 3;
       text5.inputEl.style.width = "100%";
     });
     new import_obsidian10.Setting(containerEl).setName("Timeout (ms)").setDesc("Maximum time to wait for LLM response").addText(

@@ -59,6 +59,8 @@ export interface SpaceCommandSettings {
   llmUrl: string;
   llmModel: string;
   llmPrompt: string;
+  llmRewritePrompt: string;
+  llmReviewPrompt: string;
   llmTimeout: number;
 }
 
@@ -77,5 +79,7 @@ export const DEFAULT_SETTINGS: SpaceCommandSettings = {
   llmUrl: "http://localhost:11434",
   llmModel: "llama3.2",
   llmPrompt: "Explain what this means in plain language, providing context if it's a technical term:",
+  llmRewritePrompt: "Rewrite the following text to improve clarity, accuracy, and brevity. Keep the same tone and intent. Avoid clichés and filler words. Output only the rewritten text, nothing else:",
+  llmReviewPrompt: "Review the following text and provide specific suggestions for improvement. Focus on clarity, accuracy, structure, and style. Be concise and actionable:",
   llmTimeout: 30000,
 };
