@@ -292,8 +292,9 @@ export class TodoSidebarView extends ItemView {
         dropdown.style.left = `${rect.left}px`;
       }
 
-      // Add tags to dropdown with submenus
-      for (const tag of tags) {
+      // Add tags to dropdown with submenus (sorted alphabetically)
+      const sortedTags = [...tags].sort((a, b) => a.localeCompare(b));
+      for (const tag of sortedTags) {
         const tagItem = dropdown.createEl("div", {
           cls: "tag-dropdown-item tag-dropdown-item-with-submenu",
         });
@@ -313,19 +314,7 @@ export class TodoSidebarView extends ItemView {
           cls: "tag-dropdown-submenu",
         });
 
-        // Filter by option
-        const filterOption = submenu.createEl("div", {
-          cls: "tag-dropdown-submenu-item",
-          text: "Filter by",
-        });
-        filterOption.addEventListener("click", (e) => {
-          e.stopPropagation();
-          this.activeTagFilter = tag;
-          this.closeDropdown();
-          this.render();
-        });
-
-        // Clear tag option (only if item is provided)
+        // Clear tag option (only if item is provided) - alphabetically first
         if (item) {
           const clearTagOption = submenu.createEl("div", {
             cls: "tag-dropdown-submenu-item",
@@ -340,6 +329,18 @@ export class TodoSidebarView extends ItemView {
             }
           });
         }
+
+        // Filter by option
+        const filterOption = submenu.createEl("div", {
+          cls: "tag-dropdown-submenu-item",
+          text: "Filter by",
+        });
+        filterOption.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.activeTagFilter = tag;
+          this.closeDropdown();
+          this.render();
+        });
       }
 
       // Add separator
@@ -450,18 +451,6 @@ export class TodoSidebarView extends ItemView {
     menuBtn.addEventListener("click", (evt) => {
       const menu = new Menu();
 
-      // Refresh
-      menu.addItem((item) => {
-        item
-          .setTitle("Refresh")
-          .setIcon("refresh-cw")
-          .onClick(async () => {
-            menuBtn.addClass("rotating");
-            await this.scanner.scanVault();
-            setTimeout(() => menuBtn.removeClass("rotating"), 500);
-          });
-      });
-
       // Embed Syntax submenu
       menu.addItem((item) => {
         item
@@ -469,24 +458,6 @@ export class TodoSidebarView extends ItemView {
           .setIcon("copy");
 
         const submenu = (item as any).setSubmenu();
-        submenu.addItem((subItem: any) => {
-          subItem
-            .setTitle("TODO code block")
-            .setIcon("code")
-            .onClick(() => {
-              navigator.clipboard.writeText("```focus-todos\n```");
-              showNotice("Copied TODO code block syntax");
-            });
-        });
-        submenu.addItem((subItem: any) => {
-          subItem
-            .setTitle("TODO inline")
-            .setIcon("brackets")
-            .onClick(() => {
-              navigator.clipboard.writeText("{{focus-todos}}");
-              showNotice("Copied TODO inline syntax");
-            });
-        });
         submenu.addItem((subItem: any) => {
           subItem
             .setTitle("IDEA code block")
@@ -505,16 +476,46 @@ export class TodoSidebarView extends ItemView {
               showNotice("Copied IDEA inline syntax");
             });
         });
+        submenu.addItem((subItem: any) => {
+          subItem
+            .setTitle("TODO code block")
+            .setIcon("code")
+            .onClick(() => {
+              navigator.clipboard.writeText("```focus-todos\n```");
+              showNotice("Copied TODO code block syntax");
+            });
+        });
+        submenu.addItem((subItem: any) => {
+          subItem
+            .setTitle("TODO inline")
+            .setIcon("brackets")
+            .onClick(() => {
+              navigator.clipboard.writeText("{{focus-todos}}");
+              showNotice("Copied TODO inline syntax");
+            });
+        });
+      });
+
+      // Refresh
+      menu.addItem((item) => {
+        item
+          .setTitle("Refresh")
+          .setIcon("refresh-cw")
+          .onClick(async () => {
+            menuBtn.addClass("rotating");
+            await this.scanner.scanVault();
+            setTimeout(() => menuBtn.removeClass("rotating"), 500);
+          });
       });
 
       menu.addSeparator();
 
-      // Stats
+      // About
       menu.addItem((item) => {
         item
-          .setTitle("Stats")
-          .setIcon("bar-chart-2")
-          .onClick(() => this.onShowStats());
+          .setTitle("About")
+          .setIcon("info")
+          .onClick(() => this.onShowAbout());
       });
 
       // Settings
@@ -528,12 +529,12 @@ export class TodoSidebarView extends ItemView {
           });
       });
 
-      // About
+      // Stats
       menu.addItem((item) => {
         item
-          .setTitle("About")
-          .setIcon("info")
-          .onClick(() => this.onShowAbout());
+          .setTitle("Stats")
+          .setIcon("bar-chart-2")
+          .onClick(() => this.onShowStats());
       });
 
       menu.showAtMouseEvent(evt);

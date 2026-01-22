@@ -303,6 +303,35 @@ export default class SpaceCommandPlugin extends Plugin {
                 });
             });
 
+            // Review menu item (LLM suggestions)
+            menu.addItem((item) => {
+              item
+                .setTitle("Review...")
+                .setIcon("message-square")
+                .onClick(async () => {
+                  // Show loading tooltip
+                  this.defineTooltip.show(editor, "", true, "", {
+                    loadingText: "Reviewing...",
+                    commandType: "review",
+                    showApply: true,
+                  });
+
+                  // Request review from LLM
+                  const result = await this.llmClient.review(selection);
+
+                  if (result.success && result.result) {
+                    this.defineTooltip.updateContent(result.result, {
+                      showApply: true,
+                    });
+                  } else {
+                    this.defineTooltip.showError(
+                      this.llmClient.getModel(),
+                      () => this.openLLMSettings()
+                    );
+                  }
+                });
+            });
+
             // Rewrite menu item (LLM rewrite for clarity/brevity)
             menu.addItem((item) => {
               item
@@ -333,35 +362,6 @@ export default class SpaceCommandPlugin extends Plugin {
                         editor.replaceRange(content, from, to);
                         showNotice("Text replaced");
                       },
-                    });
-                  } else {
-                    this.defineTooltip.showError(
-                      this.llmClient.getModel(),
-                      () => this.openLLMSettings()
-                    );
-                  }
-                });
-            });
-
-            // Review menu item (LLM suggestions)
-            menu.addItem((item) => {
-              item
-                .setTitle("Review...")
-                .setIcon("message-square")
-                .onClick(async () => {
-                  // Show loading tooltip
-                  this.defineTooltip.show(editor, "", true, "", {
-                    loadingText: "Reviewing...",
-                    commandType: "review",
-                    showApply: true,
-                  });
-
-                  // Request review from LLM
-                  const result = await this.llmClient.review(selection);
-
-                  if (result.success && result.result) {
-                    this.defineTooltip.updateContent(result.result, {
-                      showApply: true,
                     });
                   } else {
                     this.defineTooltip.showError(

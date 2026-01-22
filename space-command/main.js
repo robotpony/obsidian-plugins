@@ -1425,6 +1425,11 @@ var ContextMenuHandler = class {
     const hasFuture = todo.tags.includes("#future");
     const hasLaterPriority = currentPriority && /^#p[3-4]$/.test(currentPriority);
     menu.addItem((item) => {
+      item.setTitle("Copy").setIcon("copy").onClick(async () => {
+        await navigator.clipboard.writeText(todo.text);
+      });
+    });
+    menu.addItem((item) => {
       item.setTitle(hasFocus ? "Unfocus" : "Focus").setIcon("zap").onClick(async () => {
         let success;
         if (hasFocus) {
@@ -1460,11 +1465,6 @@ var ContextMenuHandler = class {
         }
         if (success)
           onRefresh();
-      });
-    });
-    menu.addItem((item) => {
-      item.setTitle("Copy").setIcon("copy").onClick(async () => {
-        await navigator.clipboard.writeText(todo.text);
       });
     });
     menu.showAtMouseEvent(evt);
@@ -1593,6 +1593,11 @@ var ContextMenuHandler = class {
       });
     });
     menu.addItem((item) => {
+      item.setTitle("Copy").setIcon("copy").onClick(async () => {
+        await navigator.clipboard.writeText(idea.text);
+      });
+    });
+    menu.addItem((item) => {
       item.setTitle(hasFocus ? "Unfocus" : "Focus").setIcon("zap").onClick(async () => {
         let success;
         if (hasFocus) {
@@ -1602,11 +1607,6 @@ var ContextMenuHandler = class {
         }
         if (success)
           onRefresh();
-      });
-    });
-    menu.addItem((item) => {
-      item.setTitle("Copy").setIcon("copy").onClick(async () => {
-        await navigator.clipboard.writeText(idea.text);
       });
     });
     menu.showAtMouseEvent(evt);
@@ -2764,7 +2764,8 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       } else {
         dropdown.style.left = `${rect.left}px`;
       }
-      for (const tag of tags) {
+      const sortedTags = [...tags].sort((a, b) => a.localeCompare(b));
+      for (const tag of sortedTags) {
         const tagItem = dropdown.createEl("div", {
           cls: "tag-dropdown-item tag-dropdown-item-with-submenu"
         });
@@ -2778,16 +2779,6 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
         });
         const submenu = tagItem.createEl("div", {
           cls: "tag-dropdown-submenu"
-        });
-        const filterOption = submenu.createEl("div", {
-          cls: "tag-dropdown-submenu-item",
-          text: "Filter by"
-        });
-        filterOption.addEventListener("click", (e2) => {
-          e2.stopPropagation();
-          this.activeTagFilter = tag;
-          this.closeDropdown();
-          this.render();
         });
         if (item) {
           const clearTagOption = submenu.createEl("div", {
@@ -2803,6 +2794,16 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
             }
           });
         }
+        const filterOption = submenu.createEl("div", {
+          cls: "tag-dropdown-submenu-item",
+          text: "Filter by"
+        });
+        filterOption.addEventListener("click", (e2) => {
+          e2.stopPropagation();
+          this.activeTagFilter = tag;
+          this.closeDropdown();
+          this.render();
+        });
       }
       dropdown.createEl("div", { cls: "tag-dropdown-separator" });
       const clearItem = dropdown.createEl("div", {
@@ -2883,27 +2884,8 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     menuBtn.addEventListener("click", (evt) => {
       const menu = new import_obsidian8.Menu();
       menu.addItem((item) => {
-        item.setTitle("Refresh").setIcon("refresh-cw").onClick(async () => {
-          menuBtn.addClass("rotating");
-          await this.scanner.scanVault();
-          setTimeout(() => menuBtn.removeClass("rotating"), 500);
-        });
-      });
-      menu.addItem((item) => {
         item.setTitle("Embed Syntax").setIcon("copy");
         const submenu = item.setSubmenu();
-        submenu.addItem((subItem) => {
-          subItem.setTitle("TODO code block").setIcon("code").onClick(() => {
-            navigator.clipboard.writeText("```focus-todos\n```");
-            showNotice("Copied TODO code block syntax");
-          });
-        });
-        submenu.addItem((subItem) => {
-          subItem.setTitle("TODO inline").setIcon("brackets").onClick(() => {
-            navigator.clipboard.writeText("{{focus-todos}}");
-            showNotice("Copied TODO inline syntax");
-          });
-        });
         submenu.addItem((subItem) => {
           subItem.setTitle("IDEA code block").setIcon("code").onClick(() => {
             navigator.clipboard.writeText("```focus-ideas\n```");
@@ -2916,10 +2898,29 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
             showNotice("Copied IDEA inline syntax");
           });
         });
+        submenu.addItem((subItem) => {
+          subItem.setTitle("TODO code block").setIcon("code").onClick(() => {
+            navigator.clipboard.writeText("```focus-todos\n```");
+            showNotice("Copied TODO code block syntax");
+          });
+        });
+        submenu.addItem((subItem) => {
+          subItem.setTitle("TODO inline").setIcon("brackets").onClick(() => {
+            navigator.clipboard.writeText("{{focus-todos}}");
+            showNotice("Copied TODO inline syntax");
+          });
+        });
+      });
+      menu.addItem((item) => {
+        item.setTitle("Refresh").setIcon("refresh-cw").onClick(async () => {
+          menuBtn.addClass("rotating");
+          await this.scanner.scanVault();
+          setTimeout(() => menuBtn.removeClass("rotating"), 500);
+        });
       });
       menu.addSeparator();
       menu.addItem((item) => {
-        item.setTitle("Stats").setIcon("bar-chart-2").onClick(() => this.onShowStats());
+        item.setTitle("About").setIcon("info").onClick(() => this.onShowAbout());
       });
       menu.addItem((item) => {
         item.setTitle("Settings").setIcon("settings").onClick(() => {
@@ -2928,7 +2929,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
         });
       });
       menu.addItem((item) => {
-        item.setTitle("About").setIcon("info").onClick(() => this.onShowAbout());
+        item.setTitle("Stats").setIcon("bar-chart-2").onClick(() => this.onShowStats());
       });
       menu.showAtMouseEvent(evt);
     });
@@ -14465,6 +14466,26 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
               });
             });
             menu.addItem((item) => {
+              item.setTitle("Review...").setIcon("message-square").onClick(async () => {
+                this.defineTooltip.show(editor, "", true, "", {
+                  loadingText: "Reviewing...",
+                  commandType: "review",
+                  showApply: true
+                });
+                const result = await this.llmClient.review(selection);
+                if (result.success && result.result) {
+                  this.defineTooltip.updateContent(result.result, {
+                    showApply: true
+                  });
+                } else {
+                  this.defineTooltip.showError(
+                    this.llmClient.getModel(),
+                    () => this.openLLMSettings()
+                  );
+                }
+              });
+            });
+            menu.addItem((item) => {
               item.setTitle("Rewrite...").setIcon("pencil").onClick(async () => {
                 const from = editor.getCursor("from");
                 const to = editor.getCursor("to");
@@ -14483,26 +14504,6 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
                       editor.replaceRange(content3, from, to);
                       showNotice("Text replaced");
                     }
-                  });
-                } else {
-                  this.defineTooltip.showError(
-                    this.llmClient.getModel(),
-                    () => this.openLLMSettings()
-                  );
-                }
-              });
-            });
-            menu.addItem((item) => {
-              item.setTitle("Review...").setIcon("message-square").onClick(async () => {
-                this.defineTooltip.show(editor, "", true, "", {
-                  loadingText: "Reviewing...",
-                  commandType: "review",
-                  showApply: true
-                });
-                const result = await this.llmClient.review(selection);
-                if (result.success && result.result) {
-                  this.defineTooltip.updateContent(result.result, {
-                    showApply: true
                   });
                 } else {
                   this.defineTooltip.showError(

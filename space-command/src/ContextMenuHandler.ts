@@ -29,6 +29,16 @@ export class ContextMenuHandler {
     const hasFuture = todo.tags.includes("#future");
     const hasLaterPriority = currentPriority && /^#p[3-4]$/.test(currentPriority);
 
+    // Copy - copies the full line text to clipboard
+    menu.addItem((item) => {
+      item
+        .setTitle("Copy")
+        .setIcon("copy")
+        .onClick(async () => {
+          await navigator.clipboard.writeText(todo.text);
+        });
+    });
+
     // Focus - Toggle: if has #focus, remove it; otherwise add #focus + increase priority
     menu.addItem((item) => {
       item
@@ -82,16 +92,6 @@ export class ContextMenuHandler {
             success = await this.processor.setPriorityTag(todo, "#future");
           }
           if (success) onRefresh();
-        });
-    });
-
-    // Copy - copies the full line text to clipboard
-    menu.addItem((item) => {
-      item
-        .setTitle("Copy")
-        .setIcon("copy")
-        .onClick(async () => {
-          await navigator.clipboard.writeText(todo.text);
         });
     });
 
@@ -276,6 +276,16 @@ export class ContextMenuHandler {
         });
     });
 
+    // Copy - copies the full line text to clipboard
+    menu.addItem((item) => {
+      item
+        .setTitle("Copy")
+        .setIcon("copy")
+        .onClick(async () => {
+          await navigator.clipboard.writeText(idea.text);
+        });
+    });
+
     // Focus - Toggle: if has #focus, remove it; otherwise add #focus
     menu.addItem((item) => {
       item
@@ -291,16 +301,6 @@ export class ContextMenuHandler {
             success = await this.processor.addFocusToIdea(idea);
           }
           if (success) onRefresh();
-        });
-    });
-
-    // Copy - copies the full line text to clipboard
-    menu.addItem((item) => {
-      item
-        .setTitle("Copy")
-        .setIcon("copy")
-        .onClick(async () => {
-          await navigator.clipboard.writeText(idea.text);
         });
     });
 

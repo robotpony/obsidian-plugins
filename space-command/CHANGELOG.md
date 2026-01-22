@@ -2,6 +2,24 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.6] - 2026-01-21
+
+### Improved
+
+- **Tag dropdown alphabetization**: Tags in the `#` dropdown menu are now sorted A→Z
+- **Tag submenu ordering**: Clear tag → Filter by (alphabetical order)
+
+## [0.9.5] - 2026-01-21
+
+### Improved
+
+- **Alphabetically sorted context menus**: All right-click menus now list items in A→Z order
+  - Editor context menu: Copy as Slack → Define term... → Review... → Rewrite...
+  - Sidebar hamburger menu: Embed Syntax → Refresh | About → Settings → Stats
+  - Embed Syntax submenu: IDEA code block → IDEA inline → TODO code block → TODO inline
+  - TODO context menu: Copy → Focus → Later → Snooze
+  - Idea context menu: Add to TODOs → Copy → Focus
+
 ## [0.9.4] - 2026-01-21
 
 ### Added
