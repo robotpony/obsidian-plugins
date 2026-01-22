@@ -1038,6 +1038,12 @@
   display: block;
 }
 
+/* Submenu positioning for right sidebar (opens to the left) */
+.dropdown-left .tag-dropdown-submenu {
+  left: auto;
+  right: 100%;
+}
+
 .tag-dropdown-submenu-item {
   padding: 6px 12px;
   cursor: pointer;

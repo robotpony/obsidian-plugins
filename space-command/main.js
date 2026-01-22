@@ -2669,8 +2669,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     textSpan.appendText(finalText);
     const tags = extractTags(cleanText).filter((tag) => !config.tagToStrip.test(tag));
     if (tags.length > 0) {
-      textSpan.appendText(" ");
-      this.renderTagDropdown(tags, textSpan, item);
+      this.renderTagDropdown(tags, rowContainer, item);
     }
     const link2 = rowContainer.createEl("a", {
       text: "\u2192",
@@ -2726,10 +2725,17 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       this.closeDropdown();
       const dropdown = document.createElement("div");
       dropdown.className = "tag-dropdown-menu";
+      const sidebarRoot = this.leaf.getRoot();
+      const isRightSidebar = sidebarRoot === this.app.workspace.rightSplit;
       const rect = trigger.getBoundingClientRect();
       dropdown.style.position = "fixed";
-      dropdown.style.left = `${rect.left}px`;
       dropdown.style.top = `${rect.bottom + 4}px`;
+      if (isRightSidebar) {
+        dropdown.style.right = `${window.innerWidth - rect.right}px`;
+        dropdown.classList.add("dropdown-left");
+      } else {
+        dropdown.style.left = `${rect.left}px`;
+      }
       for (const tag of tags) {
         const tagItem = dropdown.createEl("div", {
           cls: "tag-dropdown-item tag-dropdown-item-with-submenu"

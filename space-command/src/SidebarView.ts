@@ -204,11 +204,10 @@ export class TodoSidebarView extends ItemView {
     const finalText = displayText.replace(/\s+/g, " ").trim();
     textSpan.appendText(finalText);
 
-    // Get tags (excluding the type tag) and render dropdown inside text span
+    // Get tags (excluding the type tag) and render dropdown on the row container (right-aligned before link)
     const tags = extractTags(cleanText).filter(tag => !config.tagToStrip.test(tag));
     if (tags.length > 0) {
-      textSpan.appendText(" ");
-      this.renderTagDropdown(tags, textSpan, item);
+      this.renderTagDropdown(tags, rowContainer, item);
     }
 
     // Link to source
@@ -275,11 +274,23 @@ export class TodoSidebarView extends ItemView {
       const dropdown = document.createElement("div");
       dropdown.className = "tag-dropdown-menu";
 
-      // Position dropdown below the trigger
+      // Determine sidebar position (left or right)
+      const sidebarRoot = this.leaf.getRoot();
+      const isRightSidebar = sidebarRoot === this.app.workspace.rightSplit;
+
+      // Position dropdown below the trigger, adjusting for sidebar position
       const rect = trigger.getBoundingClientRect();
       dropdown.style.position = "fixed";
-      dropdown.style.left = `${rect.left}px`;
       dropdown.style.top = `${rect.bottom + 4}px`;
+
+      if (isRightSidebar) {
+        // Menu opens to the left when in right sidebar
+        dropdown.style.right = `${window.innerWidth - rect.right}px`;
+        dropdown.classList.add("dropdown-left");
+      } else {
+        // Menu opens to the right when in left sidebar
+        dropdown.style.left = `${rect.left}px`;
+      }
 
       // Add tags to dropdown with submenus
       for (const tag of tags) {

@@ -2,6 +2,22 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.7.33] - 2026-01-21
+
+### Fixed
+
+- **Tag dropdown menu clipping in right sidebar**: The `#` tag menu now opens within the Obsidian view instead of being clipped off-screen
+  - Detects sidebar position (left or right) and adjusts menu direction accordingly
+  - Submenus also open in the correct direction based on sidebar position
+
+## [0.7.32] - 2026-01-21
+
+### Fixed
+
+- **Tag dropdown position in TODO section**: The `#` tag menu now appears on the right side (before the → link), matching the DONE section layout
+  - Previously rendered inline within the text span
+  - Now rendered as a separate flex item on the row container
+
 ## [0.7.31] - 2026-01-21
 
 ### Fixed
