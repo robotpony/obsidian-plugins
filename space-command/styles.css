@@ -1193,3 +1193,80 @@
   margin-top: 6px;
 }
 
+/* Define Tooltip Styles */
+.define-tooltip {
+  position: fixed;
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  padding: 12px 16px;
+  max-width: 400px;
+  min-width: 200px;
+  z-index: 1000;
+  font-size: 0.9em;
+  line-height: 1.5;
+}
+
+.define-tooltip-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.define-tooltip-header .space-command-logo {
+  font-size: 0.85em;
+}
+
+.define-tooltip-content {
+  color: var(--text-normal);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.define-tooltip-loading .define-tooltip-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+}
+
+.define-tooltip-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--background-modifier-border);
+  border-top-color: var(--interactive-accent);
+  border-radius: 50%;
+  animation: define-spin 0.8s linear infinite;
+}
+
+@keyframes define-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.define-tooltip-close {
+  padding: 2px 6px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.define-tooltip-close:hover {
+  opacity: 1;
+}
+
+.define-tooltip-highlight {
+  background-color: var(--text-highlight-bg);
+  color: inherit;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+

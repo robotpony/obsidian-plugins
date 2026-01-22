@@ -54,6 +54,12 @@ export interface SpaceCommandSettings {
   priorityTags: string[];
   recentTodonesLimit: number;
   excludeFoldersFromProjects: string[];
+  // LLM/Define settings
+  llmEnabled: boolean;
+  llmUrl: string;
+  llmModel: string;
+  llmPrompt: string;
+  llmTimeout: number;
 }
 
 export const DEFAULT_SETTINGS: SpaceCommandSettings = {
@@ -66,4 +72,10 @@ export const DEFAULT_SETTINGS: SpaceCommandSettings = {
   priorityTags: ["#p0", "#p1", "#p2", "#p3", "#p4"],
   recentTodonesLimit: 5,
   excludeFoldersFromProjects: ["log"],
+  // LLM/Define settings
+  llmEnabled: true,
+  llmUrl: "http://localhost:11434",
+  llmModel: "llama3.2",
+  llmPrompt: "Explain what this means in plain language, providing context if it's a technical term:",
+  llmTimeout: 30000,
 };

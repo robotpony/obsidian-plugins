@@ -2,6 +2,51 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.8.2] - 2026-01-21
+
+### Fixed
+
+- **Definition prompt textarea size**: The prompt configuration field in settings is now full-width and 4 lines tall for easier editing
+
+## [0.8.1] - 2026-01-21
+
+### Improved
+
+- **Define tooltip branding**: Space Command logo (␣⌘) now appears in the top-left of the definition tooltip
+- **Term highlighting**: The selected term is highlighted with Obsidian's highlight color wherever it appears in the definition
+- **Context menu text**: Changed from "Define" to "Define term..." for clarity
+
+### Technical
+
+- New `.define-tooltip-header` class for logo positioning
+- New `.define-tooltip-highlight` class using `--text-highlight-bg` CSS variable
+- `DefineTooltip.show()` now accepts a `term` parameter for highlighting
+
+## [0.8.0] - 2026-01-21
+
+### Added
+
+- **Define context menu**: Select text, right-click, choose "Define" to get an LLM-powered definition
+  - Sends selected text to a local LLM (Ollama by default) for contextual explanation
+  - Definition appears in an inline tooltip near the selection
+  - Loading spinner shows while waiting for response
+  - Tooltip closes on click outside or Escape key
+  - Handles viewport overflow (repositions if near screen edges)
+
+### Settings
+
+- **Enable Define feature**: Toggle the Define menu item on/off (default: on)
+- **LLM URL**: Ollama server URL (default: `http://localhost:11434`)
+- **LLM Model**: Model name to use (default: `llama3.2`)
+- **Definition prompt**: Customizable prompt prepended to selected text
+- **Timeout**: Maximum wait time for LLM response (default: 30 seconds)
+
+### Technical
+
+- New `LLMClient` class for Ollama API integration using Obsidian's `requestUrl`
+- New `DefineTooltip` class for positioned tooltip display with CodeMirror coordinate lookup
+- New CSS classes: `.define-tooltip`, `.define-tooltip-loading`, `.define-tooltip-spinner`, `.define-tooltip-close`
+
 ## [0.7.33] - 2026-01-21
 
 ### Fixed

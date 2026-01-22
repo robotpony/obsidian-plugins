@@ -49,6 +49,14 @@ That's it. Everything else is optional.
 
 Right-click any TODO for quick actions: Focus, Later, Snooze, Copy.
 
+## Define with LLM
+
+Select any text, right-click, and choose **Define** to get a contextual explanation from a local LLM.
+
+- Requires [Ollama](https://ollama.ai) running locally (default: `http://localhost:11434`)
+- Definition appears in an inline tooltip near your selection
+- Customize the model, prompt, and timeout in Settings → Define (LLM) Settings
+
 ## Ideas Tab
 
 Capture ideas separately from actionable TODOs. The sidebar has two tabs—TODOs and Ideas.

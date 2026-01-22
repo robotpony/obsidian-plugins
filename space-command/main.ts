@@ -23,6 +23,8 @@ import {
 } from "./src/types";
 import { convertToSlackMarkdown } from "./src/SlackConverter";
 import { showNotice } from "./src/utils";
+import { LLMClient } from "./src/LLMClient";
+import { DefineTooltip } from "./src/DefineTooltip";
 
 export default class SpaceCommandPlugin extends Plugin {
   settings: SpaceCommandSettings;
@@ -30,6 +32,8 @@ export default class SpaceCommandPlugin extends Plugin {
   processor: TodoProcessor;
   projectManager: ProjectManager;
   embedRenderer: EmbedRenderer;
+  llmClient: LLMClient;
+  defineTooltip: DefineTooltip;
 
   async onload() {
     await this.loadSettings();
@@ -54,6 +58,15 @@ export default class SpaceCommandPlugin extends Plugin {
       this.settings.focusListLimit,
       this.settings.priorityTags
     );
+
+    // Initialize LLM client for Define feature
+    this.llmClient = new LLMClient({
+      url: this.settings.llmUrl,
+      model: this.settings.llmModel,
+      prompt: this.settings.llmPrompt,
+      timeout: this.settings.llmTimeout,
+    });
+    this.defineTooltip = new DefineTooltip();
 
     // Configure scanner to exclude TODONE log file from Recent TODONEs
     if (this.settings.excludeTodoneFilesFromRecent) {
@@ -245,7 +258,7 @@ export default class SpaceCommandPlugin extends Plugin {
       ],
     });
 
-    // Editor context menu: Copy as Slack
+    // Editor context menu: Copy as Slack and Define
     this.registerEvent(
       this.app.workspace.on("editor-menu", (menu, editor) => {
         const selection = editor.getSelection();
@@ -260,6 +273,31 @@ export default class SpaceCommandPlugin extends Plugin {
                 showNotice("Copied as Slack markdown");
               });
           });
+
+          // Define menu item (LLM lookup)
+          if (this.settings.llmEnabled) {
+            menu.addItem((item) => {
+              item
+                .setTitle("Define term...")
+                .setIcon("book-open")
+                .onClick(async () => {
+                  // Show loading tooltip with the selected term
+                  this.defineTooltip.show(editor, "", true, selection);
+
+                  // Request definition from LLM
+                  const result = await this.llmClient.define(selection);
+
+                  if (result.success && result.definition) {
+                    this.defineTooltip.updateContent(result.definition);
+                  } else {
+                    this.defineTooltip.updateContent(
+                      `Error: ${result.error || "Failed to get definition"}`
+                    );
+                    showNotice(`Define failed: ${result.error}`);
+                  }
+                });
+            });
+          }
         }
       })
     );
@@ -276,6 +314,8 @@ export default class SpaceCommandPlugin extends Plugin {
   onunload() {
     // Detach all sidebar views
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_TODO_SIDEBAR);
+    // Clean up define tooltip
+    this.defineTooltip.close();
   }
 
   async loadSettings() {
@@ -636,6 +676,82 @@ class SpaceCommandSettingTab extends PluginSettingTab {
             const num = parseInt(value);
             if (!isNaN(num) && num > 0) {
               this.plugin.settings.recentTodonesLimit = num;
+              await this.plugin.saveSettings();
+            }
+          })
+      );
+
+    // LLM/Define Settings
+    containerEl.createEl("h3", { text: "Define (LLM) Settings" });
+
+    new Setting(containerEl)
+      .setName("Enable Define feature")
+      .setDesc("Show 'Define' option in context menu to look up definitions via LLM")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.llmEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.llmEnabled = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("LLM URL")
+      .setDesc("Ollama server URL (default: http://localhost:11434)")
+      .addText((text) =>
+        text
+          .setPlaceholder("http://localhost:11434")
+          .setValue(this.plugin.settings.llmUrl)
+          .onChange(async (value) => {
+            this.plugin.settings.llmUrl = value;
+            this.plugin.llmClient.updateConfig({ url: value });
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("LLM Model")
+      .setDesc("Model name to use (e.g., llama3.2, mistral, codellama)")
+      .addText((text) =>
+        text
+          .setPlaceholder("llama3.2")
+          .setValue(this.plugin.settings.llmModel)
+          .onChange(async (value) => {
+            this.plugin.settings.llmModel = value;
+            this.plugin.llmClient.updateConfig({ model: value });
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Definition prompt")
+      .setDesc("Prompt prepended to the selected text")
+      .addTextArea((text) => {
+        text
+          .setPlaceholder("Explain what this means...")
+          .setValue(this.plugin.settings.llmPrompt)
+          .onChange(async (value) => {
+            this.plugin.settings.llmPrompt = value;
+            this.plugin.llmClient.updateConfig({ prompt: value });
+            await this.plugin.saveSettings();
+          });
+        text.inputEl.rows = 4;
+        text.inputEl.style.width = "100%";
+      });
+
+    new Setting(containerEl)
+      .setName("Timeout (ms)")
+      .setDesc("Maximum time to wait for LLM response")
+      .addText((text) =>
+        text
+          .setPlaceholder("30000")
+          .setValue(String(this.plugin.settings.llmTimeout))
+          .onChange(async (value) => {
+            const num = parseInt(value);
+            if (!isNaN(num) && num > 0) {
+              this.plugin.settings.llmTimeout = num;
+              this.plugin.llmClient.updateConfig({ timeout: num });
               await this.plugin.saveSettings();
             }
           })
