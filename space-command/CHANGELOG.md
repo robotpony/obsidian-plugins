@@ -2,6 +2,12 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.8.5] - 2026-01-21
+
+### Fixed
+
+- **Project info popup callouts**: Callouts in project files are now rendered with proper Obsidian styling (icons, colors) instead of appearing as plain text
+
 ## [0.8.4] - 2026-01-21
 
 ### Changed

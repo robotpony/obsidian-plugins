@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, TFile, Menu, Modal } from "obsidian";
+import { ItemView, WorkspaceLeaf, TFile, Menu, Modal, MarkdownRenderer, Component } from "obsidian";
 import { TodoScanner } from "./TodoScanner";
 import { TodoProcessor } from "./TodoProcessor";
 import { ProjectManager } from "./ProjectManager";
@@ -729,10 +729,12 @@ export class TodoSidebarView extends ItemView {
       const title = popup.createEl("div", { cls: "project-info-title" });
       title.appendText(project.tag);
 
-      // Description
+      // Description (rendered as markdown to support callouts)
       if (info.description) {
         const desc = popup.createEl("div", { cls: "project-info-description" });
-        desc.appendText(info.description);
+        const component = new Component();
+        component.load();
+        await MarkdownRenderer.render(this.app, info.description, desc, info.filepath, component);
       } else {
         const desc = popup.createEl("div", { cls: "project-info-description project-info-empty" });
         desc.appendText("No description available.");

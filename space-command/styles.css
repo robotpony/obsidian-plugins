@@ -1128,7 +1128,32 @@
   font-size: 0.9em;
   color: var(--text-normal);
   line-height: 1.5;
-  white-space: pre-wrap;
+}
+
+.project-info-description p {
+  margin: 0 0 0.5em 0;
+}
+
+.project-info-description p:last-child {
+  margin-bottom: 0;
+}
+
+/* Callout styling within popup */
+.project-info-description .callout {
+  margin: 0.5em 0;
+  padding: 8px 12px;
+}
+
+.project-info-description .callout-title {
+  font-size: 0.9em;
+}
+
+.project-info-description .callout-content {
+  font-size: 0.9em;
+}
+
+.project-info-description .callout-content p {
+  margin: 0;
 }
 
 .project-info-description.project-info-empty {

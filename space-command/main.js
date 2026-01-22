@@ -1229,17 +1229,19 @@ var ProjectManager = class {
         }
       }
     }
-    const paragraphs = [];
-    let currentParagraph = "";
+    const blocks = [];
+    let currentBlock = "";
     let inCodeBlock = false;
-    for (let i = startIndex; i < lines.length && paragraphs.length < 2; i++) {
+    let inCallout = false;
+    for (let i = startIndex; i < lines.length && blocks.length < 2; i++) {
       const line = lines[i];
       const trimmed = line.trim();
       if (trimmed.startsWith("```")) {
         inCodeBlock = !inCodeBlock;
-        if (currentParagraph) {
-          paragraphs.push(currentParagraph.trim());
-          currentParagraph = "";
+        if (currentBlock) {
+          blocks.push(currentBlock.trim());
+          currentBlock = "";
+          inCallout = false;
         }
         continue;
       }
@@ -1247,9 +1249,10 @@ var ProjectManager = class {
         continue;
       }
       if (trimmed.startsWith("#") && trimmed.match(/^#+\s/)) {
-        if (currentParagraph) {
-          paragraphs.push(currentParagraph.trim());
-          currentParagraph = "";
+        if (currentBlock) {
+          blocks.push(currentBlock.trim());
+          currentBlock = "";
+          inCallout = false;
         }
         continue;
       }
@@ -1259,20 +1262,40 @@ var ProjectManager = class {
       if (trimmed.match(/^\{\{.*\}\}$/)) {
         continue;
       }
+      if (trimmed.match(/^>\s*\[!/)) {
+        if (currentBlock) {
+          blocks.push(currentBlock.trim());
+          currentBlock = "";
+        }
+        inCallout = true;
+        currentBlock = line;
+        continue;
+      }
+      if (inCallout && trimmed.startsWith(">")) {
+        currentBlock += "\n" + line;
+        continue;
+      }
+      if (inCallout && !trimmed.startsWith(">")) {
+        if (currentBlock) {
+          blocks.push(currentBlock.trim());
+          currentBlock = "";
+        }
+        inCallout = false;
+      }
       if (trimmed === "") {
-        if (currentParagraph) {
-          paragraphs.push(currentParagraph.trim());
-          currentParagraph = "";
+        if (currentBlock) {
+          blocks.push(currentBlock.trim());
+          currentBlock = "";
         }
         continue;
       }
       const cleanedLine = trimmed.replace(/\{\{[^}]*\}\}/g, "").trim();
       if (cleanedLine) {
-        currentParagraph += (currentParagraph ? " " : "") + cleanedLine;
+        currentBlock += (currentBlock ? " " : "") + cleanedLine;
       }
     }
-    if (currentParagraph && paragraphs.length < 2) {
-      paragraphs.push(currentParagraph.trim());
+    if (currentBlock && blocks.length < 2) {
+      blocks.push(currentBlock.trim());
     }
     const principleRegex = /#principles?\b/gi;
     const principlesInFile = [];
@@ -1289,7 +1312,7 @@ var ProjectManager = class {
       }
     }
     return {
-      description: paragraphs.join("\n\n"),
+      description: blocks.join("\n\n"),
       principles: principlesInFile,
       filepath
     };
@@ -3043,7 +3066,9 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       title.appendText(project.tag);
       if (info.description) {
         const desc = popup.createEl("div", { cls: "project-info-description" });
-        desc.appendText(info.description);
+        const component = new import_obsidian8.Component();
+        component.load();
+        await import_obsidian8.MarkdownRenderer.render(this.app, info.description, desc, info.filepath, component);
       } else {
         const desc = popup.createEl("div", { cls: "project-info-description project-info-empty" });
         desc.appendText("No description available.");

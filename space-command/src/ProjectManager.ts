@@ -132,22 +132,25 @@ export class ProjectManager {
       }
     }
 
-    // Extract first 1-2 non-empty paragraphs (skip headings, embeds, code blocks, and the project tag line)
-    const paragraphs: string[] = [];
-    let currentParagraph = "";
+    // Extract first 1-2 content blocks (paragraphs or callouts)
+    // Skip headings, embeds, code blocks, and the project tag line
+    const blocks: string[] = [];
+    let currentBlock = "";
     let inCodeBlock = false;
+    let inCallout = false;
 
-    for (let i = startIndex; i < lines.length && paragraphs.length < 2; i++) {
+    for (let i = startIndex; i < lines.length && blocks.length < 2; i++) {
       const line = lines[i];
       const trimmed = line.trim();
 
       // Track code block state
       if (trimmed.startsWith("```")) {
         inCodeBlock = !inCodeBlock;
-        // End current paragraph when entering/exiting code block
-        if (currentParagraph) {
-          paragraphs.push(currentParagraph.trim());
-          currentParagraph = "";
+        // End current block when entering/exiting code block
+        if (currentBlock) {
+          blocks.push(currentBlock.trim());
+          currentBlock = "";
+          inCallout = false;
         }
         continue;
       }
@@ -159,9 +162,10 @@ export class ProjectManager {
 
       // Skip headings
       if (trimmed.startsWith("#") && trimmed.match(/^#+\s/)) {
-        if (currentParagraph) {
-          paragraphs.push(currentParagraph.trim());
-          currentParagraph = "";
+        if (currentBlock) {
+          blocks.push(currentBlock.trim());
+          currentBlock = "";
+          inCallout = false;
         }
         continue;
       }
@@ -176,11 +180,39 @@ export class ProjectManager {
         continue;
       }
 
+      // Check if this is the start of a callout
+      if (trimmed.match(/^>\s*\[!/)) {
+        // End any previous block
+        if (currentBlock) {
+          blocks.push(currentBlock.trim());
+          currentBlock = "";
+        }
+        inCallout = true;
+        currentBlock = line;
+        continue;
+      }
+
+      // Check if this is a continuation of a callout (line starting with >)
+      if (inCallout && trimmed.startsWith(">")) {
+        currentBlock += "\n" + line;
+        continue;
+      }
+
+      // If we were in a callout but this line doesn't continue it, end the callout
+      if (inCallout && !trimmed.startsWith(">")) {
+        if (currentBlock) {
+          blocks.push(currentBlock.trim());
+          currentBlock = "";
+        }
+        inCallout = false;
+        // Fall through to process this line as regular content
+      }
+
       // Empty line marks end of paragraph
       if (trimmed === "") {
-        if (currentParagraph) {
-          paragraphs.push(currentParagraph.trim());
-          currentParagraph = "";
+        if (currentBlock) {
+          blocks.push(currentBlock.trim());
+          currentBlock = "";
         }
         continue;
       }
@@ -188,13 +220,13 @@ export class ProjectManager {
       // Accumulate paragraph text (strip any inline embeds from the line)
       const cleanedLine = trimmed.replace(/\{\{[^}]*\}\}/g, "").trim();
       if (cleanedLine) {
-        currentParagraph += (currentParagraph ? " " : "") + cleanedLine;
+        currentBlock += (currentBlock ? " " : "") + cleanedLine;
       }
     }
 
-    // Don't forget the last paragraph if we didn't hit an empty line
-    if (currentParagraph && paragraphs.length < 2) {
-      paragraphs.push(currentParagraph.trim());
+    // Don't forget the last block if we didn't hit an empty line
+    if (currentBlock && blocks.length < 2) {
+      blocks.push(currentBlock.trim());
     }
 
     // Extract all #principle or #principles tags from the entire content
@@ -218,7 +250,7 @@ export class ProjectManager {
     }
 
     return {
-      description: paragraphs.join("\n\n"),
+      description: blocks.join("\n\n"),
       principles: principlesInFile,
       filepath,
     };
