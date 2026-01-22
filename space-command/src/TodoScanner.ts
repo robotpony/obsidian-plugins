@@ -385,6 +385,14 @@ export class TodoScanner extends Events {
       }
     });
 
+    // Watch for metadata cache changes - fires more reliably for external file changes
+    // (e.g., when files are modified by another editor, git operations, or sync services)
+    this.app.metadataCache.on("changed", (file) => {
+      if (file instanceof TFile && file.extension === "md") {
+        this.debouncedScanFile(file);
+      }
+    });
+
     // Watch for file creation (debounced)
     this.app.vault.on("create", (file) => {
       if (file instanceof TFile && file.extension === "md") {

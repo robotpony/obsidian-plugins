@@ -533,6 +533,11 @@ var TodoScanner = class extends import_obsidian2.Events {
         this.debouncedScanFile(file);
       }
     });
+    this.app.metadataCache.on("changed", (file) => {
+      if (file instanceof import_obsidian2.TFile && file.extension === "md") {
+        this.debouncedScanFile(file);
+      }
+    });
     this.app.vault.on("create", (file) => {
       if (file instanceof import_obsidian2.TFile && file.extension === "md") {
         this.debouncedScanFile(file);

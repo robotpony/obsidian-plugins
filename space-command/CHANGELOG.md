@@ -2,6 +2,15 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.8.6] - 2026-01-21
+
+### Fixed
+
+- **Sidebar not updating for external file changes**: TODOs and IDEAs now refresh when files are modified outside Obsidian
+  - Added `metadataCache.on("changed")` listener to detect external file modifications
+  - Fixes issue where editing files via another editor, git operations, or sync services wouldn't update the sidebar
+  - Documents already updated (Obsidian reloads them), now the sidebar cache refreshes too
+
 ## [0.8.5] - 2026-01-21
 
 ### Fixed
