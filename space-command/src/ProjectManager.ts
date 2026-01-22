@@ -105,6 +105,125 @@ export class ProjectManager {
     return projects;
   }
 
+  getProjectFilePath(tag: string): string {
+    const filename = tag.replace(/^#/, "") + ".md";
+    return this.projectsFolder + filename;
+  }
+
+  async getProjectFileInfo(tag: string): Promise<{ description: string; principles: string[]; filepath: string } | null> {
+    const filepath = this.getProjectFilePath(tag);
+    const file = this.app.vault.getAbstractFileByPath(filepath);
+
+    if (!(file instanceof TFile)) {
+      return null;
+    }
+
+    const content = await this.app.vault.read(file);
+    const lines = content.split("\n");
+
+    // Skip frontmatter if present
+    let startIndex = 0;
+    if (lines[0]?.trim() === "---") {
+      for (let i = 1; i < lines.length; i++) {
+        if (lines[i]?.trim() === "---") {
+          startIndex = i + 1;
+          break;
+        }
+      }
+    }
+
+    // Extract first 1-2 non-empty paragraphs (skip headings, embeds, code blocks, and the project tag line)
+    const paragraphs: string[] = [];
+    let currentParagraph = "";
+    let inCodeBlock = false;
+
+    for (let i = startIndex; i < lines.length && paragraphs.length < 2; i++) {
+      const line = lines[i];
+      const trimmed = line.trim();
+
+      // Track code block state
+      if (trimmed.startsWith("```")) {
+        inCodeBlock = !inCodeBlock;
+        // End current paragraph when entering/exiting code block
+        if (currentParagraph) {
+          paragraphs.push(currentParagraph.trim());
+          currentParagraph = "";
+        }
+        continue;
+      }
+
+      // Skip content inside code blocks
+      if (inCodeBlock) {
+        continue;
+      }
+
+      // Skip headings
+      if (trimmed.startsWith("#") && trimmed.match(/^#+\s/)) {
+        if (currentParagraph) {
+          paragraphs.push(currentParagraph.trim());
+          currentParagraph = "";
+        }
+        continue;
+      }
+
+      // Skip lines that are just the project tag
+      if (trimmed === tag) {
+        continue;
+      }
+
+      // Skip inline embed syntax {{...}}
+      if (trimmed.match(/^\{\{.*\}\}$/)) {
+        continue;
+      }
+
+      // Empty line marks end of paragraph
+      if (trimmed === "") {
+        if (currentParagraph) {
+          paragraphs.push(currentParagraph.trim());
+          currentParagraph = "";
+        }
+        continue;
+      }
+
+      // Accumulate paragraph text (strip any inline embeds from the line)
+      const cleanedLine = trimmed.replace(/\{\{[^}]*\}\}/g, "").trim();
+      if (cleanedLine) {
+        currentParagraph += (currentParagraph ? " " : "") + cleanedLine;
+      }
+    }
+
+    // Don't forget the last paragraph if we didn't hit an empty line
+    if (currentParagraph && paragraphs.length < 2) {
+      paragraphs.push(currentParagraph.trim());
+    }
+
+    // Extract all #principle or #principles tags from the entire content
+    const principleRegex = /#principles?\b/gi;
+    const principlesInFile: string[] = [];
+
+    // Find all lines containing #principle(s) and extract the full context
+    for (const line of lines) {
+      if (line.match(principleRegex)) {
+        // Extract all tags from this line
+        const tagMatches = line.match(/#[\w-]+/g);
+        if (tagMatches) {
+          for (const match of tagMatches) {
+            // Skip the #principle(s) tag itself, collect other tags on the same line
+            if (!match.match(/^#principles?$/i) && !principlesInFile.includes(match)) {
+              principlesInFile.push(match);
+            }
+          }
+        }
+      }
+    }
+
+    return {
+      description: paragraphs.join("\n\n"),
+      principles: principlesInFile,
+      filepath,
+    };
+  }
+
   async openProjectFile(tag: string): Promise<void> {
     // Remove # from tag to get filename
     const filename = tag.replace(/^#/, "") + ".md";

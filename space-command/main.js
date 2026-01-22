@@ -1207,6 +1207,93 @@ var ProjectManager = class {
     }
     return projects;
   }
+  getProjectFilePath(tag) {
+    const filename = tag.replace(/^#/, "") + ".md";
+    return this.projectsFolder + filename;
+  }
+  async getProjectFileInfo(tag) {
+    var _a, _b;
+    const filepath = this.getProjectFilePath(tag);
+    const file = this.app.vault.getAbstractFileByPath(filepath);
+    if (!(file instanceof import_obsidian4.TFile)) {
+      return null;
+    }
+    const content3 = await this.app.vault.read(file);
+    const lines = content3.split("\n");
+    let startIndex = 0;
+    if (((_a = lines[0]) == null ? void 0 : _a.trim()) === "---") {
+      for (let i = 1; i < lines.length; i++) {
+        if (((_b = lines[i]) == null ? void 0 : _b.trim()) === "---") {
+          startIndex = i + 1;
+          break;
+        }
+      }
+    }
+    const paragraphs = [];
+    let currentParagraph = "";
+    let inCodeBlock = false;
+    for (let i = startIndex; i < lines.length && paragraphs.length < 2; i++) {
+      const line = lines[i];
+      const trimmed = line.trim();
+      if (trimmed.startsWith("```")) {
+        inCodeBlock = !inCodeBlock;
+        if (currentParagraph) {
+          paragraphs.push(currentParagraph.trim());
+          currentParagraph = "";
+        }
+        continue;
+      }
+      if (inCodeBlock) {
+        continue;
+      }
+      if (trimmed.startsWith("#") && trimmed.match(/^#+\s/)) {
+        if (currentParagraph) {
+          paragraphs.push(currentParagraph.trim());
+          currentParagraph = "";
+        }
+        continue;
+      }
+      if (trimmed === tag) {
+        continue;
+      }
+      if (trimmed.match(/^\{\{.*\}\}$/)) {
+        continue;
+      }
+      if (trimmed === "") {
+        if (currentParagraph) {
+          paragraphs.push(currentParagraph.trim());
+          currentParagraph = "";
+        }
+        continue;
+      }
+      const cleanedLine = trimmed.replace(/\{\{[^}]*\}\}/g, "").trim();
+      if (cleanedLine) {
+        currentParagraph += (currentParagraph ? " " : "") + cleanedLine;
+      }
+    }
+    if (currentParagraph && paragraphs.length < 2) {
+      paragraphs.push(currentParagraph.trim());
+    }
+    const principleRegex = /#principles?\b/gi;
+    const principlesInFile = [];
+    for (const line of lines) {
+      if (line.match(principleRegex)) {
+        const tagMatches = line.match(/#[\w-]+/g);
+        if (tagMatches) {
+          for (const match of tagMatches) {
+            if (!match.match(/^#principles?$/i) && !principlesInFile.includes(match)) {
+              principlesInFile.push(match);
+            }
+          }
+        }
+      }
+    }
+    return {
+      description: paragraphs.join("\n\n"),
+      principles: principlesInFile,
+      filepath
+    };
+  }
   async openProjectFile(tag) {
     const filename = tag.replace(/^#/, "") + ".md";
     const filepath = this.projectsFolder + filename;
@@ -2461,6 +2548,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     this.activeTab = "todos";
     this.activeTagFilter = null;
     this.openDropdown = null;
+    this.openInfoPopup = null;
     // Configuration for unified list item rendering
     this.todoConfig = {
       type: "todo",
@@ -2908,6 +2996,15 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     });
     const textSpan = item.createEl("span", { cls: "project-text" });
     textSpan.appendText(project.tag + " ");
+    const infoIcon = item.createEl("span", {
+      cls: "project-info-icon",
+      text: "\u24D8",
+      attr: { "aria-label": "Project info" }
+    });
+    infoIcon.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      await this.showProjectInfoPopup(project, infoIcon);
+    });
     const link2 = item.createEl("a", {
       text: "\u2192",
       cls: "project-link",
@@ -2917,6 +3014,87 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       e.preventDefault();
       await this.projectManager.openProjectFile(project.tag);
     });
+  }
+  async showProjectInfoPopup(project, trigger) {
+    this.closeInfoPopup();
+    const info = await this.projectManager.getProjectFileInfo(project.tag);
+    const popup = document.createElement("div");
+    popup.className = "project-info-popup";
+    const sidebarRoot = this.leaf.getRoot();
+    const isRightSidebar = sidebarRoot === this.app.workspace.rightSplit;
+    const rect = trigger.getBoundingClientRect();
+    popup.style.position = "fixed";
+    popup.style.top = `${rect.top}px`;
+    if (isRightSidebar) {
+      popup.style.right = `${window.innerWidth - rect.left + 8}px`;
+      popup.classList.add("popup-left");
+    } else {
+      popup.style.left = `${rect.right + 8}px`;
+      popup.classList.add("popup-right");
+    }
+    if (info) {
+      const title = popup.createEl("div", { cls: "project-info-title" });
+      title.appendText(project.tag);
+      if (info.description) {
+        const desc = popup.createEl("div", { cls: "project-info-description" });
+        desc.appendText(info.description);
+      } else {
+        const desc = popup.createEl("div", { cls: "project-info-description project-info-empty" });
+        desc.appendText("No description available.");
+      }
+      if (info.principles.length > 0) {
+        popup.createEl("div", { cls: "project-info-separator" });
+        const principlesHeader = popup.createEl("div", { cls: "project-info-section-header" });
+        principlesHeader.appendText("Principles");
+        const principlesList = popup.createEl("div", { cls: "project-info-principles" });
+        for (const principle of info.principles) {
+          const principleItem = principlesList.createEl("span", { cls: "project-info-principle-tag" });
+          principleItem.appendText(principle);
+        }
+      }
+      popup.createEl("div", { cls: "project-info-separator" });
+      const linkContainer = popup.createEl("div", { cls: "project-info-link-container" });
+      const openLink = linkContainer.createEl("a", {
+        cls: "project-info-link",
+        href: "#"
+      });
+      openLink.appendText("Open project file \u2192");
+      openLink.addEventListener("click", async (e) => {
+        e.preventDefault();
+        this.closeInfoPopup();
+        const filepath = this.projectManager.getProjectFilePath(project.tag);
+        const file = this.app.vault.getAbstractFileByPath(filepath);
+        if (file instanceof import_obsidian8.TFile) {
+          const leaf = this.app.workspace.getLeaf("tab");
+          await leaf.openFile(file);
+        }
+      });
+    } else {
+      const noFile = popup.createEl("div", { cls: "project-info-no-file" });
+      noFile.appendText("Project file not found.");
+      const createHint = popup.createEl("div", { cls: "project-info-hint" });
+      createHint.appendText("Click \u2192 to create it.");
+    }
+    document.body.appendChild(popup);
+    this.openInfoPopup = popup;
+    const popupRect = popup.getBoundingClientRect();
+    if (popupRect.bottom > window.innerHeight - 10) {
+      const overflow = popupRect.bottom - window.innerHeight + 10;
+      popup.style.top = `${rect.top - overflow}px`;
+    }
+    const closeHandler = (e) => {
+      if (!popup.contains(e.target) && e.target !== trigger) {
+        this.closeInfoPopup();
+        document.removeEventListener("click", closeHandler);
+      }
+    };
+    setTimeout(() => document.addEventListener("click", closeHandler), 0);
+  }
+  closeInfoPopup() {
+    if (this.openInfoPopup) {
+      this.openInfoPopup.remove();
+      this.openInfoPopup = null;
+    }
   }
   renderActiveTodos(container) {
     let todos = this.scanner.getTodos();

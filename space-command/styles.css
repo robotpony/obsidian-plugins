@@ -1078,3 +1078,112 @@
   background-color: transparent;
 }
 
+/* Project info popup styles */
+.project-info-icon {
+  cursor: pointer;
+  font-size: 0.85em;
+  opacity: 0.5;
+  margin-right: 4px;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+
+.project-info-icon:hover {
+  opacity: 1;
+}
+
+.project-info-popup {
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  padding: 12px 16px;
+  min-width: 250px;
+  max-width: 350px;
+  z-index: 1000;
+}
+
+.project-info-popup.popup-left {
+  transform-origin: right top;
+}
+
+.project-info-popup.popup-right {
+  transform-origin: left top;
+}
+
+.project-info-title {
+  font-weight: 600;
+  font-size: 1em;
+  color: var(--text-normal);
+  margin-bottom: 8px;
+}
+
+.project-info-description {
+  font-size: 0.9em;
+  color: var(--text-normal);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.project-info-description.project-info-empty {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.project-info-separator {
+  height: 1px;
+  background-color: var(--background-modifier-border);
+  margin: 10px 0;
+}
+
+.project-info-section-header {
+  font-size: 0.8em;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.project-info-principles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.project-info-principle-tag {
+  font-size: 0.85em;
+  font-family: var(--font-monospace);
+  color: var(--tag-color);
+  background-color: var(--tag-background);
+  padding: var(--tag-padding-y) var(--tag-padding-x);
+  border-radius: var(--tag-radius);
+}
+
+.project-info-link-container {
+  text-align: right;
+}
+
+.project-info-link {
+  font-size: 0.9em;
+  color: var(--text-accent);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.project-info-link:hover {
+  text-decoration: underline;
+}
+
+.project-info-no-file {
+  font-size: 0.9em;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.project-info-hint {
+  font-size: 0.85em;
+  color: var(--text-faint);
+  margin-top: 6px;
+}
+

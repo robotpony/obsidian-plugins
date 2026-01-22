@@ -2,6 +2,34 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.7.31] - 2026-01-21
+
+### Fixed
+
+- **Project info popup excludes embeds**: Description no longer includes code blocks or `{{...}}` inline embeds
+  - Fenced code blocks (` ``` `) are skipped entirely
+  - Lines containing only `{{...}}` are skipped
+  - Inline `{{...}}` syntax within paragraphs is stripped
+
+## [0.7.30] - 2026-01-21
+
+### Added
+
+- **Project info popup**: Click the `ⓘ` icon next to any project tag in the Focus section to see project details
+  - Shows the first 1-2 paragraphs from the project file as a description
+  - Lists any `#principle` tags found in the project file
+  - Includes a link to open the project file in a new tab
+  - Popup appears to the left of sidebar (when docked right) or right (when docked left)
+  - Click outside to dismiss
+
+### Technical
+
+- New `getProjectFileInfo()` method in `ProjectManager` for reading project file content
+- New `getProjectFilePath()` helper method in `ProjectManager`
+- New `showProjectInfoPopup()` method in `SidebarView`
+- Detects sidebar position via `this.leaf.getRoot()` comparison with `workspace.rightSplit`
+- New CSS classes: `.project-info-icon`, `.project-info-popup`, `.project-info-title`, `.project-info-description`, `.project-info-principles`, `.project-info-principle-tag`, `.project-info-link`
+
 ## [0.7.29] - 2026-01-19
 
 ### Added

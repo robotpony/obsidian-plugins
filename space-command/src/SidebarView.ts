@@ -19,6 +19,7 @@ export class TodoSidebarView extends ItemView {
   private activeTab: 'todos' | 'ideas' = 'todos';
   private activeTagFilter: string | null = null;
   private openDropdown: HTMLElement | null = null;
+  private openInfoPopup: HTMLElement | null = null;
   private onShowAbout: () => void;
   private onShowStats: () => void;
 
@@ -658,6 +659,18 @@ export class TodoSidebarView extends ItemView {
     const textSpan = item.createEl("span", { cls: "project-text" });
     textSpan.appendText(project.tag + " ");
 
+    // Info icon for project details popup
+    const infoIcon = item.createEl("span", {
+      cls: "project-info-icon",
+      text: "ⓘ",
+      attr: { "aria-label": "Project info" },
+    });
+
+    infoIcon.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      await this.showProjectInfoPopup(project, infoIcon);
+    });
+
     // Link to project file
     const link = item.createEl("a", {
       text: "→",
@@ -669,6 +682,119 @@ export class TodoSidebarView extends ItemView {
       e.preventDefault();
       await this.projectManager.openProjectFile(project.tag);
     });
+  }
+
+  private async showProjectInfoPopup(project: ProjectInfo, trigger: HTMLElement): Promise<void> {
+    // Close any existing popup
+    this.closeInfoPopup();
+
+    const info = await this.projectManager.getProjectFileInfo(project.tag);
+
+    // Create popup container
+    const popup = document.createElement("div");
+    popup.className = "project-info-popup";
+
+    // Determine sidebar position (left or right)
+    const sidebarRoot = this.leaf.getRoot();
+    const isRightSidebar = sidebarRoot === this.app.workspace.rightSplit;
+
+    // Position popup relative to trigger
+    const rect = trigger.getBoundingClientRect();
+    popup.style.position = "fixed";
+    popup.style.top = `${rect.top}px`;
+
+    if (isRightSidebar) {
+      // Popup appears to the left of the sidebar
+      popup.style.right = `${window.innerWidth - rect.left + 8}px`;
+      popup.classList.add("popup-left");
+    } else {
+      // Popup appears to the right of the sidebar
+      popup.style.left = `${rect.right + 8}px`;
+      popup.classList.add("popup-right");
+    }
+
+    if (info) {
+      // Project title
+      const title = popup.createEl("div", { cls: "project-info-title" });
+      title.appendText(project.tag);
+
+      // Description
+      if (info.description) {
+        const desc = popup.createEl("div", { cls: "project-info-description" });
+        desc.appendText(info.description);
+      } else {
+        const desc = popup.createEl("div", { cls: "project-info-description project-info-empty" });
+        desc.appendText("No description available.");
+      }
+
+      // Principles section
+      if (info.principles.length > 0) {
+        popup.createEl("div", { cls: "project-info-separator" });
+        const principlesHeader = popup.createEl("div", { cls: "project-info-section-header" });
+        principlesHeader.appendText("Principles");
+
+        const principlesList = popup.createEl("div", { cls: "project-info-principles" });
+        for (const principle of info.principles) {
+          const principleItem = principlesList.createEl("span", { cls: "project-info-principle-tag" });
+          principleItem.appendText(principle);
+        }
+      }
+
+      // Link to open file
+      popup.createEl("div", { cls: "project-info-separator" });
+      const linkContainer = popup.createEl("div", { cls: "project-info-link-container" });
+      const openLink = linkContainer.createEl("a", {
+        cls: "project-info-link",
+        href: "#",
+      });
+      openLink.appendText("Open project file →");
+
+      openLink.addEventListener("click", async (e) => {
+        e.preventDefault();
+        this.closeInfoPopup();
+        // Open in new tab
+        const filepath = this.projectManager.getProjectFilePath(project.tag);
+        const file = this.app.vault.getAbstractFileByPath(filepath);
+        if (file instanceof TFile) {
+          const leaf = this.app.workspace.getLeaf("tab");
+          await leaf.openFile(file);
+        }
+      });
+    } else {
+      // File doesn't exist yet
+      const noFile = popup.createEl("div", { cls: "project-info-no-file" });
+      noFile.appendText("Project file not found.");
+
+      const createHint = popup.createEl("div", { cls: "project-info-hint" });
+      createHint.appendText("Click → to create it.");
+    }
+
+    // Add to document and track
+    document.body.appendChild(popup);
+    this.openInfoPopup = popup;
+
+    // Adjust vertical position if popup would go off screen
+    const popupRect = popup.getBoundingClientRect();
+    if (popupRect.bottom > window.innerHeight - 10) {
+      const overflow = popupRect.bottom - window.innerHeight + 10;
+      popup.style.top = `${rect.top - overflow}px`;
+    }
+
+    // Close on click outside
+    const closeHandler = (e: MouseEvent) => {
+      if (!popup.contains(e.target as Node) && e.target !== trigger) {
+        this.closeInfoPopup();
+        document.removeEventListener("click", closeHandler);
+      }
+    };
+    setTimeout(() => document.addEventListener("click", closeHandler), 0);
+  }
+
+  private closeInfoPopup(): void {
+    if (this.openInfoPopup) {
+      this.openInfoPopup.remove();
+      this.openInfoPopup = null;
+    }
   }
 
   private renderActiveTodos(container: HTMLElement): void {
