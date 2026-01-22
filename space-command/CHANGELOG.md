@@ -2,6 +2,45 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.4] - 2026-01-21
+
+### Added
+
+- **Markdown rendering in LLM tooltips**: Define, Rewrite, and Review results now render as formatted markdown
+  - Supports bold, italic, code, lists, and other markdown formatting
+  - Term highlighting still works (uses Obsidian's highlight syntax internally)
+
+### Improved
+
+- **Tooltip header with command type**: Header now shows "␣⌘ Define", "␣⌘ Rewrite", or "␣⌘ Review"
+  - Logo and command type on left, close button on right
+  - Content starts below the header on its own line
+  - Cleaner visual separation between header and content
+
+### Technical
+
+- `DefineTooltip` now requires `App` instance for markdown rendering
+- New `CommandType` type for define/rewrite/review
+- Uses Obsidian's `MarkdownRenderer.render()` for content display
+- New `Component` lifecycle management for proper cleanup
+- New CSS classes: `.define-tooltip-header`, `.define-tooltip-command-type`, `.define-tooltip-settings-link`
+
+## [0.9.3] - 2026-01-21
+
+### Improved
+
+- **User-friendly LLM error messages**: Define, Rewrite, and Review commands now show helpful error messages
+  - Displays: "Could not connect to {model-name}. Fix in Settings" with clickable link
+  - Settings link opens the Space Command settings tab directly
+  - Full error details logged to browser console for debugging
+
+### Technical
+
+- New `showError()` method in `DefineTooltip` for error display with Settings link
+- New `getModel()` method in `LLMClient` for retrieving current model name
+- New `openLLMSettings()` method in plugin for programmatic settings access
+- Console logging includes operation type, model, URL, and error details
+
 ## [0.9.2] - 2026-01-21
 
 ### Fixed

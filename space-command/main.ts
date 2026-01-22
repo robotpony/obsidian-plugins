@@ -68,7 +68,7 @@ export default class SpaceCommandPlugin extends Plugin {
       reviewPrompt: this.settings.llmReviewPrompt,
       timeout: this.settings.llmTimeout,
     });
-    this.defineTooltip = new DefineTooltip();
+    this.defineTooltip = new DefineTooltip(this.app);
 
     // Configure scanner to exclude TODONE log file from Recent TODONEs
     if (this.settings.excludeTodoneFilesFromRecent) {
@@ -286,6 +286,7 @@ export default class SpaceCommandPlugin extends Plugin {
                   // Show loading tooltip with the selected term
                   this.defineTooltip.show(editor, "", true, selection, {
                     loadingText: "Defining...",
+                    commandType: "define",
                   });
 
                   // Request definition from LLM
@@ -294,10 +295,10 @@ export default class SpaceCommandPlugin extends Plugin {
                   if (result.success && result.definition) {
                     this.defineTooltip.updateContent(result.definition);
                   } else {
-                    this.defineTooltip.updateContent(
-                      `Error: ${result.error || "Failed to get definition"}`
+                    this.defineTooltip.showError(
+                      this.llmClient.getModel(),
+                      () => this.openLLMSettings()
                     );
-                    showNotice(`Define failed: ${result.error}`);
                   }
                 });
             });
@@ -315,6 +316,7 @@ export default class SpaceCommandPlugin extends Plugin {
                   // Show loading tooltip
                   this.defineTooltip.show(editor, "", true, "", {
                     loadingText: "Rewriting...",
+                    commandType: "rewrite",
                     onApply: (content: string) => {
                       // Replace the original selection with the rewritten content
                       editor.replaceRange(content, from, to);
@@ -333,10 +335,10 @@ export default class SpaceCommandPlugin extends Plugin {
                       },
                     });
                   } else {
-                    this.defineTooltip.updateContent(
-                      `Error: ${result.error || "Failed to rewrite"}`
+                    this.defineTooltip.showError(
+                      this.llmClient.getModel(),
+                      () => this.openLLMSettings()
                     );
-                    showNotice(`Rewrite failed: ${result.error}`);
                   }
                 });
             });
@@ -350,6 +352,7 @@ export default class SpaceCommandPlugin extends Plugin {
                   // Show loading tooltip
                   this.defineTooltip.show(editor, "", true, "", {
                     loadingText: "Reviewing...",
+                    commandType: "review",
                     showApply: true,
                   });
 
@@ -361,10 +364,10 @@ export default class SpaceCommandPlugin extends Plugin {
                       showApply: true,
                     });
                   } else {
-                    this.defineTooltip.updateContent(
-                      `Error: ${result.error || "Failed to review"}`
+                    this.defineTooltip.showError(
+                      this.llmClient.getModel(),
+                      () => this.openLLMSettings()
                     );
-                    showNotice(`Review failed: ${result.error}`);
                   }
                 });
             });
@@ -454,6 +457,12 @@ export default class SpaceCommandPlugin extends Plugin {
 
   showStatsModal() {
     new StatsModal(this.app, this.scanner).open();
+  }
+
+  openLLMSettings() {
+    // Open Obsidian settings and navigate to Space Command tab
+    (this.app as any).setting.open();
+    (this.app as any).setting.openTabById("space-command");
   }
 }
 
