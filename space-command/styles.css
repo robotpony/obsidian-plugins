@@ -1208,14 +1208,10 @@
   line-height: 1.5;
 }
 
-.define-tooltip-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.define-tooltip-header .space-command-logo {
+.define-tooltip-logo {
+  float: left;
+  margin-right: 12px;
+  margin-bottom: 4px;
   font-size: 0.85em;
 }
 
@@ -1248,6 +1244,9 @@
 }
 
 .define-tooltip-close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
   padding: 2px 6px;
   border: none;
   background: transparent;

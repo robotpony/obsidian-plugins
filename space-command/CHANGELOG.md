@@ -2,6 +2,19 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.8.4] - 2026-01-21
+
+### Changed
+
+- **Definition tooltip layout**: Logo now floats at top-left instead of top-right
+
+## [0.8.3] - 2026-01-21
+
+### Fixed
+
+- **Definition tooltip positioning**: Tooltip now stays fully within the viewport, adjusting position and adding scroll if needed for long definitions
+- **Definition tooltip layout**: Logo now floats at top-right with text flowing around it on the same line
+
 ## [0.8.2] - 2026-01-21
 
 ### Fixed

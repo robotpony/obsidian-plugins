@@ -13926,9 +13926,8 @@ var DefineTooltip = class {
     if (isLoading) {
       this.tooltip.classList.add("define-tooltip-loading");
     }
-    const headerEl = this.tooltip.createEl("div", { cls: "define-tooltip-header" });
-    headerEl.createEl("span", { cls: "space-command-logo", text: "\u2423\u2318" });
-    const closeBtn = headerEl.createEl("button", {
+    const logoEl = this.tooltip.createEl("span", { cls: "define-tooltip-logo space-command-logo", text: "\u2423\u2318" });
+    const closeBtn = this.tooltip.createEl("button", {
       cls: "define-tooltip-close",
       text: "\xD7",
       attr: { "aria-label": "Close" }
@@ -13945,12 +13944,32 @@ var DefineTooltip = class {
     this.tooltip.style.top = `${coords.bottom + 8}px`;
     this.tooltip.style.left = `${coords.left}px`;
     document.body.appendChild(this.tooltip);
+    this.adjustPosition(coords);
+  }
+  adjustPosition(coords) {
+    if (!this.tooltip)
+      return;
     const rect = this.tooltip.getBoundingClientRect();
-    if (rect.right > window.innerWidth - 10) {
-      this.tooltip.style.left = `${window.innerWidth - rect.width - 10}px`;
+    const margin = 10;
+    if (rect.right > window.innerWidth - margin) {
+      const newLeft = Math.max(margin, window.innerWidth - rect.width - margin);
+      this.tooltip.style.left = `${newLeft}px`;
     }
-    if (rect.bottom > window.innerHeight - 10) {
-      this.tooltip.style.top = `${coords.top - rect.height - 8}px`;
+    if (rect.left < margin) {
+      this.tooltip.style.left = `${margin}px`;
+    }
+    if (rect.bottom > window.innerHeight - margin) {
+      const aboveTop = coords.top - rect.height - 8;
+      if (aboveTop >= margin) {
+        this.tooltip.style.top = `${aboveTop}px`;
+      } else {
+        this.tooltip.style.top = `${margin}px`;
+        const maxHeight = window.innerHeight - 2 * margin;
+        if (rect.height > maxHeight) {
+          this.tooltip.style.maxHeight = `${maxHeight}px`;
+          this.tooltip.style.overflowY = "auto";
+        }
+      }
     }
     this.closeHandler = (e) => {
       if (this.tooltip && !this.tooltip.contains(e.target)) {
