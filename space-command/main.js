@@ -1664,8 +1664,10 @@ var EmbedRenderer = class {
     const allTodos = this.scanner.getTodos();
     const allTodones = this.scanner.getTodones();
     const unfiltered = [...allTodos, ...allTodones];
-    const filteredTodos = FilterParser.applyFilters(allTodos, filters);
-    const filteredTodones = FilterParser.applyFilters(allTodones, filters);
+    let filteredTodos = FilterParser.applyFilters(allTodos, filters);
+    let filteredTodones = FilterParser.applyFilters(allTodones, filters);
+    filteredTodos = this.includeParentHeaders(filteredTodos, allTodos);
+    filteredTodones = this.includeParentHeaders(filteredTodones, allTodones);
     const combined = [...filteredTodos, ...filteredTodones];
     this.renderTodoList(container, combined, todoneFile, filterString, unfiltered);
   }
@@ -1728,8 +1730,10 @@ var EmbedRenderer = class {
     const allTodos = this.scanner.getTodos();
     const allTodones = this.scanner.getTodones();
     const unfiltered = [...allTodos, ...allTodones];
-    const filteredTodos = FilterParser.applyFilters(allTodos, filters);
-    const filteredTodones = FilterParser.applyFilters(allTodones, filters);
+    let filteredTodos = FilterParser.applyFilters(allTodos, filters);
+    let filteredTodones = FilterParser.applyFilters(allTodones, filters);
+    filteredTodos = this.includeParentHeaders(filteredTodos, allTodos);
+    filteredTodones = this.includeParentHeaders(filteredTodones, allTodones);
     const combined = [...filteredTodos, ...filteredTodones];
     this.renderTodoList(el, combined, todoneFile, filterString, unfiltered);
   }
@@ -1782,14 +1786,35 @@ var EmbedRenderer = class {
       });
     }
   }
+  // Include parent headers when their children match the filter
+  // This ensures header TODOs appear even if only their children have the filtered tag
+  includeParentHeaders(filtered, unfiltered) {
+    const result = [...filtered];
+    const filteredPaths = new Set(filtered.map((t) => `${t.filePath}:${t.lineNumber}`));
+    for (const item of filtered) {
+      if (item.parentLineNumber !== void 0) {
+        const parentKey = `${item.filePath}:${item.parentLineNumber}`;
+        if (!filteredPaths.has(parentKey)) {
+          const parent = unfiltered.find(
+            (t) => t.filePath === item.filePath && t.lineNumber === item.parentLineNumber
+          );
+          if (parent && !filteredPaths.has(parentKey)) {
+            result.push(parent);
+            filteredPaths.add(parentKey);
+          }
+        }
+      }
+    }
+    return result;
+  }
   getFirstProjectTag(todo) {
     const excludeTags = ["#focus", "#future", "#p0", "#p1", "#p2", "#p3", "#p4", "#todo", "#todone"];
     const projectTag = todo.tags.find((t) => !excludeTags.includes(t));
     return projectTag || "zzz";
   }
   sortTodos(todos) {
-    const activeTodos = todos.filter((t) => t.tags.includes("#todo"));
-    const completedTodones = todos.filter((t) => t.tags.includes("#todone"));
+    const activeTodos = todos.filter((t) => t.itemType === "todo");
+    const completedTodones = todos.filter((t) => t.itemType === "todone");
     activeTodos.sort((a, b) => {
       const priorityDiff = getPriorityValue(a.tags) - getPriorityValue(b.tags);
       if (priorityDiff !== 0)
@@ -1830,7 +1855,7 @@ var EmbedRenderer = class {
     this.setupAutoRefresh(container, todoneFile, filterString);
     let displayTodos = todos;
     if (!showTodones) {
-      displayTodos = todos.filter((t) => !t.tags.includes("#todone"));
+      displayTodos = todos.filter((t) => t.itemType !== "todone");
     }
     if (displayTodos.length === 0) {
       container.createEl("div", {
@@ -1849,7 +1874,7 @@ var EmbedRenderer = class {
   }
   // Render a single todo item (and its children if it's a header)
   renderTodoItem(list4, todo, allTodos, showTodones, todoneFile, filterString, isChild = false) {
-    const isCompleted = todo.tags.includes("#todone");
+    const isCompleted = todo.itemType === "todone";
     const isHeader = todo.isHeader === true;
     const hasChildren = isHeader && todo.childLineNumbers && todo.childLineNumbers.length > 0;
     const itemClasses = [
@@ -1926,7 +1951,7 @@ var EmbedRenderer = class {
           (t) => t.filePath === todo.filePath && t.lineNumber === childLine
         );
         if (childTodo) {
-          if (!showTodones && childTodo.tags.includes("#todone")) {
+          if (!showTodones && childTodo.itemType === "todone") {
             continue;
           }
           this.renderTodoItem(childrenContainer, childTodo, allTodos, showTodones, todoneFile, filterString, true);
@@ -2178,8 +2203,10 @@ var EmbedRenderer = class {
     const allTodos = this.scanner.getTodos();
     const allTodones = this.scanner.getTodones();
     const unfiltered = [...allTodos, ...allTodones];
-    const filteredTodos = FilterParser.applyFilters(allTodos, filters);
-    const filteredTodones = FilterParser.applyFilters(allTodones, filters);
+    let filteredTodos = FilterParser.applyFilters(allTodos, filters);
+    let filteredTodones = FilterParser.applyFilters(allTodones, filters);
+    filteredTodos = this.includeParentHeaders(filteredTodos, allTodos);
+    filteredTodones = this.includeParentHeaders(filteredTodones, allTodones);
     const combined = [...filteredTodos, ...filteredTodones];
     this.renderTodoList(container, combined, todoneFile, filterString, unfiltered);
   }

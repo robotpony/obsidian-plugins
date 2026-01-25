@@ -2,6 +2,34 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.9] - 2026-01-25
+
+### Fixed
+
+- **Embed missing children of header TODOs when filtering by tag**: Header TODOs now appear in embeds when their children match the tag filter, even if the header itself doesn't have that tag
+  - Example: `## Ideas and TODOs #todos` with children tagged `#workflow-automation` now shows when embed filters by `tags:#workflow-automation`
+  - Previously, the header was filtered out (it lacked the tag), so all its children were hidden too
+  - Affects `{{focus-todos}}` inline embeds and `` ```focus-todos``` `` code blocks with tag filters
+
+### Technical
+
+- New `includeParentHeaders()` method in `EmbedRenderer.ts` adds parent headers when their children match filters
+- Applied to `renderTodos()`, `render()`, and `refreshEmbed()` methods
+
+## [0.9.8] - 2026-01-25
+
+### Fixed
+
+- **Embed missing items with plural tags**: TODOs using `#todos` (plural) now appear correctly in embed views
+  - Previously, embeds checked `tags.includes("#todo")` which missed items tagged with `#todos`
+  - Now uses `itemType` field set during scanning, which handles both singular and plural forms
+  - Affects `{{focus-todos}}` inline embeds and `` ```focus-todos``` `` code blocks
+  - Same fix applied to TODONE visibility filtering (`#todone`/`#todones`)
+
+### Technical
+
+- Replaced 5 `tags.includes("#todo")` / `tags.includes("#todone")` checks in `EmbedRenderer.ts` with `itemType === 'todo'` / `itemType === 'todone'`
+
 ## [0.9.7] - 2026-01-21
 
 ### Added

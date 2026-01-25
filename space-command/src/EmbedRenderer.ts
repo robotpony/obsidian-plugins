@@ -75,8 +75,11 @@ export class EmbedRenderer {
     // Keep unfiltered list for child lookup
     const unfiltered = [...allTodos, ...allTodones];
     // Apply filters to both
-    const filteredTodos = FilterParser.applyFilters(allTodos, filters);
-    const filteredTodones = FilterParser.applyFilters(allTodones, filters);
+    let filteredTodos = FilterParser.applyFilters(allTodos, filters);
+    let filteredTodones = FilterParser.applyFilters(allTodones, filters);
+    // Include parent headers when children match filter
+    filteredTodos = this.includeParentHeaders(filteredTodos, allTodos);
+    filteredTodones = this.includeParentHeaders(filteredTodones, allTodones);
     // Combine them - sortTodos will separate and sort them properly
     const combined = [...filteredTodos, ...filteredTodones];
     this.renderTodoList(container, combined, todoneFile, filterString, unfiltered);
@@ -176,8 +179,11 @@ export class EmbedRenderer {
     // Keep unfiltered list for child lookup
     const unfiltered = [...allTodos, ...allTodones];
     // Apply filters
-    const filteredTodos = FilterParser.applyFilters(allTodos, filters);
-    const filteredTodones = FilterParser.applyFilters(allTodones, filters);
+    let filteredTodos = FilterParser.applyFilters(allTodos, filters);
+    let filteredTodones = FilterParser.applyFilters(allTodones, filters);
+    // Include parent headers when children match filter
+    filteredTodos = this.includeParentHeaders(filteredTodos, allTodos);
+    filteredTodones = this.includeParentHeaders(filteredTodones, allTodones);
     const combined = [...filteredTodos, ...filteredTodones];
 
     // Render the todo list
@@ -249,6 +255,32 @@ export class EmbedRenderer {
     }
   }
 
+  // Include parent headers when their children match the filter
+  // This ensures header TODOs appear even if only their children have the filtered tag
+  private includeParentHeaders(filtered: TodoItem[], unfiltered: TodoItem[]): TodoItem[] {
+    const result = [...filtered];
+    const filteredPaths = new Set(filtered.map(t => `${t.filePath}:${t.lineNumber}`));
+
+    // Find children in filtered list whose parent header is NOT in filtered
+    for (const item of filtered) {
+      if (item.parentLineNumber !== undefined) {
+        const parentKey = `${item.filePath}:${item.parentLineNumber}`;
+        if (!filteredPaths.has(parentKey)) {
+          // Find the parent header in unfiltered list
+          const parent = unfiltered.find(
+            t => t.filePath === item.filePath && t.lineNumber === item.parentLineNumber
+          );
+          if (parent && !filteredPaths.has(parentKey)) {
+            result.push(parent);
+            filteredPaths.add(parentKey); // Prevent duplicate additions
+          }
+        }
+      }
+    }
+
+    return result;
+  }
+
   private getFirstProjectTag(todo: TodoItem): string {
     // Return first non-priority tag for alphabetical sorting
     const excludeTags = ['#focus', '#future', '#p0', '#p1', '#p2', '#p3', '#p4', '#todo', '#todone'];
@@ -258,8 +290,9 @@ export class EmbedRenderer {
 
   private sortTodos(todos: TodoItem[]): TodoItem[] {
     // Separate active TODOs and completed TODONEs
-    const activeTodos = todos.filter(t => t.tags.includes("#todo"));
-    const completedTodones = todos.filter(t => t.tags.includes("#todone"));
+    // Use itemType instead of tag checks to handle both singular (#todo) and plural (#todos) forms
+    const activeTodos = todos.filter(t => t.itemType === 'todo');
+    const completedTodones = todos.filter(t => t.itemType === 'todone');
 
     // Sort active TODOs by priority, then by project tag alphabetically
     activeTodos.sort((a, b) => {
@@ -332,7 +365,7 @@ export class EmbedRenderer {
     // Filter todos for display based on visibility setting
     let displayTodos = todos;
     if (!showTodones) {
-      displayTodos = todos.filter(t => !t.tags.includes("#todone"));
+      displayTodos = todos.filter(t => t.itemType !== 'todone');
     }
 
     if (displayTodos.length === 0) {
@@ -370,7 +403,7 @@ export class EmbedRenderer {
     filterString: string,
     isChild: boolean = false
   ): void {
-    const isCompleted = todo.tags.includes("#todone");
+    const isCompleted = todo.itemType === 'todone';
     const isHeader = todo.isHeader === true;
     const hasChildren = isHeader && todo.childLineNumbers && todo.childLineNumbers.length > 0;
 
@@ -479,7 +512,7 @@ export class EmbedRenderer {
         );
         if (childTodo) {
           // Skip completed children if showTodones is false
-          if (!showTodones && childTodo.tags.includes("#todone")) {
+          if (!showTodones && childTodo.itemType === 'todone') {
             continue;
           }
           this.renderTodoItem(childrenContainer, childTodo, allTodos, showTodones, todoneFile, filterString, true);
@@ -887,8 +920,11 @@ export class EmbedRenderer {
     // Keep unfiltered list for child lookup
     const unfiltered = [...allTodos, ...allTodones];
     // Apply filters
-    const filteredTodos = FilterParser.applyFilters(allTodos, filters);
-    const filteredTodones = FilterParser.applyFilters(allTodones, filters);
+    let filteredTodos = FilterParser.applyFilters(allTodos, filters);
+    let filteredTodones = FilterParser.applyFilters(allTodones, filters);
+    // Include parent headers when children match filter
+    filteredTodos = this.includeParentHeaders(filteredTodos, allTodos);
+    filteredTodones = this.includeParentHeaders(filteredTodones, allTodones);
     const combined = [...filteredTodos, ...filteredTodones];
     this.renderTodoList(container, combined, todoneFile, filterString, unfiltered);
   }
