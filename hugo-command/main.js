@@ -125,14 +125,18 @@ var HugoScanner = class extends import_obsidian2.Events {
   }
   /**
    * Check if a file path is within one of the configured content paths
+   * Supports "." or "/" to mean the entire vault
    */
   isInContentPath(filePath) {
     if (this.contentPaths.length === 0) {
       return true;
     }
     return this.contentPaths.some((contentPath) => {
-      const normalizedContentPath = contentPath.replace(/\/$/, "");
-      return filePath.startsWith(normalizedContentPath + "/") || filePath === normalizedContentPath;
+      const normalized = contentPath.trim().replace(/\/$/, "");
+      if (normalized === "." || normalized === "/" || normalized === "") {
+        return true;
+      }
+      return filePath.startsWith(normalized + "/") || filePath === normalized;
     });
   }
   /**
@@ -295,7 +299,7 @@ var HugoScanner = class extends import_obsidian2.Events {
 var import_obsidian3 = require("obsidian");
 var VIEW_TYPE_HUGO_SIDEBAR = "hugo-command-sidebar";
 var HugoSidebarView = class extends import_obsidian3.ItemView {
-  constructor(leaf, scanner, settings, onShowAbout) {
+  constructor(leaf, scanner, settings, onShowAbout, onOpenSettings) {
     super(leaf);
     this.updateListener = null;
     this.activeTagFilter = null;
@@ -304,6 +308,7 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
     this.scanner = scanner;
     this.settings = settings;
     this.onShowAbout = onShowAbout;
+    this.onOpenSettings = onOpenSettings;
   }
   getViewType() {
     return VIEW_TYPE_HUGO_SIDEBAR;
@@ -356,15 +361,28 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
     });
     header.createEl("span", {
       cls: "hugo-command-title",
-      text: "Hugo Content"
+      text: "Hugo Command"
     });
-    const refreshBtn = header.createEl("span", {
-      cls: "hugo-command-refresh",
-      text: "\u21BB"
+    const menuBtn = header.createEl("button", {
+      cls: "clickable-icon hugo-command-menu-btn",
+      attr: { "aria-label": "Menu" }
     });
-    refreshBtn.setAttribute("aria-label", "Refresh");
-    refreshBtn.addEventListener("click", async () => {
-      await this.scanner.scanVault();
+    menuBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>';
+    menuBtn.addEventListener("click", (evt) => {
+      const menu = new import_obsidian3.Menu();
+      menu.addItem((item) => {
+        item.setTitle("Refresh").setIcon("refresh-cw").onClick(async () => {
+          await this.scanner.scanVault();
+        });
+      });
+      menu.addSeparator();
+      menu.addItem((item) => {
+        item.setTitle("About").setIcon("info").onClick(() => this.onShowAbout());
+      });
+      menu.addItem((item) => {
+        item.setTitle("Settings").setIcon("settings").onClick(() => this.onOpenSettings());
+      });
+      menu.showAtMouseEvent(evt);
     });
   }
   renderFilters(container) {
@@ -580,7 +598,7 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
 
 // src/types.ts
 var DEFAULT_SETTINGS = {
-  contentPaths: ["content"],
+  contentPaths: ["."],
   showSidebarByDefault: true,
   showDrafts: true,
   defaultSortOrder: "date-desc"
@@ -599,7 +617,8 @@ var HugoCommandPlugin = class extends import_obsidian4.Plugin {
         leaf,
         this.scanner,
         this.settings,
-        () => this.showAboutModal()
+        () => this.showAboutModal(),
+        () => this.openSettings()
       )
     );
     if (this.settings.showSidebarByDefault) {
@@ -697,6 +716,10 @@ var HugoCommandPlugin = class extends import_obsidian4.Plugin {
   }
   showAboutModal() {
     new AboutModal(this.app, this.manifest.version).open();
+  }
+  openSettings() {
+    this.app.setting.open();
+    this.app.setting.openTabById("hugo-command");
   }
 };
 var AboutModal = class extends import_obsidian4.Modal {

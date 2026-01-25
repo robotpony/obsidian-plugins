@@ -41,7 +41,8 @@ export default class HugoCommandPlugin extends Plugin {
           leaf,
           this.scanner,
           this.settings,
-          () => this.showAboutModal()
+          () => this.showAboutModal(),
+          () => this.openSettings()
         )
     );
 
@@ -165,6 +166,11 @@ export default class HugoCommandPlugin extends Plugin {
 
   showAboutModal() {
     new AboutModal(this.app, this.manifest.version).open();
+  }
+
+  openSettings() {
+    (this.app as any).setting.open();
+    (this.app as any).setting.openTabById("hugo-command");
   }
 }
 

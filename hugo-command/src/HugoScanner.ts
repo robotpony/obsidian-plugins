@@ -35,16 +35,21 @@ export class HugoScanner extends Events {
 
   /**
    * Check if a file path is within one of the configured content paths
+   * Supports "." or "/" to mean the entire vault
    */
   private isInContentPath(filePath: string): boolean {
     if (this.contentPaths.length === 0) {
       return true;
     }
     return this.contentPaths.some((contentPath) => {
-      const normalizedContentPath = contentPath.replace(/\/$/, "");
+      const normalized = contentPath.trim().replace(/\/$/, "");
+      // "." or "/" or empty means scan entire vault
+      if (normalized === "." || normalized === "/" || normalized === "") {
+        return true;
+      }
       return (
-        filePath.startsWith(normalizedContentPath + "/") ||
-        filePath === normalizedContentPath
+        filePath.startsWith(normalized + "/") ||
+        filePath === normalized
       );
     });
   }

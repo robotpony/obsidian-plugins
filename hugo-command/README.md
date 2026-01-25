@@ -31,11 +31,19 @@ Open the Hugo sidebar using:
 - **Tag Filter**: Click the `#` button to filter by tag
 - Click a tag again to clear the filter
 
+### Sidebar Menu
+
+Click the kebab menu (three dots) in the sidebar header for:
+
+- **Refresh**: Rescan content files
+- **About**: Plugin information
+- **Settings**: Open plugin settings
+
 ### Settings
 
 Configure the plugin in Settings > Hugo Command:
 
-- **Content Paths**: Folders to scan for Hugo content (one per line)
+- **Content Paths**: Folders to scan for Hugo content (one per line). Use `.` to scan the entire vault.
 - **Show Sidebar by Default**: Open sidebar when Obsidian starts
 - **Show Drafts**: Include draft posts in the content list
 - **Default Sort Order**: How to sort content (date or title)

@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf } from "obsidian";
+import { ItemView, WorkspaceLeaf, Menu } from "obsidian";
 import { HugoScanner } from "./HugoScanner";
 import { HugoContentItem, StatusFilter, HugoCommandSettings } from "./types";
 import { formatDate, openFile, LOGO_PREFIX } from "./utils";
@@ -13,17 +13,20 @@ export class HugoSidebarView extends ItemView {
   private activeStatusFilter: StatusFilter = "all";
   private openDropdown: HTMLElement | null = null;
   private onShowAbout: () => void;
+  private onOpenSettings: () => void;
 
   constructor(
     leaf: WorkspaceLeaf,
     scanner: HugoScanner,
     settings: HugoCommandSettings,
-    onShowAbout: () => void
+    onShowAbout: () => void,
+    onOpenSettings: () => void
   ) {
     super(leaf);
     this.scanner = scanner;
     this.settings = settings;
     this.onShowAbout = onShowAbout;
+    this.onOpenSettings = onOpenSettings;
   }
 
   getViewType(): string {
@@ -89,17 +92,48 @@ export class HugoSidebarView extends ItemView {
 
     header.createEl("span", {
       cls: "hugo-command-title",
-      text: "Hugo Content",
+      text: "Hugo Command",
     });
 
-    // Refresh button
-    const refreshBtn = header.createEl("span", {
-      cls: "hugo-command-refresh",
-      text: "\u21bb",
+    // Kebab menu button (three vertical dots)
+    const menuBtn = header.createEl("button", {
+      cls: "clickable-icon hugo-command-menu-btn",
+      attr: { "aria-label": "Menu" },
     });
-    refreshBtn.setAttribute("aria-label", "Refresh");
-    refreshBtn.addEventListener("click", async () => {
-      await this.scanner.scanVault();
+    menuBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>';
+
+    menuBtn.addEventListener("click", (evt) => {
+      const menu = new Menu();
+
+      // Refresh
+      menu.addItem((item) => {
+        item
+          .setTitle("Refresh")
+          .setIcon("refresh-cw")
+          .onClick(async () => {
+            await this.scanner.scanVault();
+          });
+      });
+
+      menu.addSeparator();
+
+      // About
+      menu.addItem((item) => {
+        item
+          .setTitle("About")
+          .setIcon("info")
+          .onClick(() => this.onShowAbout());
+      });
+
+      // Settings
+      menu.addItem((item) => {
+        item
+          .setTitle("Settings")
+          .setIcon("settings")
+          .onClick(() => this.onOpenSettings());
+      });
+
+      menu.showAtMouseEvent(evt);
     });
   }
 

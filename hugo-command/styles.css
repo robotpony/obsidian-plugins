@@ -135,16 +135,19 @@
   flex: 1;
 }
 
-.hugo-command-refresh {
+/* Menu button (kebab) */
+.hugo-command-menu-btn {
+  padding: 4px;
+  border: none;
+  background: transparent;
   cursor: pointer;
   opacity: 0.6;
-  font-size: 1.2em;
-  transition: opacity 0.2s, transform 0.2s;
+  transition: opacity 0.2s;
+  flex-shrink: 0;
 }
 
-.hugo-command-refresh:hover {
+.hugo-command-menu-btn:hover {
   opacity: 1;
-  transform: rotate(180deg);
 }
 
 /* Filter bar */

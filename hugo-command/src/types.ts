@@ -41,7 +41,7 @@ export interface HugoCommandSettings {
 }
 
 export const DEFAULT_SETTINGS: HugoCommandSettings = {
-  contentPaths: ["content"],
+  contentPaths: ["."],
   showSidebarByDefault: true,
   showDrafts: true,
   defaultSortOrder: "date-desc",
