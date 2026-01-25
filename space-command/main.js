@@ -344,6 +344,10 @@ var TodoScanner = class extends import_obsidian2.Events {
           continue;
         }
         if (currentHeaderTodo && this.isListItem(line)) {
+          const hasIdeaTag = tags.includes("#idea") || tags.includes("#ideas") || tags.includes("#ideation");
+          if (hasIdeaTag) {
+            continue;
+          }
           const isChecked = isCheckboxChecked(line);
           const hasTodoneTag = tags.includes("#todone");
           if (isChecked && !hasTodoneTag) {
@@ -363,10 +367,11 @@ var TodoScanner = class extends import_obsidian2.Events {
         }
         const hasTodo = tags.includes("#todo") || tags.includes("#todos");
         const hasTodone = tags.includes("#todone") || tags.includes("#todones");
+        const hasIdea = tags.includes("#idea") || tags.includes("#ideas") || tags.includes("#ideation");
         if (hasTodone && hasTodo) {
           linesToCleanup.push(i);
           todones.push(this.createTodoItem(file, i, line, tags, "todone"));
-        } else if (hasTodo) {
+        } else if (hasTodo && !hasIdea) {
           todos.push(this.createTodoItem(file, i, line, tags, "todo"));
         } else if (hasTodone) {
           todones.push(this.createTodoItem(file, i, line, tags, "todone"));
@@ -1661,7 +1666,9 @@ var EmbedRenderer = class {
   // Renders a TODO list with filters (includes both TODOs and TODONEs)
   renderTodos(container, filterString, todoneFile) {
     const filters = FilterParser.parse(filterString);
-    const allTodos = this.scanner.getTodos();
+    const allTodos = this.scanner.getTodos().filter(
+      (t) => !t.tags.includes("#idea") && !t.tags.includes("#ideas") && !t.tags.includes("#ideation")
+    );
     const allTodones = this.scanner.getTodones();
     const unfiltered = [...allTodos, ...allTodones];
     let filteredTodos = FilterParser.applyFilters(allTodos, filters);
@@ -1727,7 +1734,9 @@ var EmbedRenderer = class {
       filterString = afterPipe;
     }
     const filters = FilterParser.parse(filterString);
-    const allTodos = this.scanner.getTodos();
+    const allTodos = this.scanner.getTodos().filter(
+      (t) => !t.tags.includes("#idea") && !t.tags.includes("#ideas") && !t.tags.includes("#ideation")
+    );
     const allTodones = this.scanner.getTodones();
     const unfiltered = [...allTodos, ...allTodones];
     let filteredTodos = FilterParser.applyFilters(allTodos, filters);
@@ -2200,7 +2209,9 @@ var EmbedRenderer = class {
   // Refresh a specific embed
   refreshEmbed(container, todoneFile, filterString) {
     const filters = FilterParser.parse(filterString);
-    const allTodos = this.scanner.getTodos();
+    const allTodos = this.scanner.getTodos().filter(
+      (t) => !t.tags.includes("#idea") && !t.tags.includes("#ideas") && !t.tags.includes("#ideation")
+    );
     const allTodones = this.scanner.getTodones();
     const unfiltered = [...allTodos, ...allTodones];
     let filteredTodos = FilterParser.applyFilters(allTodos, filters);
@@ -3167,6 +3178,9 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
   renderActiveTodos(container) {
     let todos = this.scanner.getTodos();
     todos = todos.filter((todo) => !todo.tags.includes("#future"));
+    todos = todos.filter(
+      (todo) => !todo.tags.includes("#idea") && !todo.tags.includes("#ideas") && !todo.tags.includes("#ideation")
+    );
     todos = todos.filter((todo) => todo.parentLineNumber === void 0);
     if (this.activeTagFilter) {
       todos = todos.filter((todo) => todo.tags.includes(this.activeTagFilter));

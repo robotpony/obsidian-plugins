@@ -822,6 +822,13 @@ export class TodoSidebarView extends ItemView {
     // Filter out #future (snoozed) TODOs
     todos = todos.filter(todo => !todo.tags.includes("#future"));
 
+    // Filter out #idea items (they should only appear in Ideas tab)
+    todos = todos.filter(todo =>
+      !todo.tags.includes("#idea") &&
+      !todo.tags.includes("#ideas") &&
+      !todo.tags.includes("#ideation")
+    );
+
     // Filter out child items (they'll be rendered under their parent header)
     todos = todos.filter(todo => todo.parentLineNumber === undefined);
 

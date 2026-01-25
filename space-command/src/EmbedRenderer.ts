@@ -70,7 +70,12 @@ export class EmbedRenderer {
   ): void {
     const filters = FilterParser.parse(filterString);
     // Get both active TODOs and completed TODONEs
-    const allTodos = this.scanner.getTodos();
+    // Filter out #idea items - they should only appear in idea embeds
+    const allTodos = this.scanner.getTodos().filter(t =>
+      !t.tags.includes("#idea") &&
+      !t.tags.includes("#ideas") &&
+      !t.tags.includes("#ideation")
+    );
     const allTodones = this.scanner.getTodones();
     // Keep unfiltered list for child lookup
     const unfiltered = [...allTodos, ...allTodones];
@@ -174,7 +179,12 @@ export class EmbedRenderer {
     const filters = FilterParser.parse(filterString);
 
     // Get both TODOs and TODONEs
-    const allTodos = this.scanner.getTodos();
+    // Filter out #idea items - they should only appear in idea embeds
+    const allTodos = this.scanner.getTodos().filter(t =>
+      !t.tags.includes("#idea") &&
+      !t.tags.includes("#ideas") &&
+      !t.tags.includes("#ideation")
+    );
     const allTodones = this.scanner.getTodones();
     // Keep unfiltered list for child lookup
     const unfiltered = [...allTodos, ...allTodones];
@@ -915,7 +925,12 @@ export class EmbedRenderer {
   ): void {
     const filters = FilterParser.parse(filterString);
     // Get both TODOs and TODONEs
-    const allTodos = this.scanner.getTodos();
+    // Filter out #idea items - they should only appear in idea embeds
+    const allTodos = this.scanner.getTodos().filter(t =>
+      !t.tags.includes("#idea") &&
+      !t.tags.includes("#ideas") &&
+      !t.tags.includes("#ideation")
+    );
     const allTodones = this.scanner.getTodones();
     // Keep unfiltered list for child lookup
     const unfiltered = [...allTodos, ...allTodones];

@@ -2,6 +2,21 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.12] - 2026-01-25
+
+### Fixed
+
+- **#idea items appearing in TODO lists**: Items with `#idea`, `#ideas`, or `#ideation` tags now correctly appear only in Ideas tab/embeds, not in TODOs
+  - Previously, items under a `#todos` header with `#idea` tag would appear in both TODO and Idea lists
+  - Scanner now excludes `#idea` tagged items from todos cache
+  - Added safety filters in SidebarView and EmbedRenderer to ensure clean separation
+
+### Technical
+
+- `TodoScanner.scanFile()` now checks for idea tags before adding items to todos list
+- `SidebarView.renderActiveTodos()` filters out items with idea tags
+- `EmbedRenderer.renderTodos()` and `refreshEmbed()` filter out idea-tagged items
+
 ## [0.9.11] - 2026-01-25
 
 ### Fixed

@@ -7,3 +7,5 @@ cd ..
 cp -pr space-command ~/writing/development-notes/.obsidian/plugins
 
 cp -pr space-command ~/writing/nb-notes/.obsidian/plugins   
+
+cp -pr space-command ~/projects/sites/w42/content/.obsidian/plugins

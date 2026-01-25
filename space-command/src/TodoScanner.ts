@@ -125,6 +125,13 @@ export class TodoScanner extends Events {
 
         // If we're under a header TODO and this is a list item, treat as child
         if (currentHeaderTodo && this.isListItem(line)) {
+          // Skip items with #idea tags - they should only appear in ideas, not todos
+          const hasIdeaTag = tags.includes("#idea") || tags.includes("#ideas") || tags.includes("#ideation");
+          if (hasIdeaTag) {
+            // Don't add to todo children, let idea processing handle it
+            continue;
+          }
+
           // Check if checkbox is checked but missing #todone tag - sync the state
           const isChecked = isCheckboxChecked(line);
           const hasTodoneTag = tags.includes("#todone");
@@ -154,14 +161,17 @@ export class TodoScanner extends Events {
 
         // Regular TODO/TODONE processing (non-header, non-child items)
         // If line has both #todo and #todone, #todone wins and we clean up the #todo
+        // If line has #idea, it should not appear in todos (idea takes precedence)
         const hasTodo = tags.includes("#todo") || tags.includes("#todos");
         const hasTodone = tags.includes("#todone") || tags.includes("#todones");
+        const hasIdea = tags.includes("#idea") || tags.includes("#ideas") || tags.includes("#ideation");
         if (hasTodone && hasTodo) {
           // Queue this line for cleanup (remove #todo tag)
           linesToCleanup.push(i);
           // Treat as completed
           todones.push(this.createTodoItem(file, i, line, tags, 'todone'));
-        } else if (hasTodo) {
+        } else if (hasTodo && !hasIdea) {
+          // Only add to todos if not tagged as idea
           todos.push(this.createTodoItem(file, i, line, tags, 'todo'));
         } else if (hasTodone) {
           todones.push(this.createTodoItem(file, i, line, tags, 'todone'));
