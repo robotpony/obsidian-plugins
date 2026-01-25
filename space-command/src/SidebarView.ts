@@ -267,8 +267,9 @@ export class TodoSidebarView extends ItemView {
     trigger.addEventListener("click", (e) => {
       e.stopPropagation();
 
-      // Close any existing dropdown
+      // Close any existing dropdown or popup
       this.closeDropdown();
+      this.closeInfoPopup();
 
       // Create dropdown menu
       const dropdown = document.createElement("div");
@@ -697,14 +698,18 @@ export class TodoSidebarView extends ItemView {
   }
 
   private async showProjectInfoPopup(project: ProjectInfo, trigger: HTMLElement): Promise<void> {
-    // Close any existing popup
+    // Close any existing popup or dropdown
     this.closeInfoPopup();
+    this.closeDropdown();
 
     const info = await this.projectManager.getProjectFileInfo(project.tag);
 
     // Create popup container
     const popup = document.createElement("div");
     popup.className = "project-info-popup";
+    // Set width inline to ensure CSS precedence
+    popup.style.minWidth = "350px";
+    popup.style.maxWidth = "450px";
 
     // Determine sidebar position (left or right)
     const sidebarRoot = this.leaf.getRoot();

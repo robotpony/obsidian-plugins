@@ -2778,6 +2778,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     trigger.addEventListener("click", (e) => {
       e.stopPropagation();
       this.closeDropdown();
+      this.closeInfoPopup();
       const dropdown = document.createElement("div");
       dropdown.className = "tag-dropdown-menu";
       const sidebarRoot = this.leaf.getRoot();
@@ -3079,9 +3080,12 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
   }
   async showProjectInfoPopup(project, trigger) {
     this.closeInfoPopup();
+    this.closeDropdown();
     const info = await this.projectManager.getProjectFileInfo(project.tag);
     const popup = document.createElement("div");
     popup.className = "project-info-popup";
+    popup.style.minWidth = "350px";
+    popup.style.maxWidth = "450px";
     const sidebarRoot = this.leaf.getRoot();
     const isRightSidebar = sidebarRoot === this.app.workspace.rightSplit;
     const rect = trigger.getBoundingClientRect();

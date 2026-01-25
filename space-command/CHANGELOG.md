@@ -2,6 +2,18 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.11] - 2026-01-25
+
+### Fixed
+
+- **Project info popup not closing when opening other menus**: Opening a tag dropdown or other sidebar menu now properly closes any open project info popup, and vice versa
+
+## [0.9.10] - 2026-01-25
+
+### Fixed
+
+- **Project info popup too narrow**: Increased popup width from 250-350px to 350-450px for better readability (approximately 12-15 words per line instead of 8). Uses inline styles to ensure CSS precedence.
+
 ## [0.9.9] - 2026-01-25
 
 ### Fixed
