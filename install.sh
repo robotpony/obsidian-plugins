@@ -24,14 +24,19 @@ SPINNER_FRAMES=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
 typeset -ga SELECTED_ITEMS
 
 # Command line options
+USE_ALL_PLUGINS=false
 USE_PREVIOUS_VAULTS=false
 
 show_help() {
     echo "Usage: ./install.sh [options]"
     echo ""
     echo "Options:"
+    echo "  -a, --all        Install all plugins (skip plugin prompt)"
     echo "  -p, --previous   Use previously selected vaults (skip vault prompt)"
     echo "  -h, --help       Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  ./install.sh -a -p   Quick reinstall: all plugins to cached vaults"
     echo ""
     echo "Interactive prompts:"
     echo "  0        Select all items"
@@ -266,6 +271,10 @@ main() {
     # Parse command line arguments
     while [[ $# -gt 0 ]]; do
         case "$1" in
+            -a|--all)
+                USE_ALL_PLUGINS=true
+                shift
+                ;;
             -p|--previous)
                 USE_PREVIOUS_VAULTS=true
                 shift
@@ -301,25 +310,34 @@ main() {
         plugin_names+=("$(get_plugin_info "$dir")")
     done
 
-    print_header "Found ${#plugin_dirs[@]} plugins:"
-    select_items "Select plugins to install" "${plugin_names[@]}"
-    local -a selected_plugins=("${SELECTED_ITEMS[@]}")
-
-    if [[ ${#selected_plugins[@]} -eq 0 ]]; then
-        print_warn "No plugins selected"
-        exit 0
-    fi
-
-    # Map selected names back to directories
     local -a plugins_to_install
-    for selected in "${selected_plugins[@]}"; do
-        for i in {1..${#plugin_names[@]}}; do
-            if [[ "${plugin_names[$i]}" == "$selected" ]]; then
-                plugins_to_install+=("${plugin_dirs[$i]}")
-                break
-            fi
+
+    if [[ "$USE_ALL_PLUGINS" == "true" ]]; then
+        print_header "Installing all ${#plugin_dirs[@]} plugins:"
+        plugins_to_install=("${plugin_dirs[@]}")
+        for name in "${plugin_names[@]}"; do
+            echo "  ${CYAN}•${NC} $name"
         done
-    done
+    else
+        print_header "Found ${#plugin_dirs[@]} plugins:"
+        select_items "Select plugins to install" "${plugin_names[@]}"
+        local -a selected_plugins=("${SELECTED_ITEMS[@]}")
+
+        if [[ ${#selected_plugins[@]} -eq 0 ]]; then
+            print_warn "No plugins selected"
+            exit 0
+        fi
+
+        # Map selected names back to directories
+        for selected in "${selected_plugins[@]}"; do
+            for i in {1..${#plugin_names[@]}}; do
+                if [[ "${plugin_names[$i]}" == "$selected" ]]; then
+                    plugins_to_install+=("${plugin_dirs[$i]}")
+                    break
+                fi
+            done
+        done
+    fi
 
     # Build selected plugins
     print_header "Building..."

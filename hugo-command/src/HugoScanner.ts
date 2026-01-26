@@ -234,6 +234,59 @@ export class HugoScanner extends Events {
   }
 
   /**
+   * Get all unique folders (top-level + subfolder tags) for filtering
+   */
+  getAllFolders(): string[] {
+    const folderSet = new Set<string>();
+    for (const item of this.contentCache.values()) {
+      // Add top-level folder (except "(root)")
+      if (item.topLevelFolder !== "(root)") {
+        folderSet.add(item.topLevelFolder);
+      }
+      // Add subfolder tags
+      for (const tag of item.folderTags) {
+        folderSet.add(tag);
+      }
+    }
+    return Array.from(folderSet).sort((a, b) => a.localeCompare(b));
+  }
+
+  /**
+   * Get folder hierarchy as a flat list with depth for display
+   * Returns folders with their full path and nesting depth
+   */
+  getFolderHierarchy(): { name: string; path: string; depth: number }[] {
+    // Build a set of all full folder paths from content items
+    const pathSet = new Set<string>();
+
+    for (const item of this.contentCache.values()) {
+      if (item.topLevelFolder === "(root)") continue;
+
+      // Build full paths: top-level, top-level/sub1, top-level/sub1/sub2, etc.
+      let currentPath = item.topLevelFolder;
+      pathSet.add(currentPath);
+
+      for (const subFolder of item.folderTags) {
+        currentPath = `${currentPath}/${subFolder}`;
+        pathSet.add(currentPath);
+      }
+    }
+
+    // Convert to sorted array
+    const paths = Array.from(pathSet).sort((a, b) => a.localeCompare(b));
+
+    // Convert to hierarchy items with depth
+    return paths.map((path) => {
+      const parts = path.split("/");
+      return {
+        name: parts[parts.length - 1], // Just the folder name
+        path: path, // Full path for filtering
+        depth: parts.length - 1, // 0 for top-level, 1 for first sublevel, etc.
+      };
+    });
+  }
+
+  /**
    * Get all unique top-level folders
    */
   getTopLevelFolders(): string[] {

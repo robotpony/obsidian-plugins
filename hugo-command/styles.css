@@ -168,6 +168,34 @@
   font-size: 0.85em;
 }
 
+/* Unified filter trigger buttons (folder, tags) */
+.hugo-command-filter-trigger {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 0.85em;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--background-modifier-border);
+  background-color: var(--background-primary);
+  color: var(--text-muted);
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.hugo-command-filter-trigger:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+  border-color: var(--background-modifier-border-hover);
+}
+
+.hugo-command-filter-trigger svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Legacy tag trigger - keep for backwards compatibility */
 .hugo-command-tag-trigger {
   cursor: pointer;
   font-size: 9pt;
@@ -186,7 +214,15 @@
   background-color: var(--tag-background-hover);
 }
 
-.hugo-command-active-tag {
+/* Filter prefix label at start of filter bar */
+.hugo-command-filter-prefix {
+  font-size: 0.85em;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* Active filter chip (value + clear button) */
+.hugo-command-active-filter {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -197,20 +233,60 @@
   border-radius: var(--tag-radius);
 }
 
-.hugo-command-clear-tag {
+.hugo-command-active-filter.folder-filter {
+  background-color: var(--background-modifier-success);
+}
+
+.hugo-command-filter-value {
+  font-weight: 500;
+}
+
+.hugo-command-filter-clear {
   cursor: pointer;
   opacity: 0.7;
   font-weight: bold;
+  margin-left: 2px;
 }
 
-.hugo-command-clear-tag:hover {
+.hugo-command-filter-clear:hover {
   opacity: 1;
 }
 
-.hugo-command-count {
-  font-size: 0.8em;
-  color: var(--text-muted);
+/* Info icon for stats */
+.hugo-command-info-icon {
+  cursor: pointer;
+  font-size: 0.9em;
+  opacity: 0.6;
   margin-left: auto;
+  transition: opacity 0.15s;
+}
+
+.hugo-command-info-icon:hover {
+  opacity: 1;
+}
+
+/* Info popup */
+.hugo-command-info-popup {
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  padding: 8px 12px;
+  min-width: 100px;
+  z-index: 1000;
+}
+
+.hugo-command-info-row {
+  font-size: 0.85em;
+  color: var(--text-normal);
+  padding: 2px 0;
+}
+
+.hugo-command-info-row.total {
+  font-weight: 500;
+  border-top: 1px solid var(--background-modifier-border);
+  margin-top: 4px;
+  padding-top: 6px;
 }
 
 /* Tag dropdown */
@@ -394,19 +470,102 @@
   padding-left: 8px;
 }
 
-/* Folder tag trigger button */
-.hugo-command-folder-tag-trigger {
+/* Folder filter trigger button (SVG icon) - deprecated, use .hugo-command-filter-trigger */
+.hugo-command-folder-trigger {
   cursor: pointer;
-  font-size: 0.85em;
-  opacity: 0.85;
-  padding: 2px 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.7;
+  padding: 4px;
   border-radius: 4px;
   transition: opacity 0.15s, background-color 0.15s;
+  color: var(--text-muted);
 }
 
-.hugo-command-folder-tag-trigger:hover {
+.hugo-command-folder-trigger:hover {
   opacity: 1;
   background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.hugo-command-folder-trigger svg {
+  display: block;
+}
+
+/* Search field container */
+.hugo-command-search-container {
+  flex: 1;
+  min-width: 100px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background-color: var(--background-primary);
+}
+
+.hugo-command-search-container:focus-within {
+  border-color: var(--interactive-accent);
+}
+
+/* Filter chips inside search field */
+.hugo-command-search-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.75em;
+  padding: 2px 6px;
+  background-color: var(--tag-background);
+  color: var(--tag-color);
+  border-radius: 3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.hugo-command-search-chip.folder-chip {
+  background-color: var(--background-modifier-success);
+}
+
+.hugo-command-search-chip-clear {
+  cursor: pointer;
+  opacity: 0.7;
+  font-weight: bold;
+  margin-left: 2px;
+}
+
+.hugo-command-search-chip-clear:hover {
+  opacity: 1;
+}
+
+/* Search input */
+.hugo-command-search-input {
+  flex: 1;
+  min-width: 40px;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 0.85em;
+  color: var(--text-normal);
+}
+
+.hugo-command-search-input::placeholder {
+  color: var(--text-muted);
+}
+
+/* Clear all button in search */
+.hugo-command-search-clear {
+  cursor: pointer;
+  color: var(--text-muted);
+  opacity: 0.6;
+  font-size: 0.9em;
+  flex-shrink: 0;
+}
+
+.hugo-command-search-clear:hover {
+  opacity: 1;
+  color: var(--text-normal);
 }
 
 /* Folder tag styling in dropdowns */
@@ -414,15 +573,25 @@
   color: var(--text-accent);
 }
 
-.hugo-command-tag-item.folder-tag::before {
-  content: "📁 ";
-  font-size: 0.85em;
+/* Hierarchical folder indentation */
+.hugo-command-tag-item.folder-depth-0 {
+  padding-left: 12px;
 }
 
-/* Active folder tag in filter bar */
-.hugo-command-active-tag.folder-tag {
-  background-color: var(--background-modifier-success);
-  color: var(--text-on-accent);
+.hugo-command-tag-item.folder-depth-1 {
+  padding-left: 24px;
+}
+
+.hugo-command-tag-item.folder-depth-2 {
+  padding-left: 36px;
+}
+
+.hugo-command-tag-item.folder-depth-3 {
+  padding-left: 48px;
+}
+
+.hugo-command-tag-item.folder-depth-4 {
+  padding-left: 60px;
 }
 
 /* Tag section headers in dropdowns */

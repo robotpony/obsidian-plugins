@@ -11,9 +11,11 @@ export class HugoSidebarView extends ItemView {
   private updateListener: (() => void) | null = null;
   private activeTagFilter: string | null = null;
   private activeFolderTagFilter: string | null = null;
-  private activeStatusFilter: StatusFilter = "all";
+  private activeStatusFilter: StatusFilter;
+  private searchQuery: string = "";
   private collapsedFolders: Set<string> = new Set();
   private openDropdown: HTMLElement | null = null;
+  private openInfoPopup: HTMLElement | null = null;
   private onShowAbout: () => void;
   private onOpenSettings: () => void;
 
@@ -27,6 +29,7 @@ export class HugoSidebarView extends ItemView {
     super(leaf);
     this.scanner = scanner;
     this.settings = settings;
+    this.activeStatusFilter = settings.defaultStatusFilter;
     this.onShowAbout = onShowAbout;
     this.onOpenSettings = onOpenSettings;
   }
@@ -61,12 +64,20 @@ export class HugoSidebarView extends ItemView {
       this.updateListener = null;
     }
     this.closeDropdown();
+    this.closeInfoPopup();
   }
 
   private closeDropdown(): void {
     if (this.openDropdown) {
       this.openDropdown.remove();
       this.openDropdown = null;
+    }
+  }
+
+  private closeInfoPopup(): void {
+    if (this.openInfoPopup) {
+      this.openInfoPopup.remove();
+      this.openInfoPopup = null;
     }
   }
 
@@ -142,6 +153,26 @@ export class HugoSidebarView extends ItemView {
   private renderFilters(container: HTMLElement): void {
     const filterBar = container.createEl("div", { cls: "hugo-command-filters" });
 
+    // "Filter:" label at the start
+    filterBar.createEl("span", {
+      cls: "hugo-command-filter-prefix",
+      text: "",
+    });
+
+    // Order: Folder → Tags → Status
+
+    // Folder filter button
+    const folderHierarchy = this.scanner.getFolderHierarchy();
+    if (folderHierarchy.length > 0) {
+      this.renderFolderFilterButton(filterBar, folderHierarchy);
+    }
+
+    // Tag filter button (frontmatter tags)
+    const allTags = this.scanner.getAllTags();
+    if (allTags.length > 0) {
+      this.renderTagFilterButton(filterBar, allTags);
+    }
+
     // Status filter dropdown
     const statusSelect = filterBar.createEl("select", {
       cls: "hugo-command-status-filter",
@@ -168,58 +199,133 @@ export class HugoSidebarView extends ItemView {
       this.render();
     });
 
-    // Tag filter button (frontmatter tags)
-    const allTags = this.scanner.getAllTags();
-    if (allTags.length > 0) {
-      this.renderTagFilterButton(filterBar, allTags);
-    }
+    // Search field with embedded filter chips
+    this.renderSearchField(filterBar);
 
-    // Folder tag filter button
-    const allFolderTags = this.scanner.getAllFolderTags();
-    if (allFolderTags.length > 0) {
-      this.renderFolderTagFilterButton(filterBar, allFolderTags);
-    }
+    // Info icon for count display (pushed to right)
+    const counts = this.scanner.getCount();
+    const infoIcon = filterBar.createEl("span", {
+      cls: "hugo-command-info-icon",
+      text: "\u24d8",
+      attr: { "aria-label": "Content stats" },
+    });
 
-    // Show active tag filter
-    if (this.activeTagFilter) {
-      const activeTag = filterBar.createEl("span", {
-        cls: "hugo-command-active-tag",
-        text: this.activeTagFilter,
+    infoIcon.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.closeInfoPopup();
+      this.closeDropdown();
+
+      const popup = document.createElement("div");
+      popup.className = "hugo-command-info-popup";
+
+      const rect = infoIcon.getBoundingClientRect();
+      popup.style.position = "fixed";
+      popup.style.top = `${rect.bottom + 4}px`;
+      popup.style.right = `${window.innerWidth - rect.right}px`;
+
+      popup.createEl("div", {
+        cls: "hugo-command-info-row",
+        text: `${counts.published} published`,
+      });
+      popup.createEl("div", {
+        cls: "hugo-command-info-row",
+        text: `${counts.drafts} drafts`,
+      });
+      popup.createEl("div", {
+        cls: "hugo-command-info-row total",
+        text: `${counts.total} total`,
       });
 
-      const clearBtn = activeTag.createEl("span", {
-        cls: "hugo-command-clear-tag",
-        text: "\u00d7",
-      });
-      clearBtn.addEventListener("click", () => {
-        this.activeTagFilter = null;
-        this.render();
-      });
-    }
+      document.body.appendChild(popup);
+      this.openInfoPopup = popup;
 
-    // Show active folder tag filter
+      const closeHandler = (e: MouseEvent) => {
+        if (!popup.contains(e.target as Node) && e.target !== infoIcon) {
+          this.closeInfoPopup();
+          document.removeEventListener("click", closeHandler);
+        }
+      };
+      setTimeout(() => document.addEventListener("click", closeHandler), 0);
+    });
+  }
+
+  private renderSearchField(container: HTMLElement): void {
+    const searchContainer = container.createEl("div", {
+      cls: "hugo-command-search-container",
+    });
+
+    // Show active folder filter as chip inside search
     if (this.activeFolderTagFilter) {
-      const activeFolderTag = filterBar.createEl("span", {
-        cls: "hugo-command-active-tag folder-tag",
-        text: this.activeFolderTagFilter,
+      const chip = searchContainer.createEl("span", {
+        cls: "hugo-command-search-chip folder-chip",
       });
-
-      const clearBtn = activeFolderTag.createEl("span", {
-        cls: "hugo-command-clear-tag",
+      chip.createEl("span", { text: this.activeFolderTagFilter });
+      const clearBtn = chip.createEl("span", {
+        cls: "hugo-command-search-chip-clear",
         text: "\u00d7",
       });
-      clearBtn.addEventListener("click", () => {
+      clearBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
         this.activeFolderTagFilter = null;
         this.render();
       });
     }
 
-    // Count display
-    const counts = this.scanner.getCount();
-    filterBar.createEl("span", {
-      cls: "hugo-command-count",
-      text: `${counts.published} published, ${counts.drafts} drafts`,
+    // Show active tag filter as chip inside search
+    if (this.activeTagFilter) {
+      const chip = searchContainer.createEl("span", {
+        cls: "hugo-command-search-chip",
+      });
+      chip.createEl("span", { text: this.activeTagFilter });
+      const clearBtn = chip.createEl("span", {
+        cls: "hugo-command-search-chip-clear",
+        text: "\u00d7",
+      });
+      clearBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.activeTagFilter = null;
+        this.render();
+      });
+    }
+
+    // Search input
+    const searchInput = searchContainer.createEl("input", {
+      cls: "hugo-command-search-input",
+      attr: {
+        type: "text",
+        placeholder: "Search...",
+      },
     });
+    searchInput.value = this.searchQuery;
+
+    searchInput.addEventListener("input", () => {
+      this.searchQuery = searchInput.value;
+      this.render();
+    });
+
+    // Restore focus after render if there was a search query
+    if (this.searchQuery) {
+      setTimeout(() => {
+        searchInput.focus();
+        searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+      }, 0);
+    }
+
+    // Clear all button (only show if there's something to clear)
+    const hasFilters = this.activeTagFilter || this.activeFolderTagFilter || this.searchQuery;
+    if (hasFilters) {
+      const clearAll = searchContainer.createEl("span", {
+        cls: "hugo-command-search-clear",
+        text: "\u00d7",
+      });
+      clearAll.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.activeTagFilter = null;
+        this.activeFolderTagFilter = null;
+        this.searchQuery = "";
+        this.render();
+      });
+    }
   }
 
   private renderTagFilterButton(
@@ -227,9 +333,10 @@ export class HugoSidebarView extends ItemView {
     allTags: string[]
   ): void {
     const trigger = container.createEl("span", {
-      cls: "hugo-command-tag-trigger",
-      text: "#",
+      cls: "hugo-command-filter-trigger",
     });
+    // Tag icon SVG
+    trigger.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg><span>Tags</span>';
 
     trigger.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -288,14 +395,15 @@ export class HugoSidebarView extends ItemView {
     });
   }
 
-  private renderFolderTagFilterButton(
+  private renderFolderFilterButton(
     container: HTMLElement,
-    allFolderTags: string[]
+    folderHierarchy: { name: string; path: string; depth: number }[]
   ): void {
     const trigger = container.createEl("span", {
-      cls: "hugo-command-folder-tag-trigger",
-      text: "\ud83d\udcc1",
+      cls: "hugo-command-filter-trigger",
     });
+    // SVG folder icon with label
+    trigger.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg><span>Folder</span>';
 
     trigger.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -309,19 +417,20 @@ export class HugoSidebarView extends ItemView {
       dropdown.style.top = `${rect.bottom + 4}px`;
       dropdown.style.left = `${rect.left}px`;
 
-      for (const tag of allFolderTags) {
-        const tagItem = dropdown.createEl("div", {
-          cls: "hugo-command-tag-item folder-tag",
-          text: tag,
+      for (const folder of folderHierarchy) {
+        const depthClass = `folder-depth-${Math.min(folder.depth, 4)}`;
+        const folderItem = dropdown.createEl("div", {
+          cls: `hugo-command-tag-item folder-tag ${depthClass}`,
+          text: folder.name,
         });
 
-        if (tag === this.activeFolderTagFilter) {
-          tagItem.addClass("active");
+        if (folder.path === this.activeFolderTagFilter) {
+          folderItem.addClass("active");
         }
 
-        tagItem.addEventListener("click", (e) => {
+        folderItem.addEventListener("click", (e) => {
           e.stopPropagation();
-          this.activeFolderTagFilter = tag === this.activeFolderTagFilter ? null : tag;
+          this.activeFolderTagFilter = folder.path === this.activeFolderTagFilter ? null : folder.path;
           this.closeDropdown();
           this.render();
         });
@@ -373,11 +482,38 @@ export class HugoSidebarView extends ItemView {
       );
     }
 
-    // Apply folder tag filter
+    // Apply folder filter (matches full folder path or any subfolder)
     if (this.activeFolderTagFilter) {
-      items = items.filter((item) =>
-        item.folderTags.includes(this.activeFolderTagFilter!)
-      );
+      items = items.filter((item) => {
+        // Build the item's full folder path
+        const itemPath = item.topLevelFolder === "(root)"
+          ? ""
+          : item.folderTags.length > 0
+            ? `${item.topLevelFolder}/${item.folderTags.join("/")}`
+            : item.topLevelFolder;
+
+        // Match if item is in the selected folder or any subfolder
+        return (
+          itemPath === this.activeFolderTagFilter ||
+          itemPath.startsWith(this.activeFolderTagFilter + "/")
+        );
+      });
+    }
+
+    // Apply search query filter (title, tags, description)
+    if (this.searchQuery.trim()) {
+      const query = this.searchQuery.toLowerCase().trim();
+      items = items.filter((item) => {
+        // Search in title
+        if (item.title.toLowerCase().includes(query)) return true;
+        // Search in tags
+        if (item.tags.some((tag) => tag.toLowerCase().includes(query))) return true;
+        // Search in categories
+        if (item.categories.some((cat) => cat.toLowerCase().includes(query))) return true;
+        // Search in description
+        if (item.description && item.description.toLowerCase().includes(query)) return true;
+        return false;
+      });
     }
 
     // Apply drafts visibility from settings
@@ -483,19 +619,19 @@ export class HugoSidebarView extends ItemView {
       openFile(this.app, item.file);
     });
 
-    // Date
-    if (item.date) {
-      listItem.createEl("span", {
-        cls: "hugo-command-item-date",
-        text: formatDate(item.date),
-      });
-    }
-
     // Tags dropdown (if has any tags - frontmatter or folder)
     const frontmatterTags = [...item.tags, ...item.categories];
     const folderTags = item.folderTags;
     if (frontmatterTags.length > 0 || folderTags.length > 0) {
       this.renderItemTagDropdown(listItem, frontmatterTags, folderTags);
+    }
+
+    // Date (rightmost)
+    if (item.date) {
+      listItem.createEl("span", {
+        cls: "hugo-command-item-date",
+        text: formatDate(item.date),
+      });
     }
   }
 

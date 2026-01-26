@@ -63,14 +63,15 @@ function parseHugoDate(dateStr) {
   }
   return date;
 }
-function formatDate(date, format = "YYYY-MM-DD") {
+function formatDate(date) {
   if (!date) {
     return "";
   }
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const month = months[date.getMonth()];
   const day = String(date.getDate()).padStart(2, "0");
-  return format.replace("YYYY", String(year)).replace("MM", month).replace("DD", day);
+  const year = date.getFullYear();
+  return `${month}-${day}-${year}`;
 }
 function normalizeTags(tags) {
   if (!tags) {
@@ -324,6 +325,50 @@ var HugoScanner = class extends import_obsidian2.Events {
     return Array.from(tagSet).sort((a, b) => a.localeCompare(b));
   }
   /**
+   * Get all unique folders (top-level + subfolder tags) for filtering
+   */
+  getAllFolders() {
+    const folderSet = /* @__PURE__ */ new Set();
+    for (const item of this.contentCache.values()) {
+      if (item.topLevelFolder !== "(root)") {
+        folderSet.add(item.topLevelFolder);
+      }
+      for (const tag of item.folderTags) {
+        folderSet.add(tag);
+      }
+    }
+    return Array.from(folderSet).sort((a, b) => a.localeCompare(b));
+  }
+  /**
+   * Get folder hierarchy as a flat list with depth for display
+   * Returns folders with their full path and nesting depth
+   */
+  getFolderHierarchy() {
+    const pathSet = /* @__PURE__ */ new Set();
+    for (const item of this.contentCache.values()) {
+      if (item.topLevelFolder === "(root)")
+        continue;
+      let currentPath = item.topLevelFolder;
+      pathSet.add(currentPath);
+      for (const subFolder of item.folderTags) {
+        currentPath = `${currentPath}/${subFolder}`;
+        pathSet.add(currentPath);
+      }
+    }
+    const paths = Array.from(pathSet).sort((a, b) => a.localeCompare(b));
+    return paths.map((path) => {
+      const parts = path.split("/");
+      return {
+        name: parts[parts.length - 1],
+        // Just the folder name
+        path,
+        // Full path for filtering
+        depth: parts.length - 1
+        // 0 for top-level, 1 for first sublevel, etc.
+      };
+    });
+  }
+  /**
    * Get all unique top-level folders
    */
   getTopLevelFolders() {
@@ -362,11 +407,13 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
     this.updateListener = null;
     this.activeTagFilter = null;
     this.activeFolderTagFilter = null;
-    this.activeStatusFilter = "all";
+    this.searchQuery = "";
     this.collapsedFolders = /* @__PURE__ */ new Set();
     this.openDropdown = null;
+    this.openInfoPopup = null;
     this.scanner = scanner;
     this.settings = settings;
+    this.activeStatusFilter = settings.defaultStatusFilter;
     this.onShowAbout = onShowAbout;
     this.onOpenSettings = onOpenSettings;
   }
@@ -395,11 +442,18 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
       this.updateListener = null;
     }
     this.closeDropdown();
+    this.closeInfoPopup();
   }
   closeDropdown() {
     if (this.openDropdown) {
       this.openDropdown.remove();
       this.openDropdown = null;
+    }
+  }
+  closeInfoPopup() {
+    if (this.openInfoPopup) {
+      this.openInfoPopup.remove();
+      this.openInfoPopup = null;
     }
   }
   render() {
@@ -447,6 +501,18 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
   }
   renderFilters(container) {
     const filterBar = container.createEl("div", { cls: "hugo-command-filters" });
+    filterBar.createEl("span", {
+      cls: "hugo-command-filter-prefix",
+      text: ""
+    });
+    const folderHierarchy = this.scanner.getFolderHierarchy();
+    if (folderHierarchy.length > 0) {
+      this.renderFolderFilterButton(filterBar, folderHierarchy);
+    }
+    const allTags = this.scanner.getAllTags();
+    if (allTags.length > 0) {
+      this.renderTagFilterButton(filterBar, allTags);
+    }
     const statusSelect = filterBar.createEl("select", {
       cls: "hugo-command-status-filter"
     });
@@ -468,53 +534,118 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
       this.activeStatusFilter = statusSelect.value;
       this.render();
     });
-    const allTags = this.scanner.getAllTags();
-    if (allTags.length > 0) {
-      this.renderTagFilterButton(filterBar, allTags);
-    }
-    const allFolderTags = this.scanner.getAllFolderTags();
-    if (allFolderTags.length > 0) {
-      this.renderFolderTagFilterButton(filterBar, allFolderTags);
-    }
-    if (this.activeTagFilter) {
-      const activeTag = filterBar.createEl("span", {
-        cls: "hugo-command-active-tag",
-        text: this.activeTagFilter
+    this.renderSearchField(filterBar);
+    const counts = this.scanner.getCount();
+    const infoIcon = filterBar.createEl("span", {
+      cls: "hugo-command-info-icon",
+      text: "\u24D8",
+      attr: { "aria-label": "Content stats" }
+    });
+    infoIcon.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.closeInfoPopup();
+      this.closeDropdown();
+      const popup = document.createElement("div");
+      popup.className = "hugo-command-info-popup";
+      const rect = infoIcon.getBoundingClientRect();
+      popup.style.position = "fixed";
+      popup.style.top = `${rect.bottom + 4}px`;
+      popup.style.right = `${window.innerWidth - rect.right}px`;
+      popup.createEl("div", {
+        cls: "hugo-command-info-row",
+        text: `${counts.published} published`
       });
-      const clearBtn = activeTag.createEl("span", {
-        cls: "hugo-command-clear-tag",
-        text: "\xD7"
+      popup.createEl("div", {
+        cls: "hugo-command-info-row",
+        text: `${counts.drafts} drafts`
       });
-      clearBtn.addEventListener("click", () => {
-        this.activeTagFilter = null;
-        this.render();
+      popup.createEl("div", {
+        cls: "hugo-command-info-row total",
+        text: `${counts.total} total`
       });
-    }
+      document.body.appendChild(popup);
+      this.openInfoPopup = popup;
+      const closeHandler = (e2) => {
+        if (!popup.contains(e2.target) && e2.target !== infoIcon) {
+          this.closeInfoPopup();
+          document.removeEventListener("click", closeHandler);
+        }
+      };
+      setTimeout(() => document.addEventListener("click", closeHandler), 0);
+    });
+  }
+  renderSearchField(container) {
+    const searchContainer = container.createEl("div", {
+      cls: "hugo-command-search-container"
+    });
     if (this.activeFolderTagFilter) {
-      const activeFolderTag = filterBar.createEl("span", {
-        cls: "hugo-command-active-tag folder-tag",
-        text: this.activeFolderTagFilter
+      const chip = searchContainer.createEl("span", {
+        cls: "hugo-command-search-chip folder-chip"
       });
-      const clearBtn = activeFolderTag.createEl("span", {
-        cls: "hugo-command-clear-tag",
+      chip.createEl("span", { text: this.activeFolderTagFilter });
+      const clearBtn = chip.createEl("span", {
+        cls: "hugo-command-search-chip-clear",
         text: "\xD7"
       });
-      clearBtn.addEventListener("click", () => {
+      clearBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
         this.activeFolderTagFilter = null;
         this.render();
       });
     }
-    const counts = this.scanner.getCount();
-    filterBar.createEl("span", {
-      cls: "hugo-command-count",
-      text: `${counts.published} published, ${counts.drafts} drafts`
+    if (this.activeTagFilter) {
+      const chip = searchContainer.createEl("span", {
+        cls: "hugo-command-search-chip"
+      });
+      chip.createEl("span", { text: this.activeTagFilter });
+      const clearBtn = chip.createEl("span", {
+        cls: "hugo-command-search-chip-clear",
+        text: "\xD7"
+      });
+      clearBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.activeTagFilter = null;
+        this.render();
+      });
+    }
+    const searchInput = searchContainer.createEl("input", {
+      cls: "hugo-command-search-input",
+      attr: {
+        type: "text",
+        placeholder: "Search..."
+      }
     });
+    searchInput.value = this.searchQuery;
+    searchInput.addEventListener("input", () => {
+      this.searchQuery = searchInput.value;
+      this.render();
+    });
+    if (this.searchQuery) {
+      setTimeout(() => {
+        searchInput.focus();
+        searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+      }, 0);
+    }
+    const hasFilters = this.activeTagFilter || this.activeFolderTagFilter || this.searchQuery;
+    if (hasFilters) {
+      const clearAll = searchContainer.createEl("span", {
+        cls: "hugo-command-search-clear",
+        text: "\xD7"
+      });
+      clearAll.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.activeTagFilter = null;
+        this.activeFolderTagFilter = null;
+        this.searchQuery = "";
+        this.render();
+      });
+    }
   }
   renderTagFilterButton(container, allTags) {
     const trigger = container.createEl("span", {
-      cls: "hugo-command-tag-trigger",
-      text: "#"
+      cls: "hugo-command-filter-trigger"
     });
+    trigger.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg><span>Tags</span>';
     trigger.addEventListener("click", (e) => {
       e.stopPropagation();
       this.closeDropdown();
@@ -563,11 +694,11 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
       setTimeout(() => document.addEventListener("click", closeHandler), 0);
     });
   }
-  renderFolderTagFilterButton(container, allFolderTags) {
+  renderFolderFilterButton(container, folderHierarchy) {
     const trigger = container.createEl("span", {
-      cls: "hugo-command-folder-tag-trigger",
-      text: "\u{1F4C1}"
+      cls: "hugo-command-filter-trigger"
     });
+    trigger.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg><span>Folder</span>';
     trigger.addEventListener("click", (e) => {
       e.stopPropagation();
       this.closeDropdown();
@@ -577,17 +708,18 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
       dropdown.style.position = "fixed";
       dropdown.style.top = `${rect.bottom + 4}px`;
       dropdown.style.left = `${rect.left}px`;
-      for (const tag of allFolderTags) {
-        const tagItem = dropdown.createEl("div", {
-          cls: "hugo-command-tag-item folder-tag",
-          text: tag
+      for (const folder of folderHierarchy) {
+        const depthClass = `folder-depth-${Math.min(folder.depth, 4)}`;
+        const folderItem = dropdown.createEl("div", {
+          cls: `hugo-command-tag-item folder-tag ${depthClass}`,
+          text: folder.name
         });
-        if (tag === this.activeFolderTagFilter) {
-          tagItem.addClass("active");
+        if (folder.path === this.activeFolderTagFilter) {
+          folderItem.addClass("active");
         }
-        tagItem.addEventListener("click", (e2) => {
+        folderItem.addEventListener("click", (e2) => {
           e2.stopPropagation();
-          this.activeFolderTagFilter = tag === this.activeFolderTagFilter ? null : tag;
+          this.activeFolderTagFilter = folder.path === this.activeFolderTagFilter ? null : folder.path;
           this.closeDropdown();
           this.render();
         });
@@ -629,9 +761,24 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
       );
     }
     if (this.activeFolderTagFilter) {
-      items = items.filter(
-        (item) => item.folderTags.includes(this.activeFolderTagFilter)
-      );
+      items = items.filter((item) => {
+        const itemPath = item.topLevelFolder === "(root)" ? "" : item.folderTags.length > 0 ? `${item.topLevelFolder}/${item.folderTags.join("/")}` : item.topLevelFolder;
+        return itemPath === this.activeFolderTagFilter || itemPath.startsWith(this.activeFolderTagFilter + "/");
+      });
+    }
+    if (this.searchQuery.trim()) {
+      const query = this.searchQuery.toLowerCase().trim();
+      items = items.filter((item) => {
+        if (item.title.toLowerCase().includes(query))
+          return true;
+        if (item.tags.some((tag) => tag.toLowerCase().includes(query)))
+          return true;
+        if (item.categories.some((cat) => cat.toLowerCase().includes(query)))
+          return true;
+        if (item.description && item.description.toLowerCase().includes(query))
+          return true;
+        return false;
+      });
     }
     if (!this.settings.showDrafts && this.activeStatusFilter === "all") {
       items = items.filter((item) => !item.isDraft);
@@ -708,16 +855,16 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
     title.addEventListener("click", () => {
       openFile(this.app, item.file);
     });
+    const frontmatterTags = [...item.tags, ...item.categories];
+    const folderTags = item.folderTags;
+    if (frontmatterTags.length > 0 || folderTags.length > 0) {
+      this.renderItemTagDropdown(listItem, frontmatterTags, folderTags);
+    }
     if (item.date) {
       listItem.createEl("span", {
         cls: "hugo-command-item-date",
         text: formatDate(item.date)
       });
-    }
-    const frontmatterTags = [...item.tags, ...item.categories];
-    const folderTags = item.folderTags;
-    if (frontmatterTags.length > 0 || folderTags.length > 0) {
-      this.renderItemTagDropdown(listItem, frontmatterTags, folderTags);
     }
   }
   renderItemTagDropdown(container, frontmatterTags, folderTags) {
@@ -818,7 +965,8 @@ var DEFAULT_SETTINGS = {
   contentPaths: ["."],
   showSidebarByDefault: true,
   showDrafts: true,
-  defaultSortOrder: "date-desc"
+  defaultSortOrder: "date-desc",
+  defaultStatusFilter: "draft"
 };
 
 // main.ts
@@ -1009,6 +1157,12 @@ var HugoCommandSettingTab = class extends import_obsidian4.PluginSettingTab {
     new import_obsidian4.Setting(containerEl).setName("Show drafts").setDesc("Include draft posts in the content list").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.showDrafts).onChange(async (value) => {
         this.plugin.settings.showDrafts = value;
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian4.Setting(containerEl).setName("Default status filter").setDesc("Which posts to show by default when opening the sidebar").addDropdown(
+      (dropdown) => dropdown.addOption("all", "All").addOption("published", "Published").addOption("draft", "Drafts").setValue(this.plugin.settings.defaultStatusFilter).onChange(async (value) => {
+        this.plugin.settings.defaultStatusFilter = value;
         await this.plugin.saveSettings();
       })
     );

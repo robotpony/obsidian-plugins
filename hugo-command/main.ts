@@ -14,6 +14,7 @@ import {
 import {
   HugoCommandSettings,
   DEFAULT_SETTINGS,
+  StatusFilter,
 } from "./src/types";
 import { showNotice, LOGO_PREFIX } from "./src/utils";
 
@@ -291,6 +292,21 @@ class HugoCommandSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.showDrafts)
           .onChange(async (value) => {
             this.plugin.settings.showDrafts = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Default status filter")
+      .setDesc("Which posts to show by default when opening the sidebar")
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOption("all", "All")
+          .addOption("published", "Published")
+          .addOption("draft", "Drafts")
+          .setValue(this.plugin.settings.defaultStatusFilter)
+          .onChange(async (value) => {
+            this.plugin.settings.defaultStatusFilter = value as StatusFilter;
             await this.plugin.saveSettings();
           })
       );

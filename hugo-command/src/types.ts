@@ -41,6 +41,7 @@ export interface HugoCommandSettings {
   showSidebarByDefault: boolean;
   showDrafts: boolean;
   defaultSortOrder: "date-desc" | "date-asc" | "title";
+  defaultStatusFilter: StatusFilter;
 }
 
 export const DEFAULT_SETTINGS: HugoCommandSettings = {
@@ -48,6 +49,7 @@ export const DEFAULT_SETTINGS: HugoCommandSettings = {
   showSidebarByDefault: true,
   showDrafts: true,
   defaultSortOrder: "date-desc",
+  defaultStatusFilter: "draft",
 };
 
 export type StatusFilter = "all" | "draft" | "published";

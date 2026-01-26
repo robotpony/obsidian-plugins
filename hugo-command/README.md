@@ -23,6 +23,7 @@ An Obsidian plugin for managing and browsing your Hugo content. View posts, draf
 ### Sidebar
 
 Open the Hugo sidebar using:
+
 - Click the file icon in the ribbon
 - Use the command palette: "Toggle Hugo Sidebar"
 - Keyboard shortcut: `Cmd/Ctrl + Shift + H`
@@ -30,9 +31,10 @@ Open the Hugo sidebar using:
 ### Filtering
 
 - **Status Filter**: Use the dropdown to show All, Published only, or Drafts only
-- **Tag Filter**: Click the `#` button to filter by frontmatter tags
-- **Folder Filter**: Click the `📁` button to filter by subfolder path
-- Click a tag or folder again to clear the filter
+- **Tag Filter**: Click `#tags` to filter by frontmatter tags
+- **Folder Filter**: Click the folder icon to filter by folder path
+- **Stats**: Click the ⓘ icon to see publish/draft counts
+- Active filters display with "Filter:" prefix and × to clear
 
 ### Folder Organization
 

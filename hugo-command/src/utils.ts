@@ -50,21 +50,19 @@ export function parseHugoDate(dateStr: string | undefined): Date | null {
 }
 
 /**
- * Format a date for display
+ * Format a date for display (e.g., "Jan-12-2025")
  */
-export function formatDate(date: Date | null, format: string = "YYYY-MM-DD"): string {
+export function formatDate(date: Date | null): string {
   if (!date) {
     return "";
   }
 
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const month = months[date.getMonth()];
   const day = String(date.getDate()).padStart(2, "0");
+  const year = date.getFullYear();
 
-  return format
-    .replace("YYYY", String(year))
-    .replace("MM", month)
-    .replace("DD", day);
+  return `${month}-${day}-${year}`;
 }
 
 /**
