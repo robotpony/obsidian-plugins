@@ -5,7 +5,9 @@
 Run the installer from the repo root:
 
 ```bash
-./install.sh
+./install.sh           # Interactive mode
+./install.sh -p        # Use previously selected vaults
+./install.sh --help    # Show help
 ```
 
 The installer will:
@@ -13,14 +15,18 @@ The installer will:
 2. Prompt you to select plugins (enter `0` for all, or specific numbers)
 3. Build selected plugins
 4. Find Obsidian vaults (searches `~/Documents`, `~/projects`, `~/writing`, `~/Desktop`, iCloud)
-5. Prompt you to select vaults (enter `0` for all, or reuse previous selection)
+5. Prompt you to select vaults (enter `0` for all)
 6. Copy plugin files (`main.js`, `manifest.json`, `styles.css`) to selected vaults
 
-**Quick options:**
-- Enter `0` at any prompt to select all items
-- Enter `all` to select all items
-- Enter space-separated numbers to select specific items (e.g., `1 3`)
-- Previous vault selections are cached in `.install-vaults` for quick reinstalls
+**Options:**
+- `-p, --previous` - Skip vault prompt, use previously selected vaults
+- `-h, --help` - Show help
+
+**Prompts:**
+- `0` - Select all items
+- `1 3` - Space-separated numbers for specific items
+
+Vault selections are cached in `.install-vaults` for use with `--previous`.
 
 Reload Obsidian after installing to activate changes.
 

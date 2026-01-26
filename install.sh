@@ -23,6 +23,21 @@ SPINNER_FRAMES=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
 # Global to return selections (avoiding subshell issues with read)
 typeset -ga SELECTED_ITEMS
 
+# Command line options
+USE_PREVIOUS_VAULTS=false
+
+show_help() {
+    echo "Usage: ./install.sh [options]"
+    echo ""
+    echo "Options:"
+    echo "  -p, --previous   Use previously selected vaults (skip vault prompt)"
+    echo "  -h, --help       Show this help message"
+    echo ""
+    echo "Interactive prompts:"
+    echo "  0        Select all items"
+    echo "  1 2 3    Space-separated numbers for specific items"
+}
+
 # --- Helper functions ---
 
 print_header() {
@@ -141,14 +156,11 @@ save_vaults_to_cache() {
 # --- Selection functions ---
 
 # Sets SELECTED_ITEMS global array with user selections
-# Args: prompt, has_cached ("true"/"false"), has_select_all ("true"/"false"), items...
+# Args: prompt, items...
 # Returns 0 on success, 1 if no items provided
-# Sets SELECTED_ITEMS=("CACHED") if user chose cached option
 select_items() {
     local prompt="$1"
-    local has_cached="$2"
-    local has_select_all="$3"
-    shift 3
+    shift
     local -a items=("$@")
     local count=${#items[@]}
 
@@ -158,38 +170,16 @@ select_items() {
         return 1
     fi
 
-    # Show option 0 for cached or select-all
-    if [[ "$has_cached" == "true" ]]; then
-        echo "  ${BOLD}0)${NC} ${CYAN}Use previous selection${NC}"
-    elif [[ "$has_select_all" == "true" ]]; then
-        echo "  ${BOLD}0)${NC} ${CYAN}All${NC}"
-    fi
-
+    echo "  ${BOLD}0)${NC} ${CYAN}All${NC}"
     for i in {1..$count}; do
         echo "  ${BOLD}$i)${NC} ${items[$i]}"
     done
 
     echo ""
-    local hint="space-separated numbers"
-    if [[ "$has_cached" == "true" ]]; then
-        hint="0 for previous, or $hint"
-    elif [[ "$has_select_all" == "true" ]]; then
-        hint="0 for all, or $hint"
-    fi
-    echo -n "$prompt ($hint, or ${BOLD}all${NC}): "
+    echo -n "$prompt (0 for all, or space-separated numbers): "
     read -r selection </dev/tty
 
-    # Handle option 0
-    if [[ "$selection" == "0" ]]; then
-        if [[ "$has_cached" == "true" ]]; then
-            SELECTED_ITEMS=("CACHED")
-        else
-            SELECTED_ITEMS=("${items[@]}")
-        fi
-        return 0
-    fi
-
-    if [[ "$selection" == "all" ]]; then
+    if [[ "$selection" == "0" || "$selection" == "all" ]]; then
         SELECTED_ITEMS=("${items[@]}")
     else
         for num in ${=selection}; do
@@ -204,9 +194,22 @@ select_items() {
 
 # --- Build and install functions ---
 
+# Display error output in a bordered block
+show_error_block() {
+    local title="$1"
+    local output="$2"
+    echo ""
+    echo "  ${RED}┌─ ${title} ─────────────────────────────────${NC}"
+    echo "$output" | while IFS= read -r line; do
+        echo "  ${RED}│${NC} $line"
+    done
+    echo "  ${RED}└────────────────────────────────────────────${NC}"
+}
+
 build_plugin() {
     local plugin_dir="$1"
     local plugin_name=$(basename "$plugin_dir")
+    local output
 
     echo -n "Building ${BOLD}$plugin_name${NC}... "
 
@@ -216,14 +219,16 @@ build_plugin() {
     fi
 
     if [[ ! -d "$plugin_dir/node_modules" ]]; then
-        (cd "$plugin_dir" && npm install --silent 2>/dev/null) || {
+        output=$( (cd "$plugin_dir" && npm install 2>&1) ) || {
             print_error "npm install failed"
+            show_error_block "npm install" "$output"
             return 1
         }
     fi
 
-    (cd "$plugin_dir" && npm run build --silent 2>/dev/null) || {
+    output=$( (cd "$plugin_dir" && npm run build 2>&1) ) || {
         print_error "Build failed"
+        show_error_block "npm run build" "$output"
         return 1
     }
 
@@ -258,6 +263,25 @@ install_plugin() {
 # --- Main ---
 
 main() {
+    # Parse command line arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -p|--previous)
+                USE_PREVIOUS_VAULTS=true
+                shift
+                ;;
+            -h|--help)
+                show_help
+                exit 0
+                ;;
+            *)
+                print_error "Unknown option: $1"
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+
     echo "${BOLD}${BLUE}Obsidian Plugin Installer${NC}"
 
     # Find plugins
@@ -278,7 +302,7 @@ main() {
     done
 
     print_header "Found ${#plugin_dirs[@]} plugins:"
-    select_items "Select plugins to install" "false" "true" "${plugin_names[@]}"
+    select_items "Select plugins to install" "${plugin_names[@]}"
     local -a selected_plugins=("${SELECTED_ITEMS[@]}")
 
     if [[ ${#selected_plugins[@]} -eq 0 ]]; then
@@ -303,40 +327,46 @@ main() {
         build_plugin "$plugin_dir" || exit 1
     done
 
-    # Check for cached vaults
-    local -a cached_vaults
-    local has_cached="false"
-    while IFS= read -r line; do
-        [[ -n "$line" ]] && cached_vaults+=("$line")
-    done < <(load_cached_vaults 2>/dev/null)
-    [[ ${#cached_vaults[@]} -gt 0 ]] && has_cached="true"
-
-    # Find vaults
-    print_header "Discovering Obsidian vaults..."
-    local -a vault_dirs
-    while IFS= read -r line; do
-        [[ -n "$line" ]] && vault_dirs+=("$line")
-    done < <(find_vaults)
-
-    if [[ ${#vault_dirs[@]} -eq 0 ]]; then
-        print_error "No Obsidian vaults found"
-        print_warn "Searched: ~/Documents, ~/Desktop, ~/projects, ~/writing, ~, iCloud"
-        exit 1
-    fi
-
-    local -a vault_names
-    for dir in "${vault_dirs[@]}"; do
-        vault_names+=("${dir/#$HOME/~}")
-    done
-
-    print_header "Found ${#vault_dirs[@]} vaults:"
-    select_items "Select vaults" "$has_cached" "true" "${vault_names[@]}"
-
+    # Handle vaults
     local -a vaults_to_install
-    if [[ "${SELECTED_ITEMS[1]}" == "CACHED" ]]; then
-        vaults_to_install=("${cached_vaults[@]}")
-        echo "  Using ${#cached_vaults[@]} previously selected vaults"
+
+    if [[ "$USE_PREVIOUS_VAULTS" == "true" ]]; then
+        # Use cached vaults from --previous flag
+        while IFS= read -r line; do
+            [[ -n "$line" ]] && vaults_to_install+=("$line")
+        done < <(load_cached_vaults 2>/dev/null)
+
+        if [[ ${#vaults_to_install[@]} -eq 0 ]]; then
+            print_error "No cached vaults found. Run without --previous first."
+            exit 1
+        fi
+
+        print_header "Using ${#vaults_to_install[@]} cached vaults:"
+        for vault in "${vaults_to_install[@]}"; do
+            echo "  ${vault/#$HOME/~}"
+        done
     else
+        # Discover and prompt for vaults
+        print_header "Discovering Obsidian vaults..."
+        local -a vault_dirs
+        while IFS= read -r line; do
+            [[ -n "$line" ]] && vault_dirs+=("$line")
+        done < <(find_vaults)
+
+        if [[ ${#vault_dirs[@]} -eq 0 ]]; then
+            print_error "No Obsidian vaults found"
+            print_warn "Searched: ~/Documents, ~/Desktop, ~/projects, ~/writing, ~, iCloud"
+            exit 1
+        fi
+
+        local -a vault_names
+        for dir in "${vault_dirs[@]}"; do
+            vault_names+=("${dir/#$HOME/~}")
+        done
+
+        print_header "Found ${#vault_dirs[@]} vaults:"
+        select_items "Select vaults" "${vault_names[@]}"
+
         # Map selected names back to full paths
         for selected in "${SELECTED_ITEMS[@]}"; do
             for i in {1..${#vault_names[@]}}; do
@@ -346,6 +376,7 @@ main() {
                 fi
             done
         done
+
         # Save selection for next time
         [[ ${#vaults_to_install[@]} -gt 0 ]] && save_vaults_to_cache "${vaults_to_install[@]}"
     fi

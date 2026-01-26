@@ -129,7 +129,9 @@ Add an explicit project tag to override. Files outside the projects folder don't
 
 ## Installation
 
-Copy to `.obsidian/plugins/space-command/`, run `npm install && npm run build`, enable in Settings.
+From the repo root, run `./install.sh` and follow the prompts to select vaults.
+
+Or manually: copy `main.js`, `manifest.json`, and `styles.css` to `.obsidian/plugins/space-command/` in your vault, then enable in Settings.
 
 ## License
 

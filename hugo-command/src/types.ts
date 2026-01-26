@@ -28,6 +28,9 @@ export interface HugoContentItem {
   tags: string[];
   categories: string[];
   description: string;
+  // Folder organization
+  topLevelFolder: string;
+  folderTags: string[];
 }
 
 /**

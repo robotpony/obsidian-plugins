@@ -103,6 +103,34 @@ function getTitleFromItem(frontmatter, filePath) {
   const filename = lastSlash === -1 ? filePath : filePath.substring(lastSlash + 1);
   return filename.replace(/\.md$/, "");
 }
+function getRelativePath(filePath, contentPaths) {
+  for (const contentPath of contentPaths) {
+    const normalized = contentPath.trim().replace(/\/$/, "");
+    if (normalized === "." || normalized === "/" || normalized === "") {
+      return filePath;
+    }
+    if (filePath.startsWith(normalized + "/")) {
+      return filePath.substring(normalized.length + 1);
+    }
+  }
+  return filePath;
+}
+function getTopLevelFolder(filePath, contentPaths) {
+  const relativePath = getRelativePath(filePath, contentPaths);
+  const parts = relativePath.split("/");
+  if (parts.length <= 1) {
+    return "(root)";
+  }
+  return parts[0];
+}
+function getSubfolderTags(filePath, contentPaths) {
+  const relativePath = getRelativePath(filePath, contentPaths);
+  const parts = relativePath.split("/");
+  if (parts.length <= 2) {
+    return [];
+  }
+  return parts.slice(1, parts.length - 1);
+}
 
 // src/HugoScanner.ts
 var HugoScanner = class extends import_obsidian2.Events {
@@ -189,7 +217,9 @@ var HugoScanner = class extends import_obsidian2.Events {
       isDraft: frontmatter.draft === true,
       tags,
       categories,
-      description: typeof frontmatter.description === "string" ? frontmatter.description : ""
+      description: typeof frontmatter.description === "string" ? frontmatter.description : "",
+      topLevelFolder: getTopLevelFolder(file.path, this.contentPaths),
+      folderTags: getSubfolderTags(file.path, this.contentPaths)
     };
   }
   /**
@@ -282,6 +312,34 @@ var HugoScanner = class extends import_obsidian2.Events {
     return Array.from(tagSet).sort((a, b) => a.localeCompare(b));
   }
   /**
+   * Get all unique folder tags across all content
+   */
+  getAllFolderTags() {
+    const tagSet = /* @__PURE__ */ new Set();
+    for (const item of this.contentCache.values()) {
+      for (const tag of item.folderTags) {
+        tagSet.add(tag);
+      }
+    }
+    return Array.from(tagSet).sort((a, b) => a.localeCompare(b));
+  }
+  /**
+   * Get all unique top-level folders
+   */
+  getTopLevelFolders() {
+    const folderSet = /* @__PURE__ */ new Set();
+    for (const item of this.contentCache.values()) {
+      folderSet.add(item.topLevelFolder);
+    }
+    return Array.from(folderSet).sort((a, b) => {
+      if (a === "(root)")
+        return 1;
+      if (b === "(root)")
+        return -1;
+      return a.localeCompare(b);
+    });
+  }
+  /**
    * Get content count
    */
   getCount() {
@@ -303,7 +361,9 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
     super(leaf);
     this.updateListener = null;
     this.activeTagFilter = null;
+    this.activeFolderTagFilter = null;
     this.activeStatusFilter = "all";
+    this.collapsedFolders = /* @__PURE__ */ new Set();
     this.openDropdown = null;
     this.scanner = scanner;
     this.settings = settings;
@@ -412,6 +472,10 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
     if (allTags.length > 0) {
       this.renderTagFilterButton(filterBar, allTags);
     }
+    const allFolderTags = this.scanner.getAllFolderTags();
+    if (allFolderTags.length > 0) {
+      this.renderFolderTagFilterButton(filterBar, allFolderTags);
+    }
     if (this.activeTagFilter) {
       const activeTag = filterBar.createEl("span", {
         cls: "hugo-command-active-tag",
@@ -423,6 +487,20 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
       });
       clearBtn.addEventListener("click", () => {
         this.activeTagFilter = null;
+        this.render();
+      });
+    }
+    if (this.activeFolderTagFilter) {
+      const activeFolderTag = filterBar.createEl("span", {
+        cls: "hugo-command-active-tag folder-tag",
+        text: this.activeFolderTagFilter
+      });
+      const clearBtn = activeFolderTag.createEl("span", {
+        cls: "hugo-command-clear-tag",
+        text: "\xD7"
+      });
+      clearBtn.addEventListener("click", () => {
+        this.activeFolderTagFilter = null;
         this.render();
       });
     }
@@ -485,8 +563,60 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
       setTimeout(() => document.addEventListener("click", closeHandler), 0);
     });
   }
+  renderFolderTagFilterButton(container, allFolderTags) {
+    const trigger = container.createEl("span", {
+      cls: "hugo-command-folder-tag-trigger",
+      text: "\u{1F4C1}"
+    });
+    trigger.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.closeDropdown();
+      const dropdown = document.createElement("div");
+      dropdown.className = "hugo-command-tag-dropdown";
+      const rect = trigger.getBoundingClientRect();
+      dropdown.style.position = "fixed";
+      dropdown.style.top = `${rect.bottom + 4}px`;
+      dropdown.style.left = `${rect.left}px`;
+      for (const tag of allFolderTags) {
+        const tagItem = dropdown.createEl("div", {
+          cls: "hugo-command-tag-item folder-tag",
+          text: tag
+        });
+        if (tag === this.activeFolderTagFilter) {
+          tagItem.addClass("active");
+        }
+        tagItem.addEventListener("click", (e2) => {
+          e2.stopPropagation();
+          this.activeFolderTagFilter = tag === this.activeFolderTagFilter ? null : tag;
+          this.closeDropdown();
+          this.render();
+        });
+      }
+      if (this.activeFolderTagFilter) {
+        dropdown.createEl("div", { cls: "hugo-command-tag-separator" });
+        const clearItem = dropdown.createEl("div", {
+          cls: "hugo-command-tag-item clear",
+          text: "Clear filter"
+        });
+        clearItem.addEventListener("click", (e2) => {
+          e2.stopPropagation();
+          this.activeFolderTagFilter = null;
+          this.closeDropdown();
+          this.render();
+        });
+      }
+      document.body.appendChild(dropdown);
+      this.openDropdown = dropdown;
+      const closeHandler = (e2) => {
+        if (!dropdown.contains(e2.target) && e2.target !== trigger) {
+          this.closeDropdown();
+          document.removeEventListener("click", closeHandler);
+        }
+      };
+      setTimeout(() => document.addEventListener("click", closeHandler), 0);
+    });
+  }
   renderContentList(container) {
-    const list = container.createEl("ul", { cls: "hugo-command-list" });
     let items = this.scanner.getContentSorted(this.settings.defaultSortOrder);
     if (this.activeStatusFilter === "draft") {
       items = items.filter((item) => item.isDraft);
@@ -498,18 +628,70 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
         (item) => item.tags.includes(this.activeTagFilter) || item.categories.includes(this.activeTagFilter)
       );
     }
+    if (this.activeFolderTagFilter) {
+      items = items.filter(
+        (item) => item.folderTags.includes(this.activeFolderTagFilter)
+      );
+    }
     if (!this.settings.showDrafts && this.activeStatusFilter === "all") {
       items = items.filter((item) => !item.isDraft);
     }
     if (items.length === 0) {
-      list.createEl("li", {
+      const emptyDiv = container.createEl("div", {
         cls: "hugo-command-empty",
         text: "No content found"
       });
       return;
     }
+    const folders = this.scanner.getTopLevelFolders();
+    const groupedItems = /* @__PURE__ */ new Map();
+    for (const folder of folders) {
+      groupedItems.set(folder, []);
+    }
     for (const item of items) {
-      this.renderContentItem(list, item);
+      const folderItems = groupedItems.get(item.topLevelFolder);
+      if (folderItems) {
+        folderItems.push(item);
+      }
+    }
+    for (const folder of folders) {
+      const folderItems = groupedItems.get(folder) || [];
+      if (folderItems.length === 0)
+        continue;
+      this.renderFolderGroup(container, folder, folderItems);
+    }
+  }
+  renderFolderGroup(container, folder, items) {
+    const group = container.createEl("div", { cls: "hugo-command-folder-group" });
+    const isCollapsed = this.collapsedFolders.has(folder);
+    const header = group.createEl("div", {
+      cls: `hugo-command-folder-header ${isCollapsed ? "collapsed" : ""}`
+    });
+    const chevron = header.createEl("span", {
+      cls: "hugo-command-folder-chevron",
+      text: isCollapsed ? "\u25B8" : "\u25BE"
+    });
+    header.createEl("span", {
+      cls: "hugo-command-folder-name",
+      text: folder
+    });
+    header.createEl("span", {
+      cls: "hugo-command-folder-count",
+      text: `(${items.length})`
+    });
+    header.addEventListener("click", () => {
+      if (this.collapsedFolders.has(folder)) {
+        this.collapsedFolders.delete(folder);
+      } else {
+        this.collapsedFolders.add(folder);
+      }
+      this.render();
+    });
+    if (!isCollapsed) {
+      const list = group.createEl("ul", { cls: "hugo-command-list" });
+      for (const item of items) {
+        this.renderContentItem(list, item);
+      }
     }
   }
   renderContentItem(list, item) {
@@ -532,12 +714,13 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
         text: formatDate(item.date)
       });
     }
-    const allItemTags = [...item.tags, ...item.categories];
-    if (allItemTags.length > 0) {
-      this.renderItemTagDropdown(listItem, allItemTags);
+    const frontmatterTags = [...item.tags, ...item.categories];
+    const folderTags = item.folderTags;
+    if (frontmatterTags.length > 0 || folderTags.length > 0) {
+      this.renderItemTagDropdown(listItem, frontmatterTags, folderTags);
     }
   }
-  renderItemTagDropdown(container, tags) {
+  renderItemTagDropdown(container, frontmatterTags, folderTags) {
     const trigger = container.createEl("span", {
       cls: "hugo-command-item-tag-trigger",
       text: "#"
@@ -557,24 +740,58 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
       } else {
         dropdown.style.left = `${rect.left}px`;
       }
-      for (const tag of tags) {
-        const tagItem = dropdown.createEl("div", {
-          cls: "hugo-command-tag-item"
+      if (folderTags.length > 0) {
+        dropdown.createEl("div", {
+          cls: "hugo-command-tag-section-header",
+          text: "Folders"
         });
-        tagItem.createEl("span", {
-          cls: "hugo-command-tag-label",
-          text: tag
+        for (const tag of folderTags) {
+          const tagItem = dropdown.createEl("div", {
+            cls: "hugo-command-tag-item folder-tag"
+          });
+          tagItem.createEl("span", {
+            cls: "hugo-command-tag-label",
+            text: tag
+          });
+          const filterBtn = tagItem.createEl("span", {
+            cls: "hugo-command-tag-action",
+            text: "Filter"
+          });
+          filterBtn.addEventListener("click", (e2) => {
+            e2.stopPropagation();
+            this.activeFolderTagFilter = tag;
+            this.closeDropdown();
+            this.render();
+          });
+        }
+      }
+      if (frontmatterTags.length > 0) {
+        if (folderTags.length > 0) {
+          dropdown.createEl("div", { cls: "hugo-command-tag-separator" });
+        }
+        dropdown.createEl("div", {
+          cls: "hugo-command-tag-section-header",
+          text: "Tags"
         });
-        const filterBtn = tagItem.createEl("span", {
-          cls: "hugo-command-tag-action",
-          text: "Filter"
-        });
-        filterBtn.addEventListener("click", (e2) => {
-          e2.stopPropagation();
-          this.activeTagFilter = tag;
-          this.closeDropdown();
-          this.render();
-        });
+        for (const tag of frontmatterTags) {
+          const tagItem = dropdown.createEl("div", {
+            cls: "hugo-command-tag-item"
+          });
+          tagItem.createEl("span", {
+            cls: "hugo-command-tag-label",
+            text: tag
+          });
+          const filterBtn = tagItem.createEl("span", {
+            cls: "hugo-command-tag-action",
+            text: "Filter"
+          });
+          filterBtn.addEventListener("click", (e2) => {
+            e2.stopPropagation();
+            this.activeTagFilter = tag;
+            this.closeDropdown();
+            this.render();
+          });
+        }
       }
       document.body.appendChild(dropdown);
       this.openDropdown = dropdown;

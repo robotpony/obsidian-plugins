@@ -351,3 +351,86 @@
   padding: 20px 0;
   text-align: center;
 }
+
+/* Folder groups */
+.hugo-command-folder-group {
+  margin-bottom: 8px;
+}
+
+.hugo-command-folder-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 4px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.1s;
+  user-select: none;
+}
+
+.hugo-command-folder-header:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.hugo-command-folder-chevron {
+  font-size: 0.8em;
+  width: 12px;
+  color: var(--text-muted);
+}
+
+.hugo-command-folder-name {
+  font-weight: 500;
+  flex: 1;
+}
+
+.hugo-command-folder-count {
+  font-size: 0.8em;
+  color: var(--text-muted);
+}
+
+.hugo-command-folder-group .hugo-command-list {
+  margin-left: 18px;
+  border-left: 1px solid var(--background-modifier-border);
+  padding-left: 8px;
+}
+
+/* Folder tag trigger button */
+.hugo-command-folder-tag-trigger {
+  cursor: pointer;
+  font-size: 0.85em;
+  opacity: 0.85;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: opacity 0.15s, background-color 0.15s;
+}
+
+.hugo-command-folder-tag-trigger:hover {
+  opacity: 1;
+  background-color: var(--background-modifier-hover);
+}
+
+/* Folder tag styling in dropdowns */
+.hugo-command-tag-item.folder-tag {
+  color: var(--text-accent);
+}
+
+.hugo-command-tag-item.folder-tag::before {
+  content: "📁 ";
+  font-size: 0.85em;
+}
+
+/* Active folder tag in filter bar */
+.hugo-command-active-tag.folder-tag {
+  background-color: var(--background-modifier-success);
+  color: var(--text-on-accent);
+}
+
+/* Tag section headers in dropdowns */
+.hugo-command-tag-section-header {
+  font-size: 0.75em;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 6px 12px 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}

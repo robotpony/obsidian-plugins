@@ -130,3 +130,52 @@ export function getTitleFromItem(frontmatter: HugoFrontmatter, filePath: string)
   const filename = lastSlash === -1 ? filePath : filePath.substring(lastSlash + 1);
   return filename.replace(/\.md$/, "");
 }
+
+/**
+ * Get the relative path from a file path, stripping any matching content path prefix
+ */
+function getRelativePath(filePath: string, contentPaths: string[]): string {
+  for (const contentPath of contentPaths) {
+    const normalized = contentPath.trim().replace(/\/$/, "");
+    // "." or "/" or empty means scan entire vault - use full path
+    if (normalized === "." || normalized === "/" || normalized === "") {
+      return filePath;
+    }
+    if (filePath.startsWith(normalized + "/")) {
+      return filePath.substring(normalized.length + 1);
+    }
+  }
+  return filePath;
+}
+
+/**
+ * Get the top-level folder from a file path (relative to content paths)
+ * Returns "(root)" for files not in any subfolder
+ */
+export function getTopLevelFolder(filePath: string, contentPaths: string[]): string {
+  const relativePath = getRelativePath(filePath, contentPaths);
+  const parts = relativePath.split("/");
+
+  // If only one part (the filename), file is at root
+  if (parts.length <= 1) {
+    return "(root)";
+  }
+
+  return parts[0];
+}
+
+/**
+ * Get subfolder paths as tags (all folders between top-level and the file)
+ */
+export function getSubfolderTags(filePath: string, contentPaths: string[]): string[] {
+  const relativePath = getRelativePath(filePath, contentPaths);
+  const parts = relativePath.split("/");
+
+  // Need at least 3 parts: top-level folder, subfolder(s), filename
+  if (parts.length <= 2) {
+    return [];
+  }
+
+  // Return all middle parts (exclude first folder and last filename)
+  return parts.slice(1, parts.length - 1);
+}

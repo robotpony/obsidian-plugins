@@ -6,6 +6,8 @@ import {
   normalizeTags,
   getFolderFromPath,
   getTitleFromItem,
+  getTopLevelFolder,
+  getSubfolderTags,
 } from "./utils";
 
 export class HugoScanner extends Events {
@@ -119,6 +121,8 @@ export class HugoScanner extends Events {
         typeof frontmatter.description === "string"
           ? frontmatter.description
           : "",
+      topLevelFolder: getTopLevelFolder(file.path, this.contentPaths),
+      folderTags: getSubfolderTags(file.path, this.contentPaths),
     };
   }
 
@@ -214,6 +218,35 @@ export class HugoScanner extends Events {
       }
     }
     return Array.from(tagSet).sort((a, b) => a.localeCompare(b));
+  }
+
+  /**
+   * Get all unique folder tags across all content
+   */
+  getAllFolderTags(): string[] {
+    const tagSet = new Set<string>();
+    for (const item of this.contentCache.values()) {
+      for (const tag of item.folderTags) {
+        tagSet.add(tag);
+      }
+    }
+    return Array.from(tagSet).sort((a, b) => a.localeCompare(b));
+  }
+
+  /**
+   * Get all unique top-level folders
+   */
+  getTopLevelFolders(): string[] {
+    const folderSet = new Set<string>();
+    for (const item of this.contentCache.values()) {
+      folderSet.add(item.topLevelFolder);
+    }
+    return Array.from(folderSet).sort((a, b) => {
+      // Sort "(root)" to the end
+      if (a === "(root)") return 1;
+      if (b === "(root)") return -1;
+      return a.localeCompare(b);
+    });
   }
 
   /**

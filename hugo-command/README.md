@@ -4,9 +4,11 @@ An Obsidian plugin for managing and browsing your Hugo content. View posts, draf
 
 ## Features
 
+- **Folder Organization**: Content grouped by top-level folder with collapsible sections
+- **Folder Tags**: Subfolders become filterable "folder tags" separate from frontmatter tags
 - **Content Sidebar**: Browse all your Hugo content sorted by date
 - **Publish Status**: See at a glance which posts are drafts vs published
-- **Tag Filtering**: Filter content by tags and categories
+- **Tag Filtering**: Filter content by tags, categories, or folder paths
 - **Quick Navigation**: Click any item to open it in the editor
 - **Configurable Paths**: Scan multiple content folders
 
@@ -28,8 +30,18 @@ Open the Hugo sidebar using:
 ### Filtering
 
 - **Status Filter**: Use the dropdown to show All, Published only, or Drafts only
-- **Tag Filter**: Click the `#` button to filter by tag
-- Click a tag again to clear the filter
+- **Tag Filter**: Click the `#` button to filter by frontmatter tags
+- **Folder Filter**: Click the `📁` button to filter by subfolder path
+- Click a tag or folder again to clear the filter
+
+### Folder Organization
+
+Posts are automatically grouped by their top-level folder (e.g., `posts/`, `notes/`). Click a folder header to collapse or expand it.
+
+Subfolders are treated as "folder tags". For example, a file at `posts/tech/tutorials/my-article.md` will:
+
+- Appear in the "posts" section
+- Have folder tags: "tech", "tutorials"
 
 ### Sidebar Menu
 

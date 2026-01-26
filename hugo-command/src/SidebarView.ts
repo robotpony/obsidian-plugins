@@ -10,7 +10,9 @@ export class HugoSidebarView extends ItemView {
   private settings: HugoCommandSettings;
   private updateListener: (() => void) | null = null;
   private activeTagFilter: string | null = null;
+  private activeFolderTagFilter: string | null = null;
   private activeStatusFilter: StatusFilter = "all";
+  private collapsedFolders: Set<string> = new Set();
   private openDropdown: HTMLElement | null = null;
   private onShowAbout: () => void;
   private onOpenSettings: () => void;
@@ -166,10 +168,16 @@ export class HugoSidebarView extends ItemView {
       this.render();
     });
 
-    // Tag filter button
+    // Tag filter button (frontmatter tags)
     const allTags = this.scanner.getAllTags();
     if (allTags.length > 0) {
       this.renderTagFilterButton(filterBar, allTags);
+    }
+
+    // Folder tag filter button
+    const allFolderTags = this.scanner.getAllFolderTags();
+    if (allFolderTags.length > 0) {
+      this.renderFolderTagFilterButton(filterBar, allFolderTags);
     }
 
     // Show active tag filter
@@ -185,6 +193,23 @@ export class HugoSidebarView extends ItemView {
       });
       clearBtn.addEventListener("click", () => {
         this.activeTagFilter = null;
+        this.render();
+      });
+    }
+
+    // Show active folder tag filter
+    if (this.activeFolderTagFilter) {
+      const activeFolderTag = filterBar.createEl("span", {
+        cls: "hugo-command-active-tag folder-tag",
+        text: this.activeFolderTagFilter,
+      });
+
+      const clearBtn = activeFolderTag.createEl("span", {
+        cls: "hugo-command-clear-tag",
+        text: "\u00d7",
+      });
+      clearBtn.addEventListener("click", () => {
+        this.activeFolderTagFilter = null;
         this.render();
       });
     }
@@ -263,9 +288,73 @@ export class HugoSidebarView extends ItemView {
     });
   }
 
-  private renderContentList(container: HTMLElement): void {
-    const list = container.createEl("ul", { cls: "hugo-command-list" });
+  private renderFolderTagFilterButton(
+    container: HTMLElement,
+    allFolderTags: string[]
+  ): void {
+    const trigger = container.createEl("span", {
+      cls: "hugo-command-folder-tag-trigger",
+      text: "\ud83d\udcc1",
+    });
 
+    trigger.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.closeDropdown();
+
+      const dropdown = document.createElement("div");
+      dropdown.className = "hugo-command-tag-dropdown";
+
+      const rect = trigger.getBoundingClientRect();
+      dropdown.style.position = "fixed";
+      dropdown.style.top = `${rect.bottom + 4}px`;
+      dropdown.style.left = `${rect.left}px`;
+
+      for (const tag of allFolderTags) {
+        const tagItem = dropdown.createEl("div", {
+          cls: "hugo-command-tag-item folder-tag",
+          text: tag,
+        });
+
+        if (tag === this.activeFolderTagFilter) {
+          tagItem.addClass("active");
+        }
+
+        tagItem.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.activeFolderTagFilter = tag === this.activeFolderTagFilter ? null : tag;
+          this.closeDropdown();
+          this.render();
+        });
+      }
+
+      if (this.activeFolderTagFilter) {
+        dropdown.createEl("div", { cls: "hugo-command-tag-separator" });
+        const clearItem = dropdown.createEl("div", {
+          cls: "hugo-command-tag-item clear",
+          text: "Clear filter",
+        });
+        clearItem.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.activeFolderTagFilter = null;
+          this.closeDropdown();
+          this.render();
+        });
+      }
+
+      document.body.appendChild(dropdown);
+      this.openDropdown = dropdown;
+
+      const closeHandler = (e: MouseEvent) => {
+        if (!dropdown.contains(e.target as Node) && e.target !== trigger) {
+          this.closeDropdown();
+          document.removeEventListener("click", closeHandler);
+        }
+      };
+      setTimeout(() => document.addEventListener("click", closeHandler), 0);
+    });
+  }
+
+  private renderContentList(container: HTMLElement): void {
     let items = this.scanner.getContentSorted(this.settings.defaultSortOrder);
 
     // Apply status filter
@@ -275,12 +364,19 @@ export class HugoSidebarView extends ItemView {
       items = items.filter((item) => !item.isDraft);
     }
 
-    // Apply tag filter
+    // Apply tag filter (frontmatter tags)
     if (this.activeTagFilter) {
       items = items.filter(
         (item) =>
           item.tags.includes(this.activeTagFilter!) ||
           item.categories.includes(this.activeTagFilter!)
+      );
+    }
+
+    // Apply folder tag filter
+    if (this.activeFolderTagFilter) {
+      items = items.filter((item) =>
+        item.folderTags.includes(this.activeFolderTagFilter!)
       );
     }
 
@@ -290,15 +386,80 @@ export class HugoSidebarView extends ItemView {
     }
 
     if (items.length === 0) {
-      list.createEl("li", {
+      const emptyDiv = container.createEl("div", {
         cls: "hugo-command-empty",
         text: "No content found",
       });
       return;
     }
 
+    // Group items by top-level folder
+    const folders = this.scanner.getTopLevelFolders();
+    const groupedItems = new Map<string, HugoContentItem[]>();
+
+    for (const folder of folders) {
+      groupedItems.set(folder, []);
+    }
+
     for (const item of items) {
-      this.renderContentItem(list, item);
+      const folderItems = groupedItems.get(item.topLevelFolder);
+      if (folderItems) {
+        folderItems.push(item);
+      }
+    }
+
+    // Render each folder group
+    for (const folder of folders) {
+      const folderItems = groupedItems.get(folder) || [];
+      if (folderItems.length === 0) continue;
+
+      this.renderFolderGroup(container, folder, folderItems);
+    }
+  }
+
+  private renderFolderGroup(
+    container: HTMLElement,
+    folder: string,
+    items: HugoContentItem[]
+  ): void {
+    const group = container.createEl("div", { cls: "hugo-command-folder-group" });
+    const isCollapsed = this.collapsedFolders.has(folder);
+
+    // Folder header
+    const header = group.createEl("div", {
+      cls: `hugo-command-folder-header ${isCollapsed ? "collapsed" : ""}`,
+    });
+
+    const chevron = header.createEl("span", {
+      cls: "hugo-command-folder-chevron",
+      text: isCollapsed ? "\u25b8" : "\u25be",
+    });
+
+    header.createEl("span", {
+      cls: "hugo-command-folder-name",
+      text: folder,
+    });
+
+    header.createEl("span", {
+      cls: "hugo-command-folder-count",
+      text: `(${items.length})`,
+    });
+
+    header.addEventListener("click", () => {
+      if (this.collapsedFolders.has(folder)) {
+        this.collapsedFolders.delete(folder);
+      } else {
+        this.collapsedFolders.add(folder);
+      }
+      this.render();
+    });
+
+    // Content list (if not collapsed)
+    if (!isCollapsed) {
+      const list = group.createEl("ul", { cls: "hugo-command-list" });
+      for (const item of items) {
+        this.renderContentItem(list, item);
+      }
     }
   }
 
@@ -330,16 +491,18 @@ export class HugoSidebarView extends ItemView {
       });
     }
 
-    // Tags dropdown (if has tags)
-    const allItemTags = [...item.tags, ...item.categories];
-    if (allItemTags.length > 0) {
-      this.renderItemTagDropdown(listItem, allItemTags);
+    // Tags dropdown (if has any tags - frontmatter or folder)
+    const frontmatterTags = [...item.tags, ...item.categories];
+    const folderTags = item.folderTags;
+    if (frontmatterTags.length > 0 || folderTags.length > 0) {
+      this.renderItemTagDropdown(listItem, frontmatterTags, folderTags);
     }
   }
 
   private renderItemTagDropdown(
     container: HTMLElement,
-    tags: string[]
+    frontmatterTags: string[],
+    folderTags: string[]
   ): void {
     const trigger = container.createEl("span", {
       cls: "hugo-command-item-tag-trigger",
@@ -366,27 +529,70 @@ export class HugoSidebarView extends ItemView {
         dropdown.style.left = `${rect.left}px`;
       }
 
-      for (const tag of tags) {
-        const tagItem = dropdown.createEl("div", {
-          cls: "hugo-command-tag-item",
+      // Folder tags section
+      if (folderTags.length > 0) {
+        dropdown.createEl("div", {
+          cls: "hugo-command-tag-section-header",
+          text: "Folders",
         });
 
-        tagItem.createEl("span", {
-          cls: "hugo-command-tag-label",
-          text: tag,
+        for (const tag of folderTags) {
+          const tagItem = dropdown.createEl("div", {
+            cls: "hugo-command-tag-item folder-tag",
+          });
+
+          tagItem.createEl("span", {
+            cls: "hugo-command-tag-label",
+            text: tag,
+          });
+
+          const filterBtn = tagItem.createEl("span", {
+            cls: "hugo-command-tag-action",
+            text: "Filter",
+          });
+
+          filterBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            this.activeFolderTagFilter = tag;
+            this.closeDropdown();
+            this.render();
+          });
+        }
+      }
+
+      // Frontmatter tags section
+      if (frontmatterTags.length > 0) {
+        if (folderTags.length > 0) {
+          dropdown.createEl("div", { cls: "hugo-command-tag-separator" });
+        }
+
+        dropdown.createEl("div", {
+          cls: "hugo-command-tag-section-header",
+          text: "Tags",
         });
 
-        const filterBtn = tagItem.createEl("span", {
-          cls: "hugo-command-tag-action",
-          text: "Filter",
-        });
+        for (const tag of frontmatterTags) {
+          const tagItem = dropdown.createEl("div", {
+            cls: "hugo-command-tag-item",
+          });
 
-        filterBtn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          this.activeTagFilter = tag;
-          this.closeDropdown();
-          this.render();
-        });
+          tagItem.createEl("span", {
+            cls: "hugo-command-tag-label",
+            text: tag,
+          });
+
+          const filterBtn = tagItem.createEl("span", {
+            cls: "hugo-command-tag-action",
+            text: "Filter",
+          });
+
+          filterBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            this.activeTagFilter = tag;
+            this.closeDropdown();
+            this.render();
+          });
+        }
       }
 
       document.body.appendChild(dropdown);

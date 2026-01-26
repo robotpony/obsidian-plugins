@@ -2,6 +2,20 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.2.0] - 2026-01-25
+
+### Added
+
+- **Folder Organization**: Posts are now grouped by top-level folder with collapsible sections
+- **Folder Tags**: Subfolders are treated as a separate "folder tag" category for filtering
+- **Folder Tag Filter**: New 📁 button in filter bar to filter by folder path
+- Tag dropdown on items now shows both folder tags and frontmatter tags in separate sections
+
+### Changed
+
+- Content list now displays in collapsible folder groups instead of a flat list
+- Folder groups can be expanded/collapsed by clicking the header
+
 ## [0.1.1] - 2026-01-25
 
 ### Fixed
