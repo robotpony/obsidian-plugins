@@ -99,9 +99,7 @@ find_vaults() {
         "$HOME/Documents:4"
         "$HOME/Desktop:3"
         "$HOME/Library/Mobile Documents/iCloud~md~obsidian/Documents:4"
-        "$HOME/projects:5"
-        "$HOME/writing:4"
-        "$HOME:2"
+        "$HOME:5"
     )
 
     for config in "${search_configs[@]}"; do
@@ -373,7 +371,7 @@ main() {
 
         if [[ ${#vault_dirs[@]} -eq 0 ]]; then
             print_error "No Obsidian vaults found"
-            print_warn "Searched: ~/Documents, ~/Desktop, ~/projects, ~/writing, ~, iCloud"
+            print_warn "Searched: ~/Documents, ~/Desktop, ~ (depth 5), iCloud"
             exit 1
         fi
 
