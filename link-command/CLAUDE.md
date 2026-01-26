@@ -19,7 +19,6 @@ This is **Link Command** (`link-command`), an Obsidian plugin for URL unfurling.
 ### Entry Point and Core Flow
 
 [main.ts](main.ts) - Plugin entry point extending `Plugin`. Initializes all components and registers:
-- Code block processor for `link-card` blocks
 - Sidebar view for browsing page links and history
 - Inline format toggle extension (CodeMirror decorations)
 - Commands: "Toggle link format", "Clear link cache", "Toggle link sidebar"
@@ -33,7 +32,6 @@ This is **Link Command** (`link-command`), an Obsidian plugin for URL unfurling.
 | [UrlMetadataCache.ts](src/UrlMetadataCache.ts) | Two-tier cache: in-memory for session, persistent via plugin data for offline |
 | [UrlUnfurlService.ts](src/UrlUnfurlService.ts) | Coordinates providers and cache, validates URLs, handles batch unfurling |
 | [UrlFormatToggle.ts](src/UrlFormatToggle.ts) | CodeMirror extension: inline toggle buttons next to URLs to cycle formats |
-| [LinkCardProcessor.ts](src/LinkCardProcessor.ts) | Processes `link-card` code blocks, renders as compact inline cards |
 | [LinkSidebarView.ts](src/LinkSidebarView.ts) | Sidebar showing page links and recent history |
 
 ### Data Flow
@@ -42,7 +40,7 @@ This is **Link Command** (`link-command`), an Obsidian plugin for URL unfurling.
 2. **Service**: `UrlUnfurlService` checks cache, then routes to provider
 3. **Provider**: `HtmlMetadataProvider` fetches HTML via `requestUrl()`, parses Open Graph/meta tags
 4. **Cache**: Successful results stored in memory + persistent cache
-5. **UI**: Format cycles: plain URL → markdown link → compact link card → plain URL
+5. **UI**: Format cycles: plain URL → markdown link → rich link → plain URL
 
 ### Provider Architecture
 
@@ -73,16 +71,15 @@ To add a new provider (e.g., for Slack), create a file in `src/providers/` imple
 
 The `LinkCommandSettingTab` class is defined inline in [main.ts](main.ts).
 
-## Code Block Syntax
+## Link Formats
 
-Link cards are compact inline elements (favicon + title + domain):
+Three inline formats (all pure markdown, no code blocks):
 
-```link-card
-url: https://example.com
-title: Optional title (will be fetched if omitted)
-```
+1. **URL**: `https://example.com/page`
+2. **Link**: `[Page Title](https://example.com/page)`
+3. **Rich Link**: `[Page Title · **example.com**](https://example.com/page)`
 
-Note: `description` and `image` fields are ignored in the compact format.
+For Reddit, rich link uses subreddit: `[Post Title · **r/subreddit**](url)`
 
 ## Sidebar
 

@@ -660,104 +660,6 @@ var UrlUnfurlService = class {
   }
 };
 
-// src/LinkCardProcessor.ts
-function parseCardContent(source) {
-  const result = {};
-  const lines = source.trim().split("\n");
-  for (const line of lines) {
-    const colonIndex = line.indexOf(":");
-    if (colonIndex > 0) {
-      const key = line.slice(0, colonIndex).trim().toLowerCase();
-      const value = line.slice(colonIndex + 1).trim();
-      if (key && value) {
-        result[key] = value;
-      }
-    }
-  }
-  return result;
-}
-var LinkCardProcessor = class {
-  constructor(app, unfurlService) {
-    this.app = app;
-    this.unfurlService = unfurlService;
-  }
-  /**
-   * Process a link-card code block
-   */
-  async process(source, el, ctx) {
-    const data = parseCardContent(source);
-    if (!data.url) {
-      this.renderError(el, "Missing URL in link-card");
-      return;
-    }
-    const card = el.createEl("div", { cls: "link-card" });
-    if (data.title) {
-      this.renderCard(card, {
-        url: data.url,
-        title: data.title,
-        description: data.description || null,
-        image: data.image || null,
-        favicon: data.favicon || null,
-        siteName: data.sitename || null
-      });
-      return;
-    }
-    card.createEl("div", { cls: "link-card-loading", text: "Loading preview..." });
-    const result = await this.unfurlService.unfurl(data.url);
-    card.empty();
-    if (result.success && result.metadata) {
-      this.renderCard(card, {
-        url: data.url,
-        title: data.title || result.metadata.title,
-        description: data.description || result.metadata.description,
-        image: data.image || result.metadata.image,
-        favicon: data.favicon || result.metadata.favicon,
-        siteName: data.sitename || result.metadata.siteName
-      });
-    } else {
-      this.renderFallback(card, data.url, result.errorMessage);
-    }
-  }
-  renderCard(container, data) {
-    const link = container.createEl("a", {
-      cls: "link-card-link",
-      attr: { href: data.url, target: "_blank", rel: "noopener noreferrer" }
-    });
-    if (data.favicon) {
-      const favicon = link.createEl("img", {
-        cls: "link-card-favicon",
-        attr: { src: data.favicon, alt: "" }
-      });
-      favicon.addEventListener("error", () => {
-        favicon.remove();
-      });
-    }
-    link.createEl("span", {
-      cls: "link-card-title",
-      text: data.title || data.url
-    });
-    try {
-      const hostname = new URL(data.url).hostname.replace(/^www\./, "");
-      link.createEl("span", { cls: "link-card-domain", text: hostname });
-    } catch (e) {
-    }
-  }
-  renderFallback(container, url, error) {
-    const fallback = container.createEl("div", { cls: "link-card-fallback" });
-    fallback.createEl("a", {
-      cls: "link-card-fallback-link",
-      text: url,
-      attr: { href: url, target: "_blank", rel: "noopener noreferrer" }
-    });
-    if (error) {
-      fallback.createEl("span", { cls: "link-card-fallback-error", text: ` (${error})` });
-    }
-  }
-  renderError(container, message) {
-    container.createEl("div", { cls: "link-card-error", text: message });
-  }
-};
-
 // src/LinkSidebarView.ts
 var import_obsidian3 = require("obsidian");
 var VIEW_TYPE_LINK_SIDEBAR = "link-command-sidebar";
@@ -1054,32 +956,24 @@ var LinkSidebarView = class extends import_obsidian3.ItemView {
 // src/UrlFormatToggle.ts
 var import_view = require("@codemirror/view");
 var import_state = require("@codemirror/state");
-var ICONS = {
-  url: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>`,
-  link: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="0"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`,
-  card: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line></svg>`
-};
+var COMMAND_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z"></path></svg>`;
 var FormatToggleWidget = class extends import_view.WidgetType {
-  constructor(url, currentFormat, from, to, lineStart, lineEnd) {
+  constructor(url, currentFormat, from, to) {
     super();
     this.url = url;
     this.currentFormat = currentFormat;
     this.from = from;
     this.to = to;
-    this.lineStart = lineStart;
-    this.lineEnd = lineEnd;
   }
   toDOM() {
     const btn = document.createElement("span");
-    btn.className = `link-format-toggle link-format-toggle-${this.currentFormat}`;
-    btn.innerHTML = ICONS[this.currentFormat];
+    btn.className = "link-format-toggle";
+    btn.innerHTML = COMMAND_ICON;
     btn.setAttribute("aria-label", `Toggle link format (currently ${this.currentFormat})`);
     btn.setAttribute("data-url", this.url);
     btn.setAttribute("data-from", String(this.from));
     btn.setAttribute("data-to", String(this.to));
     btn.setAttribute("data-format", this.currentFormat);
-    btn.setAttribute("data-line-start", String(this.lineStart));
-    btn.setAttribute("data-line-end", String(this.lineEnd));
     return btn;
   }
   ignoreEvent() {
@@ -1093,33 +987,13 @@ function detectFormat(state, url, pos) {
   const doc = state.doc;
   const line = doc.lineAt(pos);
   const lineText = line.text;
-  let lineNum = line.number;
-  let inCodeBlock = false;
-  let codeBlockStart = -1;
-  while (lineNum > 0) {
-    const checkLine = doc.line(lineNum);
-    const text = checkLine.text.trim();
-    if (text.startsWith("```link-card")) {
-      inCodeBlock = true;
-      codeBlockStart = lineNum;
-      break;
-    }
-    if (text.startsWith("```") && !text.startsWith("```link-card")) {
-      break;
-    }
-    lineNum--;
-  }
-  if (inCodeBlock) {
-    for (let i = line.number; i <= doc.lines; i++) {
-      const checkLine = doc.line(i);
-      if (checkLine.text.trim() === "```") {
-        return "card";
-      }
-    }
-  }
   const urlEscaped = url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const mdLinkPattern = new RegExp(`\\]\\(${urlEscaped}\\)`);
-  if (mdLinkPattern.test(lineText)) {
+  const richPattern = new RegExp(`\\[[^\\]]*\\*\\*[^*]+\\*\\*[^\\]]*\\]\\(${urlEscaped}\\)`);
+  if (richPattern.test(lineText)) {
+    return "rich";
+  }
+  const linkPattern = new RegExp(`\\]\\(${urlEscaped}\\)`);
+  if (linkPattern.test(lineText)) {
     return "link";
   }
   return "url";
@@ -1127,58 +1001,29 @@ function detectFormat(state, url, pos) {
 function findFormatRange(state, url, pos, format) {
   const doc = state.doc;
   const line = doc.lineAt(pos);
+  const urlEscaped = url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   if (format === "url") {
     const urlStart = line.text.indexOf(url);
     if (urlStart >= 0) {
       return {
         from: line.from + urlStart,
-        to: line.from + urlStart + url.length,
-        lineStart: line.number,
-        lineEnd: line.number
+        to: line.from + urlStart + url.length
       };
     }
   }
-  if (format === "link") {
-    const urlEscaped = url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (format === "link" || format === "rich") {
     const mdLinkPattern = new RegExp(`\\[([^\\]]*)\\]\\(${urlEscaped}\\)`);
     const match = mdLinkPattern.exec(line.text);
     if (match) {
       return {
         from: line.from + match.index,
-        to: line.from + match.index + match[0].length,
-        lineStart: line.number,
-        lineEnd: line.number
+        to: line.from + match.index + match[0].length
       };
     }
   }
-  if (format === "card") {
-    let startLine = line.number;
-    let endLine = line.number;
-    while (startLine > 0) {
-      const checkLine = doc.line(startLine);
-      if (checkLine.text.trim().startsWith("```link-card")) {
-        break;
-      }
-      startLine--;
-    }
-    for (let i = startLine + 1; i <= doc.lines; i++) {
-      if (doc.line(i).text.trim() === "```") {
-        endLine = i;
-        break;
-      }
-    }
-    return {
-      from: doc.line(startLine).from,
-      to: doc.line(endLine).to,
-      lineStart: startLine,
-      lineEnd: endLine
-    };
-  }
   return {
     from: pos,
-    to: pos + url.length,
-    lineStart: line.number,
-    lineEnd: line.number
+    to: pos + url.length
   };
 }
 function buildDecorations(state, enabled) {
@@ -1208,14 +1053,12 @@ function buildDecorations(state, enabled) {
       const cleanUrlEnd = cleanUrlPos + cleanUrl.length;
       const format = detectFormat(state, cleanUrl, cleanUrlPos);
       const range = findFormatRange(state, cleanUrl, cleanUrlPos, format);
-      const widgetPos = format === "card" ? range.to : cleanUrlEnd;
+      const widgetPos = format === "url" ? cleanUrlEnd : range.to;
       const widget = new FormatToggleWidget(
         cleanUrl,
         format,
         range.from,
-        range.to,
-        range.lineStart,
-        range.lineEnd
+        range.to
       );
       const decoration = import_view.Decoration.widget({
         widget,
@@ -1269,12 +1112,10 @@ function createFormatToggleExtension(config) {
           const from = parseInt(toggle.getAttribute("data-from") || "0", 10);
           const to = parseInt(toggle.getAttribute("data-to") || "0", 10);
           const format = toggle.getAttribute("data-format");
-          const lineStart = parseInt(toggle.getAttribute("data-line-start") || "0", 10);
-          const lineEnd = parseInt(toggle.getAttribute("data-line-end") || "0", 10);
           if (!url)
             return false;
           const currentConfig = view.state.field(configField);
-          cycleFormat(view, url, from, to, format, lineStart, lineEnd, currentConfig);
+          cycleFormat(view, url, from, to, format, currentConfig);
           return true;
         }
       }
@@ -1282,15 +1123,15 @@ function createFormatToggleExtension(config) {
   );
   return [configField, decorationField, clickHandler];
 }
-async function cycleFormat(view, url, from, to, currentFormat, lineStart, lineEnd, config) {
+async function cycleFormat(view, url, from, to, currentFormat, config) {
   const nextFormat = getNextFormat(currentFormat);
   let replacement;
   switch (nextFormat) {
     case "link":
       replacement = await createMarkdownLink(url, config);
       break;
-    case "card":
-      replacement = await createLinkCard(url, config);
+    case "rich":
+      replacement = await createRichLink(url, config);
       break;
     case "url":
       replacement = url;
@@ -1309,8 +1150,8 @@ function getNextFormat(current) {
     case "url":
       return "link";
     case "link":
-      return "card";
-    case "card":
+      return "rich";
+    case "rich":
       return "url";
   }
 }
@@ -1324,16 +1165,34 @@ async function createMarkdownLink(url, config) {
   }
   return `[${url}](${url})`;
 }
-async function createLinkCard(url, config) {
-  var _a;
+async function createRichLink(url, config) {
   const sourcePage = config.getSourcePage();
   const result = await config.unfurlService.unfurl(url, false, sourcePage);
-  const lines = ["```link-card", `url: ${url}`];
-  if (result.success && ((_a = result.metadata) == null ? void 0 : _a.title)) {
-    lines.push(`title: ${result.metadata.title}`);
+  let title = url;
+  let extra = "";
+  if (result.success && result.metadata) {
+    const metadata = result.metadata;
+    title = metadata.title || url;
+    if (metadata.subreddit) {
+      extra = metadata.subreddit;
+    } else {
+      try {
+        const hostname = new URL(url).hostname.replace(/^www\./, "");
+        extra = hostname;
+      } catch (e) {
+      }
+    }
+  } else {
+    try {
+      const hostname = new URL(url).hostname.replace(/^www\./, "");
+      extra = hostname;
+    } catch (e) {
+    }
   }
-  lines.push("```");
-  return lines.join("\n");
+  if (extra) {
+    return `[${title} \xB7 **${extra}**](${url})`;
+  }
+  return `[${title}](${url})`;
 }
 
 // main.ts
@@ -1356,10 +1215,6 @@ var LinkCommandPlugin = class extends import_obsidian4.Plugin {
     if (savedData == null ? void 0 : savedData.cache) {
       await this.unfurlService.loadCache(savedData.cache);
     }
-    this.linkCardProcessor = new LinkCardProcessor(this.app, this.unfurlService);
-    this.registerMarkdownCodeBlockProcessor("link-card", async (source, el, ctx) => {
-      await this.linkCardProcessor.process(source, el, ctx);
-    });
     this.registerView(
       VIEW_TYPE_LINK_SIDEBAR,
       (leaf) => {
@@ -1546,66 +1401,63 @@ Memory cache: ${stats.memorySize}`,
     return null;
   }
   /**
-   * Cycle through formats at cursor (URL -> Link -> Card -> URL)
+   * Cycle through formats at cursor (URL -> Link -> Rich -> URL)
    */
   async cycleFormatAtCursor(editor, url) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     const cursor = editor.getCursor();
     const line = editor.getLine(cursor.line);
     const urlEscaped = url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const mdLinkPattern = new RegExp(`\\[([^\\]]*)\\]\\(${urlEscaped}\\)`);
-    const isMarkdownLink = mdLinkPattern.test(line);
-    let isLinkCard = false;
-    let cardStartLine = -1;
-    let cardEndLine = -1;
-    for (let i = cursor.line; i >= 0; i--) {
-      const checkLine = editor.getLine(i).trim();
-      if (checkLine.startsWith("```link-card")) {
-        isLinkCard = true;
-        cardStartLine = i;
-        break;
-      }
-      if (checkLine === "```") {
-        break;
-      }
-    }
-    if (isLinkCard) {
-      for (let i = cardStartLine + 1; i < editor.lineCount(); i++) {
-        if (editor.getLine(i).trim() === "```") {
-          cardEndLine = i;
-          break;
-        }
-      }
-    }
+    const richPattern = new RegExp(`\\[[^\\]]*\\*\\*[^*]+\\*\\*[^\\]]*\\]\\(${urlEscaped}\\)`);
+    const linkPattern = new RegExp(`\\[([^\\]]*)\\]\\(${urlEscaped}\\)`);
+    const isRichLink = richPattern.test(line);
+    const isMarkdownLink = linkPattern.test(line);
     const activeFile = this.app.workspace.getActiveFile();
-    if (isLinkCard && cardStartLine >= 0 && cardEndLine >= 0) {
-      const from = { line: cardStartLine, ch: 0 };
-      const to = { line: cardEndLine, ch: editor.getLine(cardEndLine).length };
-      editor.replaceRange(url, from, to);
-    } else if (isMarkdownLink) {
-      const result = await this.unfurlService.unfurl(url, false, activeFile == null ? void 0 : activeFile.path);
-      const lines = ["```link-card", `url: ${url}`];
-      if (result.success && ((_a = result.metadata) == null ? void 0 : _a.title)) {
-        lines.push(`title: ${result.metadata.title}`);
-      }
-      lines.push("```");
-      const match = mdLinkPattern.exec(line);
+    const result = await this.unfurlService.unfurl(url, false, activeFile == null ? void 0 : activeFile.path);
+    let replacement;
+    let from;
+    let to;
+    if (isRichLink) {
+      const match = linkPattern.exec(line);
       if (match) {
-        const from = { line: cursor.line, ch: match.index };
-        const to = { line: cursor.line, ch: match.index + match[0].length };
-        editor.replaceRange(lines.join("\n"), from, to);
+        from = { line: cursor.line, ch: match.index };
+        to = { line: cursor.line, ch: match.index + match[0].length };
+        replacement = url;
+      } else {
+        return;
+      }
+    } else if (isMarkdownLink) {
+      const match = linkPattern.exec(line);
+      if (match) {
+        from = { line: cursor.line, ch: match.index };
+        to = { line: cursor.line, ch: match.index + match[0].length };
+        const title = result.success && ((_a = result.metadata) == null ? void 0 : _a.title) || url;
+        let extra = "";
+        if (result.success && ((_b = result.metadata) == null ? void 0 : _b.subreddit)) {
+          extra = result.metadata.subreddit;
+        } else {
+          try {
+            extra = new URL(url).hostname.replace(/^www\./, "");
+          } catch (e) {
+          }
+        }
+        replacement = extra ? `[${title} \xB7 **${extra}**](${url})` : `[${title}](${url})`;
+      } else {
+        return;
       }
     } else {
-      const result = await this.unfurlService.unfurl(url, false, activeFile == null ? void 0 : activeFile.path);
-      const title = result.success && ((_b = result.metadata) == null ? void 0 : _b.title) ? this.formatLinkTitle(result.metadata, url) : url;
       const urlIndex = line.indexOf(url);
       if (urlIndex >= 0) {
-        const from = { line: cursor.line, ch: urlIndex };
-        const to = { line: cursor.line, ch: urlIndex + url.length };
-        editor.replaceRange(`[${title}](${url})`, from, to);
+        from = { line: cursor.line, ch: urlIndex };
+        to = { line: cursor.line, ch: urlIndex + url.length };
+        const title = result.success && ((_c = result.metadata) == null ? void 0 : _c.title) ? this.formatLinkTitle(result.metadata, url) : url;
+        replacement = `[${title}](${url})`;
+      } else {
+        return;
       }
     }
-    (_c = this.sidebarView) == null ? void 0 : _c.render();
+    editor.replaceRange(replacement, from, to);
+    (_d = this.sidebarView) == null ? void 0 : _d.render();
   }
 };
 var LinkCommandSettingTab = class extends import_obsidian4.PluginSettingTab {
@@ -1617,7 +1469,7 @@ var LinkCommandSettingTab = class extends import_obsidian4.PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     containerEl.createEl("h2", { text: "Link Command Settings" });
-    new import_obsidian4.Setting(containerEl).setName("Enable inline format toggle").setDesc("Show toggle buttons next to URLs to cycle between formats (URL, Link, Card)").addToggle(
+    new import_obsidian4.Setting(containerEl).setName("Enable inline format toggle").setDesc("Show toggle buttons next to URLs to cycle between formats (URL, Link, Rich Link)").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.unfurlEnabled).onChange(async (value) => {
         this.plugin.settings.unfurlEnabled = value;
         await this.plugin.saveSettings();

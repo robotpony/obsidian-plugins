@@ -15,14 +15,12 @@ import {
   CacheData,
 } from "./src/types";
 import { UrlUnfurlService } from "./src/UrlUnfurlService";
-import { LinkCardProcessor } from "./src/LinkCardProcessor";
 import { LinkSidebarView, VIEW_TYPE_LINK_SIDEBAR } from "./src/LinkSidebarView";
 import { createFormatToggleExtension, FormatToggleConfig } from "./src/UrlFormatToggle";
 
 export default class LinkCommandPlugin extends Plugin {
   settings: LinkCommandSettings;
   unfurlService: UrlUnfurlService;
-  linkCardProcessor: LinkCardProcessor;
   private cacheData: CacheData | null = null;
   private sidebarView: LinkSidebarView | null = null;
 
@@ -43,14 +41,6 @@ export default class LinkCommandPlugin extends Plugin {
     if (savedData?.cache) {
       await this.unfurlService.loadCache(savedData.cache);
     }
-
-    // Initialize code block processor
-    this.linkCardProcessor = new LinkCardProcessor(this.app, this.unfurlService);
-
-    // Register link-card code block processor
-    this.registerMarkdownCodeBlockProcessor("link-card", async (source, el, ctx) => {
-      await this.linkCardProcessor.process(source, el, ctx);
-    });
 
     // Register sidebar view
     this.registerView(
@@ -268,81 +258,79 @@ export default class LinkCommandPlugin extends Plugin {
   }
 
   /**
-   * Cycle through formats at cursor (URL -> Link -> Card -> URL)
+   * Cycle through formats at cursor (URL -> Link -> Rich -> URL)
    */
   private async cycleFormatAtCursor(editor: Editor, url: string): Promise<void> {
     const cursor = editor.getCursor();
     const line = editor.getLine(cursor.line);
+    const urlEscaped = url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
     // Detect current format
-    const urlEscaped = url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const mdLinkPattern = new RegExp(`\\[([^\\]]*)\\]\\(${urlEscaped}\\)`);
-    const isMarkdownLink = mdLinkPattern.test(line);
+    const richPattern = new RegExp(`\\[[^\\]]*\\*\\*[^*]+\\*\\*[^\\]]*\\]\\(${urlEscaped}\\)`);
+    const linkPattern = new RegExp(`\\[([^\\]]*)\\]\\(${urlEscaped}\\)`);
 
-    // Check if in link-card block
-    let isLinkCard = false;
-    let cardStartLine = -1;
-    let cardEndLine = -1;
-
-    for (let i = cursor.line; i >= 0; i--) {
-      const checkLine = editor.getLine(i).trim();
-      if (checkLine.startsWith("```link-card")) {
-        isLinkCard = true;
-        cardStartLine = i;
-        break;
-      }
-      if (checkLine === "```") {
-        break;
-      }
-    }
-
-    if (isLinkCard) {
-      for (let i = cardStartLine + 1; i < editor.lineCount(); i++) {
-        if (editor.getLine(i).trim() === "```") {
-          cardEndLine = i;
-          break;
-        }
-      }
-    }
+    const isRichLink = richPattern.test(line);
+    const isMarkdownLink = linkPattern.test(line);
 
     const activeFile = this.app.workspace.getActiveFile();
+    const result = await this.unfurlService.unfurl(url, false, activeFile?.path);
 
-    if (isLinkCard && cardStartLine >= 0 && cardEndLine >= 0) {
-      // Card -> URL: Replace entire block with plain URL
-      const from = { line: cardStartLine, ch: 0 };
-      const to = { line: cardEndLine, ch: editor.getLine(cardEndLine).length };
-      editor.replaceRange(url, from, to);
-    } else if (isMarkdownLink) {
-      // Link -> Card: Replace link with compact card block
-      const result = await this.unfurlService.unfurl(url, false, activeFile?.path);
+    let replacement: string;
+    let from: { line: number; ch: number };
+    let to: { line: number; ch: number };
 
-      const lines = ["```link-card", `url: ${url}`];
-      if (result.success && result.metadata?.title) {
-        lines.push(`title: ${result.metadata.title}`);
-      }
-      lines.push("```");
-
-      const match = mdLinkPattern.exec(line);
+    if (isRichLink) {
+      // Rich -> URL: Extract URL and replace
+      const match = linkPattern.exec(line);
       if (match) {
-        const from = { line: cursor.line, ch: match.index };
-        const to = { line: cursor.line, ch: match.index + match[0].length };
-        editor.replaceRange(lines.join("\n"), from, to);
+        from = { line: cursor.line, ch: match.index };
+        to = { line: cursor.line, ch: match.index + match[0].length };
+        replacement = url;
+      } else {
+        return;
+      }
+    } else if (isMarkdownLink) {
+      // Link -> Rich: Add domain/subreddit in bold
+      const match = linkPattern.exec(line);
+      if (match) {
+        from = { line: cursor.line, ch: match.index };
+        to = { line: cursor.line, ch: match.index + match[0].length };
+
+        const title = result.success && result.metadata?.title || url;
+        let extra = "";
+
+        if (result.success && result.metadata?.subreddit) {
+          extra = result.metadata.subreddit;
+        } else {
+          try {
+            extra = new URL(url).hostname.replace(/^www\./, "");
+          } catch {
+            // Skip
+          }
+        }
+
+        replacement = extra ? `[${title} · **${extra}**](${url})` : `[${title}](${url})`;
+      } else {
+        return;
       }
     } else {
-      // URL -> Link: Replace URL with markdown link
-      const result = await this.unfurlService.unfurl(url, false, activeFile?.path);
-      const title = result.success && result.metadata?.title
-        ? this.formatLinkTitle(result.metadata, url)
-        : url;
-
+      // URL -> Link: Create basic markdown link
       const urlIndex = line.indexOf(url);
       if (urlIndex >= 0) {
-        const from = { line: cursor.line, ch: urlIndex };
-        const to = { line: cursor.line, ch: urlIndex + url.length };
-        editor.replaceRange(`[${title}](${url})`, from, to);
+        from = { line: cursor.line, ch: urlIndex };
+        to = { line: cursor.line, ch: urlIndex + url.length };
+
+        const title = result.success && result.metadata?.title
+          ? this.formatLinkTitle(result.metadata, url)
+          : url;
+
+        replacement = `[${title}](${url})`;
+      } else {
+        return;
       }
     }
 
+    editor.replaceRange(replacement, from, to);
     this.sidebarView?.render();
   }
 }
@@ -367,7 +355,7 @@ class LinkCommandSettingTab extends PluginSettingTab {
     // Master toggle
     new Setting(containerEl)
       .setName("Enable inline format toggle")
-      .setDesc("Show toggle buttons next to URLs to cycle between formats (URL, Link, Card)")
+      .setDesc("Show toggle buttons next to URLs to cycle between formats (URL, Link, Rich Link)")
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.unfurlEnabled)

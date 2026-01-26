@@ -7,29 +7,28 @@ import {
   ViewUpdate,
 } from "@codemirror/view";
 import { StateField, EditorState, Transaction, RangeSetBuilder } from "@codemirror/state";
-import { syntaxTree } from "@codemirror/language";
 import { UrlUnfurlService } from "./UrlUnfurlService";
 import { UrlMetadata } from "./types";
 
-export type LinkFormat = "url" | "link" | "card";
+/**
+ * Three inline formats:
+ * - url: Plain URL (https://example.com)
+ * - link: Markdown link [Title](url)
+ * - rich: Rich markdown link [Title · **domain.com**](url)
+ */
+export type LinkFormat = "url" | "link" | "rich";
 
 interface UrlMatch {
   url: string;
   from: number;
   to: number;
   format: LinkFormat;
-  lineStart: number;
-  lineEnd: number;
 }
 
 /**
- * Icons for different link states
+ * Command symbol (⌘) icon for the toggle button
  */
-const ICONS = {
-  url: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>`,
-  link: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="0"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`,
-  card: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line></svg>`,
-};
+const COMMAND_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z"></path></svg>`;
 
 /**
  * Widget that renders the format toggle button
@@ -39,24 +38,20 @@ class FormatToggleWidget extends WidgetType {
     private url: string,
     private currentFormat: LinkFormat,
     private from: number,
-    private to: number,
-    private lineStart: number,
-    private lineEnd: number
+    private to: number
   ) {
     super();
   }
 
   toDOM(): HTMLElement {
     const btn = document.createElement("span");
-    btn.className = `link-format-toggle link-format-toggle-${this.currentFormat}`;
-    btn.innerHTML = ICONS[this.currentFormat];
+    btn.className = "link-format-toggle";
+    btn.innerHTML = COMMAND_ICON;
     btn.setAttribute("aria-label", `Toggle link format (currently ${this.currentFormat})`);
     btn.setAttribute("data-url", this.url);
     btn.setAttribute("data-from", String(this.from));
     btn.setAttribute("data-to", String(this.to));
     btn.setAttribute("data-format", this.currentFormat);
-    btn.setAttribute("data-line-start", String(this.lineStart));
-    btn.setAttribute("data-line-end", String(this.lineEnd));
     return btn;
   }
 
@@ -82,41 +77,18 @@ function detectFormat(state: EditorState, url: string, pos: number): LinkFormat 
   const line = doc.lineAt(pos);
   const lineText = line.text;
 
-  // Check if we're inside a link-card code block
-  // Look backwards for ```link-card
-  let lineNum = line.number;
-  let inCodeBlock = false;
-  let codeBlockStart = -1;
-
-  while (lineNum > 0) {
-    const checkLine = doc.line(lineNum);
-    const text = checkLine.text.trim();
-    if (text.startsWith("```link-card")) {
-      inCodeBlock = true;
-      codeBlockStart = lineNum;
-      break;
-    }
-    if (text.startsWith("```") && !text.startsWith("```link-card")) {
-      break; // Different code block or end of block
-    }
-    lineNum--;
-  }
-
-  if (inCodeBlock) {
-    // Verify we're before the closing ```
-    for (let i = line.number; i <= doc.lines; i++) {
-      const checkLine = doc.line(i);
-      if (checkLine.text.trim() === "```") {
-        return "card";
-      }
-    }
-  }
-
-  // Check if URL is inside a markdown link [title](url)
-  // Look for pattern like ](url) where url matches
   const urlEscaped = url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const mdLinkPattern = new RegExp(`\\]\\(${urlEscaped}\\)`);
-  if (mdLinkPattern.test(lineText)) {
+
+  // Check for rich format: [Title · **domain**](url) or [Title **r/subreddit**](url)
+  // Pattern: [...**...**...](url)
+  const richPattern = new RegExp(`\\[[^\\]]*\\*\\*[^*]+\\*\\*[^\\]]*\\]\\(${urlEscaped}\\)`);
+  if (richPattern.test(lineText)) {
+    return "rich";
+  }
+
+  // Check for basic markdown link: [title](url)
+  const linkPattern = new RegExp(`\\]\\(${urlEscaped}\\)`);
+  if (linkPattern.test(lineText)) {
     return "link";
   }
 
@@ -131,9 +103,10 @@ function findFormatRange(
   url: string,
   pos: number,
   format: LinkFormat
-): { from: number; to: number; lineStart: number; lineEnd: number } {
+): { from: number; to: number } {
   const doc = state.doc;
   const line = doc.lineAt(pos);
+  const urlEscaped = url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
   if (format === "url") {
     // Just the URL itself
@@ -142,63 +115,26 @@ function findFormatRange(
       return {
         from: line.from + urlStart,
         to: line.from + urlStart + url.length,
-        lineStart: line.number,
-        lineEnd: line.number,
       };
     }
   }
 
-  if (format === "link") {
-    // Find [title](url) pattern
-    const urlEscaped = url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (format === "link" || format === "rich") {
+    // Find [anything](url) pattern
     const mdLinkPattern = new RegExp(`\\[([^\\]]*)\\]\\(${urlEscaped}\\)`);
     const match = mdLinkPattern.exec(line.text);
     if (match) {
       return {
         from: line.from + match.index,
         to: line.from + match.index + match[0].length,
-        lineStart: line.number,
-        lineEnd: line.number,
       };
     }
-  }
-
-  if (format === "card") {
-    // Find the entire code block
-    let startLine = line.number;
-    let endLine = line.number;
-
-    // Find start
-    while (startLine > 0) {
-      const checkLine = doc.line(startLine);
-      if (checkLine.text.trim().startsWith("```link-card")) {
-        break;
-      }
-      startLine--;
-    }
-
-    // Find end
-    for (let i = startLine + 1; i <= doc.lines; i++) {
-      if (doc.line(i).text.trim() === "```") {
-        endLine = i;
-        break;
-      }
-    }
-
-    return {
-      from: doc.line(startLine).from,
-      to: doc.line(endLine).to,
-      lineStart: startLine,
-      lineEnd: endLine,
-    };
   }
 
   // Fallback
   return {
     from: pos,
     to: pos + url.length,
-    lineStart: line.number,
-    lineEnd: line.number,
   };
 }
 
@@ -223,7 +159,7 @@ function buildDecorations(state: EditorState, enabled: boolean): DecorationSet {
     const line = doc.line(i);
     const lineText = line.text;
 
-    // Skip if we're in a code block header
+    // Skip code block lines
     if (lineText.trim().startsWith("```")) continue;
 
     let match;
@@ -245,16 +181,14 @@ function buildDecorations(state: EditorState, enabled: boolean): DecorationSet {
       const format = detectFormat(state, cleanUrl, cleanUrlPos);
       const range = findFormatRange(state, cleanUrl, cleanUrlPos, format);
 
-      // Position the widget at the end of the URL/link/card
-      const widgetPos = format === "card" ? range.to : cleanUrlEnd;
+      // Position the widget at the end of the link
+      const widgetPos = format === "url" ? cleanUrlEnd : range.to;
 
       const widget = new FormatToggleWidget(
         cleanUrl,
         format,
         range.from,
-        range.to,
-        range.lineStart,
-        range.lineEnd
+        range.to
       );
 
       const decoration = Decoration.widget({
@@ -330,13 +264,11 @@ export function createFormatToggleExtension(config: FormatToggleConfig) {
           const from = parseInt(toggle.getAttribute("data-from") || "0", 10);
           const to = parseInt(toggle.getAttribute("data-to") || "0", 10);
           const format = toggle.getAttribute("data-format") as LinkFormat;
-          const lineStart = parseInt(toggle.getAttribute("data-line-start") || "0", 10);
-          const lineEnd = parseInt(toggle.getAttribute("data-line-end") || "0", 10);
 
           if (!url) return false;
 
           const currentConfig = view.state.field(configField);
-          cycleFormat(view, url, from, to, format, lineStart, lineEnd, currentConfig);
+          cycleFormat(view, url, from, to, format, currentConfig);
 
           return true;
         },
@@ -348,7 +280,7 @@ export function createFormatToggleExtension(config: FormatToggleConfig) {
 }
 
 /**
- * Cycle through formats: url -> link -> card -> url
+ * Cycle through formats: url -> link -> rich -> url
  */
 async function cycleFormat(
   view: EditorView,
@@ -356,8 +288,6 @@ async function cycleFormat(
   from: number,
   to: number,
   currentFormat: LinkFormat,
-  lineStart: number,
-  lineEnd: number,
   config: FormatToggleConfig
 ): Promise<void> {
   const nextFormat = getNextFormat(currentFormat);
@@ -366,17 +296,14 @@ async function cycleFormat(
 
   switch (nextFormat) {
     case "link":
-      // Fetch metadata and create markdown link
       replacement = await createMarkdownLink(url, config);
       break;
 
-    case "card":
-      // Create link-card block
-      replacement = await createLinkCard(url, config);
+    case "rich":
+      replacement = await createRichLink(url, config);
       break;
 
     case "url":
-      // Just the plain URL
       replacement = url;
       break;
   }
@@ -399,12 +326,15 @@ function getNextFormat(current: LinkFormat): LinkFormat {
     case "url":
       return "link";
     case "link":
-      return "card";
-    case "card":
+      return "rich";
+    case "rich":
       return "url";
   }
 }
 
+/**
+ * Create basic markdown link: [Title](url)
+ */
 async function createMarkdownLink(url: string, config: FormatToggleConfig): Promise<string> {
   const sourcePage = config.getSourcePage();
   const result = await config.unfurlService.unfurl(url, false, sourcePage);
@@ -418,19 +348,48 @@ async function createMarkdownLink(url: string, config: FormatToggleConfig): Prom
   return `[${url}](${url})`;
 }
 
-async function createLinkCard(url: string, config: FormatToggleConfig): Promise<string> {
+/**
+ * Create rich markdown link: [Title · **domain.com**](url)
+ * For Reddit: [Title **r/subreddit**](url)
+ */
+async function createRichLink(url: string, config: FormatToggleConfig): Promise<string> {
   const sourcePage = config.getSourcePage();
   const result = await config.unfurlService.unfurl(url, false, sourcePage);
 
-  // Compact card format: only url and title (no description/image for inline display)
-  const lines = ["```link-card", `url: ${url}`];
+  let title = url;
+  let extra = "";
 
-  if (result.success && result.metadata?.title) {
-    lines.push(`title: ${result.metadata.title}`);
+  if (result.success && result.metadata) {
+    const metadata = result.metadata;
+    title = metadata.title || url;
+
+    // For Reddit, use subreddit
+    if (metadata.subreddit) {
+      extra = metadata.subreddit;
+    } else {
+      // For other sites, use domain
+      try {
+        const hostname = new URL(url).hostname.replace(/^www\./, "");
+        extra = hostname;
+      } catch {
+        // Skip if URL parsing fails
+      }
+    }
+  } else {
+    // Fallback: extract domain from URL
+    try {
+      const hostname = new URL(url).hostname.replace(/^www\./, "");
+      extra = hostname;
+    } catch {
+      // Skip if URL parsing fails
+    }
   }
 
-  lines.push("```");
-  return lines.join("\n");
+  if (extra) {
+    return `[${title} · **${extra}**](${url})`;
+  }
+
+  return `[${title}](${url})`;
 }
 
 /**
@@ -442,14 +401,9 @@ export function extractUrlFromFormat(text: string, format: LinkFormat): string |
     return urlMatch ? urlMatch[0] : null;
   }
 
-  if (format === "link") {
+  if (format === "link" || format === "rich") {
     const linkMatch = text.match(/\[([^\]]*)\]\((https?:\/\/[^\)]+)\)/);
     return linkMatch ? linkMatch[2] : null;
-  }
-
-  if (format === "card") {
-    const urlMatch = text.match(/url:\s*(https?:\/\/[^\s]+)/);
-    return urlMatch ? urlMatch[1] : null;
   }
 
   return null;

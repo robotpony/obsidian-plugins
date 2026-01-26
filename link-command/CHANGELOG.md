@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.4.0
+
+### Changed
+
+- **Three inline formats**: Replaced URL/Link/Card with URL/Link/Rich Link
+  - **URL**: Plain `https://example.com`
+  - **Link**: `[Page Title](url)`
+  - **Rich Link**: `[Page Title · **domain.com**](url)` (includes bold domain)
+  - For Reddit: `[Post Title · **r/subreddit**](url)`
+- All formats are now inline text (no code blocks)
+
+### Removed
+
+- **Link card format**: Removed `link-card` code block support entirely
+  - Code blocks don't flow inline within lists/paragraphs
+  - Deleted `LinkCardProcessor.ts`
+  - Removed `.link-card-*` styles
+
+## 0.3.1
+
+### Changed
+
+- **Toggle icon**: Replaced state-specific icons with unified ⌘ (command) symbol
+  - Same icon for all states (URL, Link, Card)
+  - Consistent with Link Command branding
+
 ## 0.3.0
 
 ### Changed
