@@ -560,7 +560,8 @@
 }
 
 .hugo-command-search-chip.folder-chip {
-  background-color: var(--background-modifier-success);
+  background-color: var(--background-modifier-hover);
+  color: var(--text-muted);
 }
 
 .hugo-command-search-chip-clear {

@@ -2,6 +2,12 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.4.4] - 2026-01-25
+
+### Fixed
+
+- Folder filter chip in search bar now has readable contrast (muted background instead of green)
+
 ## [0.4.3] - 2026-01-25
 
 ### Added
