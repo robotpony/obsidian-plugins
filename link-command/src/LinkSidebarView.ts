@@ -225,11 +225,30 @@ export class LinkSidebarView extends ItemView {
   private renderLinkItem(container: HTMLElement, link: PageLink, activeFile: TFile): void {
     const item = container.createEl("div", { cls: "link-sidebar-item" });
 
-    // Status indicator
-    const status = item.createEl("span", {
-      cls: `link-sidebar-status ${link.isCached ? "link-sidebar-status-cached" : "link-sidebar-status-pending"}`,
-      attr: { title: link.isCached ? "Unfurled" : "Not unfurled" },
-    });
+    // Favicon (if cached and available) or status dot
+    if (link.metadata?.favicon) {
+      const favicon = item.createEl("img", {
+        cls: "link-sidebar-favicon",
+        attr: { src: link.metadata.favicon, alt: "" },
+      });
+      favicon.addEventListener("error", () => {
+        // Replace failed favicon with status dot
+        favicon.remove();
+        item.insertBefore(
+          createEl("span", {
+            cls: `link-sidebar-status ${link.isCached ? "link-sidebar-status-cached" : "link-sidebar-status-pending"}`,
+            attr: { title: link.isCached ? "Unfurled" : "Not unfurled" },
+          }),
+          item.firstChild
+        );
+      });
+    } else {
+      // Status indicator (colored dot)
+      item.createEl("span", {
+        cls: `link-sidebar-status ${link.isCached ? "link-sidebar-status-cached" : "link-sidebar-status-pending"}`,
+        attr: { title: link.isCached ? "Unfurled" : "Not unfurled" },
+      });
+    }
 
     // Content
     const content = item.createEl("div", { cls: "link-sidebar-item-content" });

@@ -60,17 +60,23 @@
    Sidebar Styles
    -------------------------------------------- */
 
-/* Logo styling */
+/* Container - matches space-command/hugo-command */
+.link-command-sidebar {
+  padding: 10px;
+}
+
+/* Logo styling - matches space-command */
 .link-command-logo {
   display: inline-block;
   background-color: #689fd6;
   color: white;
-  padding: 2px 5px;
   border-radius: 4px;
-  font-weight: bold;
-  font-size: 12px;
-  font-family: var(--font-monospace);
-  letter-spacing: -0.5px;
+  padding: 3px 3px 2px;
+  font-weight: 600;
+  font-size: 0.9em;
+  text-align: center;
+  line-height: 1.2;
+  vertical-align: middle;
 }
 
 .link-command-logo.clickable-logo {
@@ -83,13 +89,12 @@
   transform: scale(1.05);
 }
 
-/* Sidebar header */
+/* Sidebar header - matches space-command */
 .link-sidebar-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--background-modifier-border);
+  margin-bottom: 15px;
 }
 
 .link-command-sidebar h4 {
@@ -102,9 +107,9 @@
   align-items: center;
   gap: 6px;
   white-space: nowrap;
-  font-size: 14px;
 }
 
+/* Menu button - matches space-command */
 .link-sidebar-menu-btn {
   padding: 4px;
   border: none;
@@ -120,70 +125,72 @@
 }
 
 .link-sidebar-menu-btn.rotating {
-  animation: link-sidebar-rotate 0.5s ease-in-out;
+  animation: rotate 0.5s ease-in-out;
 }
 
-@keyframes link-sidebar-rotate {
+@keyframes rotate {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
 
+/* Section styles */
 .link-sidebar-content {
   padding: 0;
 }
 
 .link-sidebar-section {
-  border-bottom: 1px solid var(--background-modifier-border);
-}
-
-.link-sidebar-section:last-child {
-  border-bottom: none;
+  margin-bottom: 20px;
 }
 
 .link-sidebar-section-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 12px;
-  background: var(--background-secondary);
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--text-muted);
+  cursor: pointer;
+  padding: 5px 0;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  user-select: none;
 }
 
 .link-sidebar-section-title {
-  flex: 1;
+  font-weight: 600;
+  color: var(--text-normal);
+  font-size: 14px;
 }
 
 .link-sidebar-count {
-  color: var(--text-faint);
-  font-weight: normal;
+  opacity: 0.65;
+  background-color: var(--background-primary);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 0.8em;
+  margin-left: 6px;
 }
 
+/* List styles */
 .link-sidebar-list {
-  padding: 4px 0;
+  list-style: none;
+  padding: 0;
+  margin: 0;
 }
 
 .link-sidebar-empty {
-  padding: 16px 12px;
   color: var(--text-muted);
-  font-size: 13px;
-  text-align: center;
+  font-style: italic;
+  padding: 10px 0;
 }
 
+/* Item styles */
 .link-sidebar-item {
   display: flex;
   align-items: flex-start;
+  padding: 4px 0;
   gap: 8px;
-  padding: 8px 12px;
   cursor: pointer;
-  transition: background 0.1s ease;
 }
 
 .link-sidebar-item:hover {
   background: var(--background-modifier-hover);
+  margin: 0 -10px;
+  padding: 4px 10px;
 }
 
 .link-sidebar-status {
@@ -226,12 +233,9 @@
 }
 
 .link-sidebar-item-title {
-  font-size: 13px;
   color: var(--text-normal);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   line-height: 1.4;
+  word-wrap: break-word;
 }
 
 .link-sidebar-item:hover .link-sidebar-item-title {
@@ -242,17 +246,11 @@
   font-size: 11px;
   color: var(--text-accent);
   opacity: 0.8;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .link-sidebar-item-url {
   font-size: 11px;
   color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .link-sidebar-item-meta {
@@ -261,8 +259,6 @@
   gap: 4px;
   font-size: 11px;
   color: var(--text-faint);
-  white-space: nowrap;
-  overflow: hidden;
 }
 
 .link-sidebar-item-source,
@@ -272,6 +268,8 @@
 
 .link-sidebar-history-item {
   border-left: 2px solid transparent;
+  margin-left: -2px;
+  padding-left: 2px;
 }
 
 .link-sidebar-history-item:hover {

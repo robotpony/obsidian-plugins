@@ -796,14 +796,31 @@ var LinkSidebarView = class extends import_obsidian3.ItemView {
     return links;
   }
   renderLinkItem(container, link, activeFile) {
-    var _a;
+    var _a, _b;
     const item = container.createEl("div", { cls: "link-sidebar-item" });
-    const status = item.createEl("span", {
-      cls: `link-sidebar-status ${link.isCached ? "link-sidebar-status-cached" : "link-sidebar-status-pending"}`,
-      attr: { title: link.isCached ? "Unfurled" : "Not unfurled" }
-    });
+    if ((_a = link.metadata) == null ? void 0 : _a.favicon) {
+      const favicon = item.createEl("img", {
+        cls: "link-sidebar-favicon",
+        attr: { src: link.metadata.favicon, alt: "" }
+      });
+      favicon.addEventListener("error", () => {
+        favicon.remove();
+        item.insertBefore(
+          createEl("span", {
+            cls: `link-sidebar-status ${link.isCached ? "link-sidebar-status-cached" : "link-sidebar-status-pending"}`,
+            attr: { title: link.isCached ? "Unfurled" : "Not unfurled" }
+          }),
+          item.firstChild
+        );
+      });
+    } else {
+      item.createEl("span", {
+        cls: `link-sidebar-status ${link.isCached ? "link-sidebar-status-cached" : "link-sidebar-status-pending"}`,
+        attr: { title: link.isCached ? "Unfurled" : "Not unfurled" }
+      });
+    }
     const content = item.createEl("div", { cls: "link-sidebar-item-content" });
-    if ((_a = link.metadata) == null ? void 0 : _a.title) {
+    if ((_b = link.metadata) == null ? void 0 : _b.title) {
       content.createEl("div", { cls: "link-sidebar-item-title", text: link.metadata.title });
       if (link.metadata.subreddit) {
         content.createEl("div", { cls: "link-sidebar-item-subreddit", text: link.metadata.subreddit });
@@ -1212,9 +1229,7 @@ var LinkCommandPlugin = class extends import_obsidian4.Plugin {
       }
     );
     const savedData = await this.loadData();
-    if (savedData == null ? void 0 : savedData.cache) {
-      await this.unfurlService.loadCache(savedData.cache);
-    }
+    await this.unfurlService.loadCache((savedData == null ? void 0 : savedData.cache) || null);
     this.registerView(
       VIEW_TYPE_LINK_SIDEBAR,
       (leaf) => {

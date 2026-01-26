@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.4.3
+
+### Fixed
+
+- **Recent History now loads correctly**: Fixed bug where the cache was never initialized on first run or when no cache data existed, causing "Recent History" to always show empty
+  - Cache is now always initialized on plugin load, even when starting fresh
+
+## 0.4.2
+
+### Added
+
+- **Favicons in Page Links**: Links in the "Page Links" section now show favicons (when available from cache) instead of only status dots
+  - Unfurled links show their favicon on the left
+  - Non-unfurled links still show the grey status dot
+  - Falls back to status dot if favicon fails to load
+
+## 0.4.1
+
+### Changed
+
+- **Sidebar styles**: Updated to match space-command and hugo-command sidebars
+  - Consistent container padding (`padding: 10px`)
+  - Header uses `margin-bottom` instead of border
+  - Section headers match space-command's `todo-section-header` pattern
+  - Logo styling aligned with other plugins
+  - Count badges use pill style with `background-primary`
+  - Item hover states use negative margin for edge-to-edge highlight
+
 ## 0.4.0
 
 ### Changed

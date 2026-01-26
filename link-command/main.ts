@@ -36,11 +36,9 @@ export default class LinkCommandPlugin extends Plugin {
       }
     );
 
-    // Load cache from storage
+    // Load cache from storage (always call loadCache to initialize)
     const savedData = await this.loadData();
-    if (savedData?.cache) {
-      await this.unfurlService.loadCache(savedData.cache);
-    }
+    await this.unfurlService.loadCache(savedData?.cache || null);
 
     // Register sidebar view
     this.registerView(
