@@ -325,5 +325,18 @@ class HugoCommandSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
       );
+
+    new Setting(containerEl)
+      .setName("Trash folder")
+      .setDesc("Folder for trashed posts (relative to vault root)")
+      .addText((text) =>
+        text
+          .setPlaceholder("_trash")
+          .setValue(this.plugin.settings.trashFolder)
+          .onChange(async (value) => {
+            this.plugin.settings.trashFolder = value.trim() || "_trash";
+            await this.plugin.saveSettings();
+          })
+      );
   }
 }

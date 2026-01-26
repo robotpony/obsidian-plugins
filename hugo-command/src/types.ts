@@ -38,6 +38,7 @@ export interface HugoContentItem {
  */
 export interface HugoCommandSettings {
   contentPaths: string[];
+  trashFolder: string;
   showSidebarByDefault: boolean;
   showDrafts: boolean;
   defaultSortOrder: "date-desc" | "date-asc" | "title";
@@ -45,7 +46,8 @@ export interface HugoCommandSettings {
 }
 
 export const DEFAULT_SETTINGS: HugoCommandSettings = {
-  contentPaths: ["."],
+  contentPaths: ["content"],
+  trashFolder: "_trash",
   showSidebarByDefault: true,
   showDrafts: true,
   defaultSortOrder: "date-desc",

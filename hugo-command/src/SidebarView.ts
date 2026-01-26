@@ -13,7 +13,6 @@ export class HugoSidebarView extends ItemView {
   private activeFolderTagFilter: string | null = null;
   private activeStatusFilter: StatusFilter;
   private searchQuery: string = "";
-  private collapsedFolders: Set<string> = new Set();
   private openDropdown: HTMLElement | null = null;
   private openInfoPopup: HTMLElement | null = null;
   private onShowAbout: () => void;
@@ -571,16 +570,10 @@ export class HugoSidebarView extends ItemView {
     items: HugoContentItem[]
   ): void {
     const group = container.createEl("div", { cls: "hugo-command-folder-group" });
-    const isCollapsed = this.collapsedFolders.has(folder);
 
-    // Folder header
+    // Folder header (static, not collapsible)
     const header = group.createEl("div", {
-      cls: `hugo-command-folder-header ${isCollapsed ? "collapsed" : ""}`,
-    });
-
-    const chevron = header.createEl("span", {
-      cls: "hugo-command-folder-chevron",
-      text: isCollapsed ? "\u25b8" : "\u25be",
+      cls: "hugo-command-folder-header static",
     });
 
     header.createEl("span", {
@@ -588,21 +581,10 @@ export class HugoSidebarView extends ItemView {
       text: folder,
     });
 
-    header.addEventListener("click", () => {
-      if (this.collapsedFolders.has(folder)) {
-        this.collapsedFolders.delete(folder);
-      } else {
-        this.collapsedFolders.add(folder);
-      }
-      this.render();
-    });
-
-    // Content list (if not collapsed)
-    if (!isCollapsed) {
-      const list = group.createEl("ul", { cls: "hugo-command-list" });
-      for (const item of items) {
-        this.renderContentItem(list, item);
-      }
+    // Content list
+    const list = group.createEl("ul", { cls: "hugo-command-list" });
+    for (const item of items) {
+      this.renderContentItem(list, item);
     }
   }
 
@@ -625,6 +607,14 @@ export class HugoSidebarView extends ItemView {
     title.addEventListener("click", () => {
       openFile(this.app, item.file);
     });
+
+    // Subfolder chip (if item is in a subfolder - show full path)
+    if (item.folderTags.length > 0) {
+      const subfolderChip = listItem.createEl("span", {
+        cls: "hugo-command-subfolder-chip",
+        text: item.folderTags.join("/"),
+      });
+    }
 
     // Info dropdown (always show - contains date, folder tags, frontmatter tags)
     const frontmatterTags = [...item.tags, ...item.categories];

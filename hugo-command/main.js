@@ -425,7 +425,6 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
     this.activeTagFilter = null;
     this.activeFolderTagFilter = null;
     this.searchQuery = "";
-    this.collapsedFolders = /* @__PURE__ */ new Set();
     this.openDropdown = null;
     this.openInfoPopup = null;
     this.scanner = scanner;
@@ -836,31 +835,16 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
   }
   renderFolderGroup(container, folder, items) {
     const group = container.createEl("div", { cls: "hugo-command-folder-group" });
-    const isCollapsed = this.collapsedFolders.has(folder);
     const header = group.createEl("div", {
-      cls: `hugo-command-folder-header ${isCollapsed ? "collapsed" : ""}`
-    });
-    const chevron = header.createEl("span", {
-      cls: "hugo-command-folder-chevron",
-      text: isCollapsed ? "\u25B8" : "\u25BE"
+      cls: "hugo-command-folder-header static"
     });
     header.createEl("span", {
       cls: "hugo-command-folder-name",
       text: folder
     });
-    header.addEventListener("click", () => {
-      if (this.collapsedFolders.has(folder)) {
-        this.collapsedFolders.delete(folder);
-      } else {
-        this.collapsedFolders.add(folder);
-      }
-      this.render();
-    });
-    if (!isCollapsed) {
-      const list = group.createEl("ul", { cls: "hugo-command-list" });
-      for (const item of items) {
-        this.renderContentItem(list, item);
-      }
+    const list = group.createEl("ul", { cls: "hugo-command-list" });
+    for (const item of items) {
+      this.renderContentItem(list, item);
     }
   }
   renderContentItem(list, item) {
@@ -877,6 +861,12 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
     title.addEventListener("click", () => {
       openFile(this.app, item.file);
     });
+    if (item.folderTags.length > 0) {
+      const subfolderChip = listItem.createEl("span", {
+        cls: "hugo-command-subfolder-chip",
+        text: item.folderTags.join("/")
+      });
+    }
     const frontmatterTags = [...item.tags, ...item.categories];
     const folderTags = item.folderTags;
     this.renderItemInfoDropdown(listItem, item.date, frontmatterTags, folderTags);
@@ -1127,7 +1117,8 @@ var TitlePromptModal = class extends import_obsidian3.Modal {
 
 // src/types.ts
 var DEFAULT_SETTINGS = {
-  contentPaths: ["."],
+  contentPaths: ["content"],
+  trashFolder: "_trash",
   showSidebarByDefault: true,
   showDrafts: true,
   defaultSortOrder: "date-desc",
@@ -1334,6 +1325,12 @@ var HugoCommandSettingTab = class extends import_obsidian4.PluginSettingTab {
     new import_obsidian4.Setting(containerEl).setName("Default sort order").setDesc("How to sort content in the sidebar").addDropdown(
       (dropdown) => dropdown.addOption("date-desc", "Date (newest first)").addOption("date-asc", "Date (oldest first)").addOption("title", "Title (A-Z)").setValue(this.plugin.settings.defaultSortOrder).onChange(async (value) => {
         this.plugin.settings.defaultSortOrder = value;
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian4.Setting(containerEl).setName("Trash folder").setDesc("Folder for trashed posts (relative to vault root)").addText(
+      (text) => text.setPlaceholder("_trash").setValue(this.plugin.settings.trashFolder).onChange(async (value) => {
+        this.plugin.settings.trashFolder = value.trim() || "_trash";
         await this.plugin.saveSettings();
       })
     );

@@ -2,6 +2,29 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.3.2] - 2026-01-25
+
+### Fixed
+
+- Subfolder chips now show full path (e.g., "tutorials/advanced" instead of just "tutorials")
+
+## [0.3.1] - 2026-01-25
+
+### Changed
+
+- Folder sections are no longer collapsible (always expanded)
+- Subfolder name now displays as a chip next to the post title
+
+## [0.3.0] - 2026-01-25
+
+### Changed
+
+- Default content path changed from "." (entire vault) to "content" (Hugo standard)
+
+### Added
+
+- Trash folder setting for future use (default: "_trash")
+
 ## [0.2.9] - 2026-01-25
 
 ### Changed
