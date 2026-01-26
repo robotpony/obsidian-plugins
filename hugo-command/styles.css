@@ -793,6 +793,20 @@
   color: var(--text-muted);
 }
 
+.hugo-command-site-settings .site-settings-file-info.clickable {
+  cursor: pointer;
+}
+
+.hugo-command-site-settings .site-settings-file-link {
+  color: var(--text-accent);
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+
+.hugo-command-site-settings .site-settings-file-link:hover {
+  text-decoration-style: solid;
+}
+
 .hugo-command-site-settings .site-settings-buttons {
   display: flex;
   gap: 8px;

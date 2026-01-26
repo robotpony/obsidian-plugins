@@ -2,6 +2,12 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.4.3] - 2026-01-25
+
+### Added
+
+- Config filename in Site Settings footer is now clickable - opens hugo.toml in editor for full access to all settings
+
 ## [0.4.2] - 2026-01-25
 
 ### Fixed

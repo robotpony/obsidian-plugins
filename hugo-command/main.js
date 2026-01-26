@@ -1457,9 +1457,20 @@ var SiteSettingsModal = class extends import_obsidian4.Modal {
       }
     }
     const footerSection = container.createEl("div", { cls: "site-settings-footer-section" });
-    footerSection.createEl("div", {
-      cls: "site-settings-file-info",
-      text: `Config: ${(_a = this.configFile) == null ? void 0 : _a.name}`
+    const fileInfo = footerSection.createEl("div", {
+      cls: "site-settings-file-info clickable"
+    });
+    fileInfo.createEl("span", { text: "Config: " });
+    const fileLink = fileInfo.createEl("span", {
+      cls: "site-settings-file-link",
+      text: ((_a = this.configFile) == null ? void 0 : _a.name) || ""
+    });
+    fileLink.addEventListener("click", async () => {
+      if (this.configFile) {
+        const leaf = this.app.workspace.getLeaf(false);
+        await leaf.openFile(this.configFile);
+        this.close();
+      }
     });
     const buttonContainer = footerSection.createEl("div", { cls: "site-settings-buttons" });
     const cancelBtn = buttonContainer.createEl("button", {

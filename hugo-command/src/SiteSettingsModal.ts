@@ -340,10 +340,21 @@ export class SiteSettingsModal extends Modal {
     // Fixed footer section
     const footerSection = container.createEl("div", { cls: "site-settings-footer-section" });
 
-    // Config file info (in footer)
-    footerSection.createEl("div", {
-      cls: "site-settings-file-info",
-      text: `Config: ${this.configFile?.name}`,
+    // Config file info (in footer) - clickable to open in editor
+    const fileInfo = footerSection.createEl("div", {
+      cls: "site-settings-file-info clickable",
+    });
+    fileInfo.createEl("span", { text: "Config: " });
+    const fileLink = fileInfo.createEl("span", {
+      cls: "site-settings-file-link",
+      text: this.configFile?.name || "",
+    });
+    fileLink.addEventListener("click", async () => {
+      if (this.configFile) {
+        const leaf = this.app.workspace.getLeaf(false);
+        await leaf.openFile(this.configFile);
+        this.close();
+      }
     });
 
     // Buttons
