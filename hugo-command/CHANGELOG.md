@@ -2,6 +2,19 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.2.11] - 2026-01-25
+
+### Fixed
+
+- Empty folders now appear in folder dropdowns (new post, filter) immediately when created in Obsidian
+- Folder create/delete/rename events now trigger UI updates
+
+## [0.2.10] - 2026-01-25
+
+### Fixed
+
+- Clicking the (i) info button a second time now closes the dropdown (toggle behavior)
+
 ## [0.2.9] - 2026-01-25
 
 ### Changed

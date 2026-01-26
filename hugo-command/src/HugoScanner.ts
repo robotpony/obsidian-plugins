@@ -1,4 +1,4 @@
-import { App, TFile, Events, debounce } from "obsidian";
+import { App, TFile, TFolder, Events, debounce } from "obsidian";
 import { HugoContentItem, HugoFrontmatter } from "./types";
 import {
   parseFrontmatter,
@@ -14,6 +14,7 @@ export class HugoScanner extends Events {
   private app: App;
   private contentPaths: string[];
   private contentCache: Map<string, HugoContentItem> = new Map();
+  private folderCache: Set<string> = new Set();
   private debouncedScanFile: (file: TFile) => void;
 
   constructor(app: App, contentPaths: string[]) {
@@ -61,7 +62,9 @@ export class HugoScanner extends Events {
    */
   async scanVault(): Promise<void> {
     this.contentCache.clear();
+    this.folderCache.clear();
 
+    // Scan all markdown files
     const files = this.app.vault.getMarkdownFiles();
     for (const file of files) {
       if (this.isInContentPath(file.path)) {
@@ -69,7 +72,22 @@ export class HugoScanner extends Events {
       }
     }
 
+    // Scan all folders
+    this.scanFolders();
+
     this.trigger("content-updated");
+  }
+
+  /**
+   * Scan all folders in the vault that match content paths
+   */
+  private scanFolders(): void {
+    const folders = this.app.vault.getAllFolders();
+    for (const folder of folders) {
+      if (this.isInContentPath(folder.path)) {
+        this.folderCache.add(folder.path);
+      }
+    }
   }
 
   /**
@@ -141,12 +159,20 @@ export class HugoScanner extends Events {
       if (file instanceof TFile && file.extension === "md") {
         this.debouncedScanFile(file);
         this.trigger("content-updated");
+      } else if (file instanceof TFolder) {
+        if (this.isInContentPath(file.path)) {
+          this.folderCache.add(file.path);
+          this.trigger("content-updated");
+        }
       }
     });
 
     this.app.vault.on("delete", (file) => {
       if (file instanceof TFile) {
         this.contentCache.delete(file.path);
+        this.trigger("content-updated");
+      } else if (file instanceof TFolder) {
+        this.folderCache.delete(file.path);
         this.trigger("content-updated");
       }
     });
@@ -155,6 +181,12 @@ export class HugoScanner extends Events {
       if (file instanceof TFile && file.extension === "md") {
         this.contentCache.delete(oldPath);
         this.debouncedScanFile(file);
+        this.trigger("content-updated");
+      } else if (file instanceof TFolder) {
+        this.folderCache.delete(oldPath);
+        if (this.isInContentPath(file.path)) {
+          this.folderCache.add(file.path);
+        }
         this.trigger("content-updated");
       }
     });
@@ -254,11 +286,13 @@ export class HugoScanner extends Events {
   /**
    * Get folder hierarchy as a flat list with depth for display
    * Returns folders with their full path and nesting depth
+   * Merges folders derived from files with actual folders from the vault
    */
   getFolderHierarchy(): { name: string; path: string; depth: number }[] {
     // Build a set of all full folder paths from content items
     const pathSet = new Set<string>();
 
+    // Add folders derived from file paths
     for (const item of this.contentCache.values()) {
       if (item.topLevelFolder === "(root)") continue;
 
@@ -268,6 +302,18 @@ export class HugoScanner extends Events {
 
       for (const subFolder of item.folderTags) {
         currentPath = `${currentPath}/${subFolder}`;
+        pathSet.add(currentPath);
+      }
+    }
+
+    // Add actual folders from the vault (includes empty folders)
+    for (const folderPath of this.folderCache) {
+      pathSet.add(folderPath);
+      // Also add parent folders to ensure hierarchy is complete
+      const parts = folderPath.split("/");
+      let currentPath = "";
+      for (const part of parts) {
+        currentPath = currentPath ? `${currentPath}/${part}` : part;
         pathSet.add(currentPath);
       }
     }

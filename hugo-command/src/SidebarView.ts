@@ -15,6 +15,7 @@ export class HugoSidebarView extends ItemView {
   private searchQuery: string = "";
   private collapsedFolders: Set<string> = new Set();
   private openDropdown: HTMLElement | null = null;
+  private openDropdownTrigger: HTMLElement | null = null;
   private openInfoPopup: HTMLElement | null = null;
   private onShowAbout: () => void;
   private onOpenSettings: () => void;
@@ -72,6 +73,7 @@ export class HugoSidebarView extends ItemView {
       this.openDropdown.remove();
       this.openDropdown = null;
     }
+    this.openDropdownTrigger = null;
   }
 
   private closeInfoPopup(): void {
@@ -645,6 +647,13 @@ export class HugoSidebarView extends ItemView {
 
     trigger.addEventListener("click", (e) => {
       e.stopPropagation();
+
+      // Toggle off if clicking the same trigger
+      if (this.openDropdownTrigger === trigger) {
+        this.closeDropdown();
+        return;
+      }
+
       this.closeDropdown();
 
       const dropdown = document.createElement("div");
@@ -743,6 +752,7 @@ export class HugoSidebarView extends ItemView {
 
       document.body.appendChild(dropdown);
       this.openDropdown = dropdown;
+      this.openDropdownTrigger = trigger;
 
       const closeHandler = (e: MouseEvent) => {
         if (!dropdown.contains(e.target as Node) && e.target !== trigger) {
