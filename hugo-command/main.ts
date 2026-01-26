@@ -17,6 +17,7 @@ import {
   StatusFilter,
 } from "./src/types";
 import { showNotice, LOGO_PREFIX } from "./src/utils";
+import { SiteSettingsModal } from "./src/SiteSettingsModal";
 
 export default class HugoCommandPlugin extends Plugin {
   settings: HugoCommandSettings;
@@ -43,7 +44,8 @@ export default class HugoCommandPlugin extends Plugin {
           this.scanner,
           this.settings,
           () => this.showAboutModal(),
-          () => this.openSettings()
+          () => this.openSettings(),
+          () => this.showSiteSettings()
         )
     );
 
@@ -172,6 +174,10 @@ export default class HugoCommandPlugin extends Plugin {
   openSettings() {
     (this.app as any).setting.open();
     (this.app as any).setting.openTabById("hugo-command");
+  }
+
+  showSiteSettings() {
+    new SiteSettingsModal(this.app).open();
   }
 }
 

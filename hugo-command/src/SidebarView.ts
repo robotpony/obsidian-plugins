@@ -17,13 +17,15 @@ export class HugoSidebarView extends ItemView {
   private openInfoPopup: HTMLElement | null = null;
   private onShowAbout: () => void;
   private onOpenSettings: () => void;
+  private onOpenSiteSettings: () => void;
 
   constructor(
     leaf: WorkspaceLeaf,
     scanner: HugoScanner,
     settings: HugoCommandSettings,
     onShowAbout: () => void,
-    onOpenSettings: () => void
+    onOpenSettings: () => void,
+    onOpenSiteSettings: () => void
   ) {
     super(leaf);
     this.scanner = scanner;
@@ -31,6 +33,7 @@ export class HugoSidebarView extends ItemView {
     this.activeStatusFilter = settings.defaultStatusFilter;
     this.onShowAbout = onShowAbout;
     this.onOpenSettings = onOpenSettings;
+    this.onOpenSiteSettings = onOpenSiteSettings;
   }
 
   getViewType(): string {
@@ -128,6 +131,14 @@ export class HugoSidebarView extends ItemView {
 
     menuBtn.addEventListener("click", (evt) => {
       const menu = new Menu();
+
+      // Site Settings
+      menu.addItem((item) => {
+        item
+          .setTitle("Site Settings")
+          .setIcon("globe")
+          .onClick(() => this.onOpenSiteSettings());
+      });
 
       // Refresh
       menu.addItem((item) => {

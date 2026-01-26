@@ -2,6 +2,32 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.4.1] - 2026-01-25
+
+### Changed
+
+- Site Settings modal layout: fixed header with scrollable content area
+- Config file info moved to footer
+- Modal widened to 700px for better readability
+- Input fields widened to 280px
+- Added Build Settings section: buildDrafts, buildFuture, buildExpired
+- Added Features section: enableRobotsTXT, enableGitInfo, disableKinds
+- Added Taxonomies section: category, tag
+- Added Permalinks section: posts permalink pattern
+- Added summaryLength and paginate to Basic Settings
+
+## [0.4.0] - 2026-01-25
+
+### Added
+
+- **Site Settings editor**: Edit hugo.toml/config.toml from the sidebar menu
+  - Displays Hugo Command logo and site title prominently
+  - Edit basic settings: title, baseURL, languageCode
+  - Edit author/copyright information
+  - Edit theme setting
+  - Edit custom [params] section fields
+  - Supports both TOML and YAML config formats
+
 ## [0.3.2] - 2026-01-25
 
 ### Fixed

@@ -55,3 +55,26 @@ export const DEFAULT_SETTINGS: HugoCommandSettings = {
 };
 
 export type StatusFilter = "all" | "draft" | "published";
+
+/**
+ * Hugo site configuration (hugo.toml / config.toml)
+ */
+export interface HugoSiteConfig {
+  // Basic settings
+  title?: string;
+  baseURL?: string;
+  languageCode?: string;
+
+  // Author/copyright
+  author?: string;
+  copyright?: string;
+
+  // Theme
+  theme?: string;
+
+  // Custom params section
+  params?: Record<string, unknown>;
+
+  // Allow other top-level fields
+  [key: string]: unknown;
+}
