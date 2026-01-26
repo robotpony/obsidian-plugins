@@ -2,6 +2,12 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.4.5] - 2026-01-25
+
+### Fixed
+
+- Post items now align flush with folder headers (removed legacy indentation from collapsible folders)
+
 ## [0.4.4] - 2026-01-25
 
 ### Fixed

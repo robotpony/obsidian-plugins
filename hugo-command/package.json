@@ -1,6 +1,6 @@
 {
   "name": "hugo-command",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "description": "H\u2318 Hugo Command - Obsidian plugin for managing Hugo content",
   "main": "main.js",
   "scripts": {

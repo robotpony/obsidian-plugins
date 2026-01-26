@@ -500,9 +500,8 @@
 }
 
 .hugo-command-folder-group .hugo-command-list {
-  margin-left: 18px;
-  border-left: 1px solid var(--background-modifier-border);
-  padding-left: 8px;
+  margin-left: 0;
+  padding-left: 0;
 }
 
 /* Folder filter trigger button (SVG icon) - deprecated, use .hugo-command-filter-trigger */
