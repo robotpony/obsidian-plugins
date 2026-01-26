@@ -177,3 +177,35 @@ export function getSubfolderTags(filePath: string, contentPaths: string[]): stri
   // Return all middle parts (exclude first folder and last filename)
   return parts.slice(1, parts.length - 1);
 }
+
+/**
+ * Convert a title to a URL-friendly slug for filenames
+ */
+export function slugify(title: string): string {
+  return title
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, "") // Remove non-word chars except spaces and hyphens
+    .replace(/\s+/g, "-") // Replace spaces with hyphens
+    .replace(/-+/g, "-") // Replace multiple hyphens with single
+    .replace(/^-+|-+$/g, ""); // Remove leading/trailing hyphens
+}
+
+/**
+ * Generate Hugo frontmatter template for a new post
+ */
+export function generateHugoFrontmatter(title: string): string {
+  const now = new Date();
+  const dateStr = now.toISOString();
+
+  return `---
+title: "${title}"
+date: ${dateStr}
+draft: true
+tags: []
+categories: []
+description: ""
+---
+
+`;
+}

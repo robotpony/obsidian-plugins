@@ -1,7 +1,7 @@
 {
   "id": "hugo-command",
   "name": "H\u2318 Hugo Command",
-  "version": "0.2.5",
+  "version": "0.2.9",
   "minAppVersion": "0.15.0",
   "description": "H\u2318 Hugo Command: Manage and browse your Hugo content with a sidebar showing posts, drafts, and tags.",
   "author": "Bruce Alderson",

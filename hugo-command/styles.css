@@ -135,6 +135,21 @@
   flex: 1;
 }
 
+/* New post button */
+.hugo-command-new-btn {
+  padding: 4px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+  flex-shrink: 0;
+}
+
+.hugo-command-new-btn:hover {
+  opacity: 1;
+}
+
 /* Menu button (kebab) */
 .hugo-command-menu-btn {
   padding: 4px;
@@ -403,21 +418,26 @@
   flex-shrink: 0;
 }
 
-.hugo-command-item-tag-trigger {
+/* Info trigger on each post item (i) */
+.hugo-command-item-info-trigger {
   cursor: pointer;
-  font-size: 9pt;
-  font-family: var(--font-monospace);
-  opacity: 0.6;
-  color: var(--tag-color);
-  background-color: var(--tag-background);
-  padding: var(--tag-padding-y) var(--tag-padding-x);
-  border-radius: var(--tag-radius);
+  font-size: 0.85em;
+  opacity: 0.5;
+  color: var(--text-muted);
   transition: opacity 0.15s;
   flex-shrink: 0;
 }
 
-.hugo-command-item-tag-trigger:hover {
+.hugo-command-item-info-trigger:hover {
   opacity: 1;
+}
+
+/* Date display in item info dropdown */
+.hugo-command-info-date {
+  font-size: 0.85em;
+  color: var(--text-normal);
+  padding: 8px 12px;
+  font-weight: 500;
 }
 
 /* Empty state */
@@ -602,4 +622,45 @@
   padding: 6px 12px 4px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+/* Title prompt modal */
+.hugo-command-title-modal {
+  padding: 16px;
+}
+
+.hugo-command-title-modal h3 {
+  margin: 0 0 16px 0;
+  font-size: 1.2em;
+}
+
+.hugo-command-title-input-container {
+  margin-bottom: 16px;
+}
+
+.hugo-command-title-input {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 1em;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+}
+
+.hugo-command-title-input:focus {
+  border-color: var(--interactive-accent);
+  outline: none;
+}
+
+.hugo-command-title-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.hugo-command-title-buttons button {
+  padding: 6px 16px;
+  border-radius: 4px;
+  cursor: pointer;
 }

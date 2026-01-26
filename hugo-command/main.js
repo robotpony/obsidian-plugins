@@ -132,6 +132,23 @@ function getSubfolderTags(filePath, contentPaths) {
   }
   return parts.slice(1, parts.length - 1);
 }
+function slugify(title) {
+  return title.toLowerCase().trim().replace(/[^\w\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "");
+}
+function generateHugoFrontmatter(title) {
+  const now = /* @__PURE__ */ new Date();
+  const dateStr = now.toISOString();
+  return `---
+title: "${title}"
+date: ${dateStr}
+draft: true
+tags: []
+categories: []
+description: ""
+---
+
+`;
+}
 
 // src/HugoScanner.ts
 var HugoScanner = class extends import_obsidian2.Events {
@@ -476,6 +493,15 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
     header.createEl("span", {
       cls: "hugo-command-title",
       text: "Hugo Command"
+    });
+    const newBtn = header.createEl("button", {
+      cls: "clickable-icon hugo-command-new-btn",
+      attr: { "aria-label": "New post" }
+    });
+    newBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
+    newBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.showNewPostDropdown(newBtn);
     });
     const menuBtn = header.createEl("button", {
       cls: "clickable-icon hugo-command-menu-btn",
@@ -822,10 +848,6 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
       cls: "hugo-command-folder-name",
       text: folder
     });
-    header.createEl("span", {
-      cls: "hugo-command-folder-count",
-      text: `(${items.length})`
-    });
     header.addEventListener("click", () => {
       if (this.collapsedFolders.has(folder)) {
         this.collapsedFolders.delete(folder);
@@ -857,20 +879,12 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
     });
     const frontmatterTags = [...item.tags, ...item.categories];
     const folderTags = item.folderTags;
-    if (frontmatterTags.length > 0 || folderTags.length > 0) {
-      this.renderItemTagDropdown(listItem, frontmatterTags, folderTags);
-    }
-    if (item.date) {
-      listItem.createEl("span", {
-        cls: "hugo-command-item-date",
-        text: formatDate(item.date)
-      });
-    }
+    this.renderItemInfoDropdown(listItem, item.date, frontmatterTags, folderTags);
   }
-  renderItemTagDropdown(container, frontmatterTags, folderTags) {
+  renderItemInfoDropdown(container, date, frontmatterTags, folderTags) {
     const trigger = container.createEl("span", {
-      cls: "hugo-command-item-tag-trigger",
-      text: "#"
+      cls: "hugo-command-item-info-trigger",
+      text: "\u24D8"
     });
     trigger.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -887,7 +901,16 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
       } else {
         dropdown.style.left = `${rect.left}px`;
       }
+      if (date) {
+        dropdown.createEl("div", {
+          cls: "hugo-command-info-date",
+          text: formatDate(date)
+        });
+      }
       if (folderTags.length > 0) {
+        if (date) {
+          dropdown.createEl("div", { cls: "hugo-command-tag-separator" });
+        }
         dropdown.createEl("div", {
           cls: "hugo-command-tag-section-header",
           text: "Folders"
@@ -913,7 +936,7 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
         }
       }
       if (frontmatterTags.length > 0) {
-        if (folderTags.length > 0) {
+        if (date || folderTags.length > 0) {
           dropdown.createEl("div", { cls: "hugo-command-tag-separator" });
         }
         dropdown.createEl("div", {
@@ -957,6 +980,148 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
   updateSettings(settings) {
     this.settings = settings;
     this.render();
+  }
+  /**
+   * Show dropdown for selecting folder to create new post
+   */
+  showNewPostDropdown(trigger) {
+    this.closeDropdown();
+    this.closeInfoPopup();
+    const dropdown = document.createElement("div");
+    dropdown.className = "hugo-command-tag-dropdown";
+    const rect = trigger.getBoundingClientRect();
+    dropdown.style.position = "fixed";
+    dropdown.style.top = `${rect.bottom + 4}px`;
+    dropdown.style.right = `${window.innerWidth - rect.right}px`;
+    dropdown.createEl("div", {
+      cls: "hugo-command-tag-section-header",
+      text: "Create in folder"
+    });
+    const folderHierarchy = this.scanner.getFolderHierarchy();
+    const rootItem = dropdown.createEl("div", {
+      cls: "hugo-command-tag-item",
+      text: "(root)"
+    });
+    rootItem.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.closeDropdown();
+      this.promptForNewPost("");
+    });
+    for (const folder of folderHierarchy) {
+      const depthClass = `folder-depth-${Math.min(folder.depth, 4)}`;
+      const folderItem = dropdown.createEl("div", {
+        cls: `hugo-command-tag-item folder-tag ${depthClass}`,
+        text: folder.name
+      });
+      folderItem.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.closeDropdown();
+        this.promptForNewPost(folder.path);
+      });
+    }
+    document.body.appendChild(dropdown);
+    this.openDropdown = dropdown;
+    const closeHandler = (e) => {
+      if (!dropdown.contains(e.target) && e.target !== trigger) {
+        this.closeDropdown();
+        document.removeEventListener("click", closeHandler);
+      }
+    };
+    setTimeout(() => document.addEventListener("click", closeHandler), 0);
+  }
+  /**
+   * Prompt user for title and create new post
+   */
+  promptForNewPost(folderPath) {
+    const modal = new TitlePromptModal(this.app, async (title) => {
+      if (!title.trim()) {
+        showNotice("Title cannot be empty");
+        return;
+      }
+      await this.createNewPost(folderPath, title.trim());
+    });
+    modal.open();
+  }
+  /**
+   * Create a new post with Hugo frontmatter
+   */
+  async createNewPost(folderPath, title) {
+    const filename = slugify(title) || "untitled";
+    const fullPath = folderPath ? `${folderPath}/${filename}.md` : `${filename}.md`;
+    const existingFile = this.app.vault.getAbstractFileByPath(fullPath);
+    if (existingFile) {
+      showNotice(`File already exists: ${fullPath}`);
+      return;
+    }
+    if (folderPath) {
+      const folderExists = this.app.vault.getAbstractFileByPath(folderPath);
+      if (!folderExists) {
+        await this.app.vault.createFolder(folderPath);
+      }
+    }
+    const content = generateHugoFrontmatter(title);
+    const newFile = await this.app.vault.create(fullPath, content);
+    showNotice(`Created: ${fullPath}`);
+    await openFile(this.app, newFile);
+    await this.scanner.scanVault();
+  }
+};
+var TitlePromptModal = class extends import_obsidian3.Modal {
+  constructor(app, onSubmit) {
+    super(app);
+    this.inputEl = null;
+    this.onSubmit = onSubmit;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass("hugo-command-title-modal");
+    contentEl.createEl("h3", { text: "New Post" });
+    const inputContainer = contentEl.createEl("div", {
+      cls: "hugo-command-title-input-container"
+    });
+    this.inputEl = inputContainer.createEl("input", {
+      cls: "hugo-command-title-input",
+      attr: {
+        type: "text",
+        placeholder: "Enter post title..."
+      }
+    });
+    this.inputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        this.submit();
+      }
+    });
+    const buttonContainer = contentEl.createEl("div", {
+      cls: "hugo-command-title-buttons"
+    });
+    const cancelBtn = buttonContainer.createEl("button", {
+      text: "Cancel"
+    });
+    cancelBtn.addEventListener("click", () => {
+      this.close();
+    });
+    const createBtn = buttonContainer.createEl("button", {
+      cls: "mod-cta",
+      text: "Create"
+    });
+    createBtn.addEventListener("click", () => {
+      this.submit();
+    });
+    setTimeout(() => {
+      var _a;
+      return (_a = this.inputEl) == null ? void 0 : _a.focus();
+    }, 10);
+  }
+  submit() {
+    var _a;
+    const title = ((_a = this.inputEl) == null ? void 0 : _a.value) || "";
+    this.close();
+    this.onSubmit(title);
+  }
+  onClose() {
+    this.contentEl.empty();
   }
 };
 

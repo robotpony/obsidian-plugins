@@ -2,6 +2,36 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.2.9] - 2026-01-25
+
+### Changed
+
+- Removed post counts from folder headers for cleaner sidebar display
+
+## [0.2.8] - 2026-01-25
+
+### Changed
+
+- Post date moved from item row into info dropdown for cleaner list display
+- Post info trigger changed from "#" to "(i)" icon since it now shows date, folders, and tags
+- Info dropdown always visible (not just when post has tags)
+
+## [0.2.7] - 2026-01-25
+
+### Fixed
+
+- New post folder dropdown now opens to the left to stay within Obsidian window bounds
+
+## [0.2.6] - 2026-01-25
+
+### Added
+
+- **New Post command**: Click the + icon in the sidebar header to create a new post
+- Folder selection dropdown with hierarchical display for new post location
+- Title prompt modal with Enter key support
+- New posts created with full Hugo frontmatter template (title, date, draft, tags, categories, description)
+- Filename automatically generated from title (slugified)
+
 ## [0.2.5] - 2026-01-25
 
 ### Changed
