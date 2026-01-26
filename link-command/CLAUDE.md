@@ -21,9 +21,8 @@ This is **Link Command** (`link-command`), an Obsidian plugin for URL unfurling.
 [main.ts](main.ts) - Plugin entry point extending `Plugin`. Initializes all components and registers:
 - Code block processor for `link-card` blocks
 - Sidebar view for browsing page links and history
-- Context menu handler for "Unfurl link..." action
-- Paste event handler for auto-unfurling
-- Commands: "Unfurl URL at cursor", "Insert link card", "Clear link cache", "Toggle link sidebar"
+- Inline format toggle extension (CodeMirror decorations)
+- Commands: "Toggle link format", "Clear link cache", "Toggle link sidebar"
 
 ### Key Components (src/)
 
@@ -33,17 +32,17 @@ This is **Link Command** (`link-command`), an Obsidian plugin for URL unfurling.
 | [UrlMetadataProvider.ts](src/UrlMetadataProvider.ts) | Provider interface and implementations: `HtmlMetadataProvider` (Open Graph/Twitter Card parser), `AuthDomainProvider` (skips auth-required domains) |
 | [UrlMetadataCache.ts](src/UrlMetadataCache.ts) | Two-tier cache: in-memory for session, persistent via plugin data for offline |
 | [UrlUnfurlService.ts](src/UrlUnfurlService.ts) | Coordinates providers and cache, validates URLs, handles batch unfurling |
-| [UrlUnfurlTooltip.ts](src/UrlUnfurlTooltip.ts) | Floating preview UI with loading/error states and action buttons |
-| [LinkCardProcessor.ts](src/LinkCardProcessor.ts) | Processes `link-card` code blocks, renders as preview cards |
+| [UrlFormatToggle.ts](src/UrlFormatToggle.ts) | CodeMirror extension: inline toggle buttons next to URLs to cycle formats |
+| [LinkCardProcessor.ts](src/LinkCardProcessor.ts) | Processes `link-card` code blocks, renders as compact inline cards |
 | [LinkSidebarView.ts](src/LinkSidebarView.ts) | Sidebar showing page links and recent history |
 
 ### Data Flow
 
-1. **Trigger**: User right-clicks URL, pastes URL, or runs command
+1. **Trigger**: User clicks inline toggle button or runs "Toggle link format" command
 2. **Service**: `UrlUnfurlService` checks cache, then routes to provider
 3. **Provider**: `HtmlMetadataProvider` fetches HTML via `requestUrl()`, parses Open Graph/meta tags
 4. **Cache**: Successful results stored in memory + persistent cache
-5. **UI**: Tooltip or code block renders metadata with action buttons
+5. **UI**: Format cycles: plain URL → markdown link → compact link card → plain URL
 
 ### Provider Architecture
 
@@ -67,7 +66,7 @@ To add a new provider (e.g., for Slack), create a file in `src/providers/` imple
 - **Network requests**: Uses Obsidian's `requestUrl()` API (bypasses CORS)
 - **HTML parsing**: Browser's `DOMParser` extracts Open Graph, Twitter Cards, and standard meta tags
 - **Caching**: Two-tier (memory + persistent) with configurable TTL and source page tracking
-- **Tooltip UI**: Follows space-command's `DefineTooltip` pattern for floating previews
+- **Inline toggle**: CodeMirror `StateField` + `WidgetType` + `ViewPlugin` for inline buttons
 - **Sidebar**: Follows space-command's `SidebarView` pattern with sections for page links and history
 
 ### Settings Tab
@@ -76,12 +75,14 @@ The `LinkCommandSettingTab` class is defined inline in [main.ts](main.ts).
 
 ## Code Block Syntax
 
+Link cards are compact inline elements (favicon + title + domain):
+
 ```link-card
 url: https://example.com
 title: Optional title (will be fetched if omitted)
-description: Optional description
-image: Optional image URL
 ```
+
+Note: `description` and `image` fields are ignored in the compact format.
 
 ## Sidebar
 
@@ -91,12 +92,10 @@ The sidebar shows two sections:
    - Green dot = unfurled (cached)
    - Grey dot = not yet unfurled
    - Click to navigate to the line in the file
-   - Right-click for context menu (unfurl, copy, open)
 
 2. **Recent History** - Recently unfurled URLs from cache
    - Shows title, URL, source pages, and time ago
    - Click to open URL in browser
-   - Right-click for context menu
 
 ## Release Checklist
 

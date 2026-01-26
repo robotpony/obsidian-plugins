@@ -99,46 +99,15 @@ export class LinkCardProcessor {
       siteName: string | null;
     }
   ): void {
+    // Compact inline card: favicon + title + domain
     const link = container.createEl("a", {
       cls: "link-card-link",
       attr: { href: data.url, target: "_blank", rel: "noopener noreferrer" },
     });
 
-    // Image (if available)
-    if (data.image) {
-      const imageContainer = link.createEl("div", { cls: "link-card-image-container" });
-      const img = imageContainer.createEl("img", {
-        cls: "link-card-image",
-        attr: { src: data.image, alt: data.title || "Preview" },
-      });
-      img.addEventListener("error", () => {
-        imageContainer.remove();
-      });
-    }
-
-    // Content section
-    const content = link.createEl("div", { cls: "link-card-content" });
-
-    // Title
-    content.createEl("div", {
-      cls: "link-card-title",
-      text: data.title || data.url,
-    });
-
-    // Description
-    if (data.description) {
-      const desc = content.createEl("div", { cls: "link-card-description" });
-      const maxLen = 150;
-      desc.textContent = data.description.length > maxLen
-        ? data.description.slice(0, maxLen) + "..."
-        : data.description;
-    }
-
-    // Footer with favicon and domain
-    const footer = content.createEl("div", { cls: "link-card-footer" });
-
+    // Favicon
     if (data.favicon) {
-      const favicon = footer.createEl("img", {
+      const favicon = link.createEl("img", {
         cls: "link-card-favicon",
         attr: { src: data.favicon, alt: "" },
       });
@@ -147,9 +116,16 @@ export class LinkCardProcessor {
       });
     }
 
+    // Title
+    link.createEl("span", {
+      cls: "link-card-title",
+      text: data.title || data.url,
+    });
+
+    // Domain
     try {
-      const hostname = new URL(data.url).hostname;
-      footer.createEl("span", { cls: "link-card-domain", text: data.siteName || hostname });
+      const hostname = new URL(data.url).hostname.replace(/^www\./, "");
+      link.createEl("span", { cls: "link-card-domain", text: hostname });
     } catch {
       // Skip domain if URL is invalid
     }

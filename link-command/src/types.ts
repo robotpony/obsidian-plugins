@@ -12,6 +12,8 @@ export interface UrlMetadata {
   publishedDate: string | null;
   fetchedAt: number;  // timestamp for cache expiry
   sourcePages?: string[];  // file paths where this URL was unfurled
+  // Site-specific fields
+  subreddit?: string;  // Reddit: r/subreddit
 }
 
 /**
@@ -44,25 +46,23 @@ export interface UrlMetadataProvider {
  */
 export interface LinkCommandSettings {
   unfurlEnabled: boolean;
-  unfurlOnPaste: boolean;
   unfurlTimeout: number;  // ms
   cacheEnabled: boolean;
   cacheTTL: number;  // hours
-  defaultFormat: 'link' | 'card';
   // Known domains that require authentication (skip unfurling)
   authDomains: string[];
   // Sidebar settings
   showSidebarByDefault: boolean;
   recentHistoryLimit: number;
+  // Reddit-specific settings
+  redditLinkFormat: 'title' | 'title_subreddit';
 }
 
 export const DEFAULT_SETTINGS: LinkCommandSettings = {
   unfurlEnabled: true,
-  unfurlOnPaste: false,
   unfurlTimeout: 10000,
   cacheEnabled: true,
   cacheTTL: 168,  // 7 days
-  defaultFormat: 'link',
   authDomains: [
     'slack.com',
     'app.slack.com',
@@ -83,6 +83,7 @@ export const DEFAULT_SETTINGS: LinkCommandSettings = {
   ],
   showSidebarByDefault: true,
   recentHistoryLimit: 25,
+  redditLinkFormat: 'title_subreddit',
 };
 
 /**

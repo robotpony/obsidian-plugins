@@ -237,6 +237,10 @@ export class LinkSidebarView extends ItemView {
     // Title or URL
     if (link.metadata?.title) {
       content.createEl("div", { cls: "link-sidebar-item-title", text: link.metadata.title });
+      // Show subreddit if available (Reddit links)
+      if (link.metadata.subreddit) {
+        content.createEl("div", { cls: "link-sidebar-item-subreddit", text: link.metadata.subreddit });
+      }
       content.createEl("div", { cls: "link-sidebar-item-url", text: this.truncateUrl(link.url) });
     } else {
       content.createEl("div", { cls: "link-sidebar-item-title", text: this.truncateUrl(link.url) });
@@ -276,6 +280,11 @@ export class LinkSidebarView extends ItemView {
       cls: "link-sidebar-item-title",
       text: metadata.title || this.truncateUrl(metadata.url),
     });
+
+    // Show subreddit if available (Reddit links)
+    if (metadata.subreddit) {
+      content.createEl("div", { cls: "link-sidebar-item-subreddit", text: metadata.subreddit });
+    }
 
     // URL and source info
     const metaRow = content.createEl("div", { cls: "link-sidebar-item-meta" });

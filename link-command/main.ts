@@ -15,14 +15,13 @@ import {
   CacheData,
 } from "./src/types";
 import { UrlUnfurlService } from "./src/UrlUnfurlService";
-import { UrlUnfurlTooltip } from "./src/UrlUnfurlTooltip";
 import { LinkCardProcessor } from "./src/LinkCardProcessor";
 import { LinkSidebarView, VIEW_TYPE_LINK_SIDEBAR } from "./src/LinkSidebarView";
+import { createFormatToggleExtension, FormatToggleConfig } from "./src/UrlFormatToggle";
 
 export default class LinkCommandPlugin extends Plugin {
   settings: LinkCommandSettings;
   unfurlService: UrlUnfurlService;
-  tooltip: UrlUnfurlTooltip;
   linkCardProcessor: LinkCardProcessor;
   private cacheData: CacheData | null = null;
   private sidebarView: LinkSidebarView | null = null;
@@ -44,9 +43,6 @@ export default class LinkCommandPlugin extends Plugin {
     if (savedData?.cache) {
       await this.unfurlService.loadCache(savedData.cache);
     }
-
-    // Initialize tooltip
-    this.tooltip = new UrlUnfurlTooltip(this.app);
 
     // Initialize code block processor
     this.linkCardProcessor = new LinkCardProcessor(this.app, this.unfurlService);
@@ -84,59 +80,17 @@ export default class LinkCommandPlugin extends Plugin {
       });
     }
 
-    // Register context menu for URLs
-    this.registerEvent(
-      this.app.workspace.on("editor-menu", (menu, editor) => {
-        if (!this.settings.unfurlEnabled) return;
-
-        const url = this.detectUrlAtCursor(editor);
-        if (url) {
-          menu.addItem((item) => {
-            item
-              .setTitle("Unfurl link...")
-              .setIcon("link")
-              .onClick(() => {
-                this.unfurlUrl(editor, url);
-              });
-          });
-        }
-      })
-    );
-
-    // Register paste handler (if enabled)
-    this.registerEvent(
-      this.app.workspace.on("editor-paste", async (evt, editor) => {
-        if (!this.settings.unfurlEnabled || !this.settings.unfurlOnPaste) return;
-
-        const clipboardText = evt.clipboardData?.getData("text/plain")?.trim();
-        if (clipboardText && this.unfurlService.isValidUrl(clipboardText)) {
-          evt.preventDefault();
-          await this.handlePasteUrl(editor, clipboardText);
-        }
-      })
-    );
+    // Register inline format toggle extension
+    this.registerFormatToggleExtension();
 
     // Register commands
     this.addCommand({
-      id: "unfurl-url",
-      name: "Unfurl URL at cursor",
-      editorCallback: (editor) => {
-        const url = this.detectUrlAtCursor(editor);
-        if (url) {
-          this.unfurlUrl(editor, url);
-        } else {
-          new Notice("No URL found at cursor");
-        }
-      },
-    });
-
-    this.addCommand({
-      id: "insert-link-card",
-      name: "Insert link card",
+      id: "toggle-link-format",
+      name: "Toggle link format",
       editorCallback: async (editor) => {
         const url = this.detectUrlAtCursor(editor);
         if (url) {
-          await this.insertLinkCard(editor, url);
+          await this.cycleFormatAtCursor(editor, url);
         } else {
           new Notice("No URL found at cursor");
         }
@@ -166,7 +120,6 @@ export default class LinkCommandPlugin extends Plugin {
   }
 
   onunload() {
-    this.tooltip.close();
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_LINK_SIDEBAR);
   }
 
@@ -254,6 +207,37 @@ export default class LinkCommandPlugin extends Plugin {
   }
 
   /**
+   * Format metadata title for display, including subreddit if configured
+   */
+  private formatLinkTitle(metadata: UrlMetadata, url: string): string {
+    if (!metadata.title) return url;
+
+    // For Reddit links, optionally include subreddit
+    if (metadata.subreddit && this.settings.redditLinkFormat === 'title_subreddit') {
+      return `${metadata.title} (${metadata.subreddit})`;
+    }
+
+    return metadata.title;
+  }
+
+  /**
+   * Register the inline format toggle extension
+   */
+  private registerFormatToggleExtension(): void {
+    const config: FormatToggleConfig = {
+      enabled: this.settings.unfurlEnabled,
+      unfurlService: this.unfurlService,
+      getSourcePage: () => this.app.workspace.getActiveFile()?.path,
+      onFormatChange: () => {
+        this.sidebarView?.render();
+      },
+    };
+
+    const extension = createFormatToggleExtension(config);
+    this.registerEditorExtension(extension);
+  }
+
+  /**
    * Detect if cursor is on a URL and return it
    */
   private detectUrlAtCursor(editor: Editor): string | null {
@@ -284,151 +268,82 @@ export default class LinkCommandPlugin extends Plugin {
   }
 
   /**
-   * Unfurl URL and show tooltip
+   * Cycle through formats at cursor (URL -> Link -> Card -> URL)
    */
-  private async unfurlUrl(editor: Editor, url: string): Promise<void> {
-    const actions = {
-      onInsertLink: (metadata: UrlMetadata) => {
-        this.insertMarkdownLink(editor, url, metadata);
-      },
-      onInsertCard: (metadata: UrlMetadata) => {
-        this.insertCardBlock(editor, url, metadata);
-      },
-      onCopy: async (metadata: UrlMetadata) => {
-        const text = `[${metadata.title || url}](${url})`;
-        await navigator.clipboard.writeText(text);
-        new Notice("Link copied to clipboard");
-      },
-      onRetry: () => {
-        this.unfurlUrl(editor, url);
-      },
-    };
+  private async cycleFormatAtCursor(editor: Editor, url: string): Promise<void> {
+    const cursor = editor.getCursor();
+    const line = editor.getLine(cursor.line);
 
-    // Show loading state
-    this.tooltip.showLoading(editor, url, actions);
+    // Detect current format
+    const urlEscaped = url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const mdLinkPattern = new RegExp(`\\[([^\\]]*)\\]\\(${urlEscaped}\\)`);
+    const isMarkdownLink = mdLinkPattern.test(line);
 
-    // Fetch metadata (track source page)
+    // Check if in link-card block
+    let isLinkCard = false;
+    let cardStartLine = -1;
+    let cardEndLine = -1;
+
+    for (let i = cursor.line; i >= 0; i--) {
+      const checkLine = editor.getLine(i).trim();
+      if (checkLine.startsWith("```link-card")) {
+        isLinkCard = true;
+        cardStartLine = i;
+        break;
+      }
+      if (checkLine === "```") {
+        break;
+      }
+    }
+
+    if (isLinkCard) {
+      for (let i = cardStartLine + 1; i < editor.lineCount(); i++) {
+        if (editor.getLine(i).trim() === "```") {
+          cardEndLine = i;
+          break;
+        }
+      }
+    }
+
     const activeFile = this.app.workspace.getActiveFile();
-    const result = await this.unfurlService.unfurl(url, false, activeFile?.path);
 
-    // Update tooltip with result
-    this.tooltip.updateContent(result);
+    if (isLinkCard && cardStartLine >= 0 && cardEndLine >= 0) {
+      // Card -> URL: Replace entire block with plain URL
+      const from = { line: cardStartLine, ch: 0 };
+      const to = { line: cardEndLine, ch: editor.getLine(cardEndLine).length };
+      editor.replaceRange(url, from, to);
+    } else if (isMarkdownLink) {
+      // Link -> Card: Replace link with compact card block
+      const result = await this.unfurlService.unfurl(url, false, activeFile?.path);
 
-    // Refresh sidebar to show updated status
+      const lines = ["```link-card", `url: ${url}`];
+      if (result.success && result.metadata?.title) {
+        lines.push(`title: ${result.metadata.title}`);
+      }
+      lines.push("```");
+
+      const match = mdLinkPattern.exec(line);
+      if (match) {
+        const from = { line: cursor.line, ch: match.index };
+        const to = { line: cursor.line, ch: match.index + match[0].length };
+        editor.replaceRange(lines.join("\n"), from, to);
+      }
+    } else {
+      // URL -> Link: Replace URL with markdown link
+      const result = await this.unfurlService.unfurl(url, false, activeFile?.path);
+      const title = result.success && result.metadata?.title
+        ? this.formatLinkTitle(result.metadata, url)
+        : url;
+
+      const urlIndex = line.indexOf(url);
+      if (urlIndex >= 0) {
+        const from = { line: cursor.line, ch: urlIndex };
+        const to = { line: cursor.line, ch: urlIndex + url.length };
+        editor.replaceRange(`[${title}](${url})`, from, to);
+      }
+    }
+
     this.sidebarView?.render();
-  }
-
-  /**
-   * Handle paste of URL
-   */
-  private async handlePasteUrl(editor: Editor, url: string): Promise<void> {
-    // First insert the URL so user sees something
-    editor.replaceSelection(url);
-
-    // Then try to unfurl and update (track source page)
-    const activeFile = this.app.workspace.getActiveFile();
-    const result = await this.unfurlService.unfurl(url, false, activeFile?.path);
-
-    if (result.success && result.metadata?.title) {
-      // Replace the plain URL with markdown link
-      const cursor = editor.getCursor();
-      const line = editor.getLine(cursor.line);
-      const urlIndex = line.lastIndexOf(url);
-
-      if (urlIndex >= 0) {
-        const from = { line: cursor.line, ch: urlIndex };
-        const to = { line: cursor.line, ch: urlIndex + url.length };
-        const markdownLink = `[${result.metadata.title}](${url})`;
-        editor.replaceRange(markdownLink, from, to);
-      }
-    }
-  }
-
-  /**
-   * Insert markdown link at cursor
-   */
-  private insertMarkdownLink(editor: Editor, url: string, metadata: UrlMetadata): void {
-    const title = metadata.title || url;
-    const markdownLink = `[${title}](${url})`;
-
-    // Try to replace the URL if it's selected or at cursor
-    const selection = editor.getSelection();
-    if (selection === url) {
-      editor.replaceSelection(markdownLink);
-    } else {
-      // Check if URL is in the current line near cursor
-      const cursor = editor.getCursor();
-      const line = editor.getLine(cursor.line);
-      const urlIndex = line.indexOf(url);
-
-      if (urlIndex >= 0) {
-        const from = { line: cursor.line, ch: urlIndex };
-        const to = { line: cursor.line, ch: urlIndex + url.length };
-        editor.replaceRange(markdownLink, from, to);
-      } else {
-        // Just insert at cursor
-        editor.replaceSelection(markdownLink);
-      }
-    }
-  }
-
-  /**
-   * Insert link card code block
-   */
-  private insertCardBlock(editor: Editor, url: string, metadata: UrlMetadata): void {
-    const lines = ["```link-card", `url: ${url}`];
-
-    if (metadata.title) {
-      lines.push(`title: ${metadata.title}`);
-    }
-    if (metadata.description) {
-      // Escape any newlines in description
-      const desc = metadata.description.replace(/\n/g, " ").slice(0, 200);
-      lines.push(`description: ${desc}`);
-    }
-    if (metadata.image) {
-      lines.push(`image: ${metadata.image}`);
-    }
-
-    lines.push("```");
-
-    const cardBlock = lines.join("\n");
-
-    // Try to replace the URL if it's selected
-    const selection = editor.getSelection();
-    if (selection === url) {
-      editor.replaceSelection(cardBlock);
-    } else {
-      // Check if URL is on current line
-      const cursor = editor.getCursor();
-      const line = editor.getLine(cursor.line);
-      const urlIndex = line.indexOf(url);
-
-      if (urlIndex >= 0 && line.trim() === url) {
-        // URL is alone on the line, replace the whole line
-        const from = { line: cursor.line, ch: 0 };
-        const to = { line: cursor.line, ch: line.length };
-        editor.replaceRange(cardBlock, from, to);
-      } else {
-        // Insert at cursor
-        editor.replaceSelection(cardBlock);
-      }
-    }
-  }
-
-  /**
-   * Insert link card for URL at cursor
-   */
-  private async insertLinkCard(editor: Editor, url: string): Promise<void> {
-    const result = await this.unfurlService.unfurl(url);
-
-    if (result.success && result.metadata) {
-      this.insertCardBlock(editor, url, result.metadata);
-    } else {
-      // Insert basic card without metadata
-      const basicCard = `\`\`\`link-card\nurl: ${url}\n\`\`\``;
-      editor.replaceSelection(basicCard);
-    }
   }
 }
 
@@ -451,41 +366,13 @@ class LinkCommandSettingTab extends PluginSettingTab {
 
     // Master toggle
     new Setting(containerEl)
-      .setName("Enable URL unfurling")
-      .setDesc("Show link previews via context menu and commands")
+      .setName("Enable inline format toggle")
+      .setDesc("Show toggle buttons next to URLs to cycle between formats (URL, Link, Card)")
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.unfurlEnabled)
           .onChange(async (value) => {
             this.plugin.settings.unfurlEnabled = value;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    // Auto-unfurl on paste
-    new Setting(containerEl)
-      .setName("Auto-unfurl on paste")
-      .setDesc("Automatically convert pasted URLs to titled links")
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.unfurlOnPaste)
-          .onChange(async (value) => {
-            this.plugin.settings.unfurlOnPaste = value;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    // Default format
-    new Setting(containerEl)
-      .setName("Default format")
-      .setDesc("Default format when auto-unfurling pasted URLs")
-      .addDropdown((dropdown) =>
-        dropdown
-          .addOption("link", "Markdown link")
-          .addOption("card", "Link card")
-          .setValue(this.plugin.settings.defaultFormat)
-          .onChange(async (value: "link" | "card") => {
-            this.plugin.settings.defaultFormat = value;
             await this.plugin.saveSettings();
           })
       );
@@ -504,6 +391,23 @@ class LinkCommandSettingTab extends PluginSettingTab {
               this.plugin.settings.unfurlTimeout = num;
               await this.plugin.saveSettings();
             }
+          })
+      );
+
+    // Site-specific section
+    containerEl.createEl("h3", { text: "Site-Specific" });
+
+    new Setting(containerEl)
+      .setName("Reddit link format")
+      .setDesc("How to format Reddit links when unfurling")
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOption("title", "Title only")
+          .addOption("title_subreddit", "Title + subreddit")
+          .setValue(this.plugin.settings.redditLinkFormat)
+          .onChange(async (value: "title" | "title_subreddit") => {
+            this.plugin.settings.redditLinkFormat = value;
+            await this.plugin.saveSettings();
           })
       );
 

@@ -27,17 +27,15 @@ __export(main_exports, {
   default: () => LinkCommandPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian3 = require("obsidian");
+var import_obsidian4 = require("obsidian");
 
 // src/types.ts
 var DEFAULT_SETTINGS = {
   unfurlEnabled: true,
-  unfurlOnPaste: false,
   unfurlTimeout: 1e4,
   cacheEnabled: true,
   cacheTTL: 168,
   // 7 days
-  defaultFormat: "link",
   authDomains: [
     "slack.com",
     "app.slack.com",
@@ -57,7 +55,8 @@ var DEFAULT_SETTINGS = {
     "confluence.atlassian.com"
   ],
   showSidebarByDefault: true,
-  recentHistoryLimit: 25
+  recentHistoryLimit: 25,
+  redditLinkFormat: "title_subreddit"
 };
 
 // src/UrlMetadataCache.ts
@@ -370,6 +369,156 @@ var AuthDomainProvider = class {
   }
 };
 
+// src/providers/RedditProvider.ts
+var import_obsidian2 = require("obsidian");
+var RedditProvider = class {
+  constructor() {
+    this.name = "reddit";
+    this.priority = 10;
+  }
+  // Higher priority than generic HTML provider
+  canHandle(url) {
+    try {
+      const hostname = new URL(url).hostname;
+      return hostname === "reddit.com" || hostname === "www.reddit.com" || hostname === "old.reddit.com" || hostname === "new.reddit.com" || hostname.endsWith(".reddit.com");
+    } catch (e) {
+      return false;
+    }
+  }
+  async fetch(url, timeout) {
+    try {
+      const jsonUrl = this.getJsonUrl(url);
+      const response = await (0, import_obsidian2.requestUrl)({
+        url: jsonUrl,
+        method: "GET",
+        headers: {
+          "Accept": "application/json",
+          "User-Agent": "Mozilla/5.0 (compatible; LinkCommand/1.0)"
+        },
+        throw: false
+      });
+      if (response.status >= 400) {
+        return {
+          success: false,
+          error: "network_error",
+          errorMessage: `HTTP ${response.status}`
+        };
+      }
+      const parsed = this.parseJsonResponse(response.json, url);
+      const metadata = {
+        url,
+        title: parsed.title,
+        description: parsed.description,
+        image: parsed.image,
+        favicon: "https://www.reddit.com/favicon.ico",
+        siteName: "Reddit",
+        type: parsed.type,
+        publishedDate: null,
+        fetchedAt: Date.now(),
+        subreddit: parsed.subreddit || void 0
+      };
+      return {
+        success: true,
+        metadata
+      };
+    } catch (error) {
+      console.error(`[Link Command] Reddit fetch error for ${url}:`, error);
+      return {
+        success: false,
+        error: "network_error",
+        errorMessage: error instanceof Error ? error.message : "Unknown error"
+      };
+    }
+  }
+  /**
+   * Convert a Reddit URL to its JSON API equivalent
+   */
+  getJsonUrl(url) {
+    const parsed = new URL(url);
+    parsed.hostname = "www.reddit.com";
+    let path = parsed.pathname.replace(/\/$/, "");
+    if (!path.endsWith(".json")) {
+      path += ".json";
+    }
+    parsed.pathname = path;
+    return parsed.toString();
+  }
+  /**
+   * Extract subreddit from URL path
+   */
+  extractSubredditFromUrl(url) {
+    try {
+      const path = new URL(url).pathname;
+      const match = path.match(/^\/r\/([^\/]+)/i);
+      if (match) {
+        return `r/${match[1]}`;
+      }
+    } catch (e) {
+    }
+    return null;
+  }
+  /**
+   * Parse Reddit JSON API response
+   */
+  parseJsonResponse(json, originalUrl) {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
+    let title = null;
+    let description = null;
+    let image = null;
+    let subreddit = this.extractSubredditFromUrl(originalUrl);
+    const isPost = originalUrl.includes("/comments/");
+    const type = isPost ? "reddit:post" : "reddit:subreddit";
+    try {
+      let postData = null;
+      if (Array.isArray(json) && json.length > 0) {
+        const listing = json[0];
+        if ((_c = (_b = (_a = listing == null ? void 0 : listing.data) == null ? void 0 : _a.children) == null ? void 0 : _b[0]) == null ? void 0 : _c.data) {
+          postData = listing.data.children[0].data;
+        }
+      } else if (json && typeof json === "object" && "data" in json) {
+        const listing = json;
+        if ((_f = (_e = (_d = listing == null ? void 0 : listing.data) == null ? void 0 : _d.children) == null ? void 0 : _e[0]) == null ? void 0 : _f.data) {
+          postData = listing.data.children[0].data;
+        }
+      }
+      if (postData) {
+        if (typeof postData.title === "string") {
+          title = postData.title;
+        }
+        if (typeof postData.subreddit === "string") {
+          subreddit = `r/${postData.subreddit}`;
+        } else if (typeof postData.subreddit_name_prefixed === "string") {
+          subreddit = postData.subreddit_name_prefixed;
+        }
+        if (typeof postData.selftext === "string" && postData.selftext.trim()) {
+          description = postData.selftext.slice(0, 300);
+          if (postData.selftext.length > 300) {
+            description += "...";
+          }
+        }
+        if (typeof postData.thumbnail === "string" && postData.thumbnail.startsWith("http") && !postData.thumbnail.includes("thumbs.redditmedia.com")) {
+          image = postData.thumbnail;
+        }
+        if (postData.preview && typeof postData.preview === "object") {
+          const preview = postData.preview;
+          if ((_i = (_h = (_g = preview.images) == null ? void 0 : _g[0]) == null ? void 0 : _h.source) == null ? void 0 : _i.url) {
+            image = preview.images[0].source.url.replace(/&amp;/g, "&");
+          }
+        }
+      }
+    } catch (e) {
+      console.error("[Link Command] Failed to parse Reddit JSON:", e);
+    }
+    return {
+      title,
+      description,
+      image,
+      type,
+      subreddit
+    };
+  }
+};
+
 // src/UrlUnfurlService.ts
 var URL_REGEX = /^https?:\/\/[^\s]+$/i;
 var UrlUnfurlService = class {
@@ -384,6 +533,7 @@ var UrlUnfurlService = class {
     );
     this.authDomainProvider = new AuthDomainProvider(settings.authDomains);
     this.providers.push(this.authDomainProvider);
+    this.providers.push(new RedditProvider());
     this.providers.push(new HtmlMetadataProvider());
     this.sortProviders();
   }
@@ -510,264 +660,6 @@ var UrlUnfurlService = class {
   }
 };
 
-// src/UrlUnfurlTooltip.ts
-var UrlUnfurlTooltip = class {
-  constructor(app) {
-    this.tooltip = null;
-    this.closeHandler = null;
-    this.escapeHandler = null;
-    this.component = null;
-    this.currentUrl = "";
-    this.actions = null;
-    this.app = app;
-  }
-  /**
-   * Show tooltip with loading state
-   */
-  showLoading(editor, url, actions) {
-    this.show(editor, url, { loading: true }, actions);
-  }
-  /**
-   * Show tooltip with metadata
-   */
-  showMetadata(editor, url, metadata, actions) {
-    this.show(editor, url, { metadata }, actions);
-  }
-  /**
-   * Show tooltip with error
-   */
-  showError(editor, url, error, actions) {
-    this.show(editor, url, { error }, actions);
-  }
-  /**
-   * Update existing tooltip content
-   */
-  updateContent(result) {
-    if (!this.tooltip)
-      return;
-    const contentEl = this.tooltip.querySelector(".link-tooltip-content");
-    if (!contentEl)
-      return;
-    contentEl.empty();
-    if (result.success && result.metadata) {
-      this.renderMetadata(contentEl, result.metadata);
-      this.tooltip.classList.remove("link-tooltip-loading", "link-tooltip-error");
-      this.createActionsBar(result.metadata);
-    } else {
-      this.renderError(contentEl, result.errorMessage || "Failed to fetch link");
-      this.tooltip.classList.remove("link-tooltip-loading");
-      this.tooltip.classList.add("link-tooltip-error");
-    }
-  }
-  /**
-   * Close the tooltip
-   */
-  close() {
-    if (this.component) {
-      this.component.unload();
-      this.component = null;
-    }
-    if (this.tooltip) {
-      this.tooltip.remove();
-      this.tooltip = null;
-    }
-    if (this.closeHandler) {
-      document.removeEventListener("click", this.closeHandler);
-      this.closeHandler = null;
-    }
-    if (this.escapeHandler) {
-      document.removeEventListener("keydown", this.escapeHandler);
-      this.escapeHandler = null;
-    }
-    this.currentUrl = "";
-    this.actions = null;
-  }
-  show(editor, url, content, actions) {
-    this.close();
-    this.currentUrl = url;
-    this.actions = actions;
-    const cm = editor.cm;
-    if (!cm)
-      return;
-    const cursor = editor.getCursor("to");
-    let coords = null;
-    if (cm.coordsAtPos) {
-      const line = cm.state.doc.line(cursor.line + 1);
-      const pos = line.from + cursor.ch;
-      coords = cm.coordsAtPos(pos);
-    } else if (cm.charCoords) {
-      coords = cm.charCoords({ line: cursor.line, ch: cursor.ch }, "page");
-    }
-    if (!coords)
-      return;
-    this.tooltip = document.createElement("div");
-    this.tooltip.className = "link-tooltip";
-    if (content.loading) {
-      this.tooltip.classList.add("link-tooltip-loading");
-    }
-    if (content.error) {
-      this.tooltip.classList.add("link-tooltip-error");
-    }
-    const headerEl = this.tooltip.createEl("div", { cls: "link-tooltip-header" });
-    headerEl.createEl("span", { cls: "link-tooltip-logo", text: "Link" });
-    try {
-      const hostname = new URL(url).hostname;
-      headerEl.createEl("span", { cls: "link-tooltip-domain", text: hostname });
-    } catch (e) {
-    }
-    const closeBtn = headerEl.createEl("button", {
-      cls: "link-tooltip-close",
-      text: "\xD7",
-      attr: { "aria-label": "Close" }
-    });
-    closeBtn.addEventListener("click", () => this.close());
-    const contentEl = this.tooltip.createEl("div", { cls: "link-tooltip-content" });
-    if (content.loading) {
-      contentEl.createEl("span", { cls: "link-tooltip-spinner" });
-      contentEl.createSpan({ text: "Fetching link..." });
-    } else if (content.metadata) {
-      this.renderMetadata(contentEl, content.metadata);
-      this.createActionsBar(content.metadata);
-    } else if (content.error) {
-      this.renderError(contentEl, content.error);
-    }
-    this.tooltip.style.position = "fixed";
-    this.tooltip.style.top = `${coords.bottom + 8}px`;
-    this.tooltip.style.left = `${coords.left}px`;
-    document.body.appendChild(this.tooltip);
-    this.adjustPosition(coords);
-  }
-  renderMetadata(container, metadata) {
-    if (metadata.image) {
-      const imgContainer = container.createEl("div", { cls: "link-tooltip-image-container" });
-      const img = imgContainer.createEl("img", {
-        cls: "link-tooltip-image",
-        attr: { src: metadata.image, alt: metadata.title || "Preview" }
-      });
-      img.addEventListener("error", () => {
-        imgContainer.remove();
-      });
-    }
-    if (metadata.title) {
-      container.createEl("div", { cls: "link-tooltip-title", text: metadata.title });
-    } else {
-      container.createEl("div", { cls: "link-tooltip-title link-tooltip-no-title", text: "No title available" });
-    }
-    if (metadata.description) {
-      const desc = container.createEl("div", { cls: "link-tooltip-description" });
-      const maxLen = 200;
-      desc.textContent = metadata.description.length > maxLen ? metadata.description.slice(0, maxLen) + "..." : metadata.description;
-    }
-    if (metadata.siteName || metadata.favicon) {
-      const siteRow = container.createEl("div", { cls: "link-tooltip-site" });
-      if (metadata.favicon) {
-        const favicon = siteRow.createEl("img", {
-          cls: "link-tooltip-favicon",
-          attr: { src: metadata.favicon, alt: "" }
-        });
-        favicon.addEventListener("error", () => {
-          favicon.remove();
-        });
-      }
-      if (metadata.siteName) {
-        siteRow.createEl("span", { text: metadata.siteName });
-      }
-    }
-  }
-  renderError(container, error) {
-    container.createEl("div", { cls: "link-tooltip-error-message", text: error });
-    if (this.actions) {
-      const retryBtn = container.createEl("button", {
-        cls: "link-tooltip-btn link-tooltip-retry-btn",
-        text: "Retry"
-      });
-      retryBtn.addEventListener("click", () => {
-        if (this.actions) {
-          this.actions.onRetry();
-        }
-      });
-    }
-  }
-  createActionsBar(metadata) {
-    if (!this.tooltip || !this.actions)
-      return;
-    const existingActions = this.tooltip.querySelector(".link-tooltip-actions");
-    if (existingActions) {
-      existingActions.remove();
-    }
-    const actionsEl = this.tooltip.createEl("div", { cls: "link-tooltip-actions" });
-    const linkBtn = actionsEl.createEl("button", {
-      cls: "link-tooltip-btn",
-      text: "Insert Link"
-    });
-    linkBtn.addEventListener("click", () => {
-      if (this.actions) {
-        this.actions.onInsertLink(metadata);
-      }
-      this.close();
-    });
-    const cardBtn = actionsEl.createEl("button", {
-      cls: "link-tooltip-btn",
-      text: "Insert Card"
-    });
-    cardBtn.addEventListener("click", () => {
-      if (this.actions) {
-        this.actions.onInsertCard(metadata);
-      }
-      this.close();
-    });
-    const copyBtn = actionsEl.createEl("button", {
-      cls: "link-tooltip-btn link-tooltip-copy-btn",
-      text: "Copy"
-    });
-    copyBtn.addEventListener("click", async () => {
-      if (this.actions) {
-        this.actions.onCopy(metadata);
-      }
-    });
-  }
-  adjustPosition(coords) {
-    if (!this.tooltip)
-      return;
-    const rect = this.tooltip.getBoundingClientRect();
-    const margin = 10;
-    if (rect.right > window.innerWidth - margin) {
-      const newLeft = Math.max(margin, window.innerWidth - rect.width - margin);
-      this.tooltip.style.left = `${newLeft}px`;
-    }
-    if (rect.left < margin) {
-      this.tooltip.style.left = `${margin}px`;
-    }
-    if (rect.bottom > window.innerHeight - margin) {
-      const aboveTop = coords.top - rect.height - 8;
-      if (aboveTop >= margin) {
-        this.tooltip.style.top = `${aboveTop}px`;
-      } else {
-        this.tooltip.style.top = `${margin}px`;
-        const maxHeight = window.innerHeight - 2 * margin;
-        if (rect.height > maxHeight) {
-          this.tooltip.style.maxHeight = `${maxHeight}px`;
-          this.tooltip.style.overflowY = "auto";
-        }
-      }
-    }
-    this.closeHandler = (e) => {
-      if (this.tooltip && !this.tooltip.contains(e.target)) {
-        this.close();
-      }
-    };
-    this.escapeHandler = (e) => {
-      if (e.key === "Escape") {
-        this.close();
-      }
-    };
-    setTimeout(() => {
-      document.addEventListener("click", this.closeHandler);
-      document.addEventListener("keydown", this.escapeHandler);
-    }, 100);
-  }
-};
-
 // src/LinkCardProcessor.ts
 function parseCardContent(source) {
   const result = {};
@@ -831,29 +723,8 @@ var LinkCardProcessor = class {
       cls: "link-card-link",
       attr: { href: data.url, target: "_blank", rel: "noopener noreferrer" }
     });
-    if (data.image) {
-      const imageContainer = link.createEl("div", { cls: "link-card-image-container" });
-      const img = imageContainer.createEl("img", {
-        cls: "link-card-image",
-        attr: { src: data.image, alt: data.title || "Preview" }
-      });
-      img.addEventListener("error", () => {
-        imageContainer.remove();
-      });
-    }
-    const content = link.createEl("div", { cls: "link-card-content" });
-    content.createEl("div", {
-      cls: "link-card-title",
-      text: data.title || data.url
-    });
-    if (data.description) {
-      const desc = content.createEl("div", { cls: "link-card-description" });
-      const maxLen = 150;
-      desc.textContent = data.description.length > maxLen ? data.description.slice(0, maxLen) + "..." : data.description;
-    }
-    const footer = content.createEl("div", { cls: "link-card-footer" });
     if (data.favicon) {
-      const favicon = footer.createEl("img", {
+      const favicon = link.createEl("img", {
         cls: "link-card-favicon",
         attr: { src: data.favicon, alt: "" }
       });
@@ -861,9 +732,13 @@ var LinkCardProcessor = class {
         favicon.remove();
       });
     }
+    link.createEl("span", {
+      cls: "link-card-title",
+      text: data.title || data.url
+    });
     try {
-      const hostname = new URL(data.url).hostname;
-      footer.createEl("span", { cls: "link-card-domain", text: data.siteName || hostname });
+      const hostname = new URL(data.url).hostname.replace(/^www\./, "");
+      link.createEl("span", { cls: "link-card-domain", text: hostname });
     } catch (e) {
     }
   }
@@ -884,9 +759,9 @@ var LinkCardProcessor = class {
 };
 
 // src/LinkSidebarView.ts
-var import_obsidian2 = require("obsidian");
+var import_obsidian3 = require("obsidian");
 var VIEW_TYPE_LINK_SIDEBAR = "link-command-sidebar";
-var LinkSidebarView = class extends import_obsidian2.ItemView {
+var LinkSidebarView = class extends import_obsidian3.ItemView {
   constructor(leaf, unfurlService, settings, onOpenUrl, onShowAbout, onOpenSettings) {
     super(leaf);
     this.activeFileListener = null;
@@ -943,7 +818,7 @@ var LinkSidebarView = class extends import_obsidian2.ItemView {
     });
     menuBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>';
     menuBtn.addEventListener("click", (evt) => {
-      const menu = new import_obsidian2.Menu();
+      const menu = new import_obsidian3.Menu();
       menu.addItem((item) => {
         item.setTitle("Refresh").setIcon("refresh-cw").onClick(async () => {
           menuBtn.addClass("rotating");
@@ -1028,6 +903,9 @@ var LinkSidebarView = class extends import_obsidian2.ItemView {
     const content = item.createEl("div", { cls: "link-sidebar-item-content" });
     if ((_a = link.metadata) == null ? void 0 : _a.title) {
       content.createEl("div", { cls: "link-sidebar-item-title", text: link.metadata.title });
+      if (link.metadata.subreddit) {
+        content.createEl("div", { cls: "link-sidebar-item-subreddit", text: link.metadata.subreddit });
+      }
       content.createEl("div", { cls: "link-sidebar-item-url", text: this.truncateUrl(link.url) });
     } else {
       content.createEl("div", { cls: "link-sidebar-item-title", text: this.truncateUrl(link.url) });
@@ -1056,6 +934,9 @@ var LinkSidebarView = class extends import_obsidian2.ItemView {
       cls: "link-sidebar-item-title",
       text: metadata.title || this.truncateUrl(metadata.url)
     });
+    if (metadata.subreddit) {
+      content.createEl("div", { cls: "link-sidebar-item-subreddit", text: metadata.subreddit });
+    }
     const metaRow = content.createEl("div", { cls: "link-sidebar-item-meta" });
     metaRow.createEl("span", { cls: "link-sidebar-item-url", text: this.truncateUrl(metadata.url) });
     if (metadata.sourcePages && metadata.sourcePages.length > 0) {
@@ -1075,7 +956,7 @@ var LinkSidebarView = class extends import_obsidian2.ItemView {
   }
   showLinkContextMenu(e, link, activeFile) {
     var _a;
-    const menu = new import_obsidian2.Menu();
+    const menu = new import_obsidian3.Menu();
     menu.addItem((item) => {
       item.setTitle("Unfurl link").setIcon("refresh-cw").onClick(async () => {
         await this.unfurlService.unfurl(link.url, true, activeFile.path);
@@ -1103,7 +984,7 @@ var LinkSidebarView = class extends import_obsidian2.ItemView {
     menu.showAtMouseEvent(e);
   }
   showHistoryContextMenu(e, metadata) {
-    const menu = new import_obsidian2.Menu();
+    const menu = new import_obsidian3.Menu();
     menu.addItem((item) => {
       item.setTitle("Copy URL").setIcon("copy").onClick(async () => {
         await navigator.clipboard.writeText(metadata.url);
@@ -1131,7 +1012,7 @@ var LinkSidebarView = class extends import_obsidian2.ItemView {
         menu.addItem((item) => {
           item.setTitle(`  ${this.getFileName(sourcePath)}`).onClick(async () => {
             const file = this.app.vault.getAbstractFileByPath(sourcePath);
-            if (file instanceof import_obsidian2.TFile) {
+            if (file instanceof import_obsidian3.TFile) {
               await this.app.workspace.getLeaf().openFile(file);
             }
           });
@@ -1170,8 +1051,293 @@ var LinkSidebarView = class extends import_obsidian2.ItemView {
   }
 };
 
+// src/UrlFormatToggle.ts
+var import_view = require("@codemirror/view");
+var import_state = require("@codemirror/state");
+var ICONS = {
+  url: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>`,
+  link: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="0"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`,
+  card: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line></svg>`
+};
+var FormatToggleWidget = class extends import_view.WidgetType {
+  constructor(url, currentFormat, from, to, lineStart, lineEnd) {
+    super();
+    this.url = url;
+    this.currentFormat = currentFormat;
+    this.from = from;
+    this.to = to;
+    this.lineStart = lineStart;
+    this.lineEnd = lineEnd;
+  }
+  toDOM() {
+    const btn = document.createElement("span");
+    btn.className = `link-format-toggle link-format-toggle-${this.currentFormat}`;
+    btn.innerHTML = ICONS[this.currentFormat];
+    btn.setAttribute("aria-label", `Toggle link format (currently ${this.currentFormat})`);
+    btn.setAttribute("data-url", this.url);
+    btn.setAttribute("data-from", String(this.from));
+    btn.setAttribute("data-to", String(this.to));
+    btn.setAttribute("data-format", this.currentFormat);
+    btn.setAttribute("data-line-start", String(this.lineStart));
+    btn.setAttribute("data-line-end", String(this.lineEnd));
+    return btn;
+  }
+  ignoreEvent() {
+    return false;
+  }
+  eq(other) {
+    return this.url === other.url && this.currentFormat === other.currentFormat && this.from === other.from && this.to === other.to;
+  }
+};
+function detectFormat(state, url, pos) {
+  const doc = state.doc;
+  const line = doc.lineAt(pos);
+  const lineText = line.text;
+  let lineNum = line.number;
+  let inCodeBlock = false;
+  let codeBlockStart = -1;
+  while (lineNum > 0) {
+    const checkLine = doc.line(lineNum);
+    const text = checkLine.text.trim();
+    if (text.startsWith("```link-card")) {
+      inCodeBlock = true;
+      codeBlockStart = lineNum;
+      break;
+    }
+    if (text.startsWith("```") && !text.startsWith("```link-card")) {
+      break;
+    }
+    lineNum--;
+  }
+  if (inCodeBlock) {
+    for (let i = line.number; i <= doc.lines; i++) {
+      const checkLine = doc.line(i);
+      if (checkLine.text.trim() === "```") {
+        return "card";
+      }
+    }
+  }
+  const urlEscaped = url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const mdLinkPattern = new RegExp(`\\]\\(${urlEscaped}\\)`);
+  if (mdLinkPattern.test(lineText)) {
+    return "link";
+  }
+  return "url";
+}
+function findFormatRange(state, url, pos, format) {
+  const doc = state.doc;
+  const line = doc.lineAt(pos);
+  if (format === "url") {
+    const urlStart = line.text.indexOf(url);
+    if (urlStart >= 0) {
+      return {
+        from: line.from + urlStart,
+        to: line.from + urlStart + url.length,
+        lineStart: line.number,
+        lineEnd: line.number
+      };
+    }
+  }
+  if (format === "link") {
+    const urlEscaped = url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const mdLinkPattern = new RegExp(`\\[([^\\]]*)\\]\\(${urlEscaped}\\)`);
+    const match = mdLinkPattern.exec(line.text);
+    if (match) {
+      return {
+        from: line.from + match.index,
+        to: line.from + match.index + match[0].length,
+        lineStart: line.number,
+        lineEnd: line.number
+      };
+    }
+  }
+  if (format === "card") {
+    let startLine = line.number;
+    let endLine = line.number;
+    while (startLine > 0) {
+      const checkLine = doc.line(startLine);
+      if (checkLine.text.trim().startsWith("```link-card")) {
+        break;
+      }
+      startLine--;
+    }
+    for (let i = startLine + 1; i <= doc.lines; i++) {
+      if (doc.line(i).text.trim() === "```") {
+        endLine = i;
+        break;
+      }
+    }
+    return {
+      from: doc.line(startLine).from,
+      to: doc.line(endLine).to,
+      lineStart: startLine,
+      lineEnd: endLine
+    };
+  }
+  return {
+    from: pos,
+    to: pos + url.length,
+    lineStart: line.number,
+    lineEnd: line.number
+  };
+}
+function buildDecorations(state, enabled) {
+  if (!enabled) {
+    return import_view.Decoration.none;
+  }
+  const builder = new import_state.RangeSetBuilder();
+  const doc = state.doc;
+  const urlRegex = /https?:\/\/[^\s\]\)"`'<>]+/g;
+  const processed = /* @__PURE__ */ new Set();
+  for (let i = 1; i <= doc.lines; i++) {
+    const line = doc.line(i);
+    const lineText = line.text;
+    if (lineText.trim().startsWith("```"))
+      continue;
+    let match;
+    urlRegex.lastIndex = 0;
+    while ((match = urlRegex.exec(lineText)) !== null) {
+      const url = match[0];
+      const urlPos = line.from + match.index;
+      const key = `${urlPos}:${url}`;
+      if (processed.has(key))
+        continue;
+      processed.add(key);
+      const cleanUrl = url.replace(/[.,;:!?)]+$/, "");
+      const cleanUrlPos = urlPos;
+      const cleanUrlEnd = cleanUrlPos + cleanUrl.length;
+      const format = detectFormat(state, cleanUrl, cleanUrlPos);
+      const range = findFormatRange(state, cleanUrl, cleanUrlPos, format);
+      const widgetPos = format === "card" ? range.to : cleanUrlEnd;
+      const widget = new FormatToggleWidget(
+        cleanUrl,
+        format,
+        range.from,
+        range.to,
+        range.lineStart,
+        range.lineEnd
+      );
+      const decoration = import_view.Decoration.widget({
+        widget,
+        side: 1
+        // After the position
+      });
+      builder.add(widgetPos, widgetPos, decoration);
+    }
+  }
+  return builder.finish();
+}
+function createConfigField(config) {
+  return import_state.StateField.define({
+    create: () => config,
+    update: (value) => value
+  });
+}
+function createFormatToggleExtension(config) {
+  const configField = createConfigField(config);
+  const decorationField = import_state.StateField.define({
+    create(state) {
+      return buildDecorations(state, config.enabled);
+    },
+    update(decorations, tr) {
+      const currentConfig = tr.state.field(configField);
+      if (tr.docChanged) {
+        return buildDecorations(tr.state, currentConfig.enabled);
+      }
+      return decorations.map(tr.changes);
+    },
+    provide: (f) => import_view.EditorView.decorations.from(f)
+  });
+  const clickHandler = import_view.ViewPlugin.fromClass(
+    class {
+      constructor(view) {
+        this.view = view;
+      }
+      destroy() {
+      }
+    },
+    {
+      eventHandlers: {
+        click: (event, view) => {
+          const target = event.target;
+          const toggle = target.closest(".link-format-toggle");
+          if (!toggle)
+            return false;
+          event.preventDefault();
+          event.stopPropagation();
+          const url = toggle.getAttribute("data-url");
+          const from = parseInt(toggle.getAttribute("data-from") || "0", 10);
+          const to = parseInt(toggle.getAttribute("data-to") || "0", 10);
+          const format = toggle.getAttribute("data-format");
+          const lineStart = parseInt(toggle.getAttribute("data-line-start") || "0", 10);
+          const lineEnd = parseInt(toggle.getAttribute("data-line-end") || "0", 10);
+          if (!url)
+            return false;
+          const currentConfig = view.state.field(configField);
+          cycleFormat(view, url, from, to, format, lineStart, lineEnd, currentConfig);
+          return true;
+        }
+      }
+    }
+  );
+  return [configField, decorationField, clickHandler];
+}
+async function cycleFormat(view, url, from, to, currentFormat, lineStart, lineEnd, config) {
+  const nextFormat = getNextFormat(currentFormat);
+  let replacement;
+  switch (nextFormat) {
+    case "link":
+      replacement = await createMarkdownLink(url, config);
+      break;
+    case "card":
+      replacement = await createLinkCard(url, config);
+      break;
+    case "url":
+      replacement = url;
+      break;
+  }
+  const transaction = view.state.update({
+    changes: { from, to, insert: replacement }
+  });
+  view.dispatch(transaction);
+  if (config.onFormatChange) {
+    config.onFormatChange();
+  }
+}
+function getNextFormat(current) {
+  switch (current) {
+    case "url":
+      return "link";
+    case "link":
+      return "card";
+    case "card":
+      return "url";
+  }
+}
+async function createMarkdownLink(url, config) {
+  var _a;
+  const sourcePage = config.getSourcePage();
+  const result = await config.unfurlService.unfurl(url, false, sourcePage);
+  if (result.success && ((_a = result.metadata) == null ? void 0 : _a.title)) {
+    const title = result.metadata.title;
+    return `[${title}](${url})`;
+  }
+  return `[${url}](${url})`;
+}
+async function createLinkCard(url, config) {
+  var _a;
+  const sourcePage = config.getSourcePage();
+  const result = await config.unfurlService.unfurl(url, false, sourcePage);
+  const lines = ["```link-card", `url: ${url}`];
+  if (result.success && ((_a = result.metadata) == null ? void 0 : _a.title)) {
+    lines.push(`title: ${result.metadata.title}`);
+  }
+  lines.push("```");
+  return lines.join("\n");
+}
+
 // main.ts
-var LinkCommandPlugin = class extends import_obsidian3.Plugin {
+var LinkCommandPlugin = class extends import_obsidian4.Plugin {
   constructor() {
     super(...arguments);
     this.cacheData = null;
@@ -1190,7 +1356,6 @@ var LinkCommandPlugin = class extends import_obsidian3.Plugin {
     if (savedData == null ? void 0 : savedData.cache) {
       await this.unfurlService.loadCache(savedData.cache);
     }
-    this.tooltip = new UrlUnfurlTooltip(this.app);
     this.linkCardProcessor = new LinkCardProcessor(this.app, this.unfurlService);
     this.registerMarkdownCodeBlockProcessor("link-card", async (source, el, ctx) => {
       await this.linkCardProcessor.process(source, el, ctx);
@@ -1217,53 +1382,16 @@ var LinkCommandPlugin = class extends import_obsidian3.Plugin {
         this.activateSidebar();
       });
     }
-    this.registerEvent(
-      this.app.workspace.on("editor-menu", (menu, editor) => {
-        if (!this.settings.unfurlEnabled)
-          return;
-        const url = this.detectUrlAtCursor(editor);
-        if (url) {
-          menu.addItem((item) => {
-            item.setTitle("Unfurl link...").setIcon("link").onClick(() => {
-              this.unfurlUrl(editor, url);
-            });
-          });
-        }
-      })
-    );
-    this.registerEvent(
-      this.app.workspace.on("editor-paste", async (evt, editor) => {
-        var _a, _b;
-        if (!this.settings.unfurlEnabled || !this.settings.unfurlOnPaste)
-          return;
-        const clipboardText = (_b = (_a = evt.clipboardData) == null ? void 0 : _a.getData("text/plain")) == null ? void 0 : _b.trim();
-        if (clipboardText && this.unfurlService.isValidUrl(clipboardText)) {
-          evt.preventDefault();
-          await this.handlePasteUrl(editor, clipboardText);
-        }
-      })
-    );
+    this.registerFormatToggleExtension();
     this.addCommand({
-      id: "unfurl-url",
-      name: "Unfurl URL at cursor",
-      editorCallback: (editor) => {
-        const url = this.detectUrlAtCursor(editor);
-        if (url) {
-          this.unfurlUrl(editor, url);
-        } else {
-          new import_obsidian3.Notice("No URL found at cursor");
-        }
-      }
-    });
-    this.addCommand({
-      id: "insert-link-card",
-      name: "Insert link card",
+      id: "toggle-link-format",
+      name: "Toggle link format",
       editorCallback: async (editor) => {
         const url = this.detectUrlAtCursor(editor);
         if (url) {
-          await this.insertLinkCard(editor, url);
+          await this.cycleFormatAtCursor(editor, url);
         } else {
-          new import_obsidian3.Notice("No URL found at cursor");
+          new import_obsidian4.Notice("No URL found at cursor");
         }
       }
     });
@@ -1273,7 +1401,7 @@ var LinkCommandPlugin = class extends import_obsidian3.Plugin {
       callback: async () => {
         var _a;
         await this.unfurlService.clearCache();
-        new import_obsidian3.Notice("Link cache cleared");
+        new import_obsidian4.Notice("Link cache cleared");
         (_a = this.sidebarView) == null ? void 0 : _a.render();
       }
     });
@@ -1287,7 +1415,6 @@ var LinkCommandPlugin = class extends import_obsidian3.Plugin {
     this.addSettingTab(new LinkCommandSettingTab(this.app, this));
   }
   onunload() {
-    this.tooltip.close();
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_LINK_SIDEBAR);
   }
   /**
@@ -1342,7 +1469,7 @@ var LinkCommandPlugin = class extends import_obsidian3.Plugin {
    */
   showAbout() {
     const stats = this.unfurlService.getCacheStats();
-    new import_obsidian3.Notice(
+    new import_obsidian4.Notice(
       `L\u2318 Link Command v${this.manifest.version}
 
 Cached links: ${stats.persistentSize}
@@ -1368,6 +1495,36 @@ Memory cache: ${stats.memorySize}`,
     (_a = this.sidebarView) == null ? void 0 : _a.updateSettings(this.settings);
   }
   /**
+   * Format metadata title for display, including subreddit if configured
+   */
+  formatLinkTitle(metadata, url) {
+    if (!metadata.title)
+      return url;
+    if (metadata.subreddit && this.settings.redditLinkFormat === "title_subreddit") {
+      return `${metadata.title} (${metadata.subreddit})`;
+    }
+    return metadata.title;
+  }
+  /**
+   * Register the inline format toggle extension
+   */
+  registerFormatToggleExtension() {
+    const config = {
+      enabled: this.settings.unfurlEnabled,
+      unfurlService: this.unfurlService,
+      getSourcePage: () => {
+        var _a;
+        return (_a = this.app.workspace.getActiveFile()) == null ? void 0 : _a.path;
+      },
+      onFormatChange: () => {
+        var _a;
+        (_a = this.sidebarView) == null ? void 0 : _a.render();
+      }
+    };
+    const extension = createFormatToggleExtension(config);
+    this.registerEditorExtension(extension);
+  }
+  /**
    * Detect if cursor is on a URL and return it
    */
   detectUrlAtCursor(editor) {
@@ -1389,123 +1546,69 @@ Memory cache: ${stats.memorySize}`,
     return null;
   }
   /**
-   * Unfurl URL and show tooltip
+   * Cycle through formats at cursor (URL -> Link -> Card -> URL)
    */
-  async unfurlUrl(editor, url) {
-    var _a;
-    const actions = {
-      onInsertLink: (metadata) => {
-        this.insertMarkdownLink(editor, url, metadata);
-      },
-      onInsertCard: (metadata) => {
-        this.insertCardBlock(editor, url, metadata);
-      },
-      onCopy: async (metadata) => {
-        const text = `[${metadata.title || url}](${url})`;
-        await navigator.clipboard.writeText(text);
-        new import_obsidian3.Notice("Link copied to clipboard");
-      },
-      onRetry: () => {
-        this.unfurlUrl(editor, url);
+  async cycleFormatAtCursor(editor, url) {
+    var _a, _b, _c;
+    const cursor = editor.getCursor();
+    const line = editor.getLine(cursor.line);
+    const urlEscaped = url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const mdLinkPattern = new RegExp(`\\[([^\\]]*)\\]\\(${urlEscaped}\\)`);
+    const isMarkdownLink = mdLinkPattern.test(line);
+    let isLinkCard = false;
+    let cardStartLine = -1;
+    let cardEndLine = -1;
+    for (let i = cursor.line; i >= 0; i--) {
+      const checkLine = editor.getLine(i).trim();
+      if (checkLine.startsWith("```link-card")) {
+        isLinkCard = true;
+        cardStartLine = i;
+        break;
       }
-    };
-    this.tooltip.showLoading(editor, url, actions);
-    const activeFile = this.app.workspace.getActiveFile();
-    const result = await this.unfurlService.unfurl(url, false, activeFile == null ? void 0 : activeFile.path);
-    this.tooltip.updateContent(result);
-    (_a = this.sidebarView) == null ? void 0 : _a.render();
-  }
-  /**
-   * Handle paste of URL
-   */
-  async handlePasteUrl(editor, url) {
-    var _a;
-    editor.replaceSelection(url);
-    const activeFile = this.app.workspace.getActiveFile();
-    const result = await this.unfurlService.unfurl(url, false, activeFile == null ? void 0 : activeFile.path);
-    if (result.success && ((_a = result.metadata) == null ? void 0 : _a.title)) {
-      const cursor = editor.getCursor();
-      const line = editor.getLine(cursor.line);
-      const urlIndex = line.lastIndexOf(url);
-      if (urlIndex >= 0) {
-        const from = { line: cursor.line, ch: urlIndex };
-        const to = { line: cursor.line, ch: urlIndex + url.length };
-        const markdownLink = `[${result.metadata.title}](${url})`;
-        editor.replaceRange(markdownLink, from, to);
+      if (checkLine === "```") {
+        break;
       }
     }
-  }
-  /**
-   * Insert markdown link at cursor
-   */
-  insertMarkdownLink(editor, url, metadata) {
-    const title = metadata.title || url;
-    const markdownLink = `[${title}](${url})`;
-    const selection = editor.getSelection();
-    if (selection === url) {
-      editor.replaceSelection(markdownLink);
+    if (isLinkCard) {
+      for (let i = cardStartLine + 1; i < editor.lineCount(); i++) {
+        if (editor.getLine(i).trim() === "```") {
+          cardEndLine = i;
+          break;
+        }
+      }
+    }
+    const activeFile = this.app.workspace.getActiveFile();
+    if (isLinkCard && cardStartLine >= 0 && cardEndLine >= 0) {
+      const from = { line: cardStartLine, ch: 0 };
+      const to = { line: cardEndLine, ch: editor.getLine(cardEndLine).length };
+      editor.replaceRange(url, from, to);
+    } else if (isMarkdownLink) {
+      const result = await this.unfurlService.unfurl(url, false, activeFile == null ? void 0 : activeFile.path);
+      const lines = ["```link-card", `url: ${url}`];
+      if (result.success && ((_a = result.metadata) == null ? void 0 : _a.title)) {
+        lines.push(`title: ${result.metadata.title}`);
+      }
+      lines.push("```");
+      const match = mdLinkPattern.exec(line);
+      if (match) {
+        const from = { line: cursor.line, ch: match.index };
+        const to = { line: cursor.line, ch: match.index + match[0].length };
+        editor.replaceRange(lines.join("\n"), from, to);
+      }
     } else {
-      const cursor = editor.getCursor();
-      const line = editor.getLine(cursor.line);
+      const result = await this.unfurlService.unfurl(url, false, activeFile == null ? void 0 : activeFile.path);
+      const title = result.success && ((_b = result.metadata) == null ? void 0 : _b.title) ? this.formatLinkTitle(result.metadata, url) : url;
       const urlIndex = line.indexOf(url);
       if (urlIndex >= 0) {
         const from = { line: cursor.line, ch: urlIndex };
         const to = { line: cursor.line, ch: urlIndex + url.length };
-        editor.replaceRange(markdownLink, from, to);
-      } else {
-        editor.replaceSelection(markdownLink);
+        editor.replaceRange(`[${title}](${url})`, from, to);
       }
     }
-  }
-  /**
-   * Insert link card code block
-   */
-  insertCardBlock(editor, url, metadata) {
-    const lines = ["```link-card", `url: ${url}`];
-    if (metadata.title) {
-      lines.push(`title: ${metadata.title}`);
-    }
-    if (metadata.description) {
-      const desc = metadata.description.replace(/\n/g, " ").slice(0, 200);
-      lines.push(`description: ${desc}`);
-    }
-    if (metadata.image) {
-      lines.push(`image: ${metadata.image}`);
-    }
-    lines.push("```");
-    const cardBlock = lines.join("\n");
-    const selection = editor.getSelection();
-    if (selection === url) {
-      editor.replaceSelection(cardBlock);
-    } else {
-      const cursor = editor.getCursor();
-      const line = editor.getLine(cursor.line);
-      const urlIndex = line.indexOf(url);
-      if (urlIndex >= 0 && line.trim() === url) {
-        const from = { line: cursor.line, ch: 0 };
-        const to = { line: cursor.line, ch: line.length };
-        editor.replaceRange(cardBlock, from, to);
-      } else {
-        editor.replaceSelection(cardBlock);
-      }
-    }
-  }
-  /**
-   * Insert link card for URL at cursor
-   */
-  async insertLinkCard(editor, url) {
-    const result = await this.unfurlService.unfurl(url);
-    if (result.success && result.metadata) {
-      this.insertCardBlock(editor, url, result.metadata);
-    } else {
-      const basicCard = `\`\`\`link-card
-url: ${url}
-\`\`\``;
-      editor.replaceSelection(basicCard);
-    }
+    (_c = this.sidebarView) == null ? void 0 : _c.render();
   }
 };
-var LinkCommandSettingTab = class extends import_obsidian3.PluginSettingTab {
+var LinkCommandSettingTab = class extends import_obsidian4.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -1514,25 +1617,13 @@ var LinkCommandSettingTab = class extends import_obsidian3.PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     containerEl.createEl("h2", { text: "Link Command Settings" });
-    new import_obsidian3.Setting(containerEl).setName("Enable URL unfurling").setDesc("Show link previews via context menu and commands").addToggle(
+    new import_obsidian4.Setting(containerEl).setName("Enable inline format toggle").setDesc("Show toggle buttons next to URLs to cycle between formats (URL, Link, Card)").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.unfurlEnabled).onChange(async (value) => {
         this.plugin.settings.unfurlEnabled = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian3.Setting(containerEl).setName("Auto-unfurl on paste").setDesc("Automatically convert pasted URLs to titled links").addToggle(
-      (toggle) => toggle.setValue(this.plugin.settings.unfurlOnPaste).onChange(async (value) => {
-        this.plugin.settings.unfurlOnPaste = value;
-        await this.plugin.saveSettings();
-      })
-    );
-    new import_obsidian3.Setting(containerEl).setName("Default format").setDesc("Default format when auto-unfurling pasted URLs").addDropdown(
-      (dropdown) => dropdown.addOption("link", "Markdown link").addOption("card", "Link card").setValue(this.plugin.settings.defaultFormat).onChange(async (value) => {
-        this.plugin.settings.defaultFormat = value;
-        await this.plugin.saveSettings();
-      })
-    );
-    new import_obsidian3.Setting(containerEl).setName("Request timeout").setDesc("Timeout for fetching URL metadata (milliseconds)").addText(
+    new import_obsidian4.Setting(containerEl).setName("Request timeout").setDesc("Timeout for fetching URL metadata (milliseconds)").addText(
       (text) => text.setPlaceholder("10000").setValue(String(this.plugin.settings.unfurlTimeout)).onChange(async (value) => {
         const num = parseInt(value, 10);
         if (!isNaN(num) && num > 0) {
@@ -1541,14 +1632,21 @@ var LinkCommandSettingTab = class extends import_obsidian3.PluginSettingTab {
         }
       })
     );
+    containerEl.createEl("h3", { text: "Site-Specific" });
+    new import_obsidian4.Setting(containerEl).setName("Reddit link format").setDesc("How to format Reddit links when unfurling").addDropdown(
+      (dropdown) => dropdown.addOption("title", "Title only").addOption("title_subreddit", "Title + subreddit").setValue(this.plugin.settings.redditLinkFormat).onChange(async (value) => {
+        this.plugin.settings.redditLinkFormat = value;
+        await this.plugin.saveSettings();
+      })
+    );
     containerEl.createEl("h3", { text: "Cache" });
-    new import_obsidian3.Setting(containerEl).setName("Enable cache").setDesc("Cache fetched metadata for faster access and offline use").addToggle(
+    new import_obsidian4.Setting(containerEl).setName("Enable cache").setDesc("Cache fetched metadata for faster access and offline use").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.cacheEnabled).onChange(async (value) => {
         this.plugin.settings.cacheEnabled = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian3.Setting(containerEl).setName("Cache TTL").setDesc("How long to keep cached metadata (hours)").addText(
+    new import_obsidian4.Setting(containerEl).setName("Cache TTL").setDesc("How long to keep cached metadata (hours)").addText(
       (text) => text.setPlaceholder("168").setValue(String(this.plugin.settings.cacheTTL)).onChange(async (value) => {
         const num = parseInt(value, 10);
         if (!isNaN(num) && num > 0) {
@@ -1558,21 +1656,21 @@ var LinkCommandSettingTab = class extends import_obsidian3.PluginSettingTab {
       })
     );
     const stats = this.plugin.unfurlService.getCacheStats();
-    new import_obsidian3.Setting(containerEl).setName("Cache statistics").setDesc(`Memory: ${stats.memorySize} entries | Persistent: ${stats.persistentSize} entries`).addButton(
+    new import_obsidian4.Setting(containerEl).setName("Cache statistics").setDesc(`Memory: ${stats.memorySize} entries | Persistent: ${stats.persistentSize} entries`).addButton(
       (btn) => btn.setButtonText("Clear cache").onClick(async () => {
         await this.plugin.unfurlService.clearCache();
-        new import_obsidian3.Notice("Link cache cleared");
+        new import_obsidian4.Notice("Link cache cleared");
         this.display();
       })
     );
     containerEl.createEl("h3", { text: "Sidebar" });
-    new import_obsidian3.Setting(containerEl).setName("Show sidebar by default").setDesc("Open the link sidebar when Obsidian starts").addToggle(
+    new import_obsidian4.Setting(containerEl).setName("Show sidebar by default").setDesc("Open the link sidebar when Obsidian starts").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.showSidebarByDefault).onChange(async (value) => {
         this.plugin.settings.showSidebarByDefault = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian3.Setting(containerEl).setName("Recent history limit").setDesc("Number of items to show in the Recent History section").addText(
+    new import_obsidian4.Setting(containerEl).setName("Recent history limit").setDesc("Number of items to show in the Recent History section").addText(
       (text) => text.setPlaceholder("25").setValue(String(this.plugin.settings.recentHistoryLimit)).onChange(async (value) => {
         const num = parseInt(value, 10);
         if (!isNaN(num) && num > 0 && num <= 100) {
@@ -1586,7 +1684,7 @@ var LinkCommandSettingTab = class extends import_obsidian3.PluginSettingTab {
       cls: "setting-item-description",
       text: "Domains that require authentication are skipped during unfurling. One domain per line."
     });
-    new import_obsidian3.Setting(containerEl).setName("Auth domains").setDesc("Domains that require login (skipped during unfurling)").addTextArea(
+    new import_obsidian4.Setting(containerEl).setName("Auth domains").setDesc("Domains that require login (skipped during unfurling)").addTextArea(
       (text) => text.setPlaceholder("slack.com\nnotion.so").setValue(this.plugin.settings.authDomains.join("\n")).onChange(async (value) => {
         this.plugin.settings.authDomains = value.split("\n").map((d) => d.trim()).filter((d) => d.length > 0);
         await this.plugin.saveSettings();

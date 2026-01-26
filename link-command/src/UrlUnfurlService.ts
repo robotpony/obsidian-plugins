@@ -1,6 +1,7 @@
 import { UrlMetadataProvider, UrlMetadataResult, LinkCommandSettings } from "./types";
 import { UrlMetadataCache } from "./UrlMetadataCache";
 import { HtmlMetadataProvider, AuthDomainProvider } from "./UrlMetadataProvider";
+import { RedditProvider } from "./providers/RedditProvider";
 import { CacheData } from "./types";
 
 /**
@@ -32,6 +33,7 @@ export class UrlUnfurlService {
     // Initialize default providers
     this.authDomainProvider = new AuthDomainProvider(settings.authDomains);
     this.providers.push(this.authDomainProvider);
+    this.providers.push(new RedditProvider());
     this.providers.push(new HtmlMetadataProvider());
 
     // Sort by priority

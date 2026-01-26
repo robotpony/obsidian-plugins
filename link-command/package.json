@@ -1,6 +1,6 @@
 {
   "name": "link-command",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Link Command - Obsidian plugin for URL unfurling",
   "main": "main.js",
   "scripts": {
@@ -11,6 +11,9 @@
   "author": "Bruce Alderson",
   "license": "MIT",
   "devDependencies": {
+    "@codemirror/language": "^6.0.0",
+    "@codemirror/state": "^6.0.0",
+    "@codemirror/view": "^6.0.0",
     "@types/node": "^20.10.0",
     "@typescript-eslint/eslint-plugin": "^6.15.0",
     "@typescript-eslint/parser": "^6.15.0",
