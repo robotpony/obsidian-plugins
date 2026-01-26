@@ -2,6 +2,7 @@ import { UrlMetadataProvider, UrlMetadataResult, LinkCommandSettings } from "./t
 import { UrlMetadataCache } from "./UrlMetadataCache";
 import { HtmlMetadataProvider, AuthDomainProvider } from "./UrlMetadataProvider";
 import { RedditProvider } from "./providers/RedditProvider";
+import { GoogleSearchProvider } from "./providers/GoogleSearchProvider";
 import { CacheData } from "./types";
 
 /**
@@ -33,6 +34,7 @@ export class UrlUnfurlService {
     // Initialize default providers
     this.authDomainProvider = new AuthDomainProvider(settings.authDomains);
     this.providers.push(this.authDomainProvider);
+    this.providers.push(new GoogleSearchProvider());
     this.providers.push(new RedditProvider());
     this.providers.push(new HtmlMetadataProvider());
 
@@ -143,7 +145,9 @@ export class UrlUnfurlService {
    */
   extractUrls(text: string): string[] {
     const urlRegex = /https?:\/\/[^\s\]\)]+/g;
-    return text.match(urlRegex) || [];
+    const matches = text.match(urlRegex) || [];
+    // Clean up URLs (remove trailing punctuation that's likely not part of URL)
+    return matches.map(url => url.replace(/[.,;:!?)*]+$/, ""));
   }
 
   /**

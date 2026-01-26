@@ -205,7 +205,8 @@ export class LinkSidebarView extends ItemView {
       let match;
 
       while ((match = urlRegex.exec(line)) !== null) {
-        const url = match[0];
+        // Clean up URL (remove trailing punctuation that's likely not part of URL)
+        const url = match[0].replace(/[.,;:!?)*]+$/, "");
         // Avoid duplicates
         if (!links.some(l => l.url === url)) {
           const cached = this.unfurlService.getCached(url);

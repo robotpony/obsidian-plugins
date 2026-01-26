@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.4.5
+
+### Fixed
+
+- **Trailing asterisks stripped from URLs**: URLs with trailing `**` (common in pasted Google search results) are now cleaned up correctly
+  - Added `*` to the trailing punctuation cleanup pattern across all URL extraction points
+
+## 0.4.4
+
+### Added
+
+- **Google Search provider**: Google search URLs now display the search query as the title
+  - `https://google.com/search?q=typescript+generics` → `[typescript generics · **Google**](url)`
+  - Works with all Google TLDs (google.com, google.ca, google.co.uk, etc.)
+  - No network request needed - extracts query directly from URL
+
 ## 0.4.3
 
 ### Fixed

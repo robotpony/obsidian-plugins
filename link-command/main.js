@@ -519,6 +519,65 @@ var RedditProvider = class {
   }
 };
 
+// src/providers/GoogleSearchProvider.ts
+var GoogleSearchProvider = class {
+  constructor() {
+    this.name = "google-search";
+    this.priority = 5;
+  }
+  // Between AuthDomain (1) and Reddit (10)
+  canHandle(url) {
+    try {
+      const parsed = new URL(url);
+      const hostname = parsed.hostname;
+      const isGoogle = hostname === "google.com" || hostname === "www.google.com" || hostname.match(/^(www\.)?google\.[a-z]{2,3}(\.[a-z]{2})?$/i) !== null;
+      if (!isGoogle)
+        return false;
+      const isSearchPath = parsed.pathname === "/search" || parsed.pathname.startsWith("/search");
+      const hasQuery = parsed.searchParams.has("q");
+      return isSearchPath && hasQuery;
+    } catch (e) {
+      return false;
+    }
+  }
+  async fetch(url, _timeout) {
+    try {
+      const parsed = new URL(url);
+      const query = parsed.searchParams.get("q");
+      if (!query) {
+        return {
+          success: false,
+          error: "parse_error",
+          errorMessage: "No search query found in URL"
+        };
+      }
+      const decodedQuery = decodeURIComponent(query.replace(/\+/g, " "));
+      const metadata = {
+        url,
+        title: decodedQuery,
+        description: `Google search for "${decodedQuery}"`,
+        image: null,
+        favicon: "https://www.google.com/favicon.ico",
+        siteName: "Google",
+        type: "search",
+        publishedDate: null,
+        fetchedAt: Date.now(),
+        searchQuery: decodedQuery
+      };
+      return {
+        success: true,
+        metadata
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: "parse_error",
+        errorMessage: error instanceof Error ? error.message : "Failed to parse Google search URL"
+      };
+    }
+  }
+};
+
 // src/UrlUnfurlService.ts
 var URL_REGEX = /^https?:\/\/[^\s]+$/i;
 var UrlUnfurlService = class {
@@ -533,6 +592,7 @@ var UrlUnfurlService = class {
     );
     this.authDomainProvider = new AuthDomainProvider(settings.authDomains);
     this.providers.push(this.authDomainProvider);
+    this.providers.push(new GoogleSearchProvider());
     this.providers.push(new RedditProvider());
     this.providers.push(new HtmlMetadataProvider());
     this.sortProviders();
@@ -623,7 +683,8 @@ var UrlUnfurlService = class {
    */
   extractUrls(text) {
     const urlRegex = /https?:\/\/[^\s\]\)]+/g;
-    return text.match(urlRegex) || [];
+    const matches = text.match(urlRegex) || [];
+    return matches.map((url) => url.replace(/[.,;:!?)*]+$/, ""));
   }
   /**
    * Get cache statistics
@@ -781,7 +842,7 @@ var LinkSidebarView = class extends import_obsidian3.ItemView {
       const line = lines[i];
       let match;
       while ((match = urlRegex.exec(line)) !== null) {
-        const url = match[0];
+        const url = match[0].replace(/[.,;:!?)*]+$/, "");
         if (!links.some((l) => l.url === url)) {
           const cached = this.unfurlService.getCached(url);
           links.push({
@@ -1065,7 +1126,7 @@ function buildDecorations(state, enabled) {
       if (processed.has(key))
         continue;
       processed.add(key);
-      const cleanUrl = url.replace(/[.,;:!?)]+$/, "");
+      const cleanUrl = url.replace(/[.,;:!?)*]+$/, "");
       const cleanUrlPos = urlPos;
       const cleanUrlEnd = cleanUrlPos + cleanUrl.length;
       const format = detectFormat(state, cleanUrl, cleanUrlPos);
@@ -1190,7 +1251,9 @@ async function createRichLink(url, config) {
   if (result.success && result.metadata) {
     const metadata = result.metadata;
     title = metadata.title || url;
-    if (metadata.subreddit) {
+    if (metadata.searchQuery) {
+      extra = "Google";
+    } else if (metadata.subreddit) {
       extra = metadata.subreddit;
     } else {
       try {

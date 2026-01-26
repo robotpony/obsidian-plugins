@@ -174,7 +174,8 @@ function buildDecorations(state: EditorState, enabled: boolean): DecorationSet {
       processed.add(key);
 
       // Clean up URL (remove trailing punctuation that's likely not part of URL)
-      const cleanUrl = url.replace(/[.,;:!?)]+$/, "");
+      // Includes * for markdown bold markers that can appear in pasted content
+      const cleanUrl = url.replace(/[.,;:!?)*]+$/, "");
       const cleanUrlPos = urlPos;
       const cleanUrlEnd = cleanUrlPos + cleanUrl.length;
 
@@ -363,8 +364,11 @@ async function createRichLink(url: string, config: FormatToggleConfig): Promise<
     const metadata = result.metadata;
     title = metadata.title || url;
 
+    // For Google Search, use "Google" as the extra text
+    if (metadata.searchQuery) {
+      extra = "Google";
     // For Reddit, use subreddit
-    if (metadata.subreddit) {
+    } else if (metadata.subreddit) {
       extra = metadata.subreddit;
     } else {
       // For other sites, use domain

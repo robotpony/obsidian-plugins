@@ -14,6 +14,7 @@ export interface UrlMetadata {
   sourcePages?: string[];  // file paths where this URL was unfurled
   // Site-specific fields
   subreddit?: string;  // Reddit: r/subreddit
+  searchQuery?: string;  // Google Search: the search query
 }
 
 /**
