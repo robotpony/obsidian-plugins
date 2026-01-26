@@ -1111,6 +1111,21 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
     this.render();
   }
   /**
+   * Get the primary content root folder from settings
+   * Returns empty string if set to "." or "/" (vault root)
+   */
+  getContentRoot() {
+    const contentPaths = this.settings.contentPaths;
+    if (!contentPaths || contentPaths.length === 0) {
+      return "";
+    }
+    const first = contentPaths[0].trim().replace(/\/$/, "");
+    if (first === "." || first === "/" || first === "") {
+      return "";
+    }
+    return first;
+  }
+  /**
    * Show dropdown for selecting folder to create new post
    */
   showNewPostDropdown(trigger) {
@@ -1127,14 +1142,15 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
       text: "Create in folder"
     });
     const folderHierarchy = this.scanner.getFolderHierarchy();
+    const contentRoot = this.getContentRoot();
     const rootItem = dropdown.createEl("div", {
       cls: "hugo-command-tag-item",
-      text: "(root)"
+      text: `(${contentRoot || "root"})`
     });
     rootItem.addEventListener("click", (e) => {
       e.stopPropagation();
       this.closeDropdown();
-      this.promptForNewPost("");
+      this.promptForNewPost(contentRoot);
     });
     for (const folder of folderHierarchy) {
       const depthClass = `folder-depth-${Math.min(folder.depth, 4)}`;
@@ -1142,10 +1158,11 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
         cls: `hugo-command-tag-item folder-tag ${depthClass}`,
         text: folder.name
       });
+      const fullPath = contentRoot ? `${contentRoot}/${folder.path}` : folder.path;
       folderItem.addEventListener("click", (e) => {
         e.stopPropagation();
         this.closeDropdown();
-        this.promptForNewPost(folder.path);
+        this.promptForNewPost(fullPath);
       });
     }
     document.body.appendChild(dropdown);

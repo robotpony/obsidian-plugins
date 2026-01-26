@@ -2,6 +2,13 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.4.2] - 2026-01-25
+
+### Fixed
+
+- New post button now creates files in the correct content folder (e.g., `content/posts/`) instead of vault root
+- Folder dropdown shows content root name (e.g., "(content)") instead of generic "(root)"
+
 ## [0.4.1] - 2026-01-25
 
 ### Changed

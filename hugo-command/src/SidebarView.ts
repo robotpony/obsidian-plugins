@@ -764,6 +764,23 @@ export class HugoSidebarView extends ItemView {
   }
 
   /**
+   * Get the primary content root folder from settings
+   * Returns empty string if set to "." or "/" (vault root)
+   */
+  private getContentRoot(): string {
+    const contentPaths = this.settings.contentPaths;
+    if (!contentPaths || contentPaths.length === 0) {
+      return "";
+    }
+    const first = contentPaths[0].trim().replace(/\/$/, "");
+    // "." or "/" or empty means vault root
+    if (first === "." || first === "/" || first === "") {
+      return "";
+    }
+    return first;
+  }
+
+  /**
    * Show dropdown for selecting folder to create new post
    */
   private showNewPostDropdown(trigger: HTMLElement): void {
@@ -784,21 +801,22 @@ export class HugoSidebarView extends ItemView {
       text: "Create in folder",
     });
 
-    // Get folder hierarchy
+    // Get folder hierarchy and content root
     const folderHierarchy = this.scanner.getFolderHierarchy();
+    const contentRoot = this.getContentRoot();
 
-    // Add root option first
+    // Add root option first (content folder root)
     const rootItem = dropdown.createEl("div", {
       cls: "hugo-command-tag-item",
-      text: "(root)",
+      text: `(${contentRoot || "root"})`,
     });
     rootItem.addEventListener("click", (e) => {
       e.stopPropagation();
       this.closeDropdown();
-      this.promptForNewPost("");
+      this.promptForNewPost(contentRoot);
     });
 
-    // Add all folders with hierarchy
+    // Add all folders with hierarchy (prepend content root)
     for (const folder of folderHierarchy) {
       const depthClass = `folder-depth-${Math.min(folder.depth, 4)}`;
       const folderItem = dropdown.createEl("div", {
@@ -806,10 +824,11 @@ export class HugoSidebarView extends ItemView {
         text: folder.name,
       });
 
+      const fullPath = contentRoot ? `${contentRoot}/${folder.path}` : folder.path;
       folderItem.addEventListener("click", (e) => {
         e.stopPropagation();
         this.closeDropdown();
-        this.promptForNewPost(folder.path);
+        this.promptForNewPost(fullPath);
       });
     }
 
