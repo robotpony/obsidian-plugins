@@ -3454,7 +3454,7 @@ var DEFAULT_SETTINGS = {
   excludeTodoneFilesFromRecent: true,
   defaultProjectsFolder: "projects/",
   focusListLimit: 5,
-  activeTodosLimit: 5,
+  activeTodosLimit: 0,
   priorityTags: ["#p0", "#p1", "#p2", "#p3", "#p4"],
   recentTodonesLimit: 5,
   excludeFoldersFromProjects: ["log"],

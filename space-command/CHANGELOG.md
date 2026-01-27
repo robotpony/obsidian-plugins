@@ -9,11 +9,12 @@ All notable changes to the ␣⌘ Space Command plugin will be documented in thi
 - **Unified sorting**: TODOs, projects, and ideas now sort by: 1) `#focus` first, 2) priority (`#p0`-`#p4`), 3) total tag count (more tags = higher ranking)
   - Consistent sorting across sidebar, embeds, and project lists
   - Items with more context (more tags) surface higher within the same priority level
-- **Active TODOs limit**: New setting to limit TODOs shown in sidebar (default: 5)
-  - "+N more" indicator shows when items are hidden
-  - Set to 0 for unlimited
+- **Active TODOs limit**: New setting to limit TODOs shown in sidebar
+  - Default: 0 (unlimited) - shows all TODOs
+  - Set a value to cap the list with "+N more" indicator
   - Embeds remain unlimited unless `limit:N` filter specified
 - **Focus list limit in sidebar**: Projects section now respects `focusListLimit` setting
+  - Default: 5 projects
   - "+N more" indicator when projects exceed limit
 
 ### Changed
