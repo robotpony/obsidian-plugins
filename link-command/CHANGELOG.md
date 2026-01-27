@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.12
+
+### Changed
+
+- **Sidebar scrollbar**: Semi-transparent (65% opacity) scrollbar thumb with transparent track
+
+## 0.4.11
+
+### Fixed
+
+- **Sidebar layout padding**: Reduced header padding to 2px top/bottom, 4px left/right; scrollbar now flush with right edge
+
 ## 0.4.10
 
 ### Fixed

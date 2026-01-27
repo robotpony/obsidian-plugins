@@ -2,6 +2,18 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.4.9] - 2026-01-26
+
+### Changed
+
+- **Sidebar scrollbar**: Semi-transparent (65% opacity) scrollbar thumb with transparent track
+
+## [0.4.8] - 2026-01-26
+
+### Fixed
+
+- **Sidebar layout padding**: Reduced header padding to 2px top/bottom, 4px left/right; scrollbar now flush with right edge
+
 ## [0.4.7] - 2026-01-26
 
 ### Fixed

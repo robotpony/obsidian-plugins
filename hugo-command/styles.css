@@ -129,7 +129,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px;
+  padding: 2px 4px;
   background-color: var(--background-secondary);
   flex-shrink: 0;
   z-index: 1;
@@ -138,7 +138,21 @@
 .hugo-command-content {
   flex: 1;
   overflow-y: auto;
-  padding: 10px;
+  padding: 0 0 0 4px;
+}
+
+/* Scrollbar styling */
+.hugo-command-sidebar ::-webkit-scrollbar {
+  width: 8px;
+}
+
+.hugo-command-sidebar ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.hugo-command-sidebar ::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--text-muted) 65%, transparent);
+  border-radius: 4px;
 }
 
 .hugo-command-title {
