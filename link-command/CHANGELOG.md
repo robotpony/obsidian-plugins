@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.14
+
+### Fixed
+
+- **Sidebar scrollbar no longer overlaps content**: Added right padding to content area so scrollbar sits beside content, not over it
+- **Scrollbar hugs right edge**: Scrollbar now positioned flush against the right edge of the sidebar
+
 ## 0.4.13
 
 ### Fixed

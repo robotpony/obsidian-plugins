@@ -2,6 +2,13 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.23] - 2026-01-27
+
+### Fixed
+
+- **Sidebar scrollbar no longer overlaps content**: Added right padding to content area so scrollbar sits beside content, not over it
+- **Scrollbar hugs right edge**: Scrollbar now positioned flush against the right edge of the sidebar
+
 ## [0.9.22] - 2026-01-27
 
 ### Fixed

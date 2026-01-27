@@ -1,6 +1,6 @@
 {
   "name": "link-command",
-  "version": "0.4.13",
+  "version": "0.4.14",
   "description": "Link Command - Obsidian plugin for URL unfurling",
   "main": "main.js",
   "scripts": {
