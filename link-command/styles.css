@@ -156,13 +156,20 @@
   font-size: 14px;
 }
 
-.link-sidebar-count {
-  opacity: 0.65;
-  background-color: var(--background-primary);
-  border-radius: 4px;
-  padding: 1px 5px;
-  font-size: 0.8em;
-  margin-left: 6px;
+/* Clear button in section header */
+.link-sidebar-clear-btn {
+  padding: 2px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.2s, color 0.2s;
+  margin-left: auto;
+}
+
+.link-sidebar-clear-btn:hover {
+  opacity: 1;
+  color: var(--text-error);
 }
 
 /* List styles */
@@ -274,6 +281,24 @@
 
 .link-sidebar-history-item:hover {
   border-left-color: var(--text-accent);
+}
+
+/* External link button (arrow) */
+.link-sidebar-external-btn {
+  padding: 2px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0.4;
+  transition: opacity 0.2s, color 0.2s;
+  flex-shrink: 0;
+  margin-left: auto;
+  align-self: center;
+}
+
+.link-sidebar-external-btn:hover {
+  opacity: 1;
+  color: var(--text-accent);
 }
 
 /* --------------------------------------------

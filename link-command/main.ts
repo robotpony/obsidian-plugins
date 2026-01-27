@@ -50,7 +50,11 @@ export default class LinkCommandPlugin extends Plugin {
           this.settings,
           (url, lineNumber) => this.navigateToUrl(url, lineNumber),
           () => this.showAbout(),
-          () => this.openSettings()
+          () => this.openSettings(),
+          async () => {
+            await this.unfurlService.clearCache();
+            new Notice("Link history cleared");
+          }
         );
         return this.sidebarView;
       }

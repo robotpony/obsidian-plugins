@@ -18,6 +18,8 @@ export class LinkSidebarView extends ItemView {
   private onOpenUrl: (url: string, lineNumber: number) => void;
   private onShowAbout: () => void;
   private onOpenSettings: () => void;
+  private onClearHistory: () => Promise<void>;
+  private renderDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -25,7 +27,8 @@ export class LinkSidebarView extends ItemView {
     settings: LinkCommandSettings,
     onOpenUrl: (url: string, lineNumber: number) => void,
     onShowAbout: () => void,
-    onOpenSettings: () => void
+    onOpenSettings: () => void,
+    onClearHistory: () => Promise<void>
   ) {
     super(leaf);
     this.unfurlService = unfurlService;
@@ -33,6 +36,7 @@ export class LinkSidebarView extends ItemView {
     this.onOpenUrl = onOpenUrl;
     this.onShowAbout = onShowAbout;
     this.onOpenSettings = onOpenSettings;
+    this.onClearHistory = onClearHistory;
   }
 
   getViewType(): string {
@@ -57,7 +61,25 @@ export class LinkSidebarView extends ItemView {
       this.app.workspace.on("file-open", this.activeFileListener)
     );
 
+    // Listen for editor changes (debounced) to update when URLs are added/removed
+    this.registerEvent(
+      this.app.workspace.on("editor-change", () => this.debouncedRender())
+    );
+
     await this.render();
+  }
+
+  /**
+   * Debounced render to avoid excessive re-renders during typing
+   */
+  private debouncedRender(): void {
+    if (this.renderDebounceTimer) {
+      clearTimeout(this.renderDebounceTimer);
+    }
+    this.renderDebounceTimer = setTimeout(() => {
+      this.render();
+      this.renderDebounceTimer = null;
+    }, 300);
   }
 
   async onClose(): Promise<void> {
@@ -163,9 +185,6 @@ export class LinkSidebarView extends ItemView {
       return;
     }
 
-    // Add count to header
-    header.createEl("span", { cls: "link-sidebar-count", text: `(${pageLinks.length})` });
-
     // Render each link
     for (const link of pageLinks) {
       this.renderLinkItem(listContainer, link, activeFile);
@@ -186,8 +205,17 @@ export class LinkSidebarView extends ItemView {
       return;
     }
 
-    // Add count to header
-    header.createEl("span", { cls: "link-sidebar-count", text: `(${recentEntries.length})` });
+    // Add clear button to header
+    const clearBtn = header.createEl("button", {
+      cls: "clickable-icon link-sidebar-clear-btn",
+      attr: { "aria-label": "Clear history" },
+    });
+    clearBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>';
+    clearBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      await this.onClearHistory();
+      this.render();
+    });
 
     // Render each entry
     for (const metadata of recentEntries) {
@@ -266,6 +294,17 @@ export class LinkSidebarView extends ItemView {
       content.createEl("div", { cls: "link-sidebar-item-title", text: this.truncateUrl(link.url) });
     }
 
+    // External link button (arrow)
+    const externalBtn = item.createEl("button", {
+      cls: "clickable-icon link-sidebar-external-btn",
+      attr: { "aria-label": "Open in browser" },
+    });
+    externalBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>';
+    externalBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      window.open(link.url, "_blank");
+    });
+
     // Click to navigate to line
     item.addEventListener("click", () => {
       this.onOpenUrl(link.url, link.lineNumber);
@@ -322,6 +361,17 @@ export class LinkSidebarView extends ItemView {
     // Timestamp
     const timeAgo = this.formatTimeAgo(metadata.fetchedAt);
     metaRow.createEl("span", { cls: "link-sidebar-item-time", text: `· ${timeAgo}` });
+
+    // External link button (arrow)
+    const externalBtn = item.createEl("button", {
+      cls: "clickable-icon link-sidebar-external-btn",
+      attr: { "aria-label": "Open in browser" },
+    });
+    externalBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>';
+    externalBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      window.open(metadata.url, "_blank");
+    });
 
     // Click to open URL externally
     item.addEventListener("click", () => {

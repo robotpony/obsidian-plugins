@@ -725,14 +725,16 @@ var UrlUnfurlService = class {
 var import_obsidian3 = require("obsidian");
 var VIEW_TYPE_LINK_SIDEBAR = "link-command-sidebar";
 var LinkSidebarView = class extends import_obsidian3.ItemView {
-  constructor(leaf, unfurlService, settings, onOpenUrl, onShowAbout, onOpenSettings) {
+  constructor(leaf, unfurlService, settings, onOpenUrl, onShowAbout, onOpenSettings, onClearHistory) {
     super(leaf);
     this.activeFileListener = null;
+    this.renderDebounceTimer = null;
     this.unfurlService = unfurlService;
     this.settings = settings;
     this.onOpenUrl = onOpenUrl;
     this.onShowAbout = onShowAbout;
     this.onOpenSettings = onOpenSettings;
+    this.onClearHistory = onClearHistory;
   }
   getViewType() {
     return VIEW_TYPE_LINK_SIDEBAR;
@@ -751,7 +753,22 @@ var LinkSidebarView = class extends import_obsidian3.ItemView {
     this.registerEvent(
       this.app.workspace.on("file-open", this.activeFileListener)
     );
+    this.registerEvent(
+      this.app.workspace.on("editor-change", () => this.debouncedRender())
+    );
     await this.render();
+  }
+  /**
+   * Debounced render to avoid excessive re-renders during typing
+   */
+  debouncedRender() {
+    if (this.renderDebounceTimer) {
+      clearTimeout(this.renderDebounceTimer);
+    }
+    this.renderDebounceTimer = setTimeout(() => {
+      this.render();
+      this.renderDebounceTimer = null;
+    }, 300);
   }
   async onClose() {
   }
@@ -814,7 +831,6 @@ var LinkSidebarView = class extends import_obsidian3.ItemView {
       listContainer.createEl("div", { cls: "link-sidebar-empty", text: "No links in this file" });
       return;
     }
-    header.createEl("span", { cls: "link-sidebar-count", text: `(${pageLinks.length})` });
     for (const link of pageLinks) {
       this.renderLinkItem(listContainer, link, activeFile);
     }
@@ -829,7 +845,16 @@ var LinkSidebarView = class extends import_obsidian3.ItemView {
       listContainer.createEl("div", { cls: "link-sidebar-empty", text: "No unfurled links yet" });
       return;
     }
-    header.createEl("span", { cls: "link-sidebar-count", text: `(${recentEntries.length})` });
+    const clearBtn = header.createEl("button", {
+      cls: "clickable-icon link-sidebar-clear-btn",
+      attr: { "aria-label": "Clear history" }
+    });
+    clearBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>';
+    clearBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      await this.onClearHistory();
+      this.render();
+    });
     for (const metadata of recentEntries) {
       this.renderHistoryItem(listContainer, metadata);
     }
@@ -890,6 +915,15 @@ var LinkSidebarView = class extends import_obsidian3.ItemView {
     } else {
       content.createEl("div", { cls: "link-sidebar-item-title", text: this.truncateUrl(link.url) });
     }
+    const externalBtn = item.createEl("button", {
+      cls: "clickable-icon link-sidebar-external-btn",
+      attr: { "aria-label": "Open in browser" }
+    });
+    externalBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>';
+    externalBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      window.open(link.url, "_blank");
+    });
     item.addEventListener("click", () => {
       this.onOpenUrl(link.url, link.lineNumber);
     });
@@ -926,6 +960,15 @@ var LinkSidebarView = class extends import_obsidian3.ItemView {
     }
     const timeAgo = this.formatTimeAgo(metadata.fetchedAt);
     metaRow.createEl("span", { cls: "link-sidebar-item-time", text: `\xB7 ${timeAgo}` });
+    const externalBtn = item.createEl("button", {
+      cls: "clickable-icon link-sidebar-external-btn",
+      attr: { "aria-label": "Open in browser" }
+    });
+    externalBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>';
+    externalBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      window.open(metadata.url, "_blank");
+    });
     item.addEventListener("click", () => {
       window.open(metadata.url, "_blank");
     });
@@ -1302,7 +1345,11 @@ var LinkCommandPlugin = class extends import_obsidian4.Plugin {
           this.settings,
           (url, lineNumber) => this.navigateToUrl(url, lineNumber),
           () => this.showAbout(),
-          () => this.openSettings()
+          () => this.openSettings(),
+          async () => {
+            await this.unfurlService.clearCache();
+            new import_obsidian4.Notice("Link history cleared");
+          }
         );
         return this.sidebarView;
       }

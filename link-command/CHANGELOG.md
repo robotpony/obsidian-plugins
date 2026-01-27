@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.6
+
+### Added
+
+- **External link buttons**: Arrow button on the right of all sidebar links to open URLs in browser
+- **Clear history button**: Trash icon in the Recent History section header to clear the cache
+
+### Changed
+
+- **Removed link counts** from section headers (Page Links, Recent History)
+
+### Fixed
+
+- **Sidebar now updates immediately** when URLs are added or removed
+  - Previously required switching files or manual refresh
+  - Now listens to editor changes with 300ms debounce for responsive updates
+
 ## 0.4.5
 
 ### Fixed
