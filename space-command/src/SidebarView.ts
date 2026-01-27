@@ -4,7 +4,7 @@ import { TodoProcessor } from "./TodoProcessor";
 import { ProjectManager } from "./ProjectManager";
 import { TodoItem, ProjectInfo, ItemRenderConfig } from "./types";
 import { ContextMenuHandler } from "./ContextMenuHandler";
-import { getPriorityValue, openFileAtLine, extractTags, showNotice } from "./utils";
+import { getPriorityValue, compareTodoItems, openFileAtLine, extractTags, showNotice } from "./utils";
 
 export const VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 
@@ -16,6 +16,8 @@ export class TodoSidebarView extends ItemView {
   private updateListener: (() => void) | null = null;
   private contextMenuHandler: ContextMenuHandler;
   private recentTodonesLimit: number;
+  private activeTodosLimit: number;
+  private focusListLimit: number;
   private activeTab: 'todos' | 'ideas' = 'todos';
   private activeTagFilter: string | null = null;
   private openDropdown: HTMLElement | null = null;
@@ -31,6 +33,8 @@ export class TodoSidebarView extends ItemView {
     defaultTodoneFile: string,
     priorityTags: string[],
     recentTodonesLimit: number,
+    activeTodosLimit: number,
+    focusListLimit: number,
     onShowAbout: () => void,
     onShowStats: () => void
   ) {
@@ -40,6 +44,8 @@ export class TodoSidebarView extends ItemView {
     this.projectManager = projectManager;
     this.defaultTodoneFile = defaultTodoneFile;
     this.recentTodonesLimit = recentTodonesLimit;
+    this.activeTodosLimit = activeTodosLimit;
+    this.focusListLimit = focusListLimit;
     this.onShowAbout = onShowAbout;
     this.onShowStats = onShowStats;
 
@@ -572,12 +578,7 @@ export class TodoSidebarView extends ItemView {
   }
 
   private sortTodosByPriority(todos: TodoItem[]): TodoItem[] {
-    return [...todos].sort((a, b) => {
-      const priorityDiff = getPriorityValue(a.tags) - getPriorityValue(b.tags);
-      if (priorityDiff !== 0) return priorityDiff;
-      // If same priority, sort by date created
-      return a.dateCreated - b.dateCreated;
-    });
+    return [...todos].sort(compareTodoItems);
   }
 
   /**
@@ -602,7 +603,7 @@ export class TodoSidebarView extends ItemView {
   }
 
   private renderProjects(container: HTMLElement): void {
-    const projects = this.projectManager.getProjects();
+    let projects = this.projectManager.getProjects();
 
     const section = container.createEl("div", { cls: "projects-section" });
 
@@ -622,18 +623,43 @@ export class TodoSidebarView extends ItemView {
       return;
     }
 
-    // Sort projects by priority, then by count
+    // Sort projects by: 1) has focus items, 2) priority, 3) tag count (higher = better)
     projects.sort((a, b) => {
+      // Focus items first (priority 0 = #focus)
+      const aHasFocus = a.highestPriority === 0;
+      const bHasFocus = b.highestPriority === 0;
+      if (aHasFocus && !bHasFocus) return -1;
+      if (!aHasFocus && bHasFocus) return 1;
+
+      // Then by priority
       const priorityDiff = a.highestPriority - b.highestPriority;
       if (priorityDiff !== 0) return priorityDiff;
-      // If same priority, sort by count (higher count first)
+
+      // Then by count (higher count = more tags/activity)
       return b.count - a.count;
     });
+
+    // Track total count before limiting
+    const totalCount = projects.length;
+
+    // Apply limit
+    if (this.focusListLimit > 0) {
+      projects = projects.slice(0, this.focusListLimit);
+    }
 
     const list = section.createEl("ul", { cls: "project-list" });
 
     for (const project of projects) {
       this.renderProjectItem(list, project);
+    }
+
+    // Show count indicator if there are more projects than displayed
+    if (totalCount > projects.length) {
+      const moreIndicator = section.createEl("div", {
+        cls: "todo-more-indicator",
+        text: `+${totalCount - projects.length} more`,
+      });
+      moreIndicator.setAttribute("title", `Showing ${projects.length} of ${totalCount} projects`);
     }
   }
 
@@ -840,8 +866,16 @@ export class TodoSidebarView extends ItemView {
       todos = todos.filter(todo => todo.tags.includes(this.activeTagFilter!));
     }
 
-    // Sort by priority
+    // Sort by focus, priority, then tag count
     todos = this.sortTodosByPriority(todos);
+
+    // Track total count before limiting
+    const totalCount = todos.length;
+
+    // Apply limit
+    if (this.activeTodosLimit > 0) {
+      todos = todos.slice(0, this.activeTodosLimit);
+    }
 
     const section = container.createEl("div", { cls: "todo-section" });
 
@@ -850,7 +884,7 @@ export class TodoSidebarView extends ItemView {
     titleSpan.textContent = "TODO";
     this.renderFilterIndicator(header);
 
-    if (todos.length === 0) {
+    if (totalCount === 0) {
       section.createEl("div", {
         text: this.activeTagFilter ? `No TODOs matching ${this.activeTagFilter}` : "No TODOs",
         cls: "todo-empty",
@@ -862,6 +896,15 @@ export class TodoSidebarView extends ItemView {
 
     for (const todo of todos) {
       this.renderTodoItem(list, todo);
+    }
+
+    // Show count indicator if there are more items than displayed
+    if (totalCount > todos.length) {
+      const moreIndicator = section.createEl("div", {
+        cls: "todo-more-indicator",
+        text: `+${totalCount - todos.length} more`,
+      });
+      moreIndicator.setAttribute("title", `Showing ${todos.length} of ${totalCount} TODOs`);
     }
   }
 

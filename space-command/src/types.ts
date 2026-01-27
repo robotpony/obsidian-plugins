@@ -51,6 +51,7 @@ export interface SpaceCommandSettings {
   excludeTodoneFilesFromRecent: boolean;
   defaultProjectsFolder: string;
   focusListLimit: number;
+  activeTodosLimit: number;
   priorityTags: string[];
   recentTodonesLimit: number;
   excludeFoldersFromProjects: string[];
@@ -73,6 +74,7 @@ export const DEFAULT_SETTINGS: SpaceCommandSettings = {
   excludeTodoneFilesFromRecent: true,
   defaultProjectsFolder: "projects/",
   focusListLimit: 5,
+  activeTodosLimit: 5,
   priorityTags: ["#p0", "#p1", "#p2", "#p3", "#p4"],
   recentTodonesLimit: 5,
   excludeFoldersFromProjects: ["log"],

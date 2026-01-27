@@ -433,6 +433,13 @@
   padding: 10px 0;
 }
 
+.todo-more-indicator {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  padding: 4px 0;
+  cursor: default;
+}
+
 /* Embed Styles */
 .space-command-embed {
   margin: 10px 0;

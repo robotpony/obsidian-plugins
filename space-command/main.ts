@@ -162,6 +162,8 @@ export default class SpaceCommandPlugin extends Plugin {
           this.settings.defaultTodoneFile,
           this.settings.priorityTags,
           this.settings.recentTodonesLimit,
+          this.settings.activeTodosLimit,
+          this.settings.focusListLimit,
           () => this.showAboutModal(),
           () => this.showStatsModal()
         )
@@ -710,7 +712,7 @@ class SpaceCommandSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Focus list limit")
-      .setDesc("Maximum number of projects to show in {{focus-list}}")
+      .setDesc("Maximum number of projects to show in sidebar and {{focus-list}}")
       .addText((text) =>
         text
           .setPlaceholder("5")
@@ -719,6 +721,22 @@ class SpaceCommandSettingTab extends PluginSettingTab {
             const num = parseInt(value);
             if (!isNaN(num) && num > 0) {
               this.plugin.settings.focusListLimit = num;
+              await this.plugin.saveSettings();
+            }
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Active TODOs limit")
+      .setDesc("Maximum number of TODOs to show in sidebar (0 for unlimited)")
+      .addText((text) =>
+        text
+          .setPlaceholder("5")
+          .setValue(String(this.plugin.settings.activeTodosLimit))
+          .onChange(async (value) => {
+            const num = parseInt(value);
+            if (!isNaN(num) && num >= 0) {
+              this.plugin.settings.activeTodosLimit = num;
               await this.plugin.saveSettings();
             }
           })

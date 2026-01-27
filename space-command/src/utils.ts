@@ -40,6 +40,45 @@ export function getPriorityValue(tags: string[]): number {
   return 4; // No priority = medium (between #p2 and #p3)
 }
 
+/**
+ * Count meaningful tags (excludes system tags like #todo, #todone, #idea, etc.).
+ * Used as a tertiary sort criterion after focus and priority.
+ */
+export function getTagCount(tags: string[]): number {
+  const systemTags = new Set([
+    "#todo", "#todos", "#todone", "#todones",
+    "#idea", "#ideas", "#ideation",
+    "#principle", "#principles",
+    "#focus", "#future",
+    "#p0", "#p1", "#p2", "#p3", "#p4"
+  ]);
+  return tags.filter(tag => !systemTags.has(tag)).length;
+}
+
+/**
+ * Compare two items for sorting.
+ * Sort order: 1) #focus first, 2) priority (p0-p4), 3) more tags = higher ranking
+ * Returns negative if a < b, positive if a > b, 0 if equal.
+ */
+export function compareTodoItems(
+  a: { tags: string[] },
+  b: { tags: string[] }
+): number {
+  // 1. Focus tag first
+  const aHasFocus = a.tags.includes("#focus");
+  const bHasFocus = b.tags.includes("#focus");
+  if (aHasFocus && !bHasFocus) return -1;
+  if (!aHasFocus && bHasFocus) return 1;
+
+  // 2. Priority (lower value = higher priority)
+  const priorityDiff = getPriorityValue(a.tags) - getPriorityValue(b.tags);
+  if (priorityDiff !== 0) return priorityDiff;
+
+  // 3. Tag count (more tags = higher ranking, so sort descending)
+  const tagCountDiff = getTagCount(b.tags) - getTagCount(a.tags);
+  return tagCountDiff;
+}
+
 export function extractTags(text: string): string[] {
   // Remove inline code spans before extracting tags
   // This prevents matching tags inside backticks like `#ideation` (documentation examples)

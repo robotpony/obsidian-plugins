@@ -36,9 +36,11 @@ That's it. Everything else is optional.
 
 | Tag | Purpose |
 |-----|---------|
-| `#focus` | The one thing to do next (highlighted) |
+| `#focus` | The one thing to do next (highlighted, always first) |
 | `#p0` – `#p4` | Priority levels (0 = highest) |
 | `#future` | Snoozed—hidden from active list |
+
+Sidebar shows top 5 TODOs and projects by default. Items sort by: focus → priority → tag count (more tags = more context = higher). Configure limits in Settings.
 
 **Project tags** group TODOs in the sidebar's Focus section. Any tag that isn't a priority or type tag becomes a project:
 

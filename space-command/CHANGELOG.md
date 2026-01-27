@@ -2,6 +2,33 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.20] - 2026-01-27
+
+### Added
+
+- **Unified sorting**: TODOs, projects, and ideas now sort by: 1) `#focus` first, 2) priority (`#p0`-`#p4`), 3) total tag count (more tags = higher ranking)
+  - Consistent sorting across sidebar, embeds, and project lists
+  - Items with more context (more tags) surface higher within the same priority level
+- **Active TODOs limit**: New setting to limit TODOs shown in sidebar (default: 5)
+  - "+N more" indicator shows when items are hidden
+  - Set to 0 for unlimited
+  - Embeds remain unlimited unless `limit:N` filter specified
+- **Focus list limit in sidebar**: Projects section now respects `focusListLimit` setting
+  - "+N more" indicator when projects exceed limit
+
+### Changed
+
+- Sidebar sorting now uses unified algorithm instead of priority + date
+- Projects sort by focus status, then priority, then item count
+- Embeds sort by focus, priority, tag count (no longer by project tag alphabetically)
+
+### Technical
+
+- New `compareTodoItems()` function in `utils.ts` for unified sorting
+- New `getTagCount()` function counts meaningful tags (excludes system tags)
+- `SidebarView` constructor now accepts `activeTodosLimit` and `focusListLimit` parameters
+- Removed unused `getFirstProjectTag()` method from `EmbedRenderer`
+
 ## [0.9.19] - 2026-01-27
 
 ### Fixed

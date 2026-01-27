@@ -5,7 +5,7 @@ import { ProjectManager } from "./ProjectManager";
 import { FilterParser } from "./FilterParser";
 import { ContextMenuHandler } from "./ContextMenuHandler";
 import { TodoItem } from "./types";
-import { getPriorityValue, renderTextWithTags, openFileAtLine } from "./utils";
+import { compareTodoItems, renderTextWithTags, openFileAtLine } from "./utils";
 
 export class EmbedRenderer {
   private app: App;
@@ -291,26 +291,14 @@ export class EmbedRenderer {
     return result;
   }
 
-  private getFirstProjectTag(todo: TodoItem): string {
-    // Return first non-priority tag for alphabetical sorting
-    const excludeTags = ['#focus', '#future', '#p0', '#p1', '#p2', '#p3', '#p4', '#todo', '#todone'];
-    const projectTag = todo.tags.find(t => !excludeTags.includes(t));
-    return projectTag || 'zzz'; // Sort items without project tags to end
-  }
-
   private sortTodos(todos: TodoItem[]): TodoItem[] {
     // Separate active TODOs and completed TODONEs
     // Use itemType instead of tag checks to handle both singular (#todo) and plural (#todos) forms
     const activeTodos = todos.filter(t => t.itemType === 'todo');
     const completedTodones = todos.filter(t => t.itemType === 'todone');
 
-    // Sort active TODOs by priority, then by project tag alphabetically
-    activeTodos.sort((a, b) => {
-      const priorityDiff = getPriorityValue(a.tags) - getPriorityValue(b.tags);
-      if (priorityDiff !== 0) return priorityDiff;
-      // Same priority: sort by first project tag alphabetically
-      return this.getFirstProjectTag(a).localeCompare(this.getFirstProjectTag(b));
-    });
+    // Sort active TODOs by focus, priority, then tag count
+    activeTodos.sort(compareTodoItems);
 
     // Append completed TODONEs at the end (unsorted)
     return [...activeTodos, ...completedTodones];

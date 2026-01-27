@@ -87,14 +87,20 @@ export class ProjectManager {
   getFocusProjects(limit?: number): ProjectInfo[] {
     const projects = this.getProjects();
 
-    // Sort by activity (count + recency)
+    // Sort by: 1) has focus items, 2) priority, 3) count (as proxy for tag activity)
     projects.sort((a, b) => {
-      // Higher count = more active
-      const countDiff = b.count - a.count;
-      if (countDiff !== 0) return countDiff;
+      // Focus items first (priority 0 = #focus)
+      const aHasFocus = a.highestPriority === 0;
+      const bHasFocus = b.highestPriority === 0;
+      if (aHasFocus && !bHasFocus) return -1;
+      if (!aHasFocus && bHasFocus) return 1;
 
-      // If counts equal, more recent = more active
-      return b.lastActivity - a.lastActivity;
+      // Then by priority
+      const priorityDiff = a.highestPriority - b.highestPriority;
+      if (priorityDiff !== 0) return priorityDiff;
+
+      // Then by count (higher count = more items/activity)
+      return b.count - a.count;
     });
 
     // Apply limit if specified

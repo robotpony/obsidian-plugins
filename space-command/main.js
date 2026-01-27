@@ -168,6 +168,40 @@ function getPriorityValue(tags) {
     return 7;
   return 4;
 }
+function getTagCount(tags) {
+  const systemTags = /* @__PURE__ */ new Set([
+    "#todo",
+    "#todos",
+    "#todone",
+    "#todones",
+    "#idea",
+    "#ideas",
+    "#ideation",
+    "#principle",
+    "#principles",
+    "#focus",
+    "#future",
+    "#p0",
+    "#p1",
+    "#p2",
+    "#p3",
+    "#p4"
+  ]);
+  return tags.filter((tag) => !systemTags.has(tag)).length;
+}
+function compareTodoItems(a, b) {
+  const aHasFocus = a.tags.includes("#focus");
+  const bHasFocus = b.tags.includes("#focus");
+  if (aHasFocus && !bHasFocus)
+    return -1;
+  if (!aHasFocus && bHasFocus)
+    return 1;
+  const priorityDiff = getPriorityValue(a.tags) - getPriorityValue(b.tags);
+  if (priorityDiff !== 0)
+    return priorityDiff;
+  const tagCountDiff = getTagCount(b.tags) - getTagCount(a.tags);
+  return tagCountDiff;
+}
 function extractTags(text5) {
   const textWithoutCode = text5.replace(/`[^`]*`/g, "");
   const tagRegex = /#[\w-]+/g;
@@ -1207,10 +1241,16 @@ var ProjectManager = class {
   getFocusProjects(limit) {
     const projects = this.getProjects();
     projects.sort((a, b) => {
-      const countDiff = b.count - a.count;
-      if (countDiff !== 0)
-        return countDiff;
-      return b.lastActivity - a.lastActivity;
+      const aHasFocus = a.highestPriority === 0;
+      const bHasFocus = b.highestPriority === 0;
+      if (aHasFocus && !bHasFocus)
+        return -1;
+      if (!aHasFocus && bHasFocus)
+        return 1;
+      const priorityDiff = a.highestPriority - b.highestPriority;
+      if (priorityDiff !== 0)
+        return priorityDiff;
+      return b.count - a.count;
     });
     if (limit !== void 0 && limit > 0) {
       return projects.slice(0, limit);
@@ -1816,20 +1856,10 @@ var EmbedRenderer = class {
     }
     return result;
   }
-  getFirstProjectTag(todo) {
-    const excludeTags = ["#focus", "#future", "#p0", "#p1", "#p2", "#p3", "#p4", "#todo", "#todone"];
-    const projectTag = todo.tags.find((t) => !excludeTags.includes(t));
-    return projectTag || "zzz";
-  }
   sortTodos(todos) {
     const activeTodos = todos.filter((t) => t.itemType === "todo");
     const completedTodones = todos.filter((t) => t.itemType === "todone");
-    activeTodos.sort((a, b) => {
-      const priorityDiff = getPriorityValue(a.tags) - getPriorityValue(b.tags);
-      if (priorityDiff !== 0)
-        return priorityDiff;
-      return this.getFirstProjectTag(a).localeCompare(this.getFirstProjectTag(b));
-    });
+    activeTodos.sort(compareTodoItems);
     return [...activeTodos, ...completedTodones];
   }
   extractCompletionDate(text5) {
@@ -2608,7 +2638,7 @@ var DateSuggest = class extends import_obsidian7.EditorSuggest {
 var import_obsidian8 = require("obsidian");
 var VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 var TodoSidebarView = class extends import_obsidian8.ItemView {
-  constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, recentTodonesLimit, onShowAbout, onShowStats) {
+  constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, recentTodonesLimit, activeTodosLimit, focusListLimit, onShowAbout, onShowStats) {
     super(leaf);
     this.updateListener = null;
     this.activeTab = "todos";
@@ -2644,6 +2674,8 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     this.projectManager = projectManager;
     this.defaultTodoneFile = defaultTodoneFile;
     this.recentTodonesLimit = recentTodonesLimit;
+    this.activeTodosLimit = activeTodosLimit;
+    this.focusListLimit = focusListLimit;
     this.onShowAbout = onShowAbout;
     this.onShowStats = onShowStats;
     this.contextMenuHandler = new ContextMenuHandler(
@@ -2989,12 +3021,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     this.renderActiveIdeas(container);
   }
   sortTodosByPriority(todos) {
-    return [...todos].sort((a, b) => {
-      const priorityDiff = getPriorityValue(a.tags) - getPriorityValue(b.tags);
-      if (priorityDiff !== 0)
-        return priorityDiff;
-      return a.dateCreated - b.dateCreated;
-    });
+    return [...todos].sort(compareTodoItems);
   }
   /**
    * Render filter indicator button after section title if a filter is active.
@@ -3016,7 +3043,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     });
   }
   renderProjects(container) {
-    const projects = this.projectManager.getProjects();
+    let projects = this.projectManager.getProjects();
     const section = container.createEl("div", { cls: "projects-section" });
     const header = section.createEl("div", {
       cls: "todo-section-header projects-header"
@@ -3032,14 +3059,31 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       return;
     }
     projects.sort((a, b) => {
+      const aHasFocus = a.highestPriority === 0;
+      const bHasFocus = b.highestPriority === 0;
+      if (aHasFocus && !bHasFocus)
+        return -1;
+      if (!aHasFocus && bHasFocus)
+        return 1;
       const priorityDiff = a.highestPriority - b.highestPriority;
       if (priorityDiff !== 0)
         return priorityDiff;
       return b.count - a.count;
     });
+    const totalCount = projects.length;
+    if (this.focusListLimit > 0) {
+      projects = projects.slice(0, this.focusListLimit);
+    }
     const list4 = section.createEl("ul", { cls: "project-list" });
     for (const project of projects) {
       this.renderProjectItem(list4, project);
+    }
+    if (totalCount > projects.length) {
+      const moreIndicator = section.createEl("div", {
+        cls: "todo-more-indicator",
+        text: `+${totalCount - projects.length} more`
+      });
+      moreIndicator.setAttribute("title", `Showing ${projects.length} of ${totalCount} projects`);
     }
   }
   renderProjectItem(list4, project) {
@@ -3187,12 +3231,16 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       todos = todos.filter((todo) => todo.tags.includes(this.activeTagFilter));
     }
     todos = this.sortTodosByPriority(todos);
+    const totalCount = todos.length;
+    if (this.activeTodosLimit > 0) {
+      todos = todos.slice(0, this.activeTodosLimit);
+    }
     const section = container.createEl("div", { cls: "todo-section" });
     const header = section.createEl("div", { cls: "todo-section-header" });
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
     titleSpan.textContent = "TODO";
     this.renderFilterIndicator(header);
-    if (todos.length === 0) {
+    if (totalCount === 0) {
       section.createEl("div", {
         text: this.activeTagFilter ? `No TODOs matching ${this.activeTagFilter}` : "No TODOs",
         cls: "todo-empty"
@@ -3202,6 +3250,13 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     const list4 = section.createEl("ul", { cls: "todo-list" });
     for (const todo of todos) {
       this.renderTodoItem(list4, todo);
+    }
+    if (totalCount > todos.length) {
+      const moreIndicator = section.createEl("div", {
+        cls: "todo-more-indicator",
+        text: `+${totalCount - todos.length} more`
+      });
+      moreIndicator.setAttribute("title", `Showing ${todos.length} of ${totalCount} TODOs`);
     }
   }
   renderTodoItem(list4, todo, isChild = false) {
@@ -3399,6 +3454,7 @@ var DEFAULT_SETTINGS = {
   excludeTodoneFilesFromRecent: true,
   defaultProjectsFolder: "projects/",
   focusListLimit: 5,
+  activeTodosLimit: 5,
   priorityTags: ["#p0", "#p1", "#p2", "#p3", "#p4"],
   recentTodonesLimit: 5,
   excludeFoldersFromProjects: ["log"],
@@ -14639,6 +14695,8 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
         this.settings.defaultTodoneFile,
         this.settings.priorityTags,
         this.settings.recentTodonesLimit,
+        this.settings.activeTodosLimit,
+        this.settings.focusListLimit,
         () => this.showAboutModal(),
         () => this.showStatsModal()
       )
@@ -15021,11 +15079,20 @@ var SpaceCommandSettingTab = class extends import_obsidian11.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian11.Setting(containerEl).setName("Focus list limit").setDesc("Maximum number of projects to show in {{focus-list}}").addText(
+    new import_obsidian11.Setting(containerEl).setName("Focus list limit").setDesc("Maximum number of projects to show in sidebar and {{focus-list}}").addText(
       (text5) => text5.setPlaceholder("5").setValue(String(this.plugin.settings.focusListLimit)).onChange(async (value) => {
         const num = parseInt(value);
         if (!isNaN(num) && num > 0) {
           this.plugin.settings.focusListLimit = num;
+          await this.plugin.saveSettings();
+        }
+      })
+    );
+    new import_obsidian11.Setting(containerEl).setName("Active TODOs limit").setDesc("Maximum number of TODOs to show in sidebar (0 for unlimited)").addText(
+      (text5) => text5.setPlaceholder("5").setValue(String(this.plugin.settings.activeTodosLimit)).onChange(async (value) => {
+        const num = parseInt(value);
+        if (!isNaN(num) && num >= 0) {
+          this.plugin.settings.activeTodosLimit = num;
           await this.plugin.saveSettings();
         }
       })
