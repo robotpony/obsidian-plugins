@@ -149,31 +149,37 @@
 /* New post button */
 .hugo-command-new-btn {
   padding: 4px;
-  border: none;
-  background: transparent;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
   cursor: pointer;
   opacity: 0.6;
-  transition: opacity 0.2s;
+  transition: opacity 0.2s, background-color 0.15s;
   flex-shrink: 0;
+  border-radius: 4px;
 }
 
 .hugo-command-new-btn:hover {
   opacity: 1;
+  background-color: var(--background-modifier-hover) !important;
 }
 
 /* Menu button (kebab) */
 .hugo-command-menu-btn {
   padding: 4px;
-  border: none;
-  background: transparent;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
   cursor: pointer;
   opacity: 0.6;
-  transition: opacity 0.2s;
+  transition: opacity 0.2s, background-color 0.15s;
   flex-shrink: 0;
+  border-radius: 4px;
 }
 
 .hugo-command-menu-btn:hover {
   opacity: 1;
+  background-color: var(--background-modifier-hover) !important;
 }
 
 /* Filter bar */

@@ -2,6 +2,12 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.4.7] - 2026-01-26
+
+### Fixed
+
+- **Sidebar button styling**: Removed visible borders and backgrounds from menu/new post buttons; added subtle hover effect
+
 ## [0.4.6] - 2026-01-26
 
 ### Fixed

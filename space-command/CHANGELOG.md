@@ -2,6 +2,12 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.14] - 2026-01-26
+
+### Fixed
+
+- **Sidebar button styling**: Removed visible borders and backgrounds from close/menu buttons; added subtle hover effect
+
 ## [0.9.13] - 2026-01-26
 
 ### Fixed

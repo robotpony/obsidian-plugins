@@ -119,16 +119,19 @@
 /* Menu button - matches space-command */
 .link-sidebar-menu-btn {
   padding: 4px;
-  border: none;
-  background: transparent;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
   cursor: pointer;
   opacity: 0.6;
-  transition: opacity 0.2s;
+  transition: opacity 0.2s, background-color 0.15s;
   flex-shrink: 0;
+  border-radius: 4px;
 }
 
 .link-sidebar-menu-btn:hover {
   opacity: 1;
+  background-color: var(--background-modifier-hover) !important;
 }
 
 .link-sidebar-menu-btn.rotating {
@@ -168,18 +171,21 @@
 
 /* Clear button in section header */
 .link-sidebar-clear-btn {
-  padding: 2px;
-  border: none;
-  background: transparent;
+  padding: 4px;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
   cursor: pointer;
   opacity: 0.5;
-  transition: opacity 0.2s, color 0.2s;
+  transition: opacity 0.2s, color 0.2s, background-color 0.15s;
   margin-left: auto;
+  border-radius: 4px;
 }
 
 .link-sidebar-clear-btn:hover {
   opacity: 1;
   color: var(--text-error);
+  background-color: var(--background-modifier-hover) !important;
 }
 
 /* List styles */
@@ -295,15 +301,22 @@
 
 /* External link button (arrow) */
 .link-sidebar-external-btn {
-  padding: 2px;
-  border: none;
-  background: transparent;
+  padding: 4px;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
   cursor: pointer;
   opacity: 0.4;
-  transition: opacity 0.2s, color 0.2s;
+  transition: opacity 0.2s, color 0.2s, background-color 0.15s;
   flex-shrink: 0;
   margin-left: auto;
   align-self: center;
+  border-radius: 4px;
+}
+
+.link-sidebar-external-btn:hover {
+  opacity: 1;
+  background-color: var(--background-modifier-hover) !important;
 }
 
 

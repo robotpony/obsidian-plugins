@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.10
+
+### Fixed
+
+- **Sidebar button styling**: Removed visible borders and backgrounds from close/menu/clear buttons; added subtle hover effect
+
 ## 0.4.9
 
 ### Fixed
