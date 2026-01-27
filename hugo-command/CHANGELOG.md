@@ -2,6 +2,12 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.4.6] - 2026-01-26
+
+### Fixed
+
+- **Sidebar header now stays pinned** while scrolling content below
+
 ## [0.4.5] - 2026-01-25
 
 ### Fixed

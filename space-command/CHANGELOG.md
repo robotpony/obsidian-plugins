@@ -2,6 +2,12 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.13] - 2026-01-26
+
+### Fixed
+
+- **Sidebar header now stays pinned** while scrolling content below
+
 ## [0.9.12] - 2026-01-25
 
 ### Fixed

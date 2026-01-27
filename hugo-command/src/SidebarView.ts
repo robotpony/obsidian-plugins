@@ -89,8 +89,11 @@ export class HugoSidebarView extends ItemView {
     container.addClass("hugo-command-sidebar");
 
     this.renderHeader(container as HTMLElement);
-    this.renderFilters(container as HTMLElement);
-    this.renderContentList(container as HTMLElement);
+
+    // Content wrapper for scrolling (includes filters and list)
+    const content = (container as HTMLElement).createEl("div", { cls: "hugo-command-content" });
+    this.renderFilters(content);
+    this.renderContentList(content);
   }
 
   private renderHeader(container: HTMLElement): void {

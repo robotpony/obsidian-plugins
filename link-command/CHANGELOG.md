@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.9
+
+### Fixed
+
+- **Sidebar header now stays pinned** while scrolling content below
+
+## 0.4.8
+
+### Fixed
+
+- **Removed duplicate hover effect** from external link icon in sidebar rows (row hover is sufficient)
+
 ## 0.4.7
 
 ### Fixed

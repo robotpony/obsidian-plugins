@@ -613,8 +613,9 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
     container.empty();
     container.addClass("hugo-command-sidebar");
     this.renderHeader(container);
-    this.renderFilters(container);
-    this.renderContentList(container);
+    const content = container.createEl("div", { cls: "hugo-command-content" });
+    this.renderFilters(content);
+    this.renderContentList(content);
   }
   renderHeader(container) {
     const header = container.createEl("div", { cls: "hugo-command-header" });

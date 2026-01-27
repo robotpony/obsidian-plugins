@@ -541,11 +541,14 @@ export class TodoSidebarView extends ItemView {
       menu.showAtMouseEvent(evt);
     });
 
+    // Content wrapper for scrolling
+    const content = container.createEl("div", { cls: "sidebar-content" });
+
     // Render content based on active tab
     if (this.activeTab === 'todos') {
-      this.renderTodosContent(container);
+      this.renderTodosContent(content);
     } else {
-      this.renderIdeasContent(container);
+      this.renderIdeasContent(content);
     }
   }
 

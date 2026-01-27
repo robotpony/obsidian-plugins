@@ -2972,10 +2972,11 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       });
       menu.showAtMouseEvent(evt);
     });
+    const content3 = container.createEl("div", { cls: "sidebar-content" });
     if (this.activeTab === "todos") {
-      this.renderTodosContent(container);
+      this.renderTodosContent(content3);
     } else {
-      this.renderIdeasContent(container);
+      this.renderIdeasContent(content3);
     }
   }
   renderTodosContent(container) {
