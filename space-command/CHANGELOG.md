@@ -2,6 +2,17 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.24] - 2026-01-27
+
+### Added
+
+- **Focus mode toggle**: Eye icon button in Focus section header filters to show only `#focus` projects
+  - Click eye icon to toggle focus mode on/off
+  - When enabled, only projects with `#focus` tagged items are shown
+  - Shows "Focus mode enabled" / "Focus mode disabled" notification (matching TODO completion style)
+  - Eye-off icon indicates focus mode is active (filtering)
+  - Eye icon indicates normal mode (showing all projects)
+
 ## [0.9.23] - 2026-01-27
 
 ### Fixed

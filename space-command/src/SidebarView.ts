@@ -20,6 +20,7 @@ export class TodoSidebarView extends ItemView {
   private focusListLimit: number;
   private activeTab: 'todos' | 'ideas' = 'todos';
   private activeTagFilter: string | null = null;
+  private focusModeEnabled: boolean = false;
   private openDropdown: HTMLElement | null = null;
   private openInfoPopup: HTMLElement | null = null;
   private onShowAbout: () => void;
@@ -613,11 +614,33 @@ export class TodoSidebarView extends ItemView {
 
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
     titleSpan.textContent = "Focus";
+
+    // Focus mode toggle button (eye icon)
+    const focusModeBtn = header.createEl("button", {
+      cls: `clickable-icon focus-mode-toggle-btn${this.focusModeEnabled ? ' active' : ''}`,
+      attr: { "aria-label": this.focusModeEnabled ? "Show all projects" : "Show only focused" },
+    });
+    // Eye-off icon when focus mode is ON (filtering), eye icon when OFF (showing all)
+    focusModeBtn.innerHTML = this.focusModeEnabled
+      ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>'
+      : '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+
+    focusModeBtn.addEventListener("click", () => {
+      this.focusModeEnabled = !this.focusModeEnabled;
+      showNotice(this.focusModeEnabled ? "Focus mode enabled" : "Focus mode disabled");
+      this.render();
+    });
+
     this.renderFilterIndicator(header);
+
+    // Apply focus mode filter if enabled
+    if (this.focusModeEnabled) {
+      projects = projects.filter(p => p.highestPriority === 0);
+    }
 
     if (projects.length === 0) {
       section.createEl("div", {
-        text: "No focus projects yet",
+        text: this.focusModeEnabled ? "No focused projects" : "No focus projects yet",
         cls: "todo-empty",
       });
       return;

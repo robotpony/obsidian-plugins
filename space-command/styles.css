@@ -870,6 +870,26 @@
   color: var(--interactive-accent);
 }
 
+/* Focus mode toggle button in sidebar */
+.focus-mode-toggle-btn {
+  padding: 2px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0.4;
+  transition: opacity 0.2s;
+  margin-left: 6px;
+}
+
+.focus-mode-toggle-btn:hover {
+  opacity: 1;
+}
+
+.focus-mode-toggle-btn.active {
+  opacity: 0.7;
+  color: var(--interactive-accent);
+}
+
 /* Header TODO styling */
 .todo-header > .todo-text,
 .todo-header .todo-header-row > .todo-text {
