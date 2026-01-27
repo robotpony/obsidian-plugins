@@ -1,4 +1,4 @@
-import { App, TFile } from "obsidian";
+import { App, Modal, TFile } from "obsidian";
 import { TodoScanner } from "./TodoScanner";
 import { ProjectInfo, TodoItem } from "./types";
 import { getPriorityValue } from "./utils";
@@ -275,9 +275,47 @@ export class ProjectManager {
       const leaf = this.app.workspace.getLeaf(false);
       await leaf.openFile(file);
     } else {
-      // File doesn't exist, create it
-      await this.createProjectFile(filepath, tag);
+      // File doesn't exist, ask before creating
+      const confirmed = await this.confirmCreateProjectFile(tag, filepath);
+      if (confirmed) {
+        await this.createProjectFile(filepath, tag);
+      }
     }
+  }
+
+  private confirmCreateProjectFile(tag: string, filepath: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      const modal = new Modal(this.app);
+      modal.titleEl.setText("Create Project File?");
+      modal.contentEl.createEl("p", {
+        text: `Create project file for ${tag} in ${this.projectsFolder}?`,
+      });
+
+      const buttonContainer = modal.contentEl.createEl("div", {
+        cls: "modal-button-container",
+      });
+      buttonContainer.style.display = "flex";
+      buttonContainer.style.justifyContent = "flex-end";
+      buttonContainer.style.gap = "8px";
+      buttonContainer.style.marginTop = "16px";
+
+      const cancelBtn = buttonContainer.createEl("button", { text: "Cancel" });
+      cancelBtn.addEventListener("click", () => {
+        modal.close();
+        resolve(false);
+      });
+
+      const createBtn = buttonContainer.createEl("button", {
+        text: "Create",
+        cls: "mod-cta",
+      });
+      createBtn.addEventListener("click", () => {
+        modal.close();
+        resolve(true);
+      });
+
+      modal.open();
+    });
   }
 
   private async createProjectFile(filepath: string, tag: string): Promise<void> {

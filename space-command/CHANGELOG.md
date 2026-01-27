@@ -2,6 +2,14 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.21] - 2026-01-27
+
+### Changed
+
+- **Focus list asks before creating project files**: Clicking the → arrow now shows a confirmation dialog before creating a new project file
+  - Displays the project tag and destination folder
+  - Prevents accidental file creation
+
 ## [0.9.20] - 2026-01-27
 
 ### Added

@@ -1375,8 +1375,41 @@ var ProjectManager = class {
       const leaf = this.app.workspace.getLeaf(false);
       await leaf.openFile(file);
     } else {
-      await this.createProjectFile(filepath, tag);
+      const confirmed = await this.confirmCreateProjectFile(tag, filepath);
+      if (confirmed) {
+        await this.createProjectFile(filepath, tag);
+      }
     }
+  }
+  confirmCreateProjectFile(tag, filepath) {
+    return new Promise((resolve) => {
+      const modal = new import_obsidian4.Modal(this.app);
+      modal.titleEl.setText("Create Project File?");
+      modal.contentEl.createEl("p", {
+        text: `Create project file for ${tag} in ${this.projectsFolder}?`
+      });
+      const buttonContainer = modal.contentEl.createEl("div", {
+        cls: "modal-button-container"
+      });
+      buttonContainer.style.display = "flex";
+      buttonContainer.style.justifyContent = "flex-end";
+      buttonContainer.style.gap = "8px";
+      buttonContainer.style.marginTop = "16px";
+      const cancelBtn = buttonContainer.createEl("button", { text: "Cancel" });
+      cancelBtn.addEventListener("click", () => {
+        modal.close();
+        resolve(false);
+      });
+      const createBtn = buttonContainer.createEl("button", {
+        text: "Create",
+        cls: "mod-cta"
+      });
+      createBtn.addEventListener("click", () => {
+        modal.close();
+        resolve(true);
+      });
+      modal.open();
+    });
   }
   async createProjectFile(filepath, tag) {
     const folderPath = filepath.substring(0, filepath.lastIndexOf("/"));
