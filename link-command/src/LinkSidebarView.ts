@@ -305,9 +305,9 @@ export class LinkSidebarView extends ItemView {
       window.open(link.url, "_blank");
     });
 
-    // Click to navigate to line
+    // Click to open in browser
     item.addEventListener("click", () => {
-      this.onOpenUrl(link.url, link.lineNumber);
+      window.open(link.url, "_blank");
     });
 
     // Context menu

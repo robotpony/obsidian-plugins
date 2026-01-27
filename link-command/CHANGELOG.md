@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.7
+
+### Fixed
+
+- **Clear button now on same line** as "Recent History" header (added flex layout to section header)
+- **Page Links now open in browser** when clicked, consistent with history items
+
 ## 0.4.6
 
 ### Added

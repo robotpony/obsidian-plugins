@@ -925,7 +925,7 @@ var LinkSidebarView = class extends import_obsidian3.ItemView {
       window.open(link.url, "_blank");
     });
     item.addEventListener("click", () => {
-      this.onOpenUrl(link.url, link.lineNumber);
+      window.open(link.url, "_blank");
     });
     item.addEventListener("contextmenu", (e) => {
       e.preventDefault();
