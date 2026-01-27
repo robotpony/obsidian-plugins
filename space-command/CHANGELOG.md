@@ -2,6 +2,41 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.18] - 2026-01-27
+
+### Improved
+
+- **Tab lock UX cleanup**: Cleaner visual state when tabs are locked
+  - Locking a tab now hides the X (close button) and the lock button
+  - Obsidian's native pushpin shows the locked state
+  - Click the pushpin to unlock the tab
+  - Reduces visual clutter (was showing both pushpin and lock icon over X)
+
+### Technical
+
+- Added `space-command-tab-locked` class to tab headers for CSS control
+- New `addPinClickHandler()` method wires pushpin for unlocking
+- CSS hides `.space-command-tab-lock-btn` and close button when locked
+
+## [0.9.17] - 2026-01-27
+
+### Added
+
+- **Tab lock buttons**: Lock buttons on document tabs to prevent link clicks from replacing the view
+  - Click the lock icon on any tab header to toggle pinned state
+  - Locked (pinned) tabs force link clicks to open in new tabs
+  - Uses Obsidian's native pinning API for reliable behaviour
+  - Disabled by default—enable in Settings → "Show tab lock buttons"
+  - Lock icon shows open padlock (unlocked) or closed padlock (locked)
+
+### Technical
+
+- New `TabLockManager` class for managing tab lock button injection
+- New `showTabLockButton` setting (default: false)
+- Uses MutationObserver to add buttons to new tabs dynamically
+- Filters by `data-type="markdown"` to target only document tabs (not sidebar tabs)
+- CSS: `.space-command-tab-lock-btn`, `.is-locked` states
+
 ## [0.9.16] - 2026-01-26
 
 ### Changed

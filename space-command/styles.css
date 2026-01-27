@@ -1416,3 +1416,40 @@
   color: var(--interactive-accent-hover);
 }
 
+/* Tab Lock Button Styles */
+.space-command-tab-lock-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0.4;
+  padding: 2px;
+  margin-right: 2px;
+  border-radius: 3px;
+  transition: opacity 0.15s, background-color 0.15s;
+  flex-shrink: 0;
+}
+
+.space-command-tab-lock-btn:hover {
+  opacity: 0.8;
+  background-color: var(--background-modifier-hover);
+}
+
+.space-command-tab-lock-btn svg {
+  display: block;
+}
+
+/* When tab is locked: hide lock button and close button, show only Obsidian's pushpin */
+.space-command-tab-locked .space-command-tab-lock-btn {
+  display: none;
+}
+
+.space-command-tab-locked .workspace-tab-header-inner-close-button {
+  display: none;
+}
+
+/* Make the pin icon clickable when locked */
+.space-command-tab-locked .workspace-tab-header-status-container {
+  cursor: pointer;
+}
+

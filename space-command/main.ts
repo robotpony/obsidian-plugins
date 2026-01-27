@@ -25,6 +25,7 @@ import { convertToSlackMarkdown } from "./src/SlackConverter";
 import { showNotice } from "./src/utils";
 import { LLMClient } from "./src/LLMClient";
 import { DefineTooltip } from "./src/DefineTooltip";
+import { TabLockManager } from "./src/TabLockManager";
 
 export default class SpaceCommandPlugin extends Plugin {
   settings: SpaceCommandSettings;
@@ -34,6 +35,7 @@ export default class SpaceCommandPlugin extends Plugin {
   embedRenderer: EmbedRenderer;
   llmClient: LLMClient;
   defineTooltip: DefineTooltip;
+  tabLockManager: TabLockManager;
 
   async onload() {
     await this.loadSettings();
@@ -69,6 +71,16 @@ export default class SpaceCommandPlugin extends Plugin {
       timeout: this.settings.llmTimeout,
     });
     this.defineTooltip = new DefineTooltip(this.app);
+
+    // Initialize tab lock manager
+    this.tabLockManager = new TabLockManager(this.app);
+
+    // Enable tab lock buttons if setting is enabled
+    if (this.settings.showTabLockButton) {
+      this.app.workspace.onLayoutReady(() => {
+        this.tabLockManager.enable();
+      });
+    }
 
     // Configure scanner to exclude TODONE log file from Recent TODONEs
     if (this.settings.excludeTodoneFilesFromRecent) {
@@ -390,6 +402,8 @@ export default class SpaceCommandPlugin extends Plugin {
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_TODO_SIDEBAR);
     // Clean up define tooltip
     this.defineTooltip.close();
+    // Clean up tab lock manager
+    this.tabLockManager.destroy();
   }
 
   async loadSettings() {
@@ -658,6 +672,23 @@ class SpaceCommandSettingTab extends PluginSettingTab {
               this.app,
               value
             );
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Show tab lock buttons")
+      .setDesc("Add lock buttons to tab headers. Locked tabs force links to open in new tabs.")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.showTabLockButton)
+          .onChange(async (value) => {
+            this.plugin.settings.showTabLockButton = value;
+            if (value) {
+              this.plugin.tabLockManager.enable();
+            } else {
+              this.plugin.tabLockManager.disable();
+            }
             await this.plugin.saveSettings();
           })
       );

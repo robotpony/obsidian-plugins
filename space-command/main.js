@@ -3402,6 +3402,8 @@ var DEFAULT_SETTINGS = {
   priorityTags: ["#p0", "#p1", "#p2", "#p3", "#p4"],
   recentTodonesLimit: 5,
   excludeFoldersFromProjects: ["log"],
+  // Tab lock settings
+  showTabLockButton: false,
   // LLM/Define settings
   llmEnabled: true,
   llmUrl: "http://localhost:11434",
@@ -14310,6 +14312,200 @@ var DefineTooltip = class {
   }
 };
 
+// src/TabLockManager.ts
+var TabLockManager = class {
+  constructor(app) {
+    this.enabled = false;
+    this.mutationObserver = null;
+    this.app = app;
+  }
+  /**
+   * Enable the tab lock feature - adds lock buttons to all tab headers.
+   */
+  enable() {
+    if (this.enabled)
+      return;
+    this.enabled = true;
+    this.updateAllTabs();
+    this.startObserving();
+  }
+  /**
+   * Disable the tab lock feature - removes all lock buttons.
+   */
+  disable() {
+    if (!this.enabled)
+      return;
+    this.enabled = false;
+    this.stopObserving();
+    this.removeAllButtons();
+  }
+  /**
+   * Clean up resources.
+   */
+  destroy() {
+    this.disable();
+  }
+  /**
+   * Update all existing tabs with lock buttons.
+   */
+  updateAllTabs() {
+    const leaves = this.app.workspace.getLeavesOfType("markdown");
+    for (const leaf of leaves) {
+      this.addButtonToLeaf(leaf);
+    }
+    const allLeaves = this.getAllLeaves();
+    for (const leaf of allLeaves) {
+      this.addButtonToLeaf(leaf);
+    }
+  }
+  /**
+   * Get all leaves in the workspace.
+   */
+  getAllLeaves() {
+    const leaves = [];
+    this.app.workspace.iterateAllLeaves((leaf) => {
+      leaves.push(leaf);
+    });
+    return leaves;
+  }
+  /**
+   * Add a lock button to a specific leaf's tab header.
+   */
+  addButtonToLeaf(leaf) {
+    if (!this.enabled)
+      return;
+    const tabHeader = leaf.tabHeaderEl;
+    if (!tabHeader)
+      return;
+    if (!tabHeader.classList.contains("workspace-tab-header"))
+      return;
+    const dataType = tabHeader.getAttribute("data-type");
+    if (dataType !== "markdown")
+      return;
+    if (tabHeader.querySelector(".space-command-tab-lock-btn"))
+      return;
+    const innerContainer = tabHeader.querySelector(".workspace-tab-header-inner");
+    if (!innerContainer)
+      return;
+    const closeButton = innerContainer.querySelector(".workspace-tab-header-inner-close-button");
+    const lockBtn = document.createElement("div");
+    lockBtn.className = "space-command-tab-lock-btn workspace-tab-header-status-icon";
+    lockBtn.setAttribute("aria-label", "Lock tab (pinned tabs open links in new tabs)");
+    const isPinned = leaf.pinned === true;
+    this.updateButtonState(lockBtn, isPinned);
+    lockBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const currentlyPinned = leaf.pinned === true;
+      leaf.setPinned(!currentlyPinned);
+      this.updateButtonState(lockBtn, !currentlyPinned);
+    });
+    if (closeButton) {
+      innerContainer.insertBefore(lockBtn, closeButton);
+    } else {
+      innerContainer.appendChild(lockBtn);
+    }
+    this.addPinClickHandler(tabHeader, leaf, lockBtn);
+  }
+  /**
+   * Add a click handler to Obsidian's native pin icon for unlocking.
+   * The pin icon appears when the tab is pinned.
+   */
+  addPinClickHandler(tabHeader, leaf, lockBtn) {
+    const pinContainer = tabHeader.querySelector(
+      ".workspace-tab-header-status-container"
+    );
+    if (!pinContainer)
+      return;
+    if (pinContainer.hasAttribute("data-space-command-pin-handler"))
+      return;
+    pinContainer.setAttribute("data-space-command-pin-handler", "true");
+    pinContainer.addEventListener("click", (e) => {
+      if (!leaf.pinned)
+        return;
+      e.stopPropagation();
+      e.preventDefault();
+      leaf.setPinned(false);
+      this.updateButtonState(lockBtn, false);
+    });
+  }
+  /**
+   * Update the button's visual state based on pinned status.
+   * When locked: hide the lock button and close button, let Obsidian's native pushpin show.
+   * When unlocked: show the lock button (open padlock) and close button.
+   */
+  updateButtonState(button, isPinned) {
+    button.classList.toggle("is-locked", isPinned);
+    button.setAttribute("aria-label", isPinned ? "Unlock tab" : "Lock tab");
+    const tabHeader = button.closest(".workspace-tab-header");
+    if (tabHeader) {
+      tabHeader.classList.toggle("space-command-tab-locked", isPinned);
+    }
+    button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>`;
+  }
+  /**
+   * Remove all lock buttons and cleanup tab header classes.
+   */
+  removeAllButtons() {
+    const buttons = document.querySelectorAll(".space-command-tab-lock-btn");
+    buttons.forEach((btn) => btn.remove());
+    const lockedTabs = document.querySelectorAll(".space-command-tab-locked");
+    lockedTabs.forEach(
+      (tab) => tab.classList.remove("space-command-tab-locked")
+    );
+    const pinContainers = document.querySelectorAll(
+      "[data-space-command-pin-handler]"
+    );
+    pinContainers.forEach(
+      (container) => container.removeAttribute("data-space-command-pin-handler")
+    );
+  }
+  /**
+   * Start observing DOM changes to add buttons to new tabs.
+   */
+  startObserving() {
+    if (this.mutationObserver)
+      return;
+    this.mutationObserver = new MutationObserver((mutations) => {
+      var _a, _b;
+      let shouldUpdate = false;
+      for (const mutation of mutations) {
+        if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
+          for (const node2 of Array.from(mutation.addedNodes)) {
+            if (node2 instanceof HTMLElement) {
+              if (((_a = node2.classList) == null ? void 0 : _a.contains("workspace-tab-header")) || ((_b = node2.querySelector) == null ? void 0 : _b.call(node2, ".workspace-tab-header"))) {
+                shouldUpdate = true;
+                break;
+              }
+            }
+          }
+        }
+        if (shouldUpdate)
+          break;
+      }
+      if (shouldUpdate) {
+        setTimeout(() => this.updateAllTabs(), 50);
+      }
+    });
+    const workspaceContainer = document.querySelector(".workspace");
+    if (workspaceContainer) {
+      this.mutationObserver.observe(workspaceContainer, {
+        childList: true,
+        subtree: true
+      });
+    }
+  }
+  /**
+   * Stop observing DOM changes.
+   */
+  stopObserving() {
+    if (this.mutationObserver) {
+      this.mutationObserver.disconnect();
+      this.mutationObserver = null;
+    }
+  }
+};
+
 // main.ts
 var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
   async onload() {
@@ -14342,6 +14538,12 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
       timeout: this.settings.llmTimeout
     });
     this.defineTooltip = new DefineTooltip(this.app);
+    this.tabLockManager = new TabLockManager(this.app);
+    if (this.settings.showTabLockButton) {
+      this.app.workspace.onLayoutReady(() => {
+        this.tabLockManager.enable();
+      });
+    }
     if (this.settings.excludeTodoneFilesFromRecent) {
       this.scanner.setExcludeFromTodones([this.settings.defaultTodoneFile]);
     }
@@ -14571,6 +14773,7 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
   onunload() {
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_TODO_SIDEBAR);
     this.defineTooltip.close();
+    this.tabLockManager.destroy();
   }
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
@@ -14751,6 +14954,17 @@ var SpaceCommandSettingTab = class extends import_obsidian11.PluginSettingTab {
           this.app,
           value
         );
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian11.Setting(containerEl).setName("Show tab lock buttons").setDesc("Add lock buttons to tab headers. Locked tabs force links to open in new tabs.").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.showTabLockButton).onChange(async (value) => {
+        this.plugin.settings.showTabLockButton = value;
+        if (value) {
+          this.plugin.tabLockManager.enable();
+        } else {
+          this.plugin.tabLockManager.disable();
+        }
         await this.plugin.saveSettings();
       })
     );

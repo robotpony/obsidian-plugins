@@ -54,6 +54,8 @@ export interface SpaceCommandSettings {
   priorityTags: string[];
   recentTodonesLimit: number;
   excludeFoldersFromProjects: string[];
+  // Tab lock settings
+  showTabLockButton: boolean;
   // LLM/Define settings
   llmEnabled: boolean;
   llmUrl: string;
@@ -74,6 +76,8 @@ export const DEFAULT_SETTINGS: SpaceCommandSettings = {
   priorityTags: ["#p0", "#p1", "#p2", "#p3", "#p4"],
   recentTodonesLimit: 5,
   excludeFoldersFromProjects: ["log"],
+  // Tab lock settings
+  showTabLockButton: false,
   // LLM/Define settings
   llmEnabled: true,
   llmUrl: "http://localhost:11434",

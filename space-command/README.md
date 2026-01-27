@@ -75,6 +75,16 @@ Capture ideas separately from actionable TODOs. The sidebar has two tabs—TODOs
 
 Click an idea's checkbox to dismiss it. Right-click to promote it to a TODO.
 
+## Tab Lock
+
+Keep documents open while navigating. When you click links from a locked tab, they open in new tabs instead of replacing the current view.
+
+1. Enable in Settings → "Show tab lock buttons"
+2. Click the padlock icon on any tab header to lock the tab
+3. Locked tabs show a pushpin; click it to unlock
+
+Uses Obsidian's native pinning, so locked tabs also stay open when closing other tabs.
+
 ## Embed and Filter
 
 Embed TODO or idea lists anywhere:
