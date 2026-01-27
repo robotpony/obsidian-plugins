@@ -147,10 +147,11 @@
 .link-sidebar-content {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 0 0 0 4px;
 }
 
-/* Scrollbar styling */
+/* Scrollbar styling - hugs right edge with minimal gap */
 .link-command-sidebar ::-webkit-scrollbar {
   width: 8px;
 }
@@ -162,6 +163,8 @@
 .link-command-sidebar ::-webkit-scrollbar-thumb {
   background-color: color-mix(in srgb, var(--text-muted) 65%, transparent);
   border-radius: 4px;
+  border-right: 1px solid transparent;
+  background-clip: padding-box;
 }
 
 .link-sidebar-section {

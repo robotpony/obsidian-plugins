@@ -2,6 +2,13 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.4.10] - 2026-01-27
+
+### Fixed
+
+- **Sidebar scrollbar positioning**: Vertical scrollbar now hugs the right edge (0-1px gap instead of 4-6px)
+- **Horizontal scrollbar prevention**: Sidebar content no longer shows horizontal scrollbars when content overflows
+
 ## [0.4.9] - 2026-01-26
 
 ### Changed

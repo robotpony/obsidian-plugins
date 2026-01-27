@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.13
+
+### Fixed
+
+- **Sidebar scrollbar positioning**: Vertical scrollbar now hugs the right edge (0-1px gap instead of 4-6px)
+- **Horizontal scrollbar prevention**: Sidebar content no longer shows horizontal scrollbars when content overflows
+
 ## 0.4.12
 
 ### Changed

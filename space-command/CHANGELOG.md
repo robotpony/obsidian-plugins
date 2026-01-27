@@ -2,6 +2,13 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.22] - 2026-01-27
+
+### Fixed
+
+- **Sidebar scrollbar positioning**: Vertical scrollbar now hugs the right edge (0-1px gap instead of 4-6px)
+- **Horizontal scrollbar prevention**: Sidebar content no longer shows horizontal scrollbars when content overflows
+
 ## [0.9.21] - 2026-01-27
 
 ### Changed
