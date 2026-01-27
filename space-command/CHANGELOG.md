@@ -2,6 +2,23 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.19] - 2026-01-27
+
+### Fixed
+
+- **Tab lock disappears after unlock**: Lock button now properly re-appears after clicking the pushpin to unlock a tab
+  - Root cause: Obsidian's native click handler ran before ours, unpinning the tab before we could act
+  - Fix: Use capture phase event listener to intercept clicks before Obsidian's handler
+- **Tab lock missing on startup**: Lock buttons now appear more reliably on startup
+  - Added delayed re-check (200ms) after layout ready to catch late-initialized tabs
+
+### Technical
+
+- Pin container click handler now uses `{ capture: true }` to run before Obsidian's native handler
+- Added `forceRefresh` parameter to `addButtonToLeaf()` to force button re-creation
+- Pin/unpin handlers force-refresh button after 50ms delay to handle DOM changes
+- Added `scheduleUpdate()` for debounced tab updates
+
 ## [0.9.18] - 2026-01-27
 
 ### Improved

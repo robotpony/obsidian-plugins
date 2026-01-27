@@ -8,6 +8,7 @@ export class TabLockManager {
   private app: App;
   private enabled: boolean = false;
   private mutationObserver: MutationObserver | null = null;
+  private updateTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor(app: App) {
     this.app = app;
@@ -23,6 +24,9 @@ export class TabLockManager {
     // Add buttons to existing tabs
     this.updateAllTabs();
 
+    // Re-check after a short delay to catch tabs that weren't fully initialized
+    setTimeout(() => this.updateAllTabs(), 200);
+
     // Watch for new tabs being created
     this.startObserving();
   }
@@ -36,6 +40,10 @@ export class TabLockManager {
 
     this.stopObserving();
     this.removeAllButtons();
+    if (this.updateTimeout) {
+      clearTimeout(this.updateTimeout);
+      this.updateTimeout = null;
+    }
   }
 
   /**
@@ -75,8 +83,9 @@ export class TabLockManager {
 
   /**
    * Add a lock button to a specific leaf's tab header.
+   * If forceRefresh is true, removes any existing button first.
    */
-  private addButtonToLeaf(leaf: WorkspaceLeaf): void {
+  private addButtonToLeaf(leaf: WorkspaceLeaf, forceRefresh: boolean = false): void {
     if (!this.enabled) return;
 
     // Access the tab header element (undocumented but stable API)
@@ -93,8 +102,22 @@ export class TabLockManager {
     const dataType = tabHeader.getAttribute("data-type");
     if (dataType !== "markdown") return;
 
-    // Don't add button if one already exists
-    if (tabHeader.querySelector(".space-command-tab-lock-btn")) return;
+    // Check for existing button
+    const existingBtn = tabHeader.querySelector(".space-command-tab-lock-btn");
+    if (existingBtn) {
+      if (forceRefresh) {
+        // Remove existing button to force re-creation with fresh state
+        existingBtn.remove();
+        // Also remove the pin handler marker so it gets re-added
+        const pinContainer = tabHeader.querySelector("[data-space-command-pin-handler]");
+        if (pinContainer) {
+          pinContainer.removeAttribute("data-space-command-pin-handler");
+        }
+      } else {
+        // Button already exists and we're not forcing refresh
+        return;
+      }
+    }
 
     // Find the inner container where we'll insert the button
     const innerContainer = tabHeader.querySelector(".workspace-tab-header-inner");
@@ -121,10 +144,17 @@ export class TabLockManager {
       // Toggle pinned state
       // @ts-expect-error - pinned is not in the public API
       const currentlyPinned = leaf.pinned === true;
-      leaf.setPinned(!currentlyPinned);
+      const newPinnedState = !currentlyPinned;
+      leaf.setPinned(newPinnedState);
 
-      // Update button appearance
-      this.updateButtonState(lockBtn, !currentlyPinned);
+      // Update button appearance immediately
+      this.updateButtonState(lockBtn, newPinnedState);
+
+      // Obsidian may re-render the tab header after pinning, so force refresh the button
+      // after a short delay to ensure it exists and has correct state
+      setTimeout(() => {
+        this.addButtonToLeaf(leaf, true);
+      }, 50);
     });
 
     // Insert before the close button, or at the end if no close button
@@ -157,20 +187,33 @@ export class TabLockManager {
     if (pinContainer.hasAttribute("data-space-command-pin-handler")) return;
     pinContainer.setAttribute("data-space-command-pin-handler", "true");
 
-    pinContainer.addEventListener("click", (e) => {
-      // Only handle if the tab is currently pinned
-      // @ts-expect-error - pinned is not in the public API
-      if (!leaf.pinned) return;
+    // Use capture phase to run before Obsidian's native handler
+    pinContainer.addEventListener(
+      "click",
+      (e) => {
+        // Check pinned state BEFORE Obsidian's handler might change it
+        // @ts-expect-error - pinned is not in the public API
+        const wasPinned = leaf.pinned === true;
 
-      e.stopPropagation();
-      e.preventDefault();
+        // Only handle if the tab was pinned (user clicking to unlock)
+        if (!wasPinned) return;
 
-      // Unpin the tab
-      leaf.setPinned(false);
+        e.stopPropagation();
+        e.preventDefault();
 
-      // Update button appearance
-      this.updateButtonState(lockBtn, false);
-    });
+        // Unpin the tab
+        leaf.setPinned(false);
+
+        // Remove locked class immediately
+        tabHeader.classList.remove("space-command-tab-locked");
+
+        // Force refresh the button after a short delay to ensure proper state
+        setTimeout(() => {
+          this.addButtonToLeaf(leaf, true);
+        }, 50);
+      },
+      { capture: true }
+    );
   }
 
   /**
@@ -217,25 +260,50 @@ export class TabLockManager {
   }
 
   /**
+   * Schedule a debounced update of all tabs.
+   */
+  private scheduleUpdate(): void {
+    if (this.updateTimeout) {
+      clearTimeout(this.updateTimeout);
+    }
+    this.updateTimeout = setTimeout(() => {
+      this.updateTimeout = null;
+      this.updateAllTabs();
+    }, 50);
+  }
+
+  /**
    * Start observing DOM changes to add buttons to new tabs.
    */
   private startObserving(): void {
     if (this.mutationObserver) return;
 
     this.mutationObserver = new MutationObserver((mutations) => {
-      // Check if any new tab headers were added
+      // Check if any tab headers were added or modified
       let shouldUpdate = false;
       for (const mutation of mutations) {
-        if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
+        if (mutation.type === "childList") {
+          // Check for new tab headers
           for (const node of Array.from(mutation.addedNodes)) {
             if (node instanceof HTMLElement) {
               if (
                 node.classList?.contains("workspace-tab-header") ||
-                node.querySelector?.(".workspace-tab-header")
+                node.querySelector?.(".workspace-tab-header") ||
+                node.classList?.contains("workspace-tab-header-inner") ||
+                node.closest?.(".workspace-tab-header")
               ) {
                 shouldUpdate = true;
                 break;
               }
+            }
+          }
+          // Also check if any tab header children were removed (indicates re-render)
+          if (!shouldUpdate && mutation.target instanceof HTMLElement) {
+            if (
+              mutation.target.closest(".workspace-tab-header") &&
+              mutation.removedNodes.length > 0
+            ) {
+              shouldUpdate = true;
             }
           }
         }
@@ -243,8 +311,7 @@ export class TabLockManager {
       }
 
       if (shouldUpdate) {
-        // Debounce updates
-        setTimeout(() => this.updateAllTabs(), 50);
+        this.scheduleUpdate();
       }
     });
 

@@ -14317,6 +14317,7 @@ var TabLockManager = class {
   constructor(app) {
     this.enabled = false;
     this.mutationObserver = null;
+    this.updateTimeout = null;
     this.app = app;
   }
   /**
@@ -14327,6 +14328,7 @@ var TabLockManager = class {
       return;
     this.enabled = true;
     this.updateAllTabs();
+    setTimeout(() => this.updateAllTabs(), 200);
     this.startObserving();
   }
   /**
@@ -14338,6 +14340,10 @@ var TabLockManager = class {
     this.enabled = false;
     this.stopObserving();
     this.removeAllButtons();
+    if (this.updateTimeout) {
+      clearTimeout(this.updateTimeout);
+      this.updateTimeout = null;
+    }
   }
   /**
    * Clean up resources.
@@ -14370,8 +14376,9 @@ var TabLockManager = class {
   }
   /**
    * Add a lock button to a specific leaf's tab header.
+   * If forceRefresh is true, removes any existing button first.
    */
-  addButtonToLeaf(leaf) {
+  addButtonToLeaf(leaf, forceRefresh = false) {
     if (!this.enabled)
       return;
     const tabHeader = leaf.tabHeaderEl;
@@ -14382,8 +14389,18 @@ var TabLockManager = class {
     const dataType = tabHeader.getAttribute("data-type");
     if (dataType !== "markdown")
       return;
-    if (tabHeader.querySelector(".space-command-tab-lock-btn"))
-      return;
+    const existingBtn = tabHeader.querySelector(".space-command-tab-lock-btn");
+    if (existingBtn) {
+      if (forceRefresh) {
+        existingBtn.remove();
+        const pinContainer = tabHeader.querySelector("[data-space-command-pin-handler]");
+        if (pinContainer) {
+          pinContainer.removeAttribute("data-space-command-pin-handler");
+        }
+      } else {
+        return;
+      }
+    }
     const innerContainer = tabHeader.querySelector(".workspace-tab-header-inner");
     if (!innerContainer)
       return;
@@ -14397,8 +14414,12 @@ var TabLockManager = class {
       e.stopPropagation();
       e.preventDefault();
       const currentlyPinned = leaf.pinned === true;
-      leaf.setPinned(!currentlyPinned);
-      this.updateButtonState(lockBtn, !currentlyPinned);
+      const newPinnedState = !currentlyPinned;
+      leaf.setPinned(newPinnedState);
+      this.updateButtonState(lockBtn, newPinnedState);
+      setTimeout(() => {
+        this.addButtonToLeaf(leaf, true);
+      }, 50);
     });
     if (closeButton) {
       innerContainer.insertBefore(lockBtn, closeButton);
@@ -14420,14 +14441,22 @@ var TabLockManager = class {
     if (pinContainer.hasAttribute("data-space-command-pin-handler"))
       return;
     pinContainer.setAttribute("data-space-command-pin-handler", "true");
-    pinContainer.addEventListener("click", (e) => {
-      if (!leaf.pinned)
-        return;
-      e.stopPropagation();
-      e.preventDefault();
-      leaf.setPinned(false);
-      this.updateButtonState(lockBtn, false);
-    });
+    pinContainer.addEventListener(
+      "click",
+      (e) => {
+        const wasPinned = leaf.pinned === true;
+        if (!wasPinned)
+          return;
+        e.stopPropagation();
+        e.preventDefault();
+        leaf.setPinned(false);
+        tabHeader.classList.remove("space-command-tab-locked");
+        setTimeout(() => {
+          this.addButtonToLeaf(leaf, true);
+        }, 50);
+      },
+      { capture: true }
+    );
   }
   /**
    * Update the button's visual state based on pinned status.
@@ -14461,22 +14490,39 @@ var TabLockManager = class {
     );
   }
   /**
+   * Schedule a debounced update of all tabs.
+   */
+  scheduleUpdate() {
+    if (this.updateTimeout) {
+      clearTimeout(this.updateTimeout);
+    }
+    this.updateTimeout = setTimeout(() => {
+      this.updateTimeout = null;
+      this.updateAllTabs();
+    }, 50);
+  }
+  /**
    * Start observing DOM changes to add buttons to new tabs.
    */
   startObserving() {
     if (this.mutationObserver)
       return;
     this.mutationObserver = new MutationObserver((mutations) => {
-      var _a, _b;
+      var _a, _b, _c, _d;
       let shouldUpdate = false;
       for (const mutation of mutations) {
-        if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
+        if (mutation.type === "childList") {
           for (const node2 of Array.from(mutation.addedNodes)) {
             if (node2 instanceof HTMLElement) {
-              if (((_a = node2.classList) == null ? void 0 : _a.contains("workspace-tab-header")) || ((_b = node2.querySelector) == null ? void 0 : _b.call(node2, ".workspace-tab-header"))) {
+              if (((_a = node2.classList) == null ? void 0 : _a.contains("workspace-tab-header")) || ((_b = node2.querySelector) == null ? void 0 : _b.call(node2, ".workspace-tab-header")) || ((_c = node2.classList) == null ? void 0 : _c.contains("workspace-tab-header-inner")) || ((_d = node2.closest) == null ? void 0 : _d.call(node2, ".workspace-tab-header"))) {
                 shouldUpdate = true;
                 break;
               }
+            }
+          }
+          if (!shouldUpdate && mutation.target instanceof HTMLElement) {
+            if (mutation.target.closest(".workspace-tab-header") && mutation.removedNodes.length > 0) {
+              shouldUpdate = true;
             }
           }
         }
@@ -14484,7 +14530,7 @@ var TabLockManager = class {
           break;
       }
       if (shouldUpdate) {
-        setTimeout(() => this.updateAllTabs(), 50);
+        this.scheduleUpdate();
       }
     });
     const workspaceContainer = document.querySelector(".workspace");
