@@ -22,6 +22,7 @@
 [data-sc-tag-type] {
   border-radius: 4px !important;
   padding: 1px 5px !important;
+  vertical-align: middle !important;
 }
 
 /* Plugin tags (system tags like #todo, #idea, etc.) */

@@ -2,6 +2,14 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.38] - 2026-01-28
+
+### Fixed
+
+- **Tag vertical alignment**: Tag chicklets now align vertically centered with surrounding text instead of sitting on the baseline
+  - Applies to all contexts: editor (Live Preview and Source mode), Reading Mode, embeds, and sidebar
+  - Tags no longer extend below the text baseline, creating better visual balance
+
 ## [0.9.37] - 2026-01-28
 
 ### Added
