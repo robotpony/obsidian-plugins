@@ -1718,21 +1718,10 @@ var HugoCommandSettingTab = class extends import_obsidian5.PluginSettingTab {
       text: "GitHub",
       href: "https://github.com/robotpony/obsidian-plugins"
     });
-    new import_obsidian5.Setting(containerEl).setName("Content paths").setDesc("Folders to scan for Hugo content (one per line, e.g., content/posts)").addTextArea(
-      (text) => text.setPlaceholder("content\ncontent/posts").setValue(this.plugin.settings.contentPaths.join("\n")).onChange(async (value) => {
-        this.plugin.settings.contentPaths = value.split("\n").map((p) => p.trim()).filter((p) => p.length > 0);
-        await this.plugin.saveSettings();
-      })
-    );
+    containerEl.createEl("h3", { text: "Sidebar" });
     new import_obsidian5.Setting(containerEl).setName("Show sidebar by default").setDesc("Show the Hugo sidebar when Obsidian starts").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.showSidebarByDefault).onChange(async (value) => {
         this.plugin.settings.showSidebarByDefault = value;
-        await this.plugin.saveSettings();
-      })
-    );
-    new import_obsidian5.Setting(containerEl).setName("Show drafts").setDesc("Include draft posts in the content list").addToggle(
-      (toggle) => toggle.setValue(this.plugin.settings.showDrafts).onChange(async (value) => {
-        this.plugin.settings.showDrafts = value;
         await this.plugin.saveSettings();
       })
     );
@@ -1745,6 +1734,19 @@ var HugoCommandSettingTab = class extends import_obsidian5.PluginSettingTab {
     new import_obsidian5.Setting(containerEl).setName("Default sort order").setDesc("How to sort content in the sidebar").addDropdown(
       (dropdown) => dropdown.addOption("date-desc", "Date (newest first)").addOption("date-asc", "Date (oldest first)").addOption("title", "Title (A-Z)").setValue(this.plugin.settings.defaultSortOrder).onChange(async (value) => {
         this.plugin.settings.defaultSortOrder = value;
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian5.Setting(containerEl).setName("Show drafts").setDesc("Include draft posts in the content list").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.showDrafts).onChange(async (value) => {
+        this.plugin.settings.showDrafts = value;
+        await this.plugin.saveSettings();
+      })
+    );
+    containerEl.createEl("h3", { text: "Content" });
+    new import_obsidian5.Setting(containerEl).setName("Content paths").setDesc("Folders to scan for Hugo content (one per line, e.g., content/posts)").addTextArea(
+      (text) => text.setPlaceholder("content\ncontent/posts").setValue(this.plugin.settings.contentPaths.join("\n")).onChange(async (value) => {
+        this.plugin.settings.contentPaths = value.split("\n").map((p) => p.trim()).filter((p) => p.length > 0);
         await this.plugin.saveSettings();
       })
     );

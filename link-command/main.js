@@ -1610,6 +1610,23 @@ var LinkCommandSettingTab = class extends import_obsidian4.PluginSettingTab {
       text: "GitHub",
       href: "https://github.com/robotpony/obsidian-plugins"
     });
+    containerEl.createEl("h3", { text: "Sidebar" });
+    new import_obsidian4.Setting(containerEl).setName("Show sidebar by default").setDesc("Open the link sidebar when Obsidian starts").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.showSidebarByDefault).onChange(async (value) => {
+        this.plugin.settings.showSidebarByDefault = value;
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian4.Setting(containerEl).setName("Recent history limit").setDesc("Number of items to show in the Recent History section").addText(
+      (text) => text.setPlaceholder("25").setValue(String(this.plugin.settings.recentHistoryLimit)).onChange(async (value) => {
+        const num = parseInt(value, 10);
+        if (!isNaN(num) && num > 0 && num <= 100) {
+          this.plugin.settings.recentHistoryLimit = num;
+          await this.plugin.saveSettings();
+        }
+      })
+    );
+    containerEl.createEl("h3", { text: "Unfurling" });
     new import_obsidian4.Setting(containerEl).setName("Enable inline format toggle").setDesc("Show toggle buttons next to URLs to cycle between formats (URL, Link, Rich Link)").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.unfurlEnabled).onChange(async (value) => {
         this.plugin.settings.unfurlEnabled = value;
@@ -1625,7 +1642,6 @@ var LinkCommandSettingTab = class extends import_obsidian4.PluginSettingTab {
         }
       })
     );
-    containerEl.createEl("h3", { text: "Site-Specific" });
     new import_obsidian4.Setting(containerEl).setName("Reddit link format").setDesc("How to format Reddit links when unfurling").addDropdown(
       (dropdown) => dropdown.addOption("title", "Title only").addOption("title_subreddit", "Title + subreddit").setValue(this.plugin.settings.redditLinkFormat).onChange(async (value) => {
         this.plugin.settings.redditLinkFormat = value;
@@ -1654,22 +1670,6 @@ var LinkCommandSettingTab = class extends import_obsidian4.PluginSettingTab {
         await this.plugin.unfurlService.clearCache();
         new import_obsidian4.Notice("Link cache cleared");
         this.display();
-      })
-    );
-    containerEl.createEl("h3", { text: "Sidebar" });
-    new import_obsidian4.Setting(containerEl).setName("Show sidebar by default").setDesc("Open the link sidebar when Obsidian starts").addToggle(
-      (toggle) => toggle.setValue(this.plugin.settings.showSidebarByDefault).onChange(async (value) => {
-        this.plugin.settings.showSidebarByDefault = value;
-        await this.plugin.saveSettings();
-      })
-    );
-    new import_obsidian4.Setting(containerEl).setName("Recent history limit").setDesc("Number of items to show in the Recent History section").addText(
-      (text) => text.setPlaceholder("25").setValue(String(this.plugin.settings.recentHistoryLimit)).onChange(async (value) => {
-        const num = parseInt(value, 10);
-        if (!isNaN(num) && num > 0 && num <= 100) {
-          this.plugin.settings.recentHistoryLimit = num;
-          await this.plugin.saveSettings();
-        }
       })
     );
     containerEl.createEl("h3", { text: "Authenticated Domains" });

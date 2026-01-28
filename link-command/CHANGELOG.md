@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.16
+
+### Improved
+
+- **Reorganized settings sections**: Sidebar section now appears first for consistency
+  - Sidebar section first (Show sidebar by default, Recent history limit)
+  - Unfurling section (replaces "Site-Specific", includes Enable toggle, Timeout, Reddit format)
+  - Cache section (unchanged)
+  - Authenticated Domains section (unchanged)
+  - Consistent with Space Command and Hugo Command settings layout
+
 ## 0.4.15
 
 ### Improved

@@ -375,7 +375,40 @@ class LinkCommandSettingTab extends PluginSettingTab {
       href: "https://github.com/robotpony/obsidian-plugins",
     });
 
-    // Master toggle
+    // Sidebar section (first)
+    containerEl.createEl("h3", { text: "Sidebar" });
+
+    new Setting(containerEl)
+      .setName("Show sidebar by default")
+      .setDesc("Open the link sidebar when Obsidian starts")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.showSidebarByDefault)
+          .onChange(async (value) => {
+            this.plugin.settings.showSidebarByDefault = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Recent history limit")
+      .setDesc("Number of items to show in the Recent History section")
+      .addText((text) =>
+        text
+          .setPlaceholder("25")
+          .setValue(String(this.plugin.settings.recentHistoryLimit))
+          .onChange(async (value) => {
+            const num = parseInt(value, 10);
+            if (!isNaN(num) && num > 0 && num <= 100) {
+              this.plugin.settings.recentHistoryLimit = num;
+              await this.plugin.saveSettings();
+            }
+          })
+      );
+
+    // Unfurling section
+    containerEl.createEl("h3", { text: "Unfurling" });
+
     new Setting(containerEl)
       .setName("Enable inline format toggle")
       .setDesc("Show toggle buttons next to URLs to cycle between formats (URL, Link, Rich Link)")
@@ -388,7 +421,6 @@ class LinkCommandSettingTab extends PluginSettingTab {
           })
       );
 
-    // Timeout
     new Setting(containerEl)
       .setName("Request timeout")
       .setDesc("Timeout for fetching URL metadata (milliseconds)")
@@ -404,9 +436,6 @@ class LinkCommandSettingTab extends PluginSettingTab {
             }
           })
       );
-
-    // Site-specific section
-    containerEl.createEl("h3", { text: "Site-Specific" });
 
     new Setting(containerEl)
       .setName("Reddit link format")
@@ -453,7 +482,6 @@ class LinkCommandSettingTab extends PluginSettingTab {
           })
       );
 
-    // Cache stats and clear button
     const stats = this.plugin.unfurlService.getCacheStats();
     new Setting(containerEl)
       .setName("Cache statistics")
@@ -468,38 +496,7 @@ class LinkCommandSettingTab extends PluginSettingTab {
           })
       );
 
-    // Sidebar section
-    containerEl.createEl("h3", { text: "Sidebar" });
-
-    new Setting(containerEl)
-      .setName("Show sidebar by default")
-      .setDesc("Open the link sidebar when Obsidian starts")
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.showSidebarByDefault)
-          .onChange(async (value) => {
-            this.plugin.settings.showSidebarByDefault = value;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName("Recent history limit")
-      .setDesc("Number of items to show in the Recent History section")
-      .addText((text) =>
-        text
-          .setPlaceholder("25")
-          .setValue(String(this.plugin.settings.recentHistoryLimit))
-          .onChange(async (value) => {
-            const num = parseInt(value, 10);
-            if (!isNaN(num) && num > 0 && num <= 100) {
-              this.plugin.settings.recentHistoryLimit = num;
-              await this.plugin.saveSettings();
-            }
-          })
-      );
-
-    // Auth domains section
+    // Authenticated Domains section
     containerEl.createEl("h3", { text: "Authenticated Domains" });
     containerEl.createEl("p", {
       cls: "setting-item-description",

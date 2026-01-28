@@ -15106,25 +15106,10 @@ var SpaceCommandSettingTab = class extends import_obsidian11.PluginSettingTab {
       text: "GitHub",
       href: "https://github.com/robotpony/obsidian-plugins"
     });
-    new import_obsidian11.Setting(containerEl).setName("Default TODONE file").setDesc("Default file path for logging completed TODOs").addText(
-      (text5) => text5.setPlaceholder("todos/done.md").setValue(this.plugin.settings.defaultTodoneFile).onChange(async (value) => {
-        this.plugin.settings.defaultTodoneFile = value;
-        await this.plugin.saveSettings();
-      })
-    );
+    containerEl.createEl("h3", { text: "Sidebar" });
     new import_obsidian11.Setting(containerEl).setName("Show sidebar by default").setDesc("Show the TODO sidebar when Obsidian starts").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.showSidebarByDefault).onChange(async (value) => {
         this.plugin.settings.showSidebarByDefault = value;
-        await this.plugin.saveSettings();
-      })
-    );
-    new import_obsidian11.Setting(containerEl).setName("Date format").setDesc("Format for completion dates (using moment.js format)").addText(
-      (text5) => text5.setPlaceholder("YYYY-MM-DD").setValue(this.plugin.settings.dateFormat).onChange(async (value) => {
-        this.plugin.settings.dateFormat = value;
-        this.plugin.processor = new TodoProcessor(
-          this.app,
-          value
-        );
         await this.plugin.saveSettings();
       })
     );
@@ -15139,7 +15124,24 @@ var SpaceCommandSettingTab = class extends import_obsidian11.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    containerEl.createEl("h3", { text: "Projects Settings" });
+    containerEl.createEl("h3", { text: "TODOs" });
+    new import_obsidian11.Setting(containerEl).setName("Default TODONE file").setDesc("Default file path for logging completed TODOs").addText(
+      (text5) => text5.setPlaceholder("todos/done.md").setValue(this.plugin.settings.defaultTodoneFile).onChange(async (value) => {
+        this.plugin.settings.defaultTodoneFile = value;
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian11.Setting(containerEl).setName("Date format").setDesc("Format for completion dates (using moment.js format)").addText(
+      (text5) => text5.setPlaceholder("YYYY-MM-DD").setValue(this.plugin.settings.dateFormat).onChange(async (value) => {
+        this.plugin.settings.dateFormat = value;
+        this.plugin.processor = new TodoProcessor(
+          this.app,
+          value
+        );
+        await this.plugin.saveSettings();
+      })
+    );
+    containerEl.createEl("h3", { text: "Projects" });
     new import_obsidian11.Setting(containerEl).setName("Default projects folder").setDesc("Folder where project files are created (e.g., projects/)").addText(
       (text5) => text5.setPlaceholder("projects/").setValue(this.plugin.settings.defaultProjectsFolder).onChange(async (value) => {
         this.plugin.settings.defaultProjectsFolder = value;

@@ -2,6 +2,17 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.28] - 2026-01-27
+
+### Improved
+
+- **Reorganized settings sections**: Settings now organized into logical sections with h3 headers
+  - Sidebar section first (Show sidebar by default, Tab lock buttons)
+  - TODOs section (TODONE file, Date format)
+  - Projects section (unchanged)
+  - Priority section (renamed from "Priority Settings")
+  - LLM section (unchanged)
+
 ## [0.9.27] - 2026-01-27
 
 ### Improved

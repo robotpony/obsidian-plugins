@@ -261,22 +261,8 @@ class HugoCommandSettingTab extends PluginSettingTab {
       href: "https://github.com/robotpony/obsidian-plugins",
     });
 
-    // Content paths
-    new Setting(containerEl)
-      .setName("Content paths")
-      .setDesc("Folders to scan for Hugo content (one per line, e.g., content/posts)")
-      .addTextArea((text) =>
-        text
-          .setPlaceholder("content\ncontent/posts")
-          .setValue(this.plugin.settings.contentPaths.join("\n"))
-          .onChange(async (value) => {
-            this.plugin.settings.contentPaths = value
-              .split("\n")
-              .map((p) => p.trim())
-              .filter((p) => p.length > 0);
-            await this.plugin.saveSettings();
-          })
-      );
+    // Sidebar section (first)
+    containerEl.createEl("h3", { text: "Sidebar" });
 
     new Setting(containerEl)
       .setName("Show sidebar by default")
@@ -286,18 +272,6 @@ class HugoCommandSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.showSidebarByDefault)
           .onChange(async (value) => {
             this.plugin.settings.showSidebarByDefault = value;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName("Show drafts")
-      .setDesc("Include draft posts in the content list")
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.showDrafts)
-          .onChange(async (value) => {
-            this.plugin.settings.showDrafts = value;
             await this.plugin.saveSettings();
           })
       );
@@ -328,6 +302,37 @@ class HugoCommandSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.defaultSortOrder)
           .onChange(async (value) => {
             this.plugin.settings.defaultSortOrder = value as "date-desc" | "date-asc" | "title";
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Show drafts")
+      .setDesc("Include draft posts in the content list")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.showDrafts)
+          .onChange(async (value) => {
+            this.plugin.settings.showDrafts = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    // Content section
+    containerEl.createEl("h3", { text: "Content" });
+
+    new Setting(containerEl)
+      .setName("Content paths")
+      .setDesc("Folders to scan for Hugo content (one per line, e.g., content/posts)")
+      .addTextArea((text) =>
+        text
+          .setPlaceholder("content\ncontent/posts")
+          .setValue(this.plugin.settings.contentPaths.join("\n"))
+          .onChange(async (value) => {
+            this.plugin.settings.contentPaths = value
+              .split("\n")
+              .map((p) => p.trim())
+              .filter((p) => p.length > 0);
             await this.plugin.saveSettings();
           })
       );

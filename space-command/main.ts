@@ -637,18 +637,8 @@ class SpaceCommandSettingTab extends PluginSettingTab {
       href: "https://github.com/robotpony/obsidian-plugins",
     });
 
-    new Setting(containerEl)
-      .setName("Default TODONE file")
-      .setDesc("Default file path for logging completed TODOs")
-      .addText((text) =>
-        text
-          .setPlaceholder("todos/done.md")
-          .setValue(this.plugin.settings.defaultTodoneFile)
-          .onChange(async (value) => {
-            this.plugin.settings.defaultTodoneFile = value;
-            await this.plugin.saveSettings();
-          })
-      );
+    // Sidebar section (first)
+    containerEl.createEl("h3", { text: "Sidebar" });
 
     new Setting(containerEl)
       .setName("Show sidebar by default")
@@ -658,23 +648,6 @@ class SpaceCommandSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.showSidebarByDefault)
           .onChange(async (value) => {
             this.plugin.settings.showSidebarByDefault = value;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName("Date format")
-      .setDesc("Format for completion dates (using moment.js format)")
-      .addText((text) =>
-        text
-          .setPlaceholder("YYYY-MM-DD")
-          .setValue(this.plugin.settings.dateFormat)
-          .onChange(async (value) => {
-            this.plugin.settings.dateFormat = value;
-            this.plugin.processor = new TodoProcessor(
-              this.app,
-              value
-            );
             await this.plugin.saveSettings();
           })
       );
@@ -696,7 +669,41 @@ class SpaceCommandSettingTab extends PluginSettingTab {
           })
       );
 
-    containerEl.createEl("h3", { text: "Projects Settings" });
+    // TODOs section
+    containerEl.createEl("h3", { text: "TODOs" });
+
+    new Setting(containerEl)
+      .setName("Default TODONE file")
+      .setDesc("Default file path for logging completed TODOs")
+      .addText((text) =>
+        text
+          .setPlaceholder("todos/done.md")
+          .setValue(this.plugin.settings.defaultTodoneFile)
+          .onChange(async (value) => {
+            this.plugin.settings.defaultTodoneFile = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Date format")
+      .setDesc("Format for completion dates (using moment.js format)")
+      .addText((text) =>
+        text
+          .setPlaceholder("YYYY-MM-DD")
+          .setValue(this.plugin.settings.dateFormat)
+          .onChange(async (value) => {
+            this.plugin.settings.dateFormat = value;
+            this.plugin.processor = new TodoProcessor(
+              this.app,
+              value
+            );
+            await this.plugin.saveSettings();
+          })
+      );
+
+    // Projects section
+    containerEl.createEl("h3", { text: "Projects" });
 
     new Setting(containerEl)
       .setName("Default projects folder")

@@ -2,6 +2,15 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.4.13] - 2026-01-27
+
+### Improved
+
+- **Reorganized settings sections**: Settings now organized into logical sections with h3 headers
+  - Sidebar section first (Show sidebar by default, Status filter, Sort order, Show drafts)
+  - Content section (Content paths, Trash folder)
+  - Consistent with Space Command and Link Command settings layout
+
 ## [0.4.12] - 2026-01-27
 
 ### Improved
