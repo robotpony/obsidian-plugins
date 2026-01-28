@@ -25,9 +25,10 @@
 }
 
 /* Plugin tags (system tags like #todo, #idea, etc.) */
+/* At 62% lightness, dark text provides better contrast */
 [data-sc-tag-type="plugin"] {
   background-color: var(--sc-tag-plugin) !important;
-  color: white !important;
+  color: var(--text-normal) !important;
 }
 
 /* Priority tags (from #focus/dark to #future/light) */

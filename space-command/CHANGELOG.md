@@ -2,6 +2,14 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.31] - 2026-01-27
+
+### Improved
+
+- **Better tag text contrast**: Plugin tags (#todo, #idea, etc.) now use dark text instead of white
+  - At 62% background lightness, dark text provides better readability
+  - Text colour flips at ~60% lightness: white for priorities 0-3, dark for plugin and 4-6
+
 ## [0.9.30] - 2026-01-27
 
 ### Fixed
