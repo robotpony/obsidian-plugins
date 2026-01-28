@@ -40,7 +40,7 @@ That's it. Everything else is optional.
 | `#p0` – `#p4` | Priority levels (0 = highest) |
 | `#future` | Snoozed—hidden from active list |
 
-Items sort by: focus → priority → tag count (more tags = more context = higher). Focus projects list shows top 5 by default; TODO list shows all. Configure limits in Settings. Click the eye icon in the Focus header to toggle focus mode—filters both projects and TODOs to show only `#focus` items.
+Items sort by: focus → priority → tag count (more tags = more context = higher). Focus projects list shows top 5 by default; TODO list shows all. Configure limits in Settings. Click the eye icon in the Focus header to toggle focus mode—filters projects, TODOs, and recently completed items to show only `#focus` items (or items from focused projects when that setting is enabled). In focus mode, the DONE section shows only today's completions.
 
 **Project tags** group TODOs in the sidebar's Focus section. Any tag that isn't a priority or type tag becomes a project:
 

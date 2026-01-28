@@ -989,9 +989,34 @@ export class TodoSidebarView extends ItemView {
   }
 
   private renderRecentTodones(container: HTMLElement): void {
-    const allTodones = this.scanner.getTodones(100); // Get more than we need
+    let allTodones = this.scanner.getTodones(100); // Get more than we need
 
-    // DONE section is never filtered - always shows recent completions
+    // Apply focus mode filtering if enabled
+    if (this.focusModeEnabled) {
+      // Filter by today's completion date
+      const today = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
+      allTodones = allTodones.filter(todone => {
+        const completionDate = this.extractCompletionDate(todone.text);
+        return completionDate === today;
+      });
+
+      // Apply focus/project filter (same logic as Active TODOs)
+      if (this.focusModeIncludeProjects) {
+        // Get project tags from focused projects
+        const focusedProjects = this.projectManager.getProjects()
+          .filter(p => p.highestPriority === 0)
+          .map(p => p.tag);
+        // Show #focus items or items from focused projects
+        allTodones = allTodones.filter(todone =>
+          todone.tags.includes("#focus") ||
+          todone.tags.some(tag => focusedProjects.includes(tag))
+        );
+      } else {
+        // Show only #focus items
+        allTodones = allTodones.filter(todone => todone.tags.includes("#focus"));
+      }
+    }
+
     const todones = allTodones.slice(0, this.recentTodonesLimit); // Limit display
 
     const section = container.createEl("div", { cls: "todone-section" });
@@ -1019,8 +1044,12 @@ export class TodoSidebarView extends ItemView {
     });
 
     if (allTodones.length === 0) {
+      let emptyText = "No completed TODOs";
+      if (this.focusModeEnabled) {
+        emptyText = "No focused TODOs completed today";
+      }
       section.createEl("div", {
-        text: "No completed TODOs",
+        text: emptyText,
         cls: "todo-empty",
       });
       return;

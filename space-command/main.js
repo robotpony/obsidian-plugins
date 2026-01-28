@@ -3502,7 +3502,22 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     this.renderListItem(list4, todo, this.todoConfig, isChild);
   }
   renderRecentTodones(container) {
-    const allTodones = this.scanner.getTodones(100);
+    let allTodones = this.scanner.getTodones(100);
+    if (this.focusModeEnabled) {
+      const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+      allTodones = allTodones.filter((todone) => {
+        const completionDate = this.extractCompletionDate(todone.text);
+        return completionDate === today;
+      });
+      if (this.focusModeIncludeProjects) {
+        const focusedProjects = this.projectManager.getProjects().filter((p) => p.highestPriority === 0).map((p) => p.tag);
+        allTodones = allTodones.filter(
+          (todone) => todone.tags.includes("#focus") || todone.tags.some((tag) => focusedProjects.includes(tag))
+        );
+      } else {
+        allTodones = allTodones.filter((todone) => todone.tags.includes("#focus"));
+      }
+    }
     const todones = allTodones.slice(0, this.recentTodonesLimit);
     const section = container.createEl("div", { cls: "todone-section" });
     const header = section.createEl("div", {
@@ -3523,8 +3538,12 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       }
     });
     if (allTodones.length === 0) {
+      let emptyText = "No completed TODOs";
+      if (this.focusModeEnabled) {
+        emptyText = "No focused TODOs completed today";
+      }
       section.createEl("div", {
-        text: "No completed TODOs",
+        text: emptyText,
         cls: "todo-empty"
       });
       return;

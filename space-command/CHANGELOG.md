@@ -2,6 +2,16 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.36] - 2026-01-28
+
+### Fixed
+
+- **Focus mode now filters DONE section**: When focus mode (eye icon) is enabled, the Recent TODONEs section now filters to show only:
+  - TODONEs completed today (filters by completion date)
+  - TODONEs with `#focus` tag OR from focused projects (when "Focus mode includes project TODOs" is enabled)
+  - Empty state shows "No focused TODOs completed today" when focus mode is active
+  - Previously, the DONE section showed all recent completions regardless of focus mode
+
 ## [0.9.35] - 2026-01-28
 
 ### Fixed
