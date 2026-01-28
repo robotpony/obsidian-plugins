@@ -18,6 +18,12 @@
   --sc-tag-priority-6: hsl(var(--sc-tag-hue), var(--sc-tag-sat), 77%);
 }
 
+/* Base pill styling for all semantic tags */
+[data-sc-tag-type] {
+  border-radius: 4px !important;
+  padding: 1px 5px !important;
+}
+
 /* Plugin tags (system tags like #todo, #idea, etc.) */
 [data-sc-tag-type="plugin"] {
   background-color: var(--sc-tag-plugin) !important;
@@ -1144,7 +1150,8 @@
 }
 
 .tag-dropdown-item-label {
-  flex: 1;
+  flex: 0 0 auto;
+  display: inline-block;
 }
 
 .tag-dropdown-item-arrow {

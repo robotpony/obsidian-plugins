@@ -2,6 +2,14 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.30] - 2026-01-27
+
+### Fixed
+
+- **Consistent tag pill styling**: All semantic-coloured tags now have consistent rounded corners and padding
+  - Tags in dropdown menus display as proper pills
+  - Project and priority tags have matching border-radius (4px) and padding
+
 ## [0.9.29] - 2026-01-27
 
 ### Added
