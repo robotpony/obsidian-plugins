@@ -1840,7 +1840,7 @@ var ContextMenuHandler = class {
 
 // src/EmbedRenderer.ts
 var EmbedRenderer = class {
-  constructor(app, scanner, processor, projectManager, defaultTodoneFile = "todos/done.md", focusListLimit = 5, priorityTags = ["#p0", "#p1", "#p2", "#p3", "#p4"]) {
+  constructor(app, scanner, processor, projectManager, defaultTodoneFile = "todos/done.md", focusListLimit = 5, priorityTags = ["#p0", "#p1", "#p2", "#p3", "#p4"], makeLinksClickable = true) {
     // Track active renders for event cleanup
     this.activeRenders = /* @__PURE__ */ new Map();
     // Track TODONE visibility state per container
@@ -1854,6 +1854,7 @@ var EmbedRenderer = class {
     this.defaultTodoneFile = defaultTodoneFile;
     this.focusListLimit = focusListLimit;
     this.priorityTags = priorityTags;
+    this.makeLinksClickable = makeLinksClickable;
     this.contextMenuHandler = new ContextMenuHandler(app, processor, priorityTags);
   }
   // Get project colour map for tag colouring (cached per render cycle)
@@ -2338,10 +2339,23 @@ var EmbedRenderer = class {
           container.createEl("code", { text: token.content });
           break;
         case "link":
-          container.createEl("a", {
-            text: token.content,
-            attr: { href: token.url || "#" }
-          });
+          if (this.makeLinksClickable) {
+            const link2 = container.createEl("a", {
+              text: token.content,
+              cls: "internal-link"
+            });
+            link2.addEventListener("click", async (e) => {
+              e.preventDefault();
+              const url = token.url || "";
+              if (url.startsWith("http://") || url.startsWith("https://")) {
+                window.open(url, "_blank");
+              } else {
+                await this.app.workspace.openLinkText(url, "", false);
+              }
+            });
+          } else {
+            container.appendText(token.content);
+          }
           break;
       }
     }
@@ -2362,6 +2376,16 @@ var EmbedRenderer = class {
       match = remaining.match(/^`([^`]+)`/);
       if (match) {
         tokens.push({ type: "code", content: match[1] });
+        remaining = remaining.substring(match[0].length);
+        matched = true;
+        continue;
+      }
+      match = remaining.match(/^\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/);
+      if (match) {
+        const pagePath = match[1];
+        const alias = match[2];
+        const displayText = alias || pagePath.split("#")[0];
+        tokens.push({ type: "link", content: displayText, url: pagePath });
         remaining = remaining.substring(match[0].length);
         matched = true;
         continue;
@@ -2827,7 +2851,7 @@ var DateSuggest = class extends import_obsidian7.EditorSuggest {
 var import_obsidian8 = require("obsidian");
 var VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 var TodoSidebarView = class extends import_obsidian8.ItemView {
-  constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, recentTodonesLimit, activeTodosLimit, focusListLimit, focusModeIncludeProjects, onShowAbout, onShowStats) {
+  constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, recentTodonesLimit, activeTodosLimit, focusListLimit, focusModeIncludeProjects, makeLinksClickable, onShowAbout, onShowStats) {
     super(leaf);
     this.updateListener = null;
     this.activeTab = "todos";
@@ -2867,6 +2891,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     this.activeTodosLimit = activeTodosLimit;
     this.focusListLimit = focusListLimit;
     this.focusModeIncludeProjects = focusModeIncludeProjects;
+    this.makeLinksClickable = makeLinksClickable;
     this.onShowAbout = onShowAbout;
     this.onShowStats = onShowStats;
     this.contextMenuHandler = new ContextMenuHandler(
@@ -2896,6 +2921,9 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     cleaned = cleaned.replace(/_(.+?)_/g, "$1");
     cleaned = cleaned.replace(/~~(.+?)~~/g, "$1");
     cleaned = cleaned.replace(/`(.+?)`/g, "$1");
+    cleaned = cleaned.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (match, page, alias) => {
+      return alias || page.split("#")[0];
+    });
     cleaned = cleaned.replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1");
     return cleaned;
   }
@@ -2916,6 +2944,73 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     return textWithoutTags.replace(new RegExp(placeholder + "(\\d+)" + placeholder, "g"), (_, index2) => {
       return codeBlocks[parseInt(index2)];
     });
+  }
+  // Render text with clickable links (simplified version for sidebar)
+  renderTextWithLinks(text5, container) {
+    let processed = text5.replace(/^#{1,6}\s+/, "").replace(/^-\s*\[\s*\]\s*/, "").replace(/^-\s*\[x\]\s*/, "").replace(/^-\s+/, "");
+    let remaining = processed;
+    while (remaining.length > 0) {
+      let match = remaining.match(/^\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/);
+      if (match) {
+        const pagePath = match[1];
+        const alias = match[2];
+        const displayText = alias || pagePath.split("#")[0];
+        const link2 = container.createEl("a", {
+          text: displayText,
+          cls: "internal-link"
+        });
+        link2.addEventListener("click", async (e) => {
+          e.preventDefault();
+          await this.app.workspace.openLinkText(pagePath, "", false);
+        });
+        remaining = remaining.substring(match[0].length);
+        continue;
+      }
+      match = remaining.match(/^\[([^\]]+)\]\(([^)]+)\)/);
+      if (match) {
+        const linkText = match[1];
+        const url = match[2];
+        const link2 = container.createEl("a", {
+          text: linkText,
+          cls: "external-link"
+        });
+        link2.addEventListener("click", (e) => {
+          e.preventDefault();
+          window.open(url, "_blank");
+        });
+        remaining = remaining.substring(match[0].length);
+        continue;
+      }
+      match = remaining.match(/^\*\*(.+?)\*\*/);
+      if (match) {
+        container.createEl("strong", { text: match[1] });
+        remaining = remaining.substring(match[0].length);
+        continue;
+      }
+      match = remaining.match(/^\*(.+?)\*/);
+      if (match) {
+        container.createEl("em", { text: match[1] });
+        remaining = remaining.substring(match[0].length);
+        continue;
+      }
+      match = remaining.match(/^`([^`]+)`/);
+      if (match) {
+        container.createEl("code", { text: match[1] });
+        remaining = remaining.substring(match[0].length);
+        continue;
+      }
+      const nextSpecial = remaining.search(/[\*`\[]/);
+      if (nextSpecial === -1) {
+        container.appendText(remaining);
+        break;
+      } else if (nextSpecial > 0) {
+        container.appendText(remaining.substring(0, nextSpecial));
+        remaining = remaining.substring(nextSpecial);
+      } else {
+        container.appendText(remaining[0]);
+        remaining = remaining.substring(1);
+      }
+    }
   }
   // Unified list item renderer for todos, ideas, and principles
   renderListItem(list4, item, config, isChild = false) {
@@ -2953,9 +3048,13 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     const textSpan = rowContainer.createEl("span", { cls: `${config.classPrefix}-text` });
     const cleanText = item.text.replace(config.tagToStrip, "").trim();
     const textWithoutTags = this.stripTagsPreservingCode(cleanText);
-    const displayText = this.stripMarkdownSyntax(textWithoutTags);
-    const finalText = displayText.replace(/\s+/g, " ").trim();
-    textSpan.appendText(finalText);
+    if (this.makeLinksClickable) {
+      this.renderTextWithLinks(textWithoutTags, textSpan);
+    } else {
+      const displayText = this.stripMarkdownSyntax(textWithoutTags);
+      const finalText = displayText.replace(/\s+/g, " ").trim();
+      textSpan.appendText(finalText);
+    }
     const tags = extractTags(cleanText).filter((tag) => !config.tagToStrip.test(tag));
     if (tags.length > 0) {
       this.renderTagDropdown(tags, rowContainer, item);
@@ -3720,6 +3819,8 @@ var DEFAULT_SETTINGS = {
   focusModeIncludeProjects: false,
   // Tab lock settings
   showTabLockButton: false,
+  // Link rendering settings
+  makeLinksClickable: true,
   // LLM/Define settings
   llmEnabled: true,
   llmUrl: "http://localhost:11434",
@@ -15005,7 +15106,8 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
       this.projectManager,
       this.settings.defaultTodoneFile,
       this.settings.focusListLimit,
-      this.settings.priorityTags
+      this.settings.priorityTags,
+      this.settings.makeLinksClickable
     );
     this.llmClient = new LLMClient({
       url: this.settings.llmUrl,
@@ -15078,6 +15180,7 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
         this.settings.activeTodosLimit,
         this.settings.focusListLimit,
         this.settings.focusModeIncludeProjects,
+        this.settings.makeLinksClickable,
         () => this.showAboutModal(),
         () => this.showStatsModal()
       )
@@ -15502,6 +15605,13 @@ var SpaceCommandSettingTab = class extends import_obsidian11.PluginSettingTab {
           this.plugin.tabLockManager.disable();
         }
         await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian11.Setting(containerEl).setName("Make links clickable in lists").setDesc("Render wiki links and markdown links as clickable in sidebar and embeds. When disabled, links display as plain text without markdown syntax.").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.makeLinksClickable).onChange(async (value) => {
+        this.plugin.settings.makeLinksClickable = value;
+        await this.plugin.saveSettings();
+        this.plugin.refreshSidebar();
       })
     );
     containerEl.createEl("h3", { text: "TODOs" });

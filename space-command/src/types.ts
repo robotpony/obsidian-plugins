@@ -61,6 +61,8 @@ export interface SpaceCommandSettings {
   focusModeIncludeProjects: boolean;
   // Tab lock settings
   showTabLockButton: boolean;
+  // Link rendering settings
+  makeLinksClickable: boolean;
   // LLM/Define settings
   llmEnabled: boolean;
   llmUrl: string;
@@ -86,6 +88,8 @@ export const DEFAULT_SETTINGS: SpaceCommandSettings = {
   focusModeIncludeProjects: false,
   // Tab lock settings
   showTabLockButton: false,
+  // Link rendering settings
+  makeLinksClickable: true,
   // LLM/Define settings
   llmEnabled: true,
   llmUrl: "http://localhost:11434",

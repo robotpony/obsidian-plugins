@@ -16,6 +16,7 @@ export class EmbedRenderer {
   private defaultTodoneFile: string;
   private focusListLimit: number;
   private priorityTags: string[];
+  private makeLinksClickable: boolean;
 
   // Track active renders for event cleanup
   private activeRenders: Map<HTMLElement, () => void> = new Map();
@@ -33,7 +34,8 @@ export class EmbedRenderer {
     projectManager: ProjectManager,
     defaultTodoneFile: string = "todos/done.md",
     focusListLimit: number = 5,
-    priorityTags: string[] = ["#p0", "#p1", "#p2", "#p3", "#p4"]
+    priorityTags: string[] = ["#p0", "#p1", "#p2", "#p3", "#p4"],
+    makeLinksClickable: boolean = true
   ) {
     this.app = app;
     this.scanner = scanner;
@@ -42,6 +44,7 @@ export class EmbedRenderer {
     this.defaultTodoneFile = defaultTodoneFile;
     this.focusListLimit = focusListLimit;
     this.priorityTags = priorityTags;
+    this.makeLinksClickable = makeLinksClickable;
     this.contextMenuHandler = new ContextMenuHandler(app, processor, priorityTags);
   }
 
@@ -795,10 +798,30 @@ export class EmbedRenderer {
           container.createEl('code', { text: token.content });
           break;
         case 'link':
-          container.createEl('a', {
-            text: token.content,
-            attr: { href: token.url || '#' }
-          });
+          if (this.makeLinksClickable) {
+            const link = container.createEl('a', {
+              text: token.content,
+              cls: 'internal-link',
+            });
+
+            // Set up click handler
+            link.addEventListener('click', async (e) => {
+              e.preventDefault();
+              const url = token.url || '';
+
+              // Check if this is a wiki link (internal) or external markdown link
+              if (url.startsWith('http://') || url.startsWith('https://')) {
+                // External link - open in new window
+                window.open(url, '_blank');
+              } else {
+                // Wiki link - use Obsidian's link navigation
+                await this.app.workspace.openLinkText(url, '', false);
+              }
+            });
+          } else {
+            // Just show the text without link formatting
+            container.appendText(token.content);
+          }
           break;
       }
     }
@@ -841,7 +864,22 @@ export class EmbedRenderer {
         continue;
       }
 
-      // Links: [text](url)
+      // Wiki links: [[page]] or [[page|alias]] or [[page#heading]] or [[page#heading|alias]]
+      match = remaining.match(/^\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/);
+      if (match) {
+        const pagePath = match[1]; // e.g., "page" or "page#heading"
+        const alias = match[2]; // e.g., "alias" or undefined
+
+        // Display text is alias if present, otherwise the page name (without heading anchor)
+        const displayText = alias || pagePath.split('#')[0];
+
+        tokens.push({ type: 'link', content: displayText, url: pagePath });
+        remaining = remaining.substring(match[0].length);
+        matched = true;
+        continue;
+      }
+
+      // Markdown links: [text](url)
       match = remaining.match(/^\[([^\]]+)\]\(([^)]+)\)/);
       if (match) {
         tokens.push({ type: 'link', content: match[1], url: match[2] });

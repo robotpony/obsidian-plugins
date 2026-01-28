@@ -2,6 +2,29 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.37] - 2026-01-28
+
+### Added
+
+- **Clickable links in lists**: New "Make links clickable in lists" setting (enabled by default)
+  - Wiki links (`[[page]]`, `[[page|alias]]`, `[[page#heading]]`) now render as clickable links in sidebar and embeds
+  - Markdown links (`[text](url)`) also render as clickable links
+  - Wiki links navigate to the page in Obsidian when clicked
+  - External links open in a new browser window
+  - When setting is disabled, links display as plain text without markdown syntax (previous behavior)
+
+### Fixed
+
+- **Wiki-style links now display correctly**: Wiki links no longer show raw markdown syntax in sidebar and embeds
+  - `[[page]]` displays as "page"
+  - `[[page|alias]]` displays as "alias"
+  - `[[page#heading]]` displays as "page"
+  - Previously, these showed as literal `[[...]]` text
+
+### Settings
+
+- **Make links clickable in lists**: Toggle whether links in sidebar and embeds are clickable (default: on)
+
 ## [0.9.36] - 2026-01-28
 
 ### Fixed

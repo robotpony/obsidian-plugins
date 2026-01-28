@@ -60,7 +60,8 @@ export default class SpaceCommandPlugin extends Plugin {
       this.projectManager,
       this.settings.defaultTodoneFile,
       this.settings.focusListLimit,
-      this.settings.priorityTags
+      this.settings.priorityTags,
+      this.settings.makeLinksClickable
     );
 
     // Initialize LLM client for Define/Rewrite/Review features
@@ -175,6 +176,7 @@ export default class SpaceCommandPlugin extends Plugin {
           this.settings.activeTodosLimit,
           this.settings.focusListLimit,
           this.settings.focusModeIncludeProjects,
+          this.settings.makeLinksClickable,
           () => this.showAboutModal(),
           () => this.showStatsModal()
         )
@@ -761,6 +763,20 @@ class SpaceCommandSettingTab extends PluginSettingTab {
               this.plugin.tabLockManager.disable();
             }
             await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Make links clickable in lists")
+      .setDesc("Render wiki links and markdown links as clickable in sidebar and embeds. When disabled, links display as plain text without markdown syntax.")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.makeLinksClickable)
+          .onChange(async (value) => {
+            this.plugin.settings.makeLinksClickable = value;
+            await this.plugin.saveSettings();
+            // Refresh sidebar and embeds to apply the change
+            this.plugin.refreshSidebar();
           })
       );
 

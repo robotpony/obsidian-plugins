@@ -87,6 +87,22 @@ Keep documents open while navigating. When you click links from a locked tab, th
 
 Uses Obsidian's native pinning, so locked tabs also stay open when closing other tabs.
 
+## Clickable Links
+
+Links in TODOs, ideas, and principles are clickable by default in both sidebar and embeds. Both wiki-style links (`[[page]]`, `[[page|alias]]`) and markdown links (`[text](url)`) work:
+
+- **Wiki links** navigate to the page in Obsidian when clicked
+- **External links** open in a new browser window
+- **Disable in Settings** → "Make links clickable in lists" to show links as plain text instead
+
+Example:
+```markdown
+- [ ] Review the [[API Spec|spec]] #todo
+- [ ] Check [documentation](https://example.com) #todo
+```
+
+Both links will be clickable in the sidebar and embeds.
+
 ## Embed and Filter
 
 Embed TODO or idea lists anywhere:

@@ -19,6 +19,7 @@ export class TodoSidebarView extends ItemView {
   private activeTodosLimit: number;
   private focusListLimit: number;
   private focusModeIncludeProjects: boolean;
+  private makeLinksClickable: boolean;
   private activeTab: 'todos' | 'ideas' = 'todos';
   private activeTagFilter: string | null = null;
   private focusModeEnabled: boolean = false;
@@ -38,6 +39,7 @@ export class TodoSidebarView extends ItemView {
     activeTodosLimit: number,
     focusListLimit: number,
     focusModeIncludeProjects: boolean,
+    makeLinksClickable: boolean,
     onShowAbout: () => void,
     onShowStats: () => void
   ) {
@@ -50,6 +52,7 @@ export class TodoSidebarView extends ItemView {
     this.activeTodosLimit = activeTodosLimit;
     this.focusListLimit = focusListLimit;
     this.focusModeIncludeProjects = focusModeIncludeProjects;
+    this.makeLinksClickable = makeLinksClickable;
     this.onShowAbout = onShowAbout;
     this.onShowStats = onShowStats;
 
@@ -94,7 +97,12 @@ export class TodoSidebarView extends ItemView {
     cleaned = cleaned.replace(/~~(.+?)~~/g, "$1");
     // Remove inline code backticks but keep the content
     cleaned = cleaned.replace(/`(.+?)`/g, "$1");
-    // Remove links but keep the text
+    // Remove wiki links but keep the display text
+    // [[page|alias]] -> alias, [[page]] -> page
+    cleaned = cleaned.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (match, page, alias) => {
+      return alias || page.split('#')[0]; // Use alias if present, otherwise page name without heading
+    });
+    // Remove markdown links but keep the text
     cleaned = cleaned.replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1");
     return cleaned;
   }
@@ -124,6 +132,103 @@ export class TodoSidebarView extends ItemView {
     return textWithoutTags.replace(new RegExp(placeholder + '(\\d+)' + placeholder, 'g'), (_, index) => {
       return codeBlocks[parseInt(index)];
     });
+  }
+
+  // Render text with clickable links (simplified version for sidebar)
+  private renderTextWithLinks(text: string, container: HTMLElement): void {
+    // Strip markdown formatting but preserve link structure
+    let processed = text
+      .replace(/^#{1,6}\s+/, "")   // Remove heading markers
+      .replace(/^-\s*\[\s*\]\s*/, "") // Remove task markers
+      .replace(/^-\s*\[x\]\s*/, "")
+      .replace(/^-\s+/, "");       // Remove list markers
+
+    let remaining = processed;
+
+    while (remaining.length > 0) {
+      // Try to match links first (wiki or markdown)
+
+      // Wiki links: [[page]] or [[page|alias]]
+      let match = remaining.match(/^\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/);
+      if (match) {
+        const pagePath = match[1];
+        const alias = match[2];
+        const displayText = alias || pagePath.split('#')[0];
+
+        const link = container.createEl('a', {
+          text: displayText,
+          cls: 'internal-link',
+        });
+
+        link.addEventListener('click', async (e) => {
+          e.preventDefault();
+          await this.app.workspace.openLinkText(pagePath, '', false);
+        });
+
+        remaining = remaining.substring(match[0].length);
+        continue;
+      }
+
+      // Markdown links: [text](url)
+      match = remaining.match(/^\[([^\]]+)\]\(([^)]+)\)/);
+      if (match) {
+        const linkText = match[1];
+        const url = match[2];
+
+        const link = container.createEl('a', {
+          text: linkText,
+          cls: 'external-link',
+        });
+
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          window.open(url, '_blank');
+        });
+
+        remaining = remaining.substring(match[0].length);
+        continue;
+      }
+
+      // Bold: **text**
+      match = remaining.match(/^\*\*(.+?)\*\*/);
+      if (match) {
+        container.createEl('strong', { text: match[1] });
+        remaining = remaining.substring(match[0].length);
+        continue;
+      }
+
+      // Italic: *text*
+      match = remaining.match(/^\*(.+?)\*/);
+      if (match) {
+        container.createEl('em', { text: match[1] });
+        remaining = remaining.substring(match[0].length);
+        continue;
+      }
+
+      // Code: `text`
+      match = remaining.match(/^`([^`]+)`/);
+      if (match) {
+        container.createEl('code', { text: match[1] });
+        remaining = remaining.substring(match[0].length);
+        continue;
+      }
+
+      // No pattern matched, consume characters until next special character
+      const nextSpecial = remaining.search(/[\*`\[]/);
+      if (nextSpecial === -1) {
+        // No more special characters, add remaining text
+        container.appendText(remaining);
+        break;
+      } else if (nextSpecial > 0) {
+        // Add text before next special character
+        container.appendText(remaining.substring(0, nextSpecial));
+        remaining = remaining.substring(nextSpecial);
+      } else {
+        // Special character at start but didn't match, treat as literal
+        container.appendText(remaining[0]);
+        remaining = remaining.substring(1);
+      }
+    }
   }
 
   // Configuration for unified list item rendering
@@ -210,9 +315,16 @@ export class TodoSidebarView extends ItemView {
     const cleanText = item.text.replace(config.tagToStrip, "").trim();
     // Strip tags BEFORE markdown processing, but preserve tags inside backticks
     const textWithoutTags = this.stripTagsPreservingCode(cleanText);
-    const displayText = this.stripMarkdownSyntax(textWithoutTags);
-    const finalText = displayText.replace(/\s+/g, " ").trim();
-    textSpan.appendText(finalText);
+
+    if (this.makeLinksClickable) {
+      // Render with clickable links
+      this.renderTextWithLinks(textWithoutTags, textSpan);
+    } else {
+      // Strip all markdown and render as plain text
+      const displayText = this.stripMarkdownSyntax(textWithoutTags);
+      const finalText = displayText.replace(/\s+/g, " ").trim();
+      textSpan.appendText(finalText);
+    }
 
     // Get tags (excluding the type tag) and render dropdown on the row container (right-aligned before link)
     const tags = extractTags(cleanText).filter(tag => !config.tagToStrip.test(tag));
