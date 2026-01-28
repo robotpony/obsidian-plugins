@@ -341,6 +341,52 @@
    Settings Tab Styles
    -------------------------------------------- */
 
+/* About Section in Settings */
+.link-command-about-section {
+  background-color: var(--background-secondary);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 24px;
+}
+
+.link-command-about-section .about-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.link-command-about-section .about-logo {
+  font-size: 1.2em;
+}
+
+.link-command-about-section .about-title {
+  font-weight: 600;
+  font-size: 1.1em;
+}
+
+.link-command-about-section .about-blurb {
+  color: var(--text-muted);
+  margin: 0 0 12px 0;
+  font-size: 0.95em;
+  line-height: 1.4;
+}
+
+.link-command-about-section .about-version {
+  font-size: 0.85em;
+  color: var(--text-muted);
+  margin: 0 0 8px 0;
+}
+
+.link-command-about-section .about-details {
+  font-size: 0.85em;
+  color: var(--text-muted);
+}
+
+.link-command-about-section .about-details a {
+  color: var(--text-accent);
+}
+
 .link-command-settings textarea {
   width: 100%;
   min-height: 100px;

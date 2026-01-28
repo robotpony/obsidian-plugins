@@ -2,6 +2,16 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.4.12] - 2026-01-27
+
+### Improved
+
+- **Consistent plugin naming**: Removed logo symbols from plugin name and sidebar tab title
+  - Plugin name in Community plugins list: "Hugo Command" (was "H⌘ Hugo Command")
+  - Sidebar tab title: "Hugo" (was "H⌘ Hugo")
+  - Settings page title: "Hugo Command Settings" (was "H⌘ Hugo Command Settings")
+  - Logo still appears in the styled about section header within settings
+
 ## [0.4.11] - 2026-01-27
 
 ### Fixed

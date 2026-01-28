@@ -573,7 +573,7 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
     return VIEW_TYPE_HUGO_SIDEBAR;
   }
   getDisplayText() {
-    return `${LOGO_PREFIX} Hugo`;
+    return "Hugo";
   }
   getIcon() {
     return "file-text";
@@ -1701,7 +1701,7 @@ var HugoCommandSettingTab = class extends import_obsidian5.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: `${LOGO_PREFIX} Hugo Command Settings` });
+    containerEl.createEl("h2", { text: "Hugo Command Settings" });
     const aboutSection = containerEl.createEl("div", { cls: "hugo-command-about-section" });
     const aboutHeader = aboutSection.createEl("div", { cls: "about-header" });
     aboutHeader.createEl("span", { cls: "hugo-command-logo about-logo", text: LOGO_PREFIX });

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.15
+
+### Improved
+
+- **Settings page header**: Added about section with logo, plugin name, description, version, and author info
+  - Consistent with Space Command and Hugo Command settings layout
+
 ## 0.4.14
 
 ### Fixed

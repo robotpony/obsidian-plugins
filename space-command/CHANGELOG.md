@@ -2,6 +2,16 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.27] - 2026-01-27
+
+### Improved
+
+- **Consistent plugin naming**: Removed logo symbols from plugin name and sidebar tab titles
+  - Plugin name in Community plugins list: "Space Command" (was "␣⌘ Space Command")
+  - Sidebar tab titles: "TODOs" / "IDEAs" (was "␣⌘ TODOs" / "␣⌘ IDEAs")
+  - Settings page title: "Space Command Settings" (was "␣⌘ Space Command Settings")
+  - Logo still appears in the styled about section header within settings
+
 ## [0.9.26] - 2026-01-27
 
 ### Added

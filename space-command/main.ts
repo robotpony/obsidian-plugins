@@ -614,7 +614,7 @@ class SpaceCommandSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: "␣⌘ Space Command Settings" });
+    containerEl.createEl("h2", { text: "Space Command Settings" });
 
     // About section
     const aboutSection = containerEl.createEl("div", { cls: "space-command-about-section" });

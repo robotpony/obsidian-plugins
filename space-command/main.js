@@ -2723,7 +2723,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     return VIEW_TYPE_TODO_SIDEBAR;
   }
   getDisplayText() {
-    return this.activeTab === "todos" ? "\u2423\u2318 TODOs" : "\u2423\u2318 IDEAs";
+    return this.activeTab === "todos" ? "TODOs" : "IDEAs";
   }
   getIcon() {
     return "checkbox-glyph";
@@ -15089,7 +15089,7 @@ var SpaceCommandSettingTab = class extends import_obsidian11.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: "\u2423\u2318 Space Command Settings" });
+    containerEl.createEl("h2", { text: "Space Command Settings" });
     const aboutSection = containerEl.createEl("div", { cls: "space-command-about-section" });
     const aboutHeader = aboutSection.createEl("div", { cls: "about-header" });
     aboutHeader.createEl("span", { cls: "space-command-logo about-logo", text: "\u2423\u2318" });

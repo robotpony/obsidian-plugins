@@ -238,7 +238,7 @@ class HugoCommandSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: `${LOGO_PREFIX} Hugo Command Settings` });
+    containerEl.createEl("h2", { text: "Hugo Command Settings" });
 
     // About section
     const aboutSection = containerEl.createEl("div", { cls: "hugo-command-about-section" });

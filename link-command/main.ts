@@ -354,6 +354,27 @@ class LinkCommandSettingTab extends PluginSettingTab {
 
     containerEl.createEl("h2", { text: "Link Command Settings" });
 
+    // About section
+    const aboutSection = containerEl.createEl("div", { cls: "link-command-about-section" });
+    const aboutHeader = aboutSection.createEl("div", { cls: "about-header" });
+    aboutHeader.createEl("span", { cls: "link-command-logo about-logo", text: "L⌘" });
+    aboutHeader.createEl("span", { cls: "about-title", text: "Link Command" });
+
+    aboutSection.createEl("p", {
+      cls: "about-blurb",
+      text: "URL unfurling for Obsidian. Fetch link titles and descriptions, insert as markdown links or rich previews.",
+    });
+
+    aboutSection.createEl("p", { cls: "about-version", text: `Version ${this.plugin.manifest.version}` });
+
+    const aboutDetails = aboutSection.createEl("div", { cls: "about-details" });
+    aboutDetails.createEl("span", { text: "By Bruce Alderson" });
+    aboutDetails.appendText(" · ");
+    aboutDetails.createEl("a", {
+      text: "GitHub",
+      href: "https://github.com/robotpony/obsidian-plugins",
+    });
+
     // Master toggle
     new Setting(containerEl)
       .setName("Enable inline format toggle")

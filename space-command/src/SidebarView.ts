@@ -66,7 +66,7 @@ export class TodoSidebarView extends ItemView {
   }
 
   getDisplayText(): string {
-    return this.activeTab === 'todos' ? "␣⌘ TODOs" : "␣⌘ IDEAs";
+    return this.activeTab === 'todos' ? "TODOs" : "IDEAs";
   }
 
   getIcon(): string {

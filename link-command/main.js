@@ -1594,6 +1594,22 @@ var LinkCommandSettingTab = class extends import_obsidian4.PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     containerEl.createEl("h2", { text: "Link Command Settings" });
+    const aboutSection = containerEl.createEl("div", { cls: "link-command-about-section" });
+    const aboutHeader = aboutSection.createEl("div", { cls: "about-header" });
+    aboutHeader.createEl("span", { cls: "link-command-logo about-logo", text: "L\u2318" });
+    aboutHeader.createEl("span", { cls: "about-title", text: "Link Command" });
+    aboutSection.createEl("p", {
+      cls: "about-blurb",
+      text: "URL unfurling for Obsidian. Fetch link titles and descriptions, insert as markdown links or rich previews."
+    });
+    aboutSection.createEl("p", { cls: "about-version", text: `Version ${this.plugin.manifest.version}` });
+    const aboutDetails = aboutSection.createEl("div", { cls: "about-details" });
+    aboutDetails.createEl("span", { text: "By Bruce Alderson" });
+    aboutDetails.appendText(" \xB7 ");
+    aboutDetails.createEl("a", {
+      text: "GitHub",
+      href: "https://github.com/robotpony/obsidian-plugins"
+    });
     new import_obsidian4.Setting(containerEl).setName("Enable inline format toggle").setDesc("Show toggle buttons next to URLs to cycle between formats (URL, Link, Rich Link)").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.unfurlEnabled).onChange(async (value) => {
         this.plugin.settings.unfurlEnabled = value;

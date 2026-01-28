@@ -41,7 +41,7 @@ export class HugoSidebarView extends ItemView {
   }
 
   getDisplayText(): string {
-    return `${LOGO_PREFIX} Hugo`;
+    return "Hugo";
   }
 
   getIcon(): string {
