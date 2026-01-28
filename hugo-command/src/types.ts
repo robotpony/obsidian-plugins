@@ -38,6 +38,7 @@ export interface HugoContentItem {
  */
 export interface HugoCommandSettings {
   contentPaths: string[];
+  trashFolder: string;
   showSidebarByDefault: boolean;
   showDrafts: boolean;
   defaultSortOrder: "date-desc" | "date-asc" | "title";
@@ -45,7 +46,8 @@ export interface HugoCommandSettings {
 }
 
 export const DEFAULT_SETTINGS: HugoCommandSettings = {
-  contentPaths: ["."],
+  contentPaths: ["content"],
+  trashFolder: "_trash",
   showSidebarByDefault: true,
   showDrafts: true,
   defaultSortOrder: "date-desc",
@@ -53,3 +55,26 @@ export const DEFAULT_SETTINGS: HugoCommandSettings = {
 };
 
 export type StatusFilter = "all" | "draft" | "published";
+
+/**
+ * Hugo site configuration (hugo.toml / config.toml)
+ */
+export interface HugoSiteConfig {
+  // Basic settings
+  title?: string;
+  baseURL?: string;
+  languageCode?: string;
+
+  // Author/copyright
+  author?: string;
+  copyright?: string;
+
+  // Theme
+  theme?: string;
+
+  // Custom params section
+  params?: Record<string, unknown>;
+
+  // Allow other top-level fields
+  [key: string]: unknown;
+}

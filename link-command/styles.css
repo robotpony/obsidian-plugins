@@ -1,0 +1,395 @@
+/* ============================================
+   Link Command - URL Unfurling Styles
+   ============================================ */
+
+/* --------------------------------------------
+   Format Toggle Button Styles
+   -------------------------------------------- */
+
+.link-format-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-left: 4px;
+  padding: 2px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  vertical-align: middle;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.link-format-toggle:hover {
+  color: var(--text-accent);
+  background-color: var(--background-modifier-hover);
+}
+
+.link-format-toggle svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Loading state */
+.link-format-toggle.loading {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.link-format-toggle.loading::after {
+  content: "";
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--background-modifier-border);
+  border-top-color: var(--text-accent);
+  border-radius: 50%;
+  animation: link-toggle-spin 0.8s linear infinite;
+}
+
+@keyframes link-toggle-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* --------------------------------------------
+   Sidebar Styles
+   -------------------------------------------- */
+
+/* Container - matches space-command/hugo-command */
+.link-command-sidebar {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Logo styling - green to differentiate from space-command (blue) and hugo-command (orange) */
+.link-command-logo {
+  display: inline-block;
+  background-color: #5da65d;
+  color: white;
+  border-radius: 4px;
+  padding: 3px 3px 2px;
+  font-weight: 600;
+  font-size: 0.9em;
+  text-align: center;
+  line-height: 1.2;
+  vertical-align: middle;
+}
+
+.link-command-logo.clickable-logo {
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+.link-command-logo.clickable-logo:hover {
+  opacity: 0.85;
+  transform: scale(1.05);
+}
+
+/* Sidebar header - matches space-command */
+.link-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 4px;
+  background-color: var(--background-secondary);
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+.link-command-sidebar h4 {
+  margin: 0;
+  color: var(--text-normal);
+}
+
+.link-sidebar-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/* Menu button - matches space-command */
+.link-sidebar-menu-btn {
+  padding: 4px;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s, background-color 0.15s;
+  flex-shrink: 0;
+  border-radius: 4px;
+}
+
+.link-sidebar-menu-btn:hover {
+  opacity: 1;
+  background-color: var(--background-modifier-hover) !important;
+}
+
+.link-sidebar-menu-btn.rotating {
+  animation: rotate 0.5s ease-in-out;
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Section styles */
+.link-sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 8px 0 4px; /* Right padding makes room for scrollbar */
+}
+
+/* Scrollbar styling - hugs right edge, doesn't overlap content */
+.link-command-sidebar ::-webkit-scrollbar {
+  width: 8px;
+  position: absolute;
+  right: 0;
+}
+
+.link-command-sidebar ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.link-command-sidebar ::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--text-muted) 65%, transparent);
+  border-radius: 4px;
+}
+
+.link-sidebar-section {
+  margin-bottom: 20px;
+}
+
+.link-sidebar-section-header {
+  display: flex;
+  align-items: center;
+  padding: 5px 0;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  user-select: none;
+}
+
+.link-sidebar-section-title {
+  font-weight: 600;
+  color: var(--text-normal);
+  font-size: 14px;
+}
+
+/* Clear button in section header */
+.link-sidebar-clear-btn {
+  padding: 4px;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.2s, color 0.2s, background-color 0.15s;
+  margin-left: auto;
+  border-radius: 4px;
+}
+
+.link-sidebar-clear-btn:hover {
+  opacity: 1;
+  color: var(--text-error);
+  background-color: var(--background-modifier-hover) !important;
+}
+
+/* List styles */
+.link-sidebar-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.link-sidebar-empty {
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 10px 0;
+}
+
+/* Item styles */
+.link-sidebar-item {
+  display: flex;
+  align-items: flex-start;
+  padding: 4px 0;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.link-sidebar-item:hover {
+  background: var(--background-modifier-hover);
+  margin: 0 -10px;
+  padding: 4px 10px;
+}
+
+.link-sidebar-status {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 5px;
+  flex-shrink: 0;
+}
+
+.link-sidebar-status-cached {
+  background: var(--color-green);
+}
+
+.link-sidebar-status-pending {
+  background: var(--background-modifier-border);
+}
+
+.link-sidebar-favicon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  border-radius: 2px;
+}
+
+.link-sidebar-favicon-placeholder {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  background: var(--background-modifier-border);
+  border-radius: 2px;
+}
+
+.link-sidebar-item-content {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.link-sidebar-item-title {
+  color: var(--text-normal);
+  line-height: 1.4;
+  word-wrap: break-word;
+}
+
+.link-sidebar-item:hover .link-sidebar-item-title {
+  color: var(--text-accent);
+}
+
+.link-sidebar-item-subreddit {
+  font-size: 11px;
+  color: var(--text-accent);
+  opacity: 0.8;
+}
+
+.link-sidebar-item-url {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.link-sidebar-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.link-sidebar-item-source,
+.link-sidebar-item-time {
+  flex-shrink: 0;
+}
+
+.link-sidebar-history-item {
+  border-left: 2px solid transparent;
+  margin-left: -2px;
+  padding-left: 2px;
+}
+
+.link-sidebar-history-item:hover {
+  border-left-color: var(--text-accent);
+}
+
+/* External link button (arrow) */
+.link-sidebar-external-btn {
+  padding: 4px;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  cursor: pointer;
+  opacity: 0.4;
+  transition: opacity 0.2s, color 0.2s, background-color 0.15s;
+  flex-shrink: 0;
+  margin-left: auto;
+  align-self: center;
+  border-radius: 4px;
+}
+
+.link-sidebar-external-btn:hover {
+  opacity: 1;
+  background-color: var(--background-modifier-hover) !important;
+}
+
+
+/* --------------------------------------------
+   Settings Tab Styles
+   -------------------------------------------- */
+
+/* About Section in Settings */
+.link-command-about-section {
+  background-color: var(--background-secondary);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 24px;
+}
+
+.link-command-about-section .about-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.link-command-about-section .about-logo {
+  font-size: 1.2em;
+}
+
+.link-command-about-section .about-title {
+  font-weight: 600;
+  font-size: 1.1em;
+}
+
+.link-command-about-section .about-blurb {
+  color: var(--text-muted);
+  margin: 0 0 12px 0;
+  font-size: 0.95em;
+  line-height: 1.4;
+}
+
+.link-command-about-section .about-version {
+  font-size: 0.85em;
+  color: var(--text-muted);
+  margin: 0 0 8px 0;
+}
+
+.link-command-about-section .about-details {
+  font-size: 0.85em;
+  color: var(--text-muted);
+}
+
+.link-command-about-section .about-details a {
+  color: var(--text-accent);
+}
+
+.link-command-settings textarea {
+  width: 100%;
+  min-height: 100px;
+  font-family: var(--font-monospace);
+  font-size: 13px;
+}

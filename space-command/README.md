@@ -36,9 +36,11 @@ That's it. Everything else is optional.
 
 | Tag | Purpose |
 |-----|---------|
-| `#focus` | The one thing to do next (highlighted) |
+| `#focus` | The one thing to do next (highlighted, always first) |
 | `#p0` – `#p4` | Priority levels (0 = highest) |
 | `#future` | Snoozed—hidden from active list |
+
+Items sort by: focus → priority → tag count (more tags = more context = higher). Focus projects list shows top 5 by default; TODO list shows all. Configure limits in Settings. Click the eye icon in the Focus header to toggle focus mode—filters both projects and TODOs to show only `#focus` items.
 
 **Project tags** group TODOs in the sidebar's Focus section. Any tag that isn't a priority or type tag becomes a project:
 
@@ -74,6 +76,16 @@ Capture ideas separately from actionable TODOs. The sidebar has two tabs—TODOs
 | `#principle`                     | A guiding principle (reference only)      |
 
 Click an idea's checkbox to dismiss it. Right-click to promote it to a TODO.
+
+## Tab Lock
+
+Keep documents open while navigating. When you click links from a locked tab, they open in new tabs instead of replacing the current view.
+
+1. Enable in Settings → "Show tab lock buttons"
+2. Click the padlock icon on any tab header to lock the tab
+3. Locked tabs show a pushpin; click it to unlock
+
+Uses Obsidian's native pinning, so locked tabs also stay open when closing other tabs.
 
 ## Embed and Filter
 

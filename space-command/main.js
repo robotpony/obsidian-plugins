@@ -139,6 +139,38 @@ var import_obsidian2 = require("obsidian");
 // src/utils.ts
 var import_obsidian = require("obsidian");
 var LOGO_PREFIX = "\u2423\u2318";
+var PLUGIN_TAGS = /* @__PURE__ */ new Set([
+  "#todo",
+  "#todos",
+  "#todone",
+  "#todones",
+  "#idea",
+  "#ideas",
+  "#ideation",
+  "#principle",
+  "#principles"
+]);
+var PRIORITY_TAG_MAP = {
+  "#focus": 0,
+  "#p0": 1,
+  "#p1": 2,
+  "#p2": 3,
+  "#p3": 4,
+  "#p4": 5,
+  "#future": 6
+};
+function getTagColourInfo(tag, projectColourMap) {
+  var _a;
+  const normalizedTag = tag.toLowerCase();
+  if (PLUGIN_TAGS.has(normalizedTag)) {
+    return { type: "plugin", priority: 3 };
+  }
+  if (PRIORITY_TAG_MAP[normalizedTag] !== void 0) {
+    return { type: "priority", priority: PRIORITY_TAG_MAP[normalizedTag] };
+  }
+  const colourIndex = (_a = projectColourMap == null ? void 0 : projectColourMap.get(normalizedTag)) != null ? _a : 4;
+  return { type: "project", priority: colourIndex };
+}
 function showNotice(message, timeout) {
   const fragment = document.createDocumentFragment();
   const logo = document.createElement("span");
@@ -167,6 +199,40 @@ function getPriorityValue(tags) {
   if (tags.includes("#future"))
     return 7;
   return 4;
+}
+function getTagCount(tags) {
+  const systemTags = /* @__PURE__ */ new Set([
+    "#todo",
+    "#todos",
+    "#todone",
+    "#todones",
+    "#idea",
+    "#ideas",
+    "#ideation",
+    "#principle",
+    "#principles",
+    "#focus",
+    "#future",
+    "#p0",
+    "#p1",
+    "#p2",
+    "#p3",
+    "#p4"
+  ]);
+  return tags.filter((tag) => !systemTags.has(tag)).length;
+}
+function compareTodoItems(a, b) {
+  const aHasFocus = a.tags.includes("#focus");
+  const bHasFocus = b.tags.includes("#focus");
+  if (aHasFocus && !bHasFocus)
+    return -1;
+  if (!aHasFocus && bHasFocus)
+    return 1;
+  const priorityDiff = getPriorityValue(a.tags) - getPriorityValue(b.tags);
+  if (priorityDiff !== 0)
+    return priorityDiff;
+  const tagCountDiff = getTagCount(b.tags) - getTagCount(a.tags);
+  return tagCountDiff;
 }
 function extractTags(text5) {
   const textWithoutCode = text5.replace(/`[^`]*`/g, "");
@@ -210,7 +276,7 @@ function removeIdeaTag(text5) {
 function replaceIdeaWithTodo(text5) {
   return text5.replace(/#idea(?:s|tion)?\b/, "#todo");
 }
-function renderTextWithTags(text5, container, mutedTags = []) {
+function renderTextWithTags(text5, container, mutedTags = [], projectColourMap) {
   const tagRegex = /(#[\w-]+)/g;
   let lastIndex = 0;
   let match;
@@ -219,17 +285,21 @@ function renderTextWithTags(text5, container, mutedTags = []) {
       container.appendText(text5.substring(lastIndex, match.index));
     }
     const tag = match[1];
+    const colourInfo = getTagColourInfo(tag, projectColourMap);
+    let tagEl;
     if (mutedTags.length > 0 && mutedTags.includes(tag)) {
-      container.createEl("span", {
+      tagEl = container.createEl("span", {
         cls: "tag muted-pill",
         text: tag
       });
     } else {
-      container.createEl("span", {
+      tagEl = container.createEl("span", {
         cls: "tag",
         text: tag
       });
     }
+    tagEl.dataset.scTagType = colourInfo.type;
+    tagEl.dataset.scPriority = colourInfo.priority.toString();
     lastIndex = tagRegex.lastIndex;
   }
   if (lastIndex < text5.length) {
@@ -1184,6 +1254,7 @@ var ProjectManager = class {
         if (projectMap.has(tag)) {
           const project = projectMap.get(tag);
           project.count++;
+          project.prioritySum += todoPriority;
           project.lastActivity = Math.max(
             project.lastActivity,
             todo.dateCreated
@@ -1197,20 +1268,41 @@ var ProjectManager = class {
             tag,
             count: 1,
             lastActivity: todo.dateCreated,
-            highestPriority: todoPriority
+            highestPriority: todoPriority,
+            prioritySum: todoPriority,
+            colourIndex: 4
+            // default, will be calculated below
           });
         }
       }
     }
-    return Array.from(projectMap.values());
+    const projects = [];
+    for (const [, project] of projectMap) {
+      const avgPriority = project.prioritySum / project.count;
+      const colourIndex = Math.min(6, Math.round(avgPriority * 6 / 7));
+      projects.push({
+        tag: project.tag,
+        count: project.count,
+        lastActivity: project.lastActivity,
+        highestPriority: project.highestPriority,
+        colourIndex
+      });
+    }
+    return projects;
   }
   getFocusProjects(limit) {
     const projects = this.getProjects();
     projects.sort((a, b) => {
-      const countDiff = b.count - a.count;
-      if (countDiff !== 0)
-        return countDiff;
-      return b.lastActivity - a.lastActivity;
+      const aHasFocus = a.highestPriority === 0;
+      const bHasFocus = b.highestPriority === 0;
+      if (aHasFocus && !bHasFocus)
+        return -1;
+      if (!aHasFocus && bHasFocus)
+        return 1;
+      const priorityDiff = a.highestPriority - b.highestPriority;
+      if (priorityDiff !== 0)
+        return priorityDiff;
+      return b.count - a.count;
     });
     if (limit !== void 0 && limit > 0) {
       return projects.slice(0, limit);
@@ -1335,8 +1427,41 @@ var ProjectManager = class {
       const leaf = this.app.workspace.getLeaf(false);
       await leaf.openFile(file);
     } else {
-      await this.createProjectFile(filepath, tag);
+      const confirmed = await this.confirmCreateProjectFile(tag, filepath);
+      if (confirmed) {
+        await this.createProjectFile(filepath, tag);
+      }
     }
+  }
+  confirmCreateProjectFile(tag, filepath) {
+    return new Promise((resolve) => {
+      const modal = new import_obsidian4.Modal(this.app);
+      modal.titleEl.setText("Create Project File?");
+      modal.contentEl.createEl("p", {
+        text: `Create project file for ${tag} in ${this.projectsFolder}?`
+      });
+      const buttonContainer = modal.contentEl.createEl("div", {
+        cls: "modal-button-container"
+      });
+      buttonContainer.style.display = "flex";
+      buttonContainer.style.justifyContent = "flex-end";
+      buttonContainer.style.gap = "8px";
+      buttonContainer.style.marginTop = "16px";
+      const cancelBtn = buttonContainer.createEl("button", { text: "Cancel" });
+      cancelBtn.addEventListener("click", () => {
+        modal.close();
+        resolve(false);
+      });
+      const createBtn = buttonContainer.createEl("button", {
+        text: "Create",
+        cls: "mod-cta"
+      });
+      createBtn.addEventListener("click", () => {
+        modal.close();
+        resolve(true);
+      });
+      modal.open();
+    });
   }
   async createProjectFile(filepath, tag) {
     const folderPath = filepath.substring(0, filepath.lastIndexOf("/"));
@@ -1637,6 +1762,8 @@ var EmbedRenderer = class {
     this.activeRenders = /* @__PURE__ */ new Map();
     // Track TODONE visibility state per container
     this.todoneVisibility = /* @__PURE__ */ new Map();
+    // Cache project colour map to avoid recalculating for each tag
+    this.projectColourMapCache = null;
     this.app = app;
     this.scanner = scanner;
     this.processor = processor;
@@ -1645,6 +1772,21 @@ var EmbedRenderer = class {
     this.focusListLimit = focusListLimit;
     this.priorityTags = priorityTags;
     this.contextMenuHandler = new ContextMenuHandler(app, processor, priorityTags);
+  }
+  // Get project colour map for tag colouring (cached per render cycle)
+  getProjectColourMap() {
+    if (!this.projectColourMapCache) {
+      const projects = this.projectManager.getProjects();
+      this.projectColourMapCache = /* @__PURE__ */ new Map();
+      for (const project of projects) {
+        this.projectColourMapCache.set(project.tag.toLowerCase(), project.colourIndex);
+      }
+    }
+    return this.projectColourMapCache;
+  }
+  // Invalidate colour map cache (called when re-rendering)
+  invalidateColourMapCache() {
+    this.projectColourMapCache = null;
   }
   // Cleanup method to remove event listeners for a specific container
   cleanup(container) {
@@ -1816,20 +1958,10 @@ var EmbedRenderer = class {
     }
     return result;
   }
-  getFirstProjectTag(todo) {
-    const excludeTags = ["#focus", "#future", "#p0", "#p1", "#p2", "#p3", "#p4", "#todo", "#todone"];
-    const projectTag = todo.tags.find((t) => !excludeTags.includes(t));
-    return projectTag || "zzz";
-  }
   sortTodos(todos) {
     const activeTodos = todos.filter((t) => t.itemType === "todo");
     const completedTodones = todos.filter((t) => t.itemType === "todone");
-    activeTodos.sort((a, b) => {
-      const priorityDiff = getPriorityValue(a.tags) - getPriorityValue(b.tags);
-      if (priorityDiff !== 0)
-        return priorityDiff;
-      return this.getFirstProjectTag(a).localeCompare(this.getFirstProjectTag(b));
-    });
+    activeTodos.sort(compareTodoItems);
     return [...activeTodos, ...completedTodones];
   }
   extractCompletionDate(text5) {
@@ -2107,10 +2239,11 @@ var EmbedRenderer = class {
   renderInlineMarkdown(text5, container) {
     const tokens = this.parseMarkdownTokens(text5);
     const mutedTags = ["#focus", "#future", "#p0", "#p1", "#p2", "#p3", "#p4"];
+    const projectColourMap = this.getProjectColourMap();
     for (const token of tokens) {
       switch (token.type) {
         case "text":
-          renderTextWithTags(token.content, container, mutedTags);
+          renderTextWithTags(token.content, container, mutedTags, projectColourMap);
           break;
         case "bold":
           container.createEl("strong", { text: token.content });
@@ -2208,6 +2341,7 @@ var EmbedRenderer = class {
   }
   // Refresh a specific embed
   refreshEmbed(container, todoneFile, filterString) {
+    this.invalidateColourMapCache();
     const filters = FilterParser.parse(filterString);
     const allTodos = this.scanner.getTodos().filter(
       (t) => !t.tags.includes("#idea") && !t.tags.includes("#ideas") && !t.tags.includes("#ideation")
@@ -2236,6 +2370,7 @@ var EmbedRenderer = class {
   }
   // Refresh idea embed
   refreshIdeaEmbed(container, filterString) {
+    this.invalidateColourMapCache();
     const filters = FilterParser.parse(filterString);
     const allIdeas = this.scanner.getIdeas();
     const filteredIdeas = FilterParser.applyFilters(allIdeas, filters);
@@ -2256,6 +2391,7 @@ var EmbedRenderer = class {
   }
   // Refresh principle embed
   refreshPrincipleEmbed(container, filterString) {
+    this.invalidateColourMapCache();
     const filters = FilterParser.parse(filterString);
     const allPrinciples = this.scanner.getPrinciples();
     const filteredPrinciples = FilterParser.applyFilters(allPrinciples, filters);
@@ -2608,11 +2744,12 @@ var DateSuggest = class extends import_obsidian7.EditorSuggest {
 var import_obsidian8 = require("obsidian");
 var VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 var TodoSidebarView = class extends import_obsidian8.ItemView {
-  constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, recentTodonesLimit, onShowAbout, onShowStats) {
+  constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, recentTodonesLimit, activeTodosLimit, focusListLimit, focusModeIncludeProjects, onShowAbout, onShowStats) {
     super(leaf);
     this.updateListener = null;
     this.activeTab = "todos";
     this.activeTagFilter = null;
+    this.focusModeEnabled = false;
     this.openDropdown = null;
     this.openInfoPopup = null;
     // Configuration for unified list item rendering
@@ -2644,6 +2781,9 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     this.projectManager = projectManager;
     this.defaultTodoneFile = defaultTodoneFile;
     this.recentTodonesLimit = recentTodonesLimit;
+    this.activeTodosLimit = activeTodosLimit;
+    this.focusListLimit = focusListLimit;
+    this.focusModeIncludeProjects = focusModeIncludeProjects;
     this.onShowAbout = onShowAbout;
     this.onShowStats = onShowStats;
     this.contextMenuHandler = new ContextMenuHandler(
@@ -2656,7 +2796,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     return VIEW_TYPE_TODO_SIDEBAR;
   }
   getDisplayText() {
-    return this.activeTab === "todos" ? "\u2423\u2318 TODOs" : "\u2423\u2318 IDEAs";
+    return this.activeTab === "todos" ? "TODOs" : "IDEAs";
   }
   getIcon() {
     return "checkbox-glyph";
@@ -2777,11 +2917,21 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       this.openDropdown = null;
     }
   }
+  // Get project colour map for tag colouring
+  getProjectColourMap() {
+    const projects = this.projectManager.getProjects();
+    const map4 = /* @__PURE__ */ new Map();
+    for (const project of projects) {
+      map4.set(project.tag.toLowerCase(), project.colourIndex);
+    }
+    return map4;
+  }
   // Render collapsed tag indicator with dropdown
   // If item is provided, "Clear tag" option will be available to remove tags from the item
   renderTagDropdown(tags, container, item) {
     if (tags.length === 0)
       return;
+    const projectColourMap = this.getProjectColourMap();
     const trigger = container.createEl("span", {
       cls: "tag-dropdown-trigger",
       text: "#"
@@ -2808,10 +2958,13 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
         const tagItem = dropdown.createEl("div", {
           cls: "tag-dropdown-item tag-dropdown-item-with-submenu"
         });
+        const colourInfo = getTagColourInfo(tag, projectColourMap);
         const tagLabel = tagItem.createEl("span", {
-          cls: "tag-dropdown-item-label",
+          cls: "tag-dropdown-item-label tag",
           text: tag
         });
+        tagLabel.dataset.scTagType = colourInfo.type;
+        tagLabel.dataset.scPriority = colourInfo.priority.toString();
         const arrow = tagItem.createEl("span", {
           cls: "tag-dropdown-item-arrow",
           text: "\u203A"
@@ -2972,10 +3125,11 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       });
       menu.showAtMouseEvent(evt);
     });
+    const content3 = container.createEl("div", { cls: "sidebar-content" });
     if (this.activeTab === "todos") {
-      this.renderTodosContent(container);
+      this.renderTodosContent(content3);
     } else {
-      this.renderIdeasContent(container);
+      this.renderIdeasContent(content3);
     }
   }
   renderTodosContent(container) {
@@ -2988,12 +3142,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     this.renderActiveIdeas(container);
   }
   sortTodosByPriority(todos) {
-    return [...todos].sort((a, b) => {
-      const priorityDiff = getPriorityValue(a.tags) - getPriorityValue(b.tags);
-      if (priorityDiff !== 0)
-        return priorityDiff;
-      return a.dateCreated - b.dateCreated;
-    });
+    return [...todos].sort(compareTodoItems);
   }
   /**
    * Render filter indicator button after section title if a filter is active.
@@ -3015,30 +3164,60 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     });
   }
   renderProjects(container) {
-    const projects = this.projectManager.getProjects();
+    let projects = this.projectManager.getProjects();
     const section = container.createEl("div", { cls: "projects-section" });
     const header = section.createEl("div", {
       cls: "todo-section-header projects-header"
     });
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
     titleSpan.textContent = "Focus";
+    const focusModeBtn = header.createEl("button", {
+      cls: `clickable-icon focus-mode-toggle-btn${this.focusModeEnabled ? " active" : ""}`,
+      attr: { "aria-label": this.focusModeEnabled ? "Show all projects" : "Show only focused" }
+    });
+    focusModeBtn.innerHTML = this.focusModeEnabled ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+    focusModeBtn.addEventListener("click", () => {
+      this.focusModeEnabled = !this.focusModeEnabled;
+      showNotice(this.focusModeEnabled ? "Focus mode enabled" : "Focus mode disabled");
+      this.render();
+    });
     this.renderFilterIndicator(header);
+    if (this.focusModeEnabled) {
+      projects = projects.filter((p) => p.highestPriority === 0);
+    }
     if (projects.length === 0) {
       section.createEl("div", {
-        text: "No focus projects yet",
+        text: this.focusModeEnabled ? "No focused projects" : "No focus projects yet",
         cls: "todo-empty"
       });
       return;
     }
     projects.sort((a, b) => {
+      const aHasFocus = a.highestPriority === 0;
+      const bHasFocus = b.highestPriority === 0;
+      if (aHasFocus && !bHasFocus)
+        return -1;
+      if (!aHasFocus && bHasFocus)
+        return 1;
       const priorityDiff = a.highestPriority - b.highestPriority;
       if (priorityDiff !== 0)
         return priorityDiff;
       return b.count - a.count;
     });
+    const totalCount = projects.length;
+    if (this.focusListLimit > 0) {
+      projects = projects.slice(0, this.focusListLimit);
+    }
     const list4 = section.createEl("ul", { cls: "project-list" });
     for (const project of projects) {
       this.renderProjectItem(list4, project);
+    }
+    if (totalCount > projects.length) {
+      const moreIndicator = section.createEl("div", {
+        cls: "todo-more-indicator",
+        text: `+${totalCount - projects.length} more`
+      });
+      moreIndicator.setAttribute("title", `Showing ${projects.length} of ${totalCount} projects`);
     }
   }
   renderProjectItem(list4, project) {
@@ -3185,15 +3364,35 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     if (this.activeTagFilter) {
       todos = todos.filter((todo) => todo.tags.includes(this.activeTagFilter));
     }
+    if (this.focusModeEnabled) {
+      if (this.focusModeIncludeProjects) {
+        const focusedProjects = this.projectManager.getProjects().filter((p) => p.highestPriority === 0).map((p) => p.tag);
+        todos = todos.filter(
+          (todo) => todo.tags.includes("#focus") || todo.tags.some((tag) => focusedProjects.includes(tag))
+        );
+      } else {
+        todos = todos.filter((todo) => todo.tags.includes("#focus"));
+      }
+    }
     todos = this.sortTodosByPriority(todos);
+    const totalCount = todos.length;
+    if (this.activeTodosLimit > 0) {
+      todos = todos.slice(0, this.activeTodosLimit);
+    }
     const section = container.createEl("div", { cls: "todo-section" });
     const header = section.createEl("div", { cls: "todo-section-header" });
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
     titleSpan.textContent = "TODO";
     this.renderFilterIndicator(header);
-    if (todos.length === 0) {
+    if (totalCount === 0) {
+      let emptyText = "No TODOs";
+      if (this.focusModeEnabled) {
+        emptyText = "No focused TODOs";
+      } else if (this.activeTagFilter) {
+        emptyText = `No TODOs matching ${this.activeTagFilter}`;
+      }
       section.createEl("div", {
-        text: this.activeTagFilter ? `No TODOs matching ${this.activeTagFilter}` : "No TODOs",
+        text: emptyText,
         cls: "todo-empty"
       });
       return;
@@ -3201,6 +3400,13 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     const list4 = section.createEl("ul", { cls: "todo-list" });
     for (const todo of todos) {
       this.renderTodoItem(list4, todo);
+    }
+    if (totalCount > todos.length) {
+      const moreIndicator = section.createEl("div", {
+        cls: "todo-more-indicator",
+        text: `+${totalCount - todos.length} more`
+      });
+      moreIndicator.setAttribute("title", `Showing ${todos.length} of ${totalCount} TODOs`);
     }
   }
   renderTodoItem(list4, todo, isChild = false) {
@@ -3398,9 +3604,14 @@ var DEFAULT_SETTINGS = {
   excludeTodoneFilesFromRecent: true,
   defaultProjectsFolder: "projects/",
   focusListLimit: 5,
+  activeTodosLimit: 0,
   priorityTags: ["#p0", "#p1", "#p2", "#p3", "#p4"],
   recentTodonesLimit: 5,
   excludeFoldersFromProjects: ["log"],
+  // Focus mode settings
+  focusModeIncludeProjects: false,
+  // Tab lock settings
+  showTabLockButton: false,
   // LLM/Define settings
   llmEnabled: true,
   llmUrl: "http://localhost:11434",
@@ -14309,8 +14520,252 @@ var DefineTooltip = class {
   }
 };
 
+// src/TabLockManager.ts
+var TabLockManager = class {
+  constructor(app) {
+    this.enabled = false;
+    this.mutationObserver = null;
+    this.updateTimeout = null;
+    this.app = app;
+  }
+  /**
+   * Enable the tab lock feature - adds lock buttons to all tab headers.
+   */
+  enable() {
+    if (this.enabled)
+      return;
+    this.enabled = true;
+    this.updateAllTabs();
+    setTimeout(() => this.updateAllTabs(), 200);
+    this.startObserving();
+  }
+  /**
+   * Disable the tab lock feature - removes all lock buttons.
+   */
+  disable() {
+    if (!this.enabled)
+      return;
+    this.enabled = false;
+    this.stopObserving();
+    this.removeAllButtons();
+    if (this.updateTimeout) {
+      clearTimeout(this.updateTimeout);
+      this.updateTimeout = null;
+    }
+  }
+  /**
+   * Clean up resources.
+   */
+  destroy() {
+    this.disable();
+  }
+  /**
+   * Update all existing tabs with lock buttons.
+   */
+  updateAllTabs() {
+    const leaves = this.app.workspace.getLeavesOfType("markdown");
+    for (const leaf of leaves) {
+      this.addButtonToLeaf(leaf);
+    }
+    const allLeaves = this.getAllLeaves();
+    for (const leaf of allLeaves) {
+      this.addButtonToLeaf(leaf);
+    }
+  }
+  /**
+   * Get all leaves in the workspace.
+   */
+  getAllLeaves() {
+    const leaves = [];
+    this.app.workspace.iterateAllLeaves((leaf) => {
+      leaves.push(leaf);
+    });
+    return leaves;
+  }
+  /**
+   * Add a lock button to a specific leaf's tab header.
+   * If forceRefresh is true, removes any existing button first.
+   */
+  addButtonToLeaf(leaf, forceRefresh = false) {
+    if (!this.enabled)
+      return;
+    const tabHeader = leaf.tabHeaderEl;
+    if (!tabHeader)
+      return;
+    if (!tabHeader.classList.contains("workspace-tab-header"))
+      return;
+    const dataType = tabHeader.getAttribute("data-type");
+    if (dataType !== "markdown")
+      return;
+    const existingBtn = tabHeader.querySelector(".space-command-tab-lock-btn");
+    if (existingBtn) {
+      if (forceRefresh) {
+        existingBtn.remove();
+        const pinContainer = tabHeader.querySelector("[data-space-command-pin-handler]");
+        if (pinContainer) {
+          pinContainer.removeAttribute("data-space-command-pin-handler");
+        }
+      } else {
+        return;
+      }
+    }
+    const innerContainer = tabHeader.querySelector(".workspace-tab-header-inner");
+    if (!innerContainer)
+      return;
+    const closeButton = innerContainer.querySelector(".workspace-tab-header-inner-close-button");
+    const lockBtn = document.createElement("div");
+    lockBtn.className = "space-command-tab-lock-btn workspace-tab-header-status-icon";
+    lockBtn.setAttribute("aria-label", "Lock tab (pinned tabs open links in new tabs)");
+    const isPinned = leaf.pinned === true;
+    this.updateButtonState(lockBtn, isPinned);
+    lockBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const currentlyPinned = leaf.pinned === true;
+      const newPinnedState = !currentlyPinned;
+      leaf.setPinned(newPinnedState);
+      this.updateButtonState(lockBtn, newPinnedState);
+      setTimeout(() => {
+        this.addButtonToLeaf(leaf, true);
+      }, 50);
+    });
+    if (closeButton) {
+      innerContainer.insertBefore(lockBtn, closeButton);
+    } else {
+      innerContainer.appendChild(lockBtn);
+    }
+    this.addPinClickHandler(tabHeader, leaf, lockBtn);
+  }
+  /**
+   * Add a click handler to Obsidian's native pin icon for unlocking.
+   * The pin icon appears when the tab is pinned.
+   */
+  addPinClickHandler(tabHeader, leaf, lockBtn) {
+    const pinContainer = tabHeader.querySelector(
+      ".workspace-tab-header-status-container"
+    );
+    if (!pinContainer)
+      return;
+    if (pinContainer.hasAttribute("data-space-command-pin-handler"))
+      return;
+    pinContainer.setAttribute("data-space-command-pin-handler", "true");
+    pinContainer.addEventListener(
+      "click",
+      (e) => {
+        const wasPinned = leaf.pinned === true;
+        if (!wasPinned)
+          return;
+        e.stopPropagation();
+        e.preventDefault();
+        leaf.setPinned(false);
+        tabHeader.classList.remove("space-command-tab-locked");
+        setTimeout(() => {
+          this.addButtonToLeaf(leaf, true);
+        }, 50);
+      },
+      { capture: true }
+    );
+  }
+  /**
+   * Update the button's visual state based on pinned status.
+   * When locked: hide the lock button and close button, let Obsidian's native pushpin show.
+   * When unlocked: show the lock button (open padlock) and close button.
+   */
+  updateButtonState(button, isPinned) {
+    button.classList.toggle("is-locked", isPinned);
+    button.setAttribute("aria-label", isPinned ? "Unlock tab" : "Lock tab");
+    const tabHeader = button.closest(".workspace-tab-header");
+    if (tabHeader) {
+      tabHeader.classList.toggle("space-command-tab-locked", isPinned);
+    }
+    button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>`;
+  }
+  /**
+   * Remove all lock buttons and cleanup tab header classes.
+   */
+  removeAllButtons() {
+    const buttons = document.querySelectorAll(".space-command-tab-lock-btn");
+    buttons.forEach((btn) => btn.remove());
+    const lockedTabs = document.querySelectorAll(".space-command-tab-locked");
+    lockedTabs.forEach(
+      (tab) => tab.classList.remove("space-command-tab-locked")
+    );
+    const pinContainers = document.querySelectorAll(
+      "[data-space-command-pin-handler]"
+    );
+    pinContainers.forEach(
+      (container) => container.removeAttribute("data-space-command-pin-handler")
+    );
+  }
+  /**
+   * Schedule a debounced update of all tabs.
+   */
+  scheduleUpdate() {
+    if (this.updateTimeout) {
+      clearTimeout(this.updateTimeout);
+    }
+    this.updateTimeout = setTimeout(() => {
+      this.updateTimeout = null;
+      this.updateAllTabs();
+    }, 50);
+  }
+  /**
+   * Start observing DOM changes to add buttons to new tabs.
+   */
+  startObserving() {
+    if (this.mutationObserver)
+      return;
+    this.mutationObserver = new MutationObserver((mutations) => {
+      var _a, _b, _c, _d;
+      let shouldUpdate = false;
+      for (const mutation of mutations) {
+        if (mutation.type === "childList") {
+          for (const node2 of Array.from(mutation.addedNodes)) {
+            if (node2 instanceof HTMLElement) {
+              if (((_a = node2.classList) == null ? void 0 : _a.contains("workspace-tab-header")) || ((_b = node2.querySelector) == null ? void 0 : _b.call(node2, ".workspace-tab-header")) || ((_c = node2.classList) == null ? void 0 : _c.contains("workspace-tab-header-inner")) || ((_d = node2.closest) == null ? void 0 : _d.call(node2, ".workspace-tab-header"))) {
+                shouldUpdate = true;
+                break;
+              }
+            }
+          }
+          if (!shouldUpdate && mutation.target instanceof HTMLElement) {
+            if (mutation.target.closest(".workspace-tab-header") && mutation.removedNodes.length > 0) {
+              shouldUpdate = true;
+            }
+          }
+        }
+        if (shouldUpdate)
+          break;
+      }
+      if (shouldUpdate) {
+        this.scheduleUpdate();
+      }
+    });
+    const workspaceContainer = document.querySelector(".workspace");
+    if (workspaceContainer) {
+      this.mutationObserver.observe(workspaceContainer, {
+        childList: true,
+        subtree: true
+      });
+    }
+  }
+  /**
+   * Stop observing DOM changes.
+   */
+  stopObserving() {
+    if (this.mutationObserver) {
+      this.mutationObserver.disconnect();
+      this.mutationObserver = null;
+    }
+  }
+};
+
 // main.ts
 var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
+  constructor() {
+    super(...arguments);
+    this.tagColourObserver = null;
+  }
   async onload() {
     await this.loadSettings();
     this.scanner = new TodoScanner(this.app);
@@ -14341,6 +14796,12 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
       timeout: this.settings.llmTimeout
     });
     this.defineTooltip = new DefineTooltip(this.app);
+    this.tabLockManager = new TabLockManager(this.app);
+    if (this.settings.showTabLockButton) {
+      this.app.workspace.onLayoutReady(() => {
+        this.tabLockManager.enable();
+      });
+    }
     if (this.settings.excludeTodoneFilesFromRecent) {
       this.scanner.setExcludeFromTodones([this.settings.defaultTodoneFile]);
     }
@@ -14349,6 +14810,7 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
     });
     await this.scanner.scanVault();
     this.scanner.watchFiles();
+    this.registerTagColourObserver();
     this.registerDomEvent(document, "change", async (evt) => {
       const target = evt.target;
       if (!target.matches('input[type="checkbox"].task-list-item-checkbox')) {
@@ -14390,6 +14852,9 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
         this.settings.defaultTodoneFile,
         this.settings.priorityTags,
         this.settings.recentTodonesLimit,
+        this.settings.activeTodosLimit,
+        this.settings.focusListLimit,
+        this.settings.focusModeIncludeProjects,
         () => this.showAboutModal(),
         () => this.showStatsModal()
       )
@@ -14570,6 +15035,11 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
   onunload() {
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_TODO_SIDEBAR);
     this.defineTooltip.close();
+    this.tabLockManager.destroy();
+    if (this.tagColourObserver) {
+      this.tagColourObserver.disconnect();
+      this.tagColourObserver = null;
+    }
   }
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
@@ -14625,6 +15095,68 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
   openLLMSettings() {
     this.app.setting.open();
     this.app.setting.openTabById("space-command");
+  }
+  /**
+   * Register MutationObserver to apply semantic colours to Obsidian-rendered tags.
+   * This handles tags in editor (Live Preview) and reading mode.
+   */
+  registerTagColourObserver() {
+    this.tagColourObserver = new MutationObserver((mutations) => {
+      for (let i = 0; i < mutations.length; i++) {
+        const mutation = mutations[i];
+        const addedNodes = Array.from(mutation.addedNodes);
+        for (let j = 0; j < addedNodes.length; j++) {
+          const node2 = addedNodes[j];
+          if (node2 instanceof HTMLElement) {
+            this.applyTagColoursToElement(node2);
+          }
+        }
+      }
+    });
+    this.tagColourObserver.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+    this.applyTagColoursToElement(document.body);
+  }
+  /**
+   * Apply semantic tag colours to tags within an element.
+   * Targets Obsidian's tag classes in editor (.cm-hashtag) and reading mode (.tag).
+   */
+  applyTagColoursToElement(el) {
+    var _a;
+    const tagNodes = el.querySelectorAll(".tag:not([data-sc-tag-type]), a.tag:not([data-sc-tag-type]), .cm-hashtag:not([data-sc-tag-type])");
+    const tags = Array.from(tagNodes);
+    const projectColourMap = this.getProjectColourMap();
+    for (let i = 0; i < tags.length; i++) {
+      const tagEl = tags[i];
+      let tagText = ((_a = tagEl.textContent) == null ? void 0 : _a.trim()) || "";
+      if (tagEl.classList.contains("cm-hashtag-end")) {
+        const prev = tagEl.previousElementSibling;
+        if (prev == null ? void 0 : prev.classList.contains("cm-hashtag-begin")) {
+          tagText = (prev.textContent || "") + tagText;
+        }
+      } else if (tagEl.classList.contains("cm-hashtag-begin")) {
+        continue;
+      }
+      if (!tagText.startsWith("#")) {
+        tagText = "#" + tagText;
+      }
+      const colourInfo = getTagColourInfo(tagText, projectColourMap);
+      tagEl.dataset.scTagType = colourInfo.type;
+      tagEl.dataset.scPriority = colourInfo.priority.toString();
+    }
+  }
+  /**
+   * Get project colour map for tag colouring.
+   */
+  getProjectColourMap() {
+    const projects = this.projectManager.getProjects();
+    const map4 = /* @__PURE__ */ new Map();
+    for (const project of projects) {
+      map4.set(project.tag.toLowerCase(), project.colourIndex);
+    }
+    return map4;
   }
 };
 var AboutModal = class extends import_obsidian11.Modal {
@@ -14714,7 +15246,7 @@ var SpaceCommandSettingTab = class extends import_obsidian11.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: "\u2423\u2318 Space Command Settings" });
+    containerEl.createEl("h2", { text: "Space Command Settings" });
     const aboutSection = containerEl.createEl("div", { cls: "space-command-about-section" });
     const aboutHeader = aboutSection.createEl("div", { cls: "about-header" });
     aboutHeader.createEl("span", { cls: "space-command-logo about-logo", text: "\u2423\u2318" });
@@ -14731,15 +15263,28 @@ var SpaceCommandSettingTab = class extends import_obsidian11.PluginSettingTab {
       text: "GitHub",
       href: "https://github.com/robotpony/obsidian-plugins"
     });
-    new import_obsidian11.Setting(containerEl).setName("Default TODONE file").setDesc("Default file path for logging completed TODOs").addText(
-      (text5) => text5.setPlaceholder("todos/done.md").setValue(this.plugin.settings.defaultTodoneFile).onChange(async (value) => {
-        this.plugin.settings.defaultTodoneFile = value;
-        await this.plugin.saveSettings();
-      })
-    );
+    containerEl.createEl("h3", { text: "Sidebar" });
     new import_obsidian11.Setting(containerEl).setName("Show sidebar by default").setDesc("Show the TODO sidebar when Obsidian starts").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.showSidebarByDefault).onChange(async (value) => {
         this.plugin.settings.showSidebarByDefault = value;
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian11.Setting(containerEl).setName("Show tab lock buttons").setDesc("Add lock buttons to tab headers. Locked tabs force links to open in new tabs.").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.showTabLockButton).onChange(async (value) => {
+        this.plugin.settings.showTabLockButton = value;
+        if (value) {
+          this.plugin.tabLockManager.enable();
+        } else {
+          this.plugin.tabLockManager.disable();
+        }
+        await this.plugin.saveSettings();
+      })
+    );
+    containerEl.createEl("h3", { text: "TODOs" });
+    new import_obsidian11.Setting(containerEl).setName("Default TODONE file").setDesc("Default file path for logging completed TODOs").addText(
+      (text5) => text5.setPlaceholder("todos/done.md").setValue(this.plugin.settings.defaultTodoneFile).onChange(async (value) => {
+        this.plugin.settings.defaultTodoneFile = value;
         await this.plugin.saveSettings();
       })
     );
@@ -14753,20 +15298,35 @@ var SpaceCommandSettingTab = class extends import_obsidian11.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    containerEl.createEl("h3", { text: "Projects Settings" });
+    containerEl.createEl("h3", { text: "Projects" });
     new import_obsidian11.Setting(containerEl).setName("Default projects folder").setDesc("Folder where project files are created (e.g., projects/)").addText(
       (text5) => text5.setPlaceholder("projects/").setValue(this.plugin.settings.defaultProjectsFolder).onChange(async (value) => {
         this.plugin.settings.defaultProjectsFolder = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian11.Setting(containerEl).setName("Focus list limit").setDesc("Maximum number of projects to show in {{focus-list}}").addText(
+    new import_obsidian11.Setting(containerEl).setName("Focus list limit").setDesc("Maximum number of projects to show in sidebar and {{focus-list}}").addText(
       (text5) => text5.setPlaceholder("5").setValue(String(this.plugin.settings.focusListLimit)).onChange(async (value) => {
         const num = parseInt(value);
         if (!isNaN(num) && num > 0) {
           this.plugin.settings.focusListLimit = num;
           await this.plugin.saveSettings();
         }
+      })
+    );
+    new import_obsidian11.Setting(containerEl).setName("Active TODOs limit").setDesc("Maximum number of TODOs to show in sidebar (0 for unlimited)").addText(
+      (text5) => text5.setPlaceholder("5").setValue(String(this.plugin.settings.activeTodosLimit)).onChange(async (value) => {
+        const num = parseInt(value);
+        if (!isNaN(num) && num >= 0) {
+          this.plugin.settings.activeTodosLimit = num;
+          await this.plugin.saveSettings();
+        }
+      })
+    );
+    new import_obsidian11.Setting(containerEl).setName("Focus mode includes project TODOs").setDesc("When enabled, focus mode shows all TODOs from focused projects (not just #focus items)").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.focusModeIncludeProjects).onChange(async (value) => {
+        this.plugin.settings.focusModeIncludeProjects = value;
+        await this.plugin.saveSettings();
       })
     );
     new import_obsidian11.Setting(containerEl).setName("Exclude folders from projects").setDesc("Comma-separated folders to exclude from inferred project tags (e.g., log, archive)").addText(

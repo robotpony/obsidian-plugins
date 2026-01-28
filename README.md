@@ -16,7 +16,7 @@ The installer will:
 1. Discover plugins in the repo (directories with `manifest.json`)
 2. Prompt you to select plugins (or use `-a` to select all)
 3. Build selected plugins
-4. Find Obsidian vaults (searches `~/Documents`, `~/projects`, `~/writing`, `~/Desktop`, iCloud)
+4. Find Obsidian vaults
 5. Prompt you to select vaults (or use `-p` for cached selection)
 6. Copy plugin files (`main.js`, `manifest.json`, `styles.css`) to selected vaults
 

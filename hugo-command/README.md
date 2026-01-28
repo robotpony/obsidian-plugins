@@ -4,7 +4,8 @@ An Obsidian plugin for managing and browsing your Hugo content. View posts, draf
 
 ## Features
 
-- **Folder Organization**: Content grouped by top-level folder with collapsible sections
+- **Site Settings Editor**: Edit hugo.toml/config.toml directly from the sidebar
+- **Folder Organization**: Content grouped by top-level folder
 - **Folder Tags**: Subfolders become filterable "folder tags" separate from frontmatter tags
 - **Content Sidebar**: Browse all your Hugo content sorted by date
 - **Publish Status**: See at a glance which posts are drafts vs published
@@ -49,18 +50,31 @@ Subfolders are treated as "folder tags". For example, a file at `posts/tech/tuto
 
 Click the kebab menu (three dots) in the sidebar header for:
 
+- **Site Settings**: Edit your Hugo site configuration (hugo.toml)
 - **Refresh**: Rescan content files
 - **About**: Plugin information
 - **Settings**: Open plugin settings
+
+### Site Settings
+
+The Site Settings editor lets you modify your Hugo configuration file without leaving Obsidian:
+
+- **Basic Settings**: Site title, base URL, language code
+- **Author & Copyright**: Author name, copyright notice
+- **Theme**: Hugo theme name
+- **Site Parameters**: Any custom fields in your `[params]` section
+
+Supports both TOML (hugo.toml, config.toml) and YAML (hugo.yaml, config.yaml) formats.
 
 ### Settings
 
 Configure the plugin in Settings > Hugo Command:
 
-- **Content Paths**: Folders to scan for Hugo content (one per line). Use `.` to scan the entire vault.
+- **Content Paths**: Folders to scan for Hugo content (one per line, default: `content`). Use `.` to scan the entire vault.
 - **Show Sidebar by Default**: Open sidebar when Obsidian starts
 - **Show Drafts**: Include draft posts in the content list
 - **Default Sort Order**: How to sort content (date or title)
+- **Trash Folder**: Folder for trashed posts (default: `_trash`)
 
 ## Hugo Frontmatter
 

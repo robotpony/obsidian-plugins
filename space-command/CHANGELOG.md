@@ -2,6 +2,213 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.30] - 2026-01-27
+
+### Fixed
+
+- **Consistent tag pill styling**: All semantic-coloured tags now have consistent rounded corners and padding
+  - Tags in dropdown menus display as proper pills
+  - Project and priority tags have matching border-radius (4px) and padding
+
+## [0.9.29] - 2026-01-27
+
+### Added
+
+- **Semantic tag colouring**: Tags now display with colour coding based on type and priority
+  - Uses the logo colour `#689fd6` as base, with HSL gradient for priorities
+  - Plugin tags (#todo, #todone, #idea, #principle): Logo colour
+  - Priority tags (#focus, #p0-#p4, #future): 7-shade gradient from dark (high priority) to light (low priority)
+  - Project tags: Colour based on weighted average priority of the project's tasks
+  - Colours apply in sidebar, embeds, editor, and reading mode
+
+### Technical
+
+- Added CSS variables `--sc-tag-priority-0` through `--sc-tag-priority-6` for semantic tag colours
+- Added `data-sc-tag-type` and `data-sc-priority` attributes to tag elements
+- Added `getTagColourInfo()` helper in utils.ts for tag classification
+- Added `colourIndex` to `ProjectInfo` type for project-level colour calculation
+- MutationObserver applies colours to Obsidian-rendered tags in editor and preview
+
+## [0.9.28] - 2026-01-27
+
+### Improved
+
+- **Reorganized settings sections**: Settings now organized into logical sections with h3 headers
+  - Sidebar section first (Show sidebar by default, Tab lock buttons)
+  - TODOs section (TODONE file, Date format)
+  - Projects section (unchanged)
+  - Priority section (renamed from "Priority Settings")
+  - LLM section (unchanged)
+
+## [0.9.27] - 2026-01-27
+
+### Improved
+
+- **Consistent plugin naming**: Removed logo symbols from plugin name and sidebar tab titles
+  - Plugin name in Community plugins list: "Space Command" (was "␣⌘ Space Command")
+  - Sidebar tab titles: "TODOs" / "IDEAs" (was "␣⌘ TODOs" / "␣⌘ IDEAs")
+  - Settings page title: "Space Command Settings" (was "␣⌘ Space Command Settings")
+  - Logo still appears in the styled about section header within settings
+
+## [0.9.26] - 2026-01-27
+
+### Added
+
+- **Focus mode filters TODO list**: When focus mode is enabled, the TODO section now also filters to show only focused items
+  - Default: shows only `#focus` tagged TODOs
+  - Optional: show all TODOs from focused projects (configure in Settings → "Focus mode includes project TODOs")
+  - Empty state shows "No focused TODOs" when focus mode is active
+
+### Settings
+
+- **Focus mode includes project TODOs**: New toggle to expand focus mode filtering
+  - OFF (default): Focus mode shows only `#focus` items
+  - ON: Focus mode shows `#focus` items plus all TODOs from projects that have focused items
+
+## [0.9.25] - 2026-01-27
+
+### Fixed
+
+- **Focus mode icon layout**: Eye icon now displays inline beside the "Focus" heading instead of on a separate line
+  - Added flexbox layout to section headers
+
+## [0.9.24] - 2026-01-27
+
+### Added
+
+- **Focus mode toggle**: Eye icon button in Focus section header filters to show only `#focus` projects
+  - Click eye icon to toggle focus mode on/off
+  - When enabled, only projects with `#focus` tagged items are shown
+  - Shows "Focus mode enabled" / "Focus mode disabled" notification (matching TODO completion style)
+  - Eye-off icon indicates focus mode is active (filtering)
+  - Eye icon indicates normal mode (showing all projects)
+
+## [0.9.23] - 2026-01-27
+
+### Fixed
+
+- **Sidebar scrollbar no longer overlaps content**: Added right padding to content area so scrollbar sits beside content, not over it
+- **Scrollbar hugs right edge**: Scrollbar now positioned flush against the right edge of the sidebar
+
+## [0.9.22] - 2026-01-27
+
+### Fixed
+
+- **Sidebar scrollbar positioning**: Vertical scrollbar now hugs the right edge (0-1px gap instead of 4-6px)
+- **Horizontal scrollbar prevention**: Sidebar content no longer shows horizontal scrollbars when content overflows
+
+## [0.9.21] - 2026-01-27
+
+### Changed
+
+- **Focus list asks before creating project files**: Clicking the → arrow now shows a confirmation dialog before creating a new project file
+  - Displays the project tag and destination folder
+  - Prevents accidental file creation
+
+## [0.9.20] - 2026-01-27
+
+### Added
+
+- **Unified sorting**: TODOs, projects, and ideas now sort by: 1) `#focus` first, 2) priority (`#p0`-`#p4`), 3) total tag count (more tags = higher ranking)
+  - Consistent sorting across sidebar, embeds, and project lists
+  - Items with more context (more tags) surface higher within the same priority level
+- **Active TODOs limit**: New setting to limit TODOs shown in sidebar
+  - Default: 0 (unlimited) - shows all TODOs
+  - Set a value to cap the list with "+N more" indicator
+  - Embeds remain unlimited unless `limit:N` filter specified
+- **Focus list limit in sidebar**: Projects section now respects `focusListLimit` setting
+  - Default: 5 projects
+  - "+N more" indicator when projects exceed limit
+
+### Changed
+
+- Sidebar sorting now uses unified algorithm instead of priority + date
+- Projects sort by focus status, then priority, then item count
+- Embeds sort by focus, priority, tag count (no longer by project tag alphabetically)
+
+### Technical
+
+- New `compareTodoItems()` function in `utils.ts` for unified sorting
+- New `getTagCount()` function counts meaningful tags (excludes system tags)
+- `SidebarView` constructor now accepts `activeTodosLimit` and `focusListLimit` parameters
+- Removed unused `getFirstProjectTag()` method from `EmbedRenderer`
+
+## [0.9.19] - 2026-01-27
+
+### Fixed
+
+- **Tab lock disappears after unlock**: Lock button now properly re-appears after clicking the pushpin to unlock a tab
+  - Root cause: Obsidian's native click handler ran before ours, unpinning the tab before we could act
+  - Fix: Use capture phase event listener to intercept clicks before Obsidian's handler
+- **Tab lock missing on startup**: Lock buttons now appear more reliably on startup
+  - Added delayed re-check (200ms) after layout ready to catch late-initialized tabs
+
+### Technical
+
+- Pin container click handler now uses `{ capture: true }` to run before Obsidian's native handler
+- Added `forceRefresh` parameter to `addButtonToLeaf()` to force button re-creation
+- Pin/unpin handlers force-refresh button after 50ms delay to handle DOM changes
+- Added `scheduleUpdate()` for debounced tab updates
+
+## [0.9.18] - 2026-01-27
+
+### Improved
+
+- **Tab lock UX cleanup**: Cleaner visual state when tabs are locked
+  - Locking a tab now hides the X (close button) and the lock button
+  - Obsidian's native pushpin shows the locked state
+  - Click the pushpin to unlock the tab
+  - Reduces visual clutter (was showing both pushpin and lock icon over X)
+
+### Technical
+
+- Added `space-command-tab-locked` class to tab headers for CSS control
+- New `addPinClickHandler()` method wires pushpin for unlocking
+- CSS hides `.space-command-tab-lock-btn` and close button when locked
+
+## [0.9.17] - 2026-01-27
+
+### Added
+
+- **Tab lock buttons**: Lock buttons on document tabs to prevent link clicks from replacing the view
+  - Click the lock icon on any tab header to toggle pinned state
+  - Locked (pinned) tabs force link clicks to open in new tabs
+  - Uses Obsidian's native pinning API for reliable behaviour
+  - Disabled by default—enable in Settings → "Show tab lock buttons"
+  - Lock icon shows open padlock (unlocked) or closed padlock (locked)
+
+### Technical
+
+- New `TabLockManager` class for managing tab lock button injection
+- New `showTabLockButton` setting (default: false)
+- Uses MutationObserver to add buttons to new tabs dynamically
+- Filters by `data-type="markdown"` to target only document tabs (not sidebar tabs)
+- CSS: `.space-command-tab-lock-btn`, `.is-locked` states
+
+## [0.9.16] - 2026-01-26
+
+### Changed
+
+- **Sidebar scrollbar**: Semi-transparent (65% opacity) scrollbar thumb with transparent track
+
+## [0.9.15] - 2026-01-26
+
+### Fixed
+
+- **Sidebar layout padding**: Reduced header padding to 2px top/bottom, 4px left/right; scrollbar now flush with right edge
+
+## [0.9.14] - 2026-01-26
+
+### Fixed
+
+- **Sidebar button styling**: Removed visible borders and backgrounds from close/menu buttons; added subtle hover effect
+
+## [0.9.13] - 2026-01-26
+
+### Fixed
+
+- **Sidebar header now stays pinned** while scrolling content below
+
 ## [0.9.12] - 2026-01-25
 
 ### Fixed

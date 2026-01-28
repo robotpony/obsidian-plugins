@@ -4,7 +4,7 @@ import { TodoProcessor } from "./TodoProcessor";
 import { ProjectManager } from "./ProjectManager";
 import { TodoItem, ProjectInfo, ItemRenderConfig } from "./types";
 import { ContextMenuHandler } from "./ContextMenuHandler";
-import { getPriorityValue, openFileAtLine, extractTags, showNotice } from "./utils";
+import { getPriorityValue, compareTodoItems, openFileAtLine, extractTags, showNotice, getTagColourInfo } from "./utils";
 
 export const VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 
@@ -16,8 +16,12 @@ export class TodoSidebarView extends ItemView {
   private updateListener: (() => void) | null = null;
   private contextMenuHandler: ContextMenuHandler;
   private recentTodonesLimit: number;
+  private activeTodosLimit: number;
+  private focusListLimit: number;
+  private focusModeIncludeProjects: boolean;
   private activeTab: 'todos' | 'ideas' = 'todos';
   private activeTagFilter: string | null = null;
+  private focusModeEnabled: boolean = false;
   private openDropdown: HTMLElement | null = null;
   private openInfoPopup: HTMLElement | null = null;
   private onShowAbout: () => void;
@@ -31,6 +35,9 @@ export class TodoSidebarView extends ItemView {
     defaultTodoneFile: string,
     priorityTags: string[],
     recentTodonesLimit: number,
+    activeTodosLimit: number,
+    focusListLimit: number,
+    focusModeIncludeProjects: boolean,
     onShowAbout: () => void,
     onShowStats: () => void
   ) {
@@ -40,6 +47,9 @@ export class TodoSidebarView extends ItemView {
     this.projectManager = projectManager;
     this.defaultTodoneFile = defaultTodoneFile;
     this.recentTodonesLimit = recentTodonesLimit;
+    this.activeTodosLimit = activeTodosLimit;
+    this.focusListLimit = focusListLimit;
+    this.focusModeIncludeProjects = focusModeIncludeProjects;
     this.onShowAbout = onShowAbout;
     this.onShowStats = onShowStats;
 
@@ -56,7 +66,7 @@ export class TodoSidebarView extends ItemView {
   }
 
   getDisplayText(): string {
-    return this.activeTab === 'todos' ? "␣⌘ TODOs" : "␣⌘ IDEAs";
+    return this.activeTab === 'todos' ? "TODOs" : "IDEAs";
   }
 
   getIcon(): string {
@@ -254,10 +264,23 @@ export class TodoSidebarView extends ItemView {
     }
   }
 
+  // Get project colour map for tag colouring
+  private getProjectColourMap(): Map<string, number> {
+    const projects = this.projectManager.getProjects();
+    const map = new Map<string, number>();
+    for (const project of projects) {
+      map.set(project.tag.toLowerCase(), project.colourIndex);
+    }
+    return map;
+  }
+
   // Render collapsed tag indicator with dropdown
   // If item is provided, "Clear tag" option will be available to remove tags from the item
   private renderTagDropdown(tags: string[], container: HTMLElement, item?: TodoItem): void {
     if (tags.length === 0) return;
+
+    // Get project colour map for tag colouring
+    const projectColourMap = this.getProjectColourMap();
 
     const trigger = container.createEl("span", {
       cls: "tag-dropdown-trigger",
@@ -300,10 +323,16 @@ export class TodoSidebarView extends ItemView {
           cls: "tag-dropdown-item tag-dropdown-item-with-submenu",
         });
 
+        // Get colour info for this tag
+        const colourInfo = getTagColourInfo(tag, projectColourMap);
+
         const tagLabel = tagItem.createEl("span", {
-          cls: "tag-dropdown-item-label",
+          cls: "tag-dropdown-item-label tag",
           text: tag,
         });
+        // Add semantic colour data attributes
+        tagLabel.dataset.scTagType = colourInfo.type;
+        tagLabel.dataset.scPriority = colourInfo.priority.toString();
 
         const arrow = tagItem.createEl("span", {
           cls: "tag-dropdown-item-arrow",
@@ -541,11 +570,14 @@ export class TodoSidebarView extends ItemView {
       menu.showAtMouseEvent(evt);
     });
 
+    // Content wrapper for scrolling
+    const content = container.createEl("div", { cls: "sidebar-content" });
+
     // Render content based on active tab
     if (this.activeTab === 'todos') {
-      this.renderTodosContent(container);
+      this.renderTodosContent(content);
     } else {
-      this.renderIdeasContent(container);
+      this.renderIdeasContent(content);
     }
   }
 
@@ -569,12 +601,7 @@ export class TodoSidebarView extends ItemView {
   }
 
   private sortTodosByPriority(todos: TodoItem[]): TodoItem[] {
-    return [...todos].sort((a, b) => {
-      const priorityDiff = getPriorityValue(a.tags) - getPriorityValue(b.tags);
-      if (priorityDiff !== 0) return priorityDiff;
-      // If same priority, sort by date created
-      return a.dateCreated - b.dateCreated;
-    });
+    return [...todos].sort(compareTodoItems);
   }
 
   /**
@@ -599,7 +626,7 @@ export class TodoSidebarView extends ItemView {
   }
 
   private renderProjects(container: HTMLElement): void {
-    const projects = this.projectManager.getProjects();
+    let projects = this.projectManager.getProjects();
 
     const section = container.createEl("div", { cls: "projects-section" });
 
@@ -609,28 +636,75 @@ export class TodoSidebarView extends ItemView {
 
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
     titleSpan.textContent = "Focus";
+
+    // Focus mode toggle button (eye icon)
+    const focusModeBtn = header.createEl("button", {
+      cls: `clickable-icon focus-mode-toggle-btn${this.focusModeEnabled ? ' active' : ''}`,
+      attr: { "aria-label": this.focusModeEnabled ? "Show all projects" : "Show only focused" },
+    });
+    // Eye-off icon when focus mode is ON (filtering), eye icon when OFF (showing all)
+    focusModeBtn.innerHTML = this.focusModeEnabled
+      ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>'
+      : '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+
+    focusModeBtn.addEventListener("click", () => {
+      this.focusModeEnabled = !this.focusModeEnabled;
+      showNotice(this.focusModeEnabled ? "Focus mode enabled" : "Focus mode disabled");
+      this.render();
+    });
+
     this.renderFilterIndicator(header);
+
+    // Apply focus mode filter if enabled
+    if (this.focusModeEnabled) {
+      projects = projects.filter(p => p.highestPriority === 0);
+    }
 
     if (projects.length === 0) {
       section.createEl("div", {
-        text: "No focus projects yet",
+        text: this.focusModeEnabled ? "No focused projects" : "No focus projects yet",
         cls: "todo-empty",
       });
       return;
     }
 
-    // Sort projects by priority, then by count
+    // Sort projects by: 1) has focus items, 2) priority, 3) tag count (higher = better)
     projects.sort((a, b) => {
+      // Focus items first (priority 0 = #focus)
+      const aHasFocus = a.highestPriority === 0;
+      const bHasFocus = b.highestPriority === 0;
+      if (aHasFocus && !bHasFocus) return -1;
+      if (!aHasFocus && bHasFocus) return 1;
+
+      // Then by priority
       const priorityDiff = a.highestPriority - b.highestPriority;
       if (priorityDiff !== 0) return priorityDiff;
-      // If same priority, sort by count (higher count first)
+
+      // Then by count (higher count = more tags/activity)
       return b.count - a.count;
     });
+
+    // Track total count before limiting
+    const totalCount = projects.length;
+
+    // Apply limit
+    if (this.focusListLimit > 0) {
+      projects = projects.slice(0, this.focusListLimit);
+    }
 
     const list = section.createEl("ul", { cls: "project-list" });
 
     for (const project of projects) {
       this.renderProjectItem(list, project);
+    }
+
+    // Show count indicator if there are more projects than displayed
+    if (totalCount > projects.length) {
+      const moreIndicator = section.createEl("div", {
+        cls: "todo-more-indicator",
+        text: `+${totalCount - projects.length} more`,
+      });
+      moreIndicator.setAttribute("title", `Showing ${projects.length} of ${totalCount} projects`);
     }
   }
 
@@ -837,8 +911,34 @@ export class TodoSidebarView extends ItemView {
       todos = todos.filter(todo => todo.tags.includes(this.activeTagFilter!));
     }
 
-    // Sort by priority
+    // Apply focus mode filter if enabled
+    if (this.focusModeEnabled) {
+      if (this.focusModeIncludeProjects) {
+        // Get project tags from focused projects
+        const focusedProjects = this.projectManager.getProjects()
+          .filter(p => p.highestPriority === 0)
+          .map(p => p.tag);
+        // Show #focus items or items from focused projects
+        todos = todos.filter(todo =>
+          todo.tags.includes("#focus") ||
+          todo.tags.some(tag => focusedProjects.includes(tag))
+        );
+      } else {
+        // Show only #focus items
+        todos = todos.filter(todo => todo.tags.includes("#focus"));
+      }
+    }
+
+    // Sort by focus, priority, then tag count
     todos = this.sortTodosByPriority(todos);
+
+    // Track total count before limiting
+    const totalCount = todos.length;
+
+    // Apply limit
+    if (this.activeTodosLimit > 0) {
+      todos = todos.slice(0, this.activeTodosLimit);
+    }
 
     const section = container.createEl("div", { cls: "todo-section" });
 
@@ -847,9 +947,15 @@ export class TodoSidebarView extends ItemView {
     titleSpan.textContent = "TODO";
     this.renderFilterIndicator(header);
 
-    if (todos.length === 0) {
+    if (totalCount === 0) {
+      let emptyText = "No TODOs";
+      if (this.focusModeEnabled) {
+        emptyText = "No focused TODOs";
+      } else if (this.activeTagFilter) {
+        emptyText = `No TODOs matching ${this.activeTagFilter}`;
+      }
       section.createEl("div", {
-        text: this.activeTagFilter ? `No TODOs matching ${this.activeTagFilter}` : "No TODOs",
+        text: emptyText,
         cls: "todo-empty",
       });
       return;
@@ -859,6 +965,15 @@ export class TodoSidebarView extends ItemView {
 
     for (const todo of todos) {
       this.renderTodoItem(list, todo);
+    }
+
+    // Show count indicator if there are more items than displayed
+    if (totalCount > todos.length) {
+      const moreIndicator = section.createEl("div", {
+        cls: "todo-more-indicator",
+        text: `+${totalCount - todos.length} more`,
+      });
+      moreIndicator.setAttribute("title", `Showing ${todos.length} of ${totalCount} TODOs`);
     }
   }
 

@@ -1,0 +1,10 @@
+{
+  "id": "link-command",
+  "name": "Link Command",
+  "version": "0.4.17",
+  "minAppVersion": "0.15.0",
+  "description": "URL unfurling for Obsidian. Fetch link titles, descriptions, and images. Insert as markdown links or rich preview cards.",
+  "author": "Bruce Alderson",
+  "authorUrl": "",
+  "isDesktopOnly": false
+}

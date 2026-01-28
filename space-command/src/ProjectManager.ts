@@ -1,4 +1,4 @@
-import { App, TFile } from "obsidian";
+import { App, Modal, TFile } from "obsidian";
 import { TodoScanner } from "./TodoScanner";
 import { ProjectInfo, TodoItem } from "./types";
 import { getPriorityValue } from "./utils";
@@ -26,7 +26,8 @@ export class ProjectManager {
 
   getProjects(): ProjectInfo[] {
     const todos = this.scanner.getTodos();
-    const projectMap = new Map<string, ProjectInfo>();
+    // Track projects with priority sum for weighted average calculation
+    const projectMap = new Map<string, ProjectInfo & { prioritySum: number }>();
 
     // Aggregate project data from all todos
     for (const todo of todos) {
@@ -59,6 +60,7 @@ export class ProjectManager {
         if (projectMap.has(tag)) {
           const project = projectMap.get(tag)!;
           project.count++;
+          project.prioritySum += todoPriority;
           // Update last activity to most recent
           project.lastActivity = Math.max(
             project.lastActivity,
@@ -75,26 +77,51 @@ export class ProjectManager {
             count: 1,
             lastActivity: todo.dateCreated,
             highestPriority: todoPriority,
+            prioritySum: todoPriority,
+            colourIndex: 4, // default, will be calculated below
           });
         }
       }
     }
 
-    // Convert to array and return
-    return Array.from(projectMap.values());
+    // Calculate colourIndex from weighted average priority for each project
+    // Priority values range from 0 (#focus) to 7 (#future)
+    // Map to colourIndex 0-6 for CSS styling
+    const projects: ProjectInfo[] = [];
+    for (const [, project] of projectMap) {
+      const avgPriority = project.prioritySum / project.count;
+      // Map avgPriority (0-7) to colourIndex (0-6)
+      // Use Math.round for reasonable mapping
+      const colourIndex = Math.min(6, Math.round(avgPriority * 6 / 7));
+      projects.push({
+        tag: project.tag,
+        count: project.count,
+        lastActivity: project.lastActivity,
+        highestPriority: project.highestPriority,
+        colourIndex,
+      });
+    }
+
+    return projects;
   }
 
   getFocusProjects(limit?: number): ProjectInfo[] {
     const projects = this.getProjects();
 
-    // Sort by activity (count + recency)
+    // Sort by: 1) has focus items, 2) priority, 3) count (as proxy for tag activity)
     projects.sort((a, b) => {
-      // Higher count = more active
-      const countDiff = b.count - a.count;
-      if (countDiff !== 0) return countDiff;
+      // Focus items first (priority 0 = #focus)
+      const aHasFocus = a.highestPriority === 0;
+      const bHasFocus = b.highestPriority === 0;
+      if (aHasFocus && !bHasFocus) return -1;
+      if (!aHasFocus && bHasFocus) return 1;
 
-      // If counts equal, more recent = more active
-      return b.lastActivity - a.lastActivity;
+      // Then by priority
+      const priorityDiff = a.highestPriority - b.highestPriority;
+      if (priorityDiff !== 0) return priorityDiff;
+
+      // Then by count (higher count = more items/activity)
+      return b.count - a.count;
     });
 
     // Apply limit if specified
@@ -269,9 +296,47 @@ export class ProjectManager {
       const leaf = this.app.workspace.getLeaf(false);
       await leaf.openFile(file);
     } else {
-      // File doesn't exist, create it
-      await this.createProjectFile(filepath, tag);
+      // File doesn't exist, ask before creating
+      const confirmed = await this.confirmCreateProjectFile(tag, filepath);
+      if (confirmed) {
+        await this.createProjectFile(filepath, tag);
+      }
     }
+  }
+
+  private confirmCreateProjectFile(tag: string, filepath: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      const modal = new Modal(this.app);
+      modal.titleEl.setText("Create Project File?");
+      modal.contentEl.createEl("p", {
+        text: `Create project file for ${tag} in ${this.projectsFolder}?`,
+      });
+
+      const buttonContainer = modal.contentEl.createEl("div", {
+        cls: "modal-button-container",
+      });
+      buttonContainer.style.display = "flex";
+      buttonContainer.style.justifyContent = "flex-end";
+      buttonContainer.style.gap = "8px";
+      buttonContainer.style.marginTop = "16px";
+
+      const cancelBtn = buttonContainer.createEl("button", { text: "Cancel" });
+      cancelBtn.addEventListener("click", () => {
+        modal.close();
+        resolve(false);
+      });
+
+      const createBtn = buttonContainer.createEl("button", {
+        text: "Create",
+        cls: "mod-cta",
+      });
+      createBtn.addEventListener("click", () => {
+        modal.close();
+        resolve(true);
+      });
+
+      modal.open();
+    });
   }
 
   private async createProjectFile(filepath: string, tag: string): Promise<void> {

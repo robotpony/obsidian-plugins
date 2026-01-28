@@ -2,6 +2,147 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.4.14] - 2026-01-27
+
+### Improved
+
+- **Sidebar header consistency**: Header layout now matches Space Command and Link Command
+  - Uses `justify-content: space-between` layout instead of `gap: 8px`
+  - Title uses h4 element wrapped with logo in a flex container
+  - Buttons grouped in a button-group container
+  - Shortened title from "Hugo Command" to "Hugo" for consistency
+
+## [0.4.13] - 2026-01-27
+
+### Improved
+
+- **Reorganized settings sections**: Settings now organized into logical sections with h3 headers
+  - Sidebar section first (Show sidebar by default, Status filter, Sort order, Show drafts)
+  - Content section (Content paths, Trash folder)
+  - Consistent with Space Command and Link Command settings layout
+
+## [0.4.12] - 2026-01-27
+
+### Improved
+
+- **Consistent plugin naming**: Removed logo symbols from plugin name and sidebar tab title
+  - Plugin name in Community plugins list: "Hugo Command" (was "H⌘ Hugo Command")
+  - Sidebar tab title: "Hugo" (was "H⌘ Hugo")
+  - Settings page title: "Hugo Command Settings" (was "H⌘ Hugo Command Settings")
+  - Logo still appears in the styled about section header within settings
+
+## [0.4.11] - 2026-01-27
+
+### Fixed
+
+- **Sidebar scrollbar no longer overlaps content**: Added right padding to content area so scrollbar sits beside content, not over it
+- **Scrollbar hugs right edge**: Scrollbar now positioned flush against the right edge of the sidebar
+
+## [0.4.10] - 2026-01-27
+
+### Fixed
+
+- **Sidebar scrollbar positioning**: Vertical scrollbar now hugs the right edge (0-1px gap instead of 4-6px)
+- **Horizontal scrollbar prevention**: Sidebar content no longer shows horizontal scrollbars when content overflows
+
+## [0.4.9] - 2026-01-26
+
+### Changed
+
+- **Sidebar scrollbar**: Semi-transparent (65% opacity) scrollbar thumb with transparent track
+
+## [0.4.8] - 2026-01-26
+
+### Fixed
+
+- **Sidebar layout padding**: Reduced header padding to 2px top/bottom, 4px left/right; scrollbar now flush with right edge
+
+## [0.4.7] - 2026-01-26
+
+### Fixed
+
+- **Sidebar button styling**: Removed visible borders and backgrounds from menu/new post buttons; added subtle hover effect
+
+## [0.4.6] - 2026-01-26
+
+### Fixed
+
+- **Sidebar header now stays pinned** while scrolling content below
+
+## [0.4.5] - 2026-01-25
+
+### Fixed
+
+- Post items now align flush with folder headers (removed legacy indentation from collapsible folders)
+
+## [0.4.4] - 2026-01-25
+
+### Fixed
+
+- Folder filter chip in search bar now has readable contrast (muted background instead of green)
+
+## [0.4.3] - 2026-01-25
+
+### Added
+
+- Config filename in Site Settings footer is now clickable - opens hugo.toml in editor for full access to all settings
+
+## [0.4.2] - 2026-01-25
+
+### Fixed
+
+- New post button now creates files in the correct content folder (e.g., `content/posts/`) instead of vault root
+- Folder dropdown shows content root name (e.g., "(content)") instead of generic "(root)"
+
+## [0.4.1] - 2026-01-25
+
+### Changed
+
+- Site Settings modal layout: fixed header with scrollable content area
+- Config file info moved to footer
+- Modal widened to 700px for better readability
+- Input fields widened to 280px
+- Added Build Settings section: buildDrafts, buildFuture, buildExpired
+- Added Features section: enableRobotsTXT, enableGitInfo, disableKinds
+- Added Taxonomies section: category, tag
+- Added Permalinks section: posts permalink pattern
+- Added summaryLength and paginate to Basic Settings
+
+## [0.4.0] - 2026-01-25
+
+### Added
+
+- **Site Settings editor**: Edit hugo.toml/config.toml from the sidebar menu
+  - Displays Hugo Command logo and site title prominently
+  - Edit basic settings: title, baseURL, languageCode
+  - Edit author/copyright information
+  - Edit theme setting
+  - Edit custom [params] section fields
+  - Supports both TOML and YAML config formats
+
+## [0.3.2] - 2026-01-25
+
+### Fixed
+
+- Subfolder chips now show full path (e.g., "tutorials/advanced" instead of just "tutorials")
+
+## [0.3.1] - 2026-01-25
+
+### Changed
+
+- Folder sections are no longer collapsible (always expanded)
+- Subfolder name now displays as a chip next to the post title
+
+## [0.3.0] - 2026-01-25
+
+### Changed
+
+- Default content path changed from "." (entire vault) to "content" (Hugo standard)
+
+### Added
+
+- Trash folder setting for future use (default: "_trash")
+
 ## [0.2.11] - 2026-01-25
 
 ### Fixed

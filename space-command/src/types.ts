@@ -32,6 +32,8 @@ export interface ProjectInfo {
   count: number;
   lastActivity: number;
   highestPriority: number;
+  /** Colour index 0-6 based on weighted average priority of project's tasks */
+  colourIndex: number;
 }
 
 // Configuration for unified list item rendering in SidebarView
@@ -51,9 +53,14 @@ export interface SpaceCommandSettings {
   excludeTodoneFilesFromRecent: boolean;
   defaultProjectsFolder: string;
   focusListLimit: number;
+  activeTodosLimit: number;
   priorityTags: string[];
   recentTodonesLimit: number;
   excludeFoldersFromProjects: string[];
+  // Focus mode settings
+  focusModeIncludeProjects: boolean;
+  // Tab lock settings
+  showTabLockButton: boolean;
   // LLM/Define settings
   llmEnabled: boolean;
   llmUrl: string;
@@ -71,9 +78,14 @@ export const DEFAULT_SETTINGS: SpaceCommandSettings = {
   excludeTodoneFilesFromRecent: true,
   defaultProjectsFolder: "projects/",
   focusListLimit: 5,
+  activeTodosLimit: 0,
   priorityTags: ["#p0", "#p1", "#p2", "#p3", "#p4"],
   recentTodonesLimit: 5,
   excludeFoldersFromProjects: ["log"],
+  // Focus mode settings
+  focusModeIncludeProjects: false,
+  // Tab lock settings
+  showTabLockButton: false,
   // LLM/Define settings
   llmEnabled: true,
   llmUrl: "http://localhost:11434",

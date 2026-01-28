@@ -17,6 +17,7 @@ import {
   StatusFilter,
 } from "./src/types";
 import { showNotice, LOGO_PREFIX } from "./src/utils";
+import { SiteSettingsModal } from "./src/SiteSettingsModal";
 
 export default class HugoCommandPlugin extends Plugin {
   settings: HugoCommandSettings;
@@ -43,7 +44,8 @@ export default class HugoCommandPlugin extends Plugin {
           this.scanner,
           this.settings,
           () => this.showAboutModal(),
-          () => this.openSettings()
+          () => this.openSettings(),
+          () => this.showSiteSettings()
         )
     );
 
@@ -173,6 +175,10 @@ export default class HugoCommandPlugin extends Plugin {
     (this.app as any).setting.open();
     (this.app as any).setting.openTabById("hugo-command");
   }
+
+  showSiteSettings() {
+    new SiteSettingsModal(this.app).open();
+  }
 }
 
 // About modal for displaying plugin information
@@ -232,7 +238,7 @@ class HugoCommandSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: `${LOGO_PREFIX} Hugo Command Settings` });
+    containerEl.createEl("h2", { text: "Hugo Command Settings" });
 
     // About section
     const aboutSection = containerEl.createEl("div", { cls: "hugo-command-about-section" });
@@ -255,22 +261,8 @@ class HugoCommandSettingTab extends PluginSettingTab {
       href: "https://github.com/robotpony/obsidian-plugins",
     });
 
-    // Content paths
-    new Setting(containerEl)
-      .setName("Content paths")
-      .setDesc("Folders to scan for Hugo content (one per line, e.g., content/posts)")
-      .addTextArea((text) =>
-        text
-          .setPlaceholder("content\ncontent/posts")
-          .setValue(this.plugin.settings.contentPaths.join("\n"))
-          .onChange(async (value) => {
-            this.plugin.settings.contentPaths = value
-              .split("\n")
-              .map((p) => p.trim())
-              .filter((p) => p.length > 0);
-            await this.plugin.saveSettings();
-          })
-      );
+    // Sidebar section (first)
+    containerEl.createEl("h3", { text: "Sidebar" });
 
     new Setting(containerEl)
       .setName("Show sidebar by default")
@@ -280,18 +272,6 @@ class HugoCommandSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.showSidebarByDefault)
           .onChange(async (value) => {
             this.plugin.settings.showSidebarByDefault = value;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName("Show drafts")
-      .setDesc("Include draft posts in the content list")
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.showDrafts)
-          .onChange(async (value) => {
-            this.plugin.settings.showDrafts = value;
             await this.plugin.saveSettings();
           })
       );
@@ -322,6 +302,50 @@ class HugoCommandSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.defaultSortOrder)
           .onChange(async (value) => {
             this.plugin.settings.defaultSortOrder = value as "date-desc" | "date-asc" | "title";
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Show drafts")
+      .setDesc("Include draft posts in the content list")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.showDrafts)
+          .onChange(async (value) => {
+            this.plugin.settings.showDrafts = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    // Content section
+    containerEl.createEl("h3", { text: "Content" });
+
+    new Setting(containerEl)
+      .setName("Content paths")
+      .setDesc("Folders to scan for Hugo content (one per line, e.g., content/posts)")
+      .addTextArea((text) =>
+        text
+          .setPlaceholder("content\ncontent/posts")
+          .setValue(this.plugin.settings.contentPaths.join("\n"))
+          .onChange(async (value) => {
+            this.plugin.settings.contentPaths = value
+              .split("\n")
+              .map((p) => p.trim())
+              .filter((p) => p.length > 0);
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Trash folder")
+      .setDesc("Folder for trashed posts (relative to vault root)")
+      .addText((text) =>
+        text
+          .setPlaceholder("_trash")
+          .setValue(this.plugin.settings.trashFolder)
+          .onChange(async (value) => {
+            this.plugin.settings.trashFolder = value.trim() || "_trash";
             await this.plugin.saveSettings();
           })
       );

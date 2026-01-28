@@ -13,19 +13,20 @@ export class HugoSidebarView extends ItemView {
   private activeFolderTagFilter: string | null = null;
   private activeStatusFilter: StatusFilter;
   private searchQuery: string = "";
-  private collapsedFolders: Set<string> = new Set();
   private openDropdown: HTMLElement | null = null;
   private openDropdownTrigger: HTMLElement | null = null;
   private openInfoPopup: HTMLElement | null = null;
   private onShowAbout: () => void;
   private onOpenSettings: () => void;
+  private onOpenSiteSettings: () => void;
 
   constructor(
     leaf: WorkspaceLeaf,
     scanner: HugoScanner,
     settings: HugoCommandSettings,
     onShowAbout: () => void,
-    onOpenSettings: () => void
+    onOpenSettings: () => void,
+    onOpenSiteSettings: () => void
   ) {
     super(leaf);
     this.scanner = scanner;
@@ -33,6 +34,7 @@ export class HugoSidebarView extends ItemView {
     this.activeStatusFilter = settings.defaultStatusFilter;
     this.onShowAbout = onShowAbout;
     this.onOpenSettings = onOpenSettings;
+    this.onOpenSiteSettings = onOpenSiteSettings;
   }
 
   getViewType(): string {
@@ -40,7 +42,7 @@ export class HugoSidebarView extends ItemView {
   }
 
   getDisplayText(): string {
-    return `${LOGO_PREFIX} Hugo`;
+    return "Hugo";
   }
 
   getIcon(): string {
@@ -89,29 +91,32 @@ export class HugoSidebarView extends ItemView {
     container.addClass("hugo-command-sidebar");
 
     this.renderHeader(container as HTMLElement);
-    this.renderFilters(container as HTMLElement);
-    this.renderContentList(container as HTMLElement);
+
+    // Content wrapper for scrolling (includes filters and list)
+    const content = (container as HTMLElement).createEl("div", { cls: "hugo-command-content" });
+    this.renderFilters(content);
+    this.renderContentList(content);
   }
 
   private renderHeader(container: HTMLElement): void {
     const header = container.createEl("div", { cls: "hugo-command-header" });
 
-    const logo = header.createEl("span", {
+    // Title container with logo
+    const titleEl = header.createEl("div", { cls: "hugo-command-header-title" });
+    const logo = titleEl.createEl("span", {
       cls: "hugo-command-logo clickable-logo",
       text: LOGO_PREFIX,
     });
-
     logo.addEventListener("click", () => {
       this.onShowAbout();
     });
+    titleEl.createEl("h4", { text: "Hugo" });
 
-    header.createEl("span", {
-      cls: "hugo-command-title",
-      text: "Hugo Command",
-    });
+    // Button group
+    const buttonGroup = header.createEl("div", { cls: "hugo-command-button-group" });
 
     // New post button (plus icon)
-    const newBtn = header.createEl("button", {
+    const newBtn = buttonGroup.createEl("button", {
       cls: "clickable-icon hugo-command-new-btn",
       attr: { "aria-label": "New post" },
     });
@@ -123,7 +128,7 @@ export class HugoSidebarView extends ItemView {
     });
 
     // Kebab menu button (three vertical dots)
-    const menuBtn = header.createEl("button", {
+    const menuBtn = buttonGroup.createEl("button", {
       cls: "clickable-icon hugo-command-menu-btn",
       attr: { "aria-label": "Menu" },
     });
@@ -131,6 +136,14 @@ export class HugoSidebarView extends ItemView {
 
     menuBtn.addEventListener("click", (evt) => {
       const menu = new Menu();
+
+      // Site Settings
+      menu.addItem((item) => {
+        item
+          .setTitle("Site Settings")
+          .setIcon("globe")
+          .onClick(() => this.onOpenSiteSettings());
+      });
 
       // Refresh
       menu.addItem((item) => {
@@ -573,16 +586,10 @@ export class HugoSidebarView extends ItemView {
     items: HugoContentItem[]
   ): void {
     const group = container.createEl("div", { cls: "hugo-command-folder-group" });
-    const isCollapsed = this.collapsedFolders.has(folder);
 
-    // Folder header
+    // Folder header (static, not collapsible)
     const header = group.createEl("div", {
-      cls: `hugo-command-folder-header ${isCollapsed ? "collapsed" : ""}`,
-    });
-
-    const chevron = header.createEl("span", {
-      cls: "hugo-command-folder-chevron",
-      text: isCollapsed ? "\u25b8" : "\u25be",
+      cls: "hugo-command-folder-header static",
     });
 
     header.createEl("span", {
@@ -590,21 +597,10 @@ export class HugoSidebarView extends ItemView {
       text: folder,
     });
 
-    header.addEventListener("click", () => {
-      if (this.collapsedFolders.has(folder)) {
-        this.collapsedFolders.delete(folder);
-      } else {
-        this.collapsedFolders.add(folder);
-      }
-      this.render();
-    });
-
-    // Content list (if not collapsed)
-    if (!isCollapsed) {
-      const list = group.createEl("ul", { cls: "hugo-command-list" });
-      for (const item of items) {
-        this.renderContentItem(list, item);
-      }
+    // Content list
+    const list = group.createEl("ul", { cls: "hugo-command-list" });
+    for (const item of items) {
+      this.renderContentItem(list, item);
     }
   }
 
@@ -627,6 +623,14 @@ export class HugoSidebarView extends ItemView {
     title.addEventListener("click", () => {
       openFile(this.app, item.file);
     });
+
+    // Subfolder chip (if item is in a subfolder - show full path)
+    if (item.folderTags.length > 0) {
+      const subfolderChip = listItem.createEl("span", {
+        cls: "hugo-command-subfolder-chip",
+        text: item.folderTags.join("/"),
+      });
+    }
 
     // Info dropdown (always show - contains date, folder tags, frontmatter tags)
     const frontmatterTags = [...item.tags, ...item.categories];
@@ -773,6 +777,23 @@ export class HugoSidebarView extends ItemView {
   }
 
   /**
+   * Get the primary content root folder from settings
+   * Returns empty string if set to "." or "/" (vault root)
+   */
+  private getContentRoot(): string {
+    const contentPaths = this.settings.contentPaths;
+    if (!contentPaths || contentPaths.length === 0) {
+      return "";
+    }
+    const first = contentPaths[0].trim().replace(/\/$/, "");
+    // "." or "/" or empty means vault root
+    if (first === "." || first === "/" || first === "") {
+      return "";
+    }
+    return first;
+  }
+
+  /**
    * Show dropdown for selecting folder to create new post
    */
   private showNewPostDropdown(trigger: HTMLElement): void {
@@ -793,21 +814,22 @@ export class HugoSidebarView extends ItemView {
       text: "Create in folder",
     });
 
-    // Get folder hierarchy
+    // Get folder hierarchy and content root
     const folderHierarchy = this.scanner.getFolderHierarchy();
+    const contentRoot = this.getContentRoot();
 
-    // Add root option first
+    // Add root option first (content folder root)
     const rootItem = dropdown.createEl("div", {
       cls: "hugo-command-tag-item",
-      text: "(root)",
+      text: `(${contentRoot || "root"})`,
     });
     rootItem.addEventListener("click", (e) => {
       e.stopPropagation();
       this.closeDropdown();
-      this.promptForNewPost("");
+      this.promptForNewPost(contentRoot);
     });
 
-    // Add all folders with hierarchy
+    // Add all folders with hierarchy (prepend content root)
     for (const folder of folderHierarchy) {
       const depthClass = `folder-depth-${Math.min(folder.depth, 4)}`;
       const folderItem = dropdown.createEl("div", {
@@ -815,10 +837,11 @@ export class HugoSidebarView extends ItemView {
         text: folder.name,
       });
 
+      const fullPath = contentRoot ? `${contentRoot}/${folder.path}` : folder.path;
       folderItem.addEventListener("click", (e) => {
         e.stopPropagation();
         this.closeDropdown();
-        this.promptForNewPost(folder.path);
+        this.promptForNewPost(fullPath);
       });
     }
 

@@ -1,7 +1,7 @@
 {
-  "name": "space-command",
-  "version": "0.9.30",
-  "description": "␣⌘ Space Command - Obsidian plugin for managing TODOs, TODONEs, and workflows",
+  "name": "link-command",
+  "version": "0.4.17",
+  "description": "Link Command - Obsidian plugin for URL unfurling",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
@@ -11,6 +11,9 @@
   "author": "Bruce Alderson",
   "license": "MIT",
   "devDependencies": {
+    "@codemirror/language": "^6.0.0",
+    "@codemirror/state": "^6.0.0",
+    "@codemirror/view": "^6.0.0",
     "@types/node": "^20.10.0",
     "@typescript-eslint/eslint-plugin": "^6.15.0",
     "@typescript-eslint/parser": "^6.15.0",
@@ -19,8 +22,5 @@
     "obsidian": "latest",
     "tslib": "^2.6.2",
     "typescript": "^5.3.3"
-  },
-  "dependencies": {
-    "slackify-markdown": "^5.0.0"
   }
 }

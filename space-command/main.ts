@@ -22,9 +22,10 @@ import {
   DEFAULT_SETTINGS,
 } from "./src/types";
 import { convertToSlackMarkdown } from "./src/SlackConverter";
-import { showNotice } from "./src/utils";
+import { showNotice, getTagColourInfo, PLUGIN_TAGS, PRIORITY_TAG_MAP } from "./src/utils";
 import { LLMClient } from "./src/LLMClient";
 import { DefineTooltip } from "./src/DefineTooltip";
+import { TabLockManager } from "./src/TabLockManager";
 
 export default class SpaceCommandPlugin extends Plugin {
   settings: SpaceCommandSettings;
@@ -34,6 +35,8 @@ export default class SpaceCommandPlugin extends Plugin {
   embedRenderer: EmbedRenderer;
   llmClient: LLMClient;
   defineTooltip: DefineTooltip;
+  tabLockManager: TabLockManager;
+  private tagColourObserver: MutationObserver | null = null;
 
   async onload() {
     await this.loadSettings();
@@ -70,6 +73,16 @@ export default class SpaceCommandPlugin extends Plugin {
     });
     this.defineTooltip = new DefineTooltip(this.app);
 
+    // Initialize tab lock manager
+    this.tabLockManager = new TabLockManager(this.app);
+
+    // Enable tab lock buttons if setting is enabled
+    if (this.settings.showTabLockButton) {
+      this.app.workspace.onLayoutReady(() => {
+        this.tabLockManager.enable();
+      });
+    }
+
     // Configure scanner to exclude TODONE log file from Recent TODONEs
     if (this.settings.excludeTodoneFilesFromRecent) {
       this.scanner.setExcludeFromTodones([this.settings.defaultTodoneFile]);
@@ -87,6 +100,9 @@ export default class SpaceCommandPlugin extends Plugin {
 
     // Watch for file changes
     this.scanner.watchFiles();
+
+    // Register tag colour observer for editor and reading mode
+    this.registerTagColourObserver();
 
     // Watch for native checkbox clicks on #todo lines
     this.registerDomEvent(document, "change", async (evt) => {
@@ -150,6 +166,9 @@ export default class SpaceCommandPlugin extends Plugin {
           this.settings.defaultTodoneFile,
           this.settings.priorityTags,
           this.settings.recentTodonesLimit,
+          this.settings.activeTodosLimit,
+          this.settings.focusListLimit,
+          this.settings.focusModeIncludeProjects,
           () => this.showAboutModal(),
           () => this.showStatsModal()
         )
@@ -390,6 +409,13 @@ export default class SpaceCommandPlugin extends Plugin {
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_TODO_SIDEBAR);
     // Clean up define tooltip
     this.defineTooltip.close();
+    // Clean up tab lock manager
+    this.tabLockManager.destroy();
+    // Clean up tag colour observer
+    if (this.tagColourObserver) {
+      this.tagColourObserver.disconnect();
+      this.tagColourObserver = null;
+    }
   }
 
   async loadSettings() {
@@ -463,6 +489,86 @@ export default class SpaceCommandPlugin extends Plugin {
     // Open Obsidian settings and navigate to Space Command tab
     (this.app as any).setting.open();
     (this.app as any).setting.openTabById("space-command");
+  }
+
+  /**
+   * Register MutationObserver to apply semantic colours to Obsidian-rendered tags.
+   * This handles tags in editor (Live Preview) and reading mode.
+   */
+  private registerTagColourObserver(): void {
+    this.tagColourObserver = new MutationObserver((mutations) => {
+      for (let i = 0; i < mutations.length; i++) {
+        const mutation = mutations[i];
+        const addedNodes = Array.from(mutation.addedNodes);
+        for (let j = 0; j < addedNodes.length; j++) {
+          const node = addedNodes[j];
+          if (node instanceof HTMLElement) {
+            this.applyTagColoursToElement(node);
+          }
+        }
+      }
+    });
+
+    // Observe document body for tag elements being added
+    this.tagColourObserver.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
+    // Also apply to existing elements
+    this.applyTagColoursToElement(document.body);
+  }
+
+  /**
+   * Apply semantic tag colours to tags within an element.
+   * Targets Obsidian's tag classes in editor (.cm-hashtag) and reading mode (.tag).
+   */
+  private applyTagColoursToElement(el: HTMLElement): void {
+    // Find tags that don't already have colour attributes
+    const tagNodes = el.querySelectorAll('.tag:not([data-sc-tag-type]), a.tag:not([data-sc-tag-type]), .cm-hashtag:not([data-sc-tag-type])');
+    const tags = Array.from(tagNodes);
+
+    // Get project colour map for project tag lookups
+    const projectColourMap = this.getProjectColourMap();
+
+    for (let i = 0; i < tags.length; i++) {
+      const tagEl = tags[i] as HTMLElement;
+      let tagText = tagEl.textContent?.trim() || '';
+
+      // Handle .cm-hashtag which may be split across elements
+      // (.cm-hashtag-begin contains #, .cm-hashtag-end contains the tag name)
+      if (tagEl.classList.contains('cm-hashtag-end')) {
+        // Try to get the full tag by looking at previous sibling
+        const prev = tagEl.previousElementSibling;
+        if (prev?.classList.contains('cm-hashtag-begin')) {
+          tagText = (prev.textContent || '') + tagText;
+        }
+      } else if (tagEl.classList.contains('cm-hashtag-begin')) {
+        // Skip the begin element, we'll handle it when we see the end
+        continue;
+      }
+
+      // Normalize tag (ensure it starts with #)
+      if (!tagText.startsWith('#')) {
+        tagText = '#' + tagText;
+      }
+
+      const colourInfo = getTagColourInfo(tagText, projectColourMap);
+      tagEl.dataset.scTagType = colourInfo.type;
+      tagEl.dataset.scPriority = colourInfo.priority.toString();
+    }
+  }
+
+  /**
+   * Get project colour map for tag colouring.
+   */
+  private getProjectColourMap(): Map<string, number> {
+    const projects = this.projectManager.getProjects();
+    const map = new Map<string, number>();
+    for (const project of projects) {
+      map.set(project.tag.toLowerCase(), project.colourIndex);
+    }
+    return map;
   }
 }
 
@@ -597,7 +703,7 @@ class SpaceCommandSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: "␣⌘ Space Command Settings" });
+    containerEl.createEl("h2", { text: "Space Command Settings" });
 
     // About section
     const aboutSection = containerEl.createEl("div", { cls: "space-command-about-section" });
@@ -620,18 +726,8 @@ class SpaceCommandSettingTab extends PluginSettingTab {
       href: "https://github.com/robotpony/obsidian-plugins",
     });
 
-    new Setting(containerEl)
-      .setName("Default TODONE file")
-      .setDesc("Default file path for logging completed TODOs")
-      .addText((text) =>
-        text
-          .setPlaceholder("todos/done.md")
-          .setValue(this.plugin.settings.defaultTodoneFile)
-          .onChange(async (value) => {
-            this.plugin.settings.defaultTodoneFile = value;
-            await this.plugin.saveSettings();
-          })
-      );
+    // Sidebar section (first)
+    containerEl.createEl("h3", { text: "Sidebar" });
 
     new Setting(containerEl)
       .setName("Show sidebar by default")
@@ -641,6 +737,39 @@ class SpaceCommandSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.showSidebarByDefault)
           .onChange(async (value) => {
             this.plugin.settings.showSidebarByDefault = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Show tab lock buttons")
+      .setDesc("Add lock buttons to tab headers. Locked tabs force links to open in new tabs.")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.showTabLockButton)
+          .onChange(async (value) => {
+            this.plugin.settings.showTabLockButton = value;
+            if (value) {
+              this.plugin.tabLockManager.enable();
+            } else {
+              this.plugin.tabLockManager.disable();
+            }
+            await this.plugin.saveSettings();
+          })
+      );
+
+    // TODOs section
+    containerEl.createEl("h3", { text: "TODOs" });
+
+    new Setting(containerEl)
+      .setName("Default TODONE file")
+      .setDesc("Default file path for logging completed TODOs")
+      .addText((text) =>
+        text
+          .setPlaceholder("todos/done.md")
+          .setValue(this.plugin.settings.defaultTodoneFile)
+          .onChange(async (value) => {
+            this.plugin.settings.defaultTodoneFile = value;
             await this.plugin.saveSettings();
           })
       );
@@ -662,7 +791,8 @@ class SpaceCommandSettingTab extends PluginSettingTab {
           })
       );
 
-    containerEl.createEl("h3", { text: "Projects Settings" });
+    // Projects section
+    containerEl.createEl("h3", { text: "Projects" });
 
     new Setting(containerEl)
       .setName("Default projects folder")
@@ -679,7 +809,7 @@ class SpaceCommandSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Focus list limit")
-      .setDesc("Maximum number of projects to show in {{focus-list}}")
+      .setDesc("Maximum number of projects to show in sidebar and {{focus-list}}")
       .addText((text) =>
         text
           .setPlaceholder("5")
@@ -690,6 +820,34 @@ class SpaceCommandSettingTab extends PluginSettingTab {
               this.plugin.settings.focusListLimit = num;
               await this.plugin.saveSettings();
             }
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Active TODOs limit")
+      .setDesc("Maximum number of TODOs to show in sidebar (0 for unlimited)")
+      .addText((text) =>
+        text
+          .setPlaceholder("5")
+          .setValue(String(this.plugin.settings.activeTodosLimit))
+          .onChange(async (value) => {
+            const num = parseInt(value);
+            if (!isNaN(num) && num >= 0) {
+              this.plugin.settings.activeTodosLimit = num;
+              await this.plugin.saveSettings();
+            }
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Focus mode includes project TODOs")
+      .setDesc("When enabled, focus mode shows all TODOs from focused projects (not just #focus items)")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.focusModeIncludeProjects)
+          .onChange(async (value) => {
+            this.plugin.settings.focusModeIncludeProjects = value;
+            await this.plugin.saveSettings();
           })
       );
 

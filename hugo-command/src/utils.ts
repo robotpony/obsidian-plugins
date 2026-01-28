@@ -1,5 +1,5 @@
-import { App, Notice, TFile, parseYaml } from "obsidian";
-import { HugoFrontmatter, HugoContentItem } from "./types";
+import { App, Notice, TFile, parseYaml, stringifyYaml } from "obsidian";
+import { HugoFrontmatter, HugoContentItem, HugoSiteConfig } from "./types";
 
 export const LOGO_PREFIX = "H\u2318";
 
@@ -208,4 +208,202 @@ description: ""
 ---
 
 `;
+}
+
+/**
+ * Hugo config file names in order of preference
+ */
+export const HUGO_CONFIG_FILES = [
+  "hugo.toml",
+  "hugo.yaml",
+  "hugo.yml",
+  "config.toml",
+  "config.yaml",
+  "config.yml",
+];
+
+/**
+ * Find the Hugo config file in the vault root
+ */
+export async function findHugoConfigFile(app: App): Promise<TFile | null> {
+  for (const filename of HUGO_CONFIG_FILES) {
+    const file = app.vault.getAbstractFileByPath(filename);
+    if (file instanceof TFile) {
+      return file;
+    }
+  }
+  return null;
+}
+
+/**
+ * Detect config file format from filename
+ */
+export function getConfigFormat(filename: string): "toml" | "yaml" {
+  if (filename.endsWith(".toml")) {
+    return "toml";
+  }
+  return "yaml";
+}
+
+/**
+ * Simple TOML parser for Hugo config files
+ * Handles basic key-value pairs, strings, numbers, booleans, and [sections]
+ */
+export function parseToml(content: string): HugoSiteConfig {
+  const result: HugoSiteConfig = {};
+  let currentSection: Record<string, unknown> = result;
+  let currentSectionName = "";
+
+  const lines = content.split("\n");
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Skip empty lines and comments
+    if (!trimmed || trimmed.startsWith("#")) {
+      continue;
+    }
+
+    // Section header [section] or [section.subsection]
+    const sectionMatch = trimmed.match(/^\[([^\]]+)\]$/);
+    if (sectionMatch) {
+      const sectionPath = sectionMatch[1].split(".");
+      currentSectionName = sectionPath[0];
+
+      // Navigate/create nested sections
+      currentSection = result;
+      for (const part of sectionPath) {
+        if (!currentSection[part]) {
+          currentSection[part] = {};
+        }
+        currentSection = currentSection[part] as Record<string, unknown>;
+      }
+      continue;
+    }
+
+    // Key-value pair
+    const kvMatch = trimmed.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.+)$/);
+    if (kvMatch) {
+      const key = kvMatch[1];
+      const rawValue = kvMatch[2].trim();
+      currentSection[key] = parseTomlValue(rawValue);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Parse a single TOML value
+ */
+function parseTomlValue(value: string): unknown {
+  // String (double or single quoted)
+  if ((value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))) {
+    return value.slice(1, -1);
+  }
+
+  // Multi-line string (triple quotes) - just take single line for now
+  if (value.startsWith('"""') || value.startsWith("'''")) {
+    const quote = value.substring(0, 3);
+    const endIdx = value.indexOf(quote, 3);
+    if (endIdx > 0) {
+      return value.substring(3, endIdx);
+    }
+    return value.substring(3);
+  }
+
+  // Boolean
+  if (value === "true") return true;
+  if (value === "false") return false;
+
+  // Number
+  const num = Number(value);
+  if (!isNaN(num)) {
+    return num;
+  }
+
+  // Array (basic support)
+  if (value.startsWith("[") && value.endsWith("]")) {
+    const inner = value.slice(1, -1).trim();
+    if (!inner) return [];
+    // Simple comma-separated values
+    return inner.split(",").map((v) => parseTomlValue(v.trim()));
+  }
+
+  // Default to string
+  return value;
+}
+
+/**
+ * Serialize config back to TOML format
+ */
+export function serializeToml(config: HugoSiteConfig): string {
+  const lines: string[] = [];
+
+  // Top-level keys first (excluding nested objects)
+  for (const [key, value] of Object.entries(config)) {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+      lines.push(`${key} = ${tomlValue(value)}`);
+    }
+  }
+
+  // Then sections
+  for (const [key, value] of Object.entries(config)) {
+    if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+      lines.push("");
+      lines.push(`[${key}]`);
+      for (const [subKey, subValue] of Object.entries(value as Record<string, unknown>)) {
+        if (typeof subValue !== "object" || subValue === null || Array.isArray(subValue)) {
+          lines.push(`${subKey} = ${tomlValue(subValue)}`);
+        }
+      }
+    }
+  }
+
+  return lines.join("\n") + "\n";
+}
+
+/**
+ * Convert a value to TOML string representation
+ */
+function tomlValue(value: unknown): string {
+  if (typeof value === "string") {
+    return `"${value.replace(/"/g, '\\"')}"`;
+  }
+  if (typeof value === "boolean") {
+    return value ? "true" : "false";
+  }
+  if (typeof value === "number") {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(tomlValue).join(", ")}]`;
+  }
+  return '""';
+}
+
+/**
+ * Parse Hugo config file content based on format
+ */
+export function parseHugoConfig(content: string, format: "toml" | "yaml"): HugoSiteConfig {
+  if (format === "yaml") {
+    try {
+      const parsed = parseYaml(content);
+      return (parsed as HugoSiteConfig) || {};
+    } catch {
+      return {};
+    }
+  }
+  return parseToml(content);
+}
+
+/**
+ * Serialize Hugo config to string based on format
+ */
+export function serializeHugoConfig(config: HugoSiteConfig, format: "toml" | "yaml"): string {
+  if (format === "yaml") {
+    return stringifyYaml(config);
+  }
+  return serializeToml(config);
 }
