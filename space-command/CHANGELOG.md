@@ -2,6 +2,26 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.42] - 2026-01-28
+
+### Fixed
+
+- **Reading Mode tag rendering**: Fixed broken/malformed tag display in Reading Mode
+  - Tags no longer wrap or display incorrectly in Reading Mode
+  - Separated styling rules for editor tags (split .cm-hashtag elements) vs Reading Mode tags (single .tag elements)
+- **Tag color opacity**: Colored tags now display with full opacity (no more washed-out appearance)
+  - Tags with custom backgrounds (`[data-sc-tag-type]`) now show vibrant colors
+  - Base tag opacity (0.85) only applies to uncolored tags
+- **Vertical padding restoration**: Restored 2px vertical padding for better tag appearance
+  - Fixed padding regression that made tags appear squished
+  - Line-height increased to 1.3 for improved readability
+
+### Technical
+
+- Split tag styling into separate rules for Reading Mode (single elements) and editor (CodeMirror split elements)
+- Added `opacity: 1 !important` to `[data-sc-tag-type]` to override base opacity for colored tags
+- Increased padding from `1px 5px` to `2px 5px` and line-height from 1.2 to 1.3
+
 ## [0.9.41] - 2026-01-28
 
 ### Fixed

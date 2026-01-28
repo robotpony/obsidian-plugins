@@ -19,9 +19,10 @@
 }
 
 /* Base pill styling for all semantic tags */
-/* Only sets background color, inherits dimensions from unified tag styling */
+/* Colored tags should be fully opaque to show colors properly */
 [data-sc-tag-type] {
   overflow: visible !important;
+  opacity: 1 !important;
 }
 
 /* CodeMirror splits tags into begin (#) and end (tagname) elements */
@@ -801,8 +802,8 @@
   background-color: var(--background-primary);
 }
 
-/* Unified tag styling for all plugin contexts (sidebar, embeds, editor, reading mode) */
-/* Force consistent appearance across ALL tag contexts */
+/* Unified tag styling for all plugin contexts */
+/* Base styling for all tags - font, opacity, alignment */
 .space-command-sidebar .tag,
 .space-command-embed .tag,
 .cm-line .cm-hashtag,
@@ -813,11 +814,28 @@ a.tag {
   font-size: 9pt !important;
   font-family: var(--font-monospace) !important;
   opacity: 0.85 !important;
-  line-height: 1.2 !important;
-  padding: 1px 5px !important;
-  border-radius: 4px !important;
   vertical-align: middle !important;
+}
+
+/* Reading Mode tags - single element, normal padding */
+.markdown-preview-view a.tag,
+.markdown-preview-view .tag,
+.space-command-sidebar .tag,
+.space-command-embed .tag,
+a.tag:not(.cm-hashtag) {
+  padding: 2px 5px !important;
+  border-radius: 4px !important;
   display: inline-block !important;
+  line-height: 1.3 !important;
+}
+
+/* Editor tags - split elements, adjusted padding handled below */
+.cm-line .cm-hashtag,
+.cm-hashtag {
+  padding: 2px 5px !important;
+  border-radius: 4px !important;
+  display: inline-block !important;
+  line-height: 1.3 !important;
 }
 
 /* Focus highlighting for ideas and principles */
