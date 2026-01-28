@@ -2,6 +2,39 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.44] - 2026-01-28
+
+### Fixed
+
+- **Unified tag chicklets in editing mode**: Hash symbol and tag name now display as a single cohesive chicklet
+  - Previously in editing mode (Live Preview), tags like `#p0roadmap` displayed as two separate chicklets: `#` and `p0roadmap`
+  - Fixed by restructuring padding rules for `.cm-hashtag-begin` and `.cm-hashtag-end` elements
+  - Begin element gets left padding (2px 0 2px 5px), end element gets right padding (2px 5px 2px 0)
+  - Border radius removed on touching edges to create seamless appearance
+
+### Technical
+
+- Removed padding/border-radius from base `.cm-hashtag` rule to prevent override conflicts
+- Applied padding directly to `[data-sc-tag-type]` with proper begin/end adjustments
+- Added explicit padding values to merge split elements visually
+
+## [0.9.43] - 2026-01-28
+
+### Fixed
+
+- **Tag styling refinements**:
+  - Removed `!important` from base tag opacity to allow colored tags to properly override with full opacity
+  - Excluded dropdown and popup tags (`.project-info-principle-tag`, `.tag-dropdown-trigger`) from global tag style overrides
+  - Fixed sidebar dropdown tags losing border-radius and padding
+  - Colored tags now display with vibrant, full-opacity backgrounds in all contexts
+  - Mid-line tags no longer appear washed out
+
+### Technical
+
+- Added exclusions to global tag selectors using `:not()` for dropdown/popup contexts
+- Added `!important` to dropdown tag styles to prevent override by global rules
+- Removed `!important` from base tag opacity (line 816) to allow proper cascade
+
 ## [0.9.42] - 2026-01-28
 
 ### Fixed
