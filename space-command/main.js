@@ -139,6 +139,38 @@ var import_obsidian2 = require("obsidian");
 // src/utils.ts
 var import_obsidian = require("obsidian");
 var LOGO_PREFIX = "\u2423\u2318";
+var PLUGIN_TAGS = /* @__PURE__ */ new Set([
+  "#todo",
+  "#todos",
+  "#todone",
+  "#todones",
+  "#idea",
+  "#ideas",
+  "#ideation",
+  "#principle",
+  "#principles"
+]);
+var PRIORITY_TAG_MAP = {
+  "#focus": 0,
+  "#p0": 1,
+  "#p1": 2,
+  "#p2": 3,
+  "#p3": 4,
+  "#p4": 5,
+  "#future": 6
+};
+function getTagColourInfo(tag, projectColourMap) {
+  var _a;
+  const normalizedTag = tag.toLowerCase();
+  if (PLUGIN_TAGS.has(normalizedTag)) {
+    return { type: "plugin", priority: 3 };
+  }
+  if (PRIORITY_TAG_MAP[normalizedTag] !== void 0) {
+    return { type: "priority", priority: PRIORITY_TAG_MAP[normalizedTag] };
+  }
+  const colourIndex = (_a = projectColourMap == null ? void 0 : projectColourMap.get(normalizedTag)) != null ? _a : 4;
+  return { type: "project", priority: colourIndex };
+}
 function showNotice(message, timeout) {
   const fragment = document.createDocumentFragment();
   const logo = document.createElement("span");
@@ -244,7 +276,7 @@ function removeIdeaTag(text5) {
 function replaceIdeaWithTodo(text5) {
   return text5.replace(/#idea(?:s|tion)?\b/, "#todo");
 }
-function renderTextWithTags(text5, container, mutedTags = []) {
+function renderTextWithTags(text5, container, mutedTags = [], projectColourMap) {
   const tagRegex = /(#[\w-]+)/g;
   let lastIndex = 0;
   let match;
@@ -253,17 +285,21 @@ function renderTextWithTags(text5, container, mutedTags = []) {
       container.appendText(text5.substring(lastIndex, match.index));
     }
     const tag = match[1];
+    const colourInfo = getTagColourInfo(tag, projectColourMap);
+    let tagEl;
     if (mutedTags.length > 0 && mutedTags.includes(tag)) {
-      container.createEl("span", {
+      tagEl = container.createEl("span", {
         cls: "tag muted-pill",
         text: tag
       });
     } else {
-      container.createEl("span", {
+      tagEl = container.createEl("span", {
         cls: "tag",
         text: tag
       });
     }
+    tagEl.dataset.scTagType = colourInfo.type;
+    tagEl.dataset.scPriority = colourInfo.priority.toString();
     lastIndex = tagRegex.lastIndex;
   }
   if (lastIndex < text5.length) {
@@ -1218,6 +1254,7 @@ var ProjectManager = class {
         if (projectMap.has(tag)) {
           const project = projectMap.get(tag);
           project.count++;
+          project.prioritySum += todoPriority;
           project.lastActivity = Math.max(
             project.lastActivity,
             todo.dateCreated
@@ -1231,12 +1268,27 @@ var ProjectManager = class {
             tag,
             count: 1,
             lastActivity: todo.dateCreated,
-            highestPriority: todoPriority
+            highestPriority: todoPriority,
+            prioritySum: todoPriority,
+            colourIndex: 4
+            // default, will be calculated below
           });
         }
       }
     }
-    return Array.from(projectMap.values());
+    const projects = [];
+    for (const [, project] of projectMap) {
+      const avgPriority = project.prioritySum / project.count;
+      const colourIndex = Math.min(6, Math.round(avgPriority * 6 / 7));
+      projects.push({
+        tag: project.tag,
+        count: project.count,
+        lastActivity: project.lastActivity,
+        highestPriority: project.highestPriority,
+        colourIndex
+      });
+    }
+    return projects;
   }
   getFocusProjects(limit) {
     const projects = this.getProjects();
@@ -1710,6 +1762,8 @@ var EmbedRenderer = class {
     this.activeRenders = /* @__PURE__ */ new Map();
     // Track TODONE visibility state per container
     this.todoneVisibility = /* @__PURE__ */ new Map();
+    // Cache project colour map to avoid recalculating for each tag
+    this.projectColourMapCache = null;
     this.app = app;
     this.scanner = scanner;
     this.processor = processor;
@@ -1718,6 +1772,21 @@ var EmbedRenderer = class {
     this.focusListLimit = focusListLimit;
     this.priorityTags = priorityTags;
     this.contextMenuHandler = new ContextMenuHandler(app, processor, priorityTags);
+  }
+  // Get project colour map for tag colouring (cached per render cycle)
+  getProjectColourMap() {
+    if (!this.projectColourMapCache) {
+      const projects = this.projectManager.getProjects();
+      this.projectColourMapCache = /* @__PURE__ */ new Map();
+      for (const project of projects) {
+        this.projectColourMapCache.set(project.tag.toLowerCase(), project.colourIndex);
+      }
+    }
+    return this.projectColourMapCache;
+  }
+  // Invalidate colour map cache (called when re-rendering)
+  invalidateColourMapCache() {
+    this.projectColourMapCache = null;
   }
   // Cleanup method to remove event listeners for a specific container
   cleanup(container) {
@@ -2170,10 +2239,11 @@ var EmbedRenderer = class {
   renderInlineMarkdown(text5, container) {
     const tokens = this.parseMarkdownTokens(text5);
     const mutedTags = ["#focus", "#future", "#p0", "#p1", "#p2", "#p3", "#p4"];
+    const projectColourMap = this.getProjectColourMap();
     for (const token of tokens) {
       switch (token.type) {
         case "text":
-          renderTextWithTags(token.content, container, mutedTags);
+          renderTextWithTags(token.content, container, mutedTags, projectColourMap);
           break;
         case "bold":
           container.createEl("strong", { text: token.content });
@@ -2271,6 +2341,7 @@ var EmbedRenderer = class {
   }
   // Refresh a specific embed
   refreshEmbed(container, todoneFile, filterString) {
+    this.invalidateColourMapCache();
     const filters = FilterParser.parse(filterString);
     const allTodos = this.scanner.getTodos().filter(
       (t) => !t.tags.includes("#idea") && !t.tags.includes("#ideas") && !t.tags.includes("#ideation")
@@ -2299,6 +2370,7 @@ var EmbedRenderer = class {
   }
   // Refresh idea embed
   refreshIdeaEmbed(container, filterString) {
+    this.invalidateColourMapCache();
     const filters = FilterParser.parse(filterString);
     const allIdeas = this.scanner.getIdeas();
     const filteredIdeas = FilterParser.applyFilters(allIdeas, filters);
@@ -2319,6 +2391,7 @@ var EmbedRenderer = class {
   }
   // Refresh principle embed
   refreshPrincipleEmbed(container, filterString) {
+    this.invalidateColourMapCache();
     const filters = FilterParser.parse(filterString);
     const allPrinciples = this.scanner.getPrinciples();
     const filteredPrinciples = FilterParser.applyFilters(allPrinciples, filters);
@@ -2844,11 +2917,21 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       this.openDropdown = null;
     }
   }
+  // Get project colour map for tag colouring
+  getProjectColourMap() {
+    const projects = this.projectManager.getProjects();
+    const map4 = /* @__PURE__ */ new Map();
+    for (const project of projects) {
+      map4.set(project.tag.toLowerCase(), project.colourIndex);
+    }
+    return map4;
+  }
   // Render collapsed tag indicator with dropdown
   // If item is provided, "Clear tag" option will be available to remove tags from the item
   renderTagDropdown(tags, container, item) {
     if (tags.length === 0)
       return;
+    const projectColourMap = this.getProjectColourMap();
     const trigger = container.createEl("span", {
       cls: "tag-dropdown-trigger",
       text: "#"
@@ -2875,10 +2958,13 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
         const tagItem = dropdown.createEl("div", {
           cls: "tag-dropdown-item tag-dropdown-item-with-submenu"
         });
+        const colourInfo = getTagColourInfo(tag, projectColourMap);
         const tagLabel = tagItem.createEl("span", {
-          cls: "tag-dropdown-item-label",
+          cls: "tag-dropdown-item-label tag",
           text: tag
         });
+        tagLabel.dataset.scTagType = colourInfo.type;
+        tagLabel.dataset.scPriority = colourInfo.priority.toString();
         const arrow = tagItem.createEl("span", {
           cls: "tag-dropdown-item-arrow",
           text: "\u203A"
@@ -14676,6 +14762,10 @@ var TabLockManager = class {
 
 // main.ts
 var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
+  constructor() {
+    super(...arguments);
+    this.tagColourObserver = null;
+  }
   async onload() {
     await this.loadSettings();
     this.scanner = new TodoScanner(this.app);
@@ -14720,6 +14810,7 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
     });
     await this.scanner.scanVault();
     this.scanner.watchFiles();
+    this.registerTagColourObserver();
     this.registerDomEvent(document, "change", async (evt) => {
       const target = evt.target;
       if (!target.matches('input[type="checkbox"].task-list-item-checkbox')) {
@@ -14945,6 +15036,10 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_TODO_SIDEBAR);
     this.defineTooltip.close();
     this.tabLockManager.destroy();
+    if (this.tagColourObserver) {
+      this.tagColourObserver.disconnect();
+      this.tagColourObserver = null;
+    }
   }
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
@@ -15000,6 +15095,68 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
   openLLMSettings() {
     this.app.setting.open();
     this.app.setting.openTabById("space-command");
+  }
+  /**
+   * Register MutationObserver to apply semantic colours to Obsidian-rendered tags.
+   * This handles tags in editor (Live Preview) and reading mode.
+   */
+  registerTagColourObserver() {
+    this.tagColourObserver = new MutationObserver((mutations) => {
+      for (let i = 0; i < mutations.length; i++) {
+        const mutation = mutations[i];
+        const addedNodes = Array.from(mutation.addedNodes);
+        for (let j = 0; j < addedNodes.length; j++) {
+          const node2 = addedNodes[j];
+          if (node2 instanceof HTMLElement) {
+            this.applyTagColoursToElement(node2);
+          }
+        }
+      }
+    });
+    this.tagColourObserver.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+    this.applyTagColoursToElement(document.body);
+  }
+  /**
+   * Apply semantic tag colours to tags within an element.
+   * Targets Obsidian's tag classes in editor (.cm-hashtag) and reading mode (.tag).
+   */
+  applyTagColoursToElement(el) {
+    var _a;
+    const tagNodes = el.querySelectorAll(".tag:not([data-sc-tag-type]), a.tag:not([data-sc-tag-type]), .cm-hashtag:not([data-sc-tag-type])");
+    const tags = Array.from(tagNodes);
+    const projectColourMap = this.getProjectColourMap();
+    for (let i = 0; i < tags.length; i++) {
+      const tagEl = tags[i];
+      let tagText = ((_a = tagEl.textContent) == null ? void 0 : _a.trim()) || "";
+      if (tagEl.classList.contains("cm-hashtag-end")) {
+        const prev = tagEl.previousElementSibling;
+        if (prev == null ? void 0 : prev.classList.contains("cm-hashtag-begin")) {
+          tagText = (prev.textContent || "") + tagText;
+        }
+      } else if (tagEl.classList.contains("cm-hashtag-begin")) {
+        continue;
+      }
+      if (!tagText.startsWith("#")) {
+        tagText = "#" + tagText;
+      }
+      const colourInfo = getTagColourInfo(tagText, projectColourMap);
+      tagEl.dataset.scTagType = colourInfo.type;
+      tagEl.dataset.scPriority = colourInfo.priority.toString();
+    }
+  }
+  /**
+   * Get project colour map for tag colouring.
+   */
+  getProjectColourMap() {
+    const projects = this.projectManager.getProjects();
+    const map4 = /* @__PURE__ */ new Map();
+    for (const project of projects) {
+      map4.set(project.tag.toLowerCase(), project.colourIndex);
+    }
+    return map4;
   }
 };
 var AboutModal = class extends import_obsidian11.Modal {

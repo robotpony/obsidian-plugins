@@ -1,5 +1,72 @@
 /* Space Command Plugin Styles */
 
+/* ========================================
+   Tag Colour System
+   Base: #689fd6 = hsl(210, 55%, 62%)
+   Gradient from dark (focus) to light (future)
+   ======================================== */
+:root {
+  --sc-tag-hue: 210;
+  --sc-tag-sat: 55%;
+  --sc-tag-plugin: hsl(var(--sc-tag-hue), var(--sc-tag-sat), 62%);
+  --sc-tag-priority-0: hsl(var(--sc-tag-hue), var(--sc-tag-sat), 42%);
+  --sc-tag-priority-1: hsl(var(--sc-tag-hue), var(--sc-tag-sat), 47%);
+  --sc-tag-priority-2: hsl(var(--sc-tag-hue), var(--sc-tag-sat), 52%);
+  --sc-tag-priority-3: hsl(var(--sc-tag-hue), var(--sc-tag-sat), 57%);
+  --sc-tag-priority-4: hsl(var(--sc-tag-hue), var(--sc-tag-sat), 67%);
+  --sc-tag-priority-5: hsl(var(--sc-tag-hue), var(--sc-tag-sat), 72%);
+  --sc-tag-priority-6: hsl(var(--sc-tag-hue), var(--sc-tag-sat), 77%);
+}
+
+/* Plugin tags (system tags like #todo, #idea, etc.) */
+[data-sc-tag-type="plugin"] {
+  background-color: var(--sc-tag-plugin) !important;
+  color: white !important;
+}
+
+/* Priority tags (from #focus/dark to #future/light) */
+[data-sc-tag-type="priority"][data-sc-priority="0"],
+[data-sc-tag-type="project"][data-sc-priority="0"] {
+  background-color: var(--sc-tag-priority-0) !important;
+  color: white !important;
+}
+
+[data-sc-tag-type="priority"][data-sc-priority="1"],
+[data-sc-tag-type="project"][data-sc-priority="1"] {
+  background-color: var(--sc-tag-priority-1) !important;
+  color: white !important;
+}
+
+[data-sc-tag-type="priority"][data-sc-priority="2"],
+[data-sc-tag-type="project"][data-sc-priority="2"] {
+  background-color: var(--sc-tag-priority-2) !important;
+  color: white !important;
+}
+
+[data-sc-tag-type="priority"][data-sc-priority="3"],
+[data-sc-tag-type="project"][data-sc-priority="3"] {
+  background-color: var(--sc-tag-priority-3) !important;
+  color: white !important;
+}
+
+[data-sc-tag-type="priority"][data-sc-priority="4"],
+[data-sc-tag-type="project"][data-sc-priority="4"] {
+  background-color: var(--sc-tag-priority-4) !important;
+  color: var(--text-normal) !important;
+}
+
+[data-sc-tag-type="priority"][data-sc-priority="5"],
+[data-sc-tag-type="project"][data-sc-priority="5"] {
+  background-color: var(--sc-tag-priority-5) !important;
+  color: var(--text-normal) !important;
+}
+
+[data-sc-tag-type="priority"][data-sc-priority="6"],
+[data-sc-tag-type="project"][data-sc-priority="6"] {
+  background-color: var(--sc-tag-priority-6) !important;
+  color: var(--text-normal) !important;
+}
+
 /* Logo styling */
 .space-command-logo {
   display: inline-block;

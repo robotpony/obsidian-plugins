@@ -2,6 +2,25 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.29] - 2026-01-27
+
+### Added
+
+- **Semantic tag colouring**: Tags now display with colour coding based on type and priority
+  - Uses the logo colour `#689fd6` as base, with HSL gradient for priorities
+  - Plugin tags (#todo, #todone, #idea, #principle): Logo colour
+  - Priority tags (#focus, #p0-#p4, #future): 7-shade gradient from dark (high priority) to light (low priority)
+  - Project tags: Colour based on weighted average priority of the project's tasks
+  - Colours apply in sidebar, embeds, editor, and reading mode
+
+### Technical
+
+- Added CSS variables `--sc-tag-priority-0` through `--sc-tag-priority-6` for semantic tag colours
+- Added `data-sc-tag-type` and `data-sc-priority` attributes to tag elements
+- Added `getTagColourInfo()` helper in utils.ts for tag classification
+- Added `colourIndex` to `ProjectInfo` type for project-level colour calculation
+- MutationObserver applies colours to Obsidian-rendered tags in editor and preview
+
 ## [0.9.28] - 2026-01-27
 
 ### Improved

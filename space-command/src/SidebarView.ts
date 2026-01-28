@@ -4,7 +4,7 @@ import { TodoProcessor } from "./TodoProcessor";
 import { ProjectManager } from "./ProjectManager";
 import { TodoItem, ProjectInfo, ItemRenderConfig } from "./types";
 import { ContextMenuHandler } from "./ContextMenuHandler";
-import { getPriorityValue, compareTodoItems, openFileAtLine, extractTags, showNotice } from "./utils";
+import { getPriorityValue, compareTodoItems, openFileAtLine, extractTags, showNotice, getTagColourInfo } from "./utils";
 
 export const VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 
@@ -264,10 +264,23 @@ export class TodoSidebarView extends ItemView {
     }
   }
 
+  // Get project colour map for tag colouring
+  private getProjectColourMap(): Map<string, number> {
+    const projects = this.projectManager.getProjects();
+    const map = new Map<string, number>();
+    for (const project of projects) {
+      map.set(project.tag.toLowerCase(), project.colourIndex);
+    }
+    return map;
+  }
+
   // Render collapsed tag indicator with dropdown
   // If item is provided, "Clear tag" option will be available to remove tags from the item
   private renderTagDropdown(tags: string[], container: HTMLElement, item?: TodoItem): void {
     if (tags.length === 0) return;
+
+    // Get project colour map for tag colouring
+    const projectColourMap = this.getProjectColourMap();
 
     const trigger = container.createEl("span", {
       cls: "tag-dropdown-trigger",
@@ -310,10 +323,16 @@ export class TodoSidebarView extends ItemView {
           cls: "tag-dropdown-item tag-dropdown-item-with-submenu",
         });
 
+        // Get colour info for this tag
+        const colourInfo = getTagColourInfo(tag, projectColourMap);
+
         const tagLabel = tagItem.createEl("span", {
-          cls: "tag-dropdown-item-label",
+          cls: "tag-dropdown-item-label tag",
           text: tag,
         });
+        // Add semantic colour data attributes
+        tagLabel.dataset.scTagType = colourInfo.type;
+        tagLabel.dataset.scPriority = colourInfo.priority.toString();
 
         const arrow = tagItem.createEl("span", {
           cls: "tag-dropdown-item-arrow",

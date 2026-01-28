@@ -32,6 +32,8 @@ export interface ProjectInfo {
   count: number;
   lastActivity: number;
   highestPriority: number;
+  /** Colour index 0-6 based on weighted average priority of project's tasks */
+  colourIndex: number;
 }
 
 // Configuration for unified list item rendering in SidebarView

@@ -22,7 +22,7 @@ import {
   DEFAULT_SETTINGS,
 } from "./src/types";
 import { convertToSlackMarkdown } from "./src/SlackConverter";
-import { showNotice } from "./src/utils";
+import { showNotice, getTagColourInfo, PLUGIN_TAGS, PRIORITY_TAG_MAP } from "./src/utils";
 import { LLMClient } from "./src/LLMClient";
 import { DefineTooltip } from "./src/DefineTooltip";
 import { TabLockManager } from "./src/TabLockManager";
@@ -36,6 +36,7 @@ export default class SpaceCommandPlugin extends Plugin {
   llmClient: LLMClient;
   defineTooltip: DefineTooltip;
   tabLockManager: TabLockManager;
+  private tagColourObserver: MutationObserver | null = null;
 
   async onload() {
     await this.loadSettings();
@@ -99,6 +100,9 @@ export default class SpaceCommandPlugin extends Plugin {
 
     // Watch for file changes
     this.scanner.watchFiles();
+
+    // Register tag colour observer for editor and reading mode
+    this.registerTagColourObserver();
 
     // Watch for native checkbox clicks on #todo lines
     this.registerDomEvent(document, "change", async (evt) => {
@@ -407,6 +411,11 @@ export default class SpaceCommandPlugin extends Plugin {
     this.defineTooltip.close();
     // Clean up tab lock manager
     this.tabLockManager.destroy();
+    // Clean up tag colour observer
+    if (this.tagColourObserver) {
+      this.tagColourObserver.disconnect();
+      this.tagColourObserver = null;
+    }
   }
 
   async loadSettings() {
@@ -480,6 +489,86 @@ export default class SpaceCommandPlugin extends Plugin {
     // Open Obsidian settings and navigate to Space Command tab
     (this.app as any).setting.open();
     (this.app as any).setting.openTabById("space-command");
+  }
+
+  /**
+   * Register MutationObserver to apply semantic colours to Obsidian-rendered tags.
+   * This handles tags in editor (Live Preview) and reading mode.
+   */
+  private registerTagColourObserver(): void {
+    this.tagColourObserver = new MutationObserver((mutations) => {
+      for (let i = 0; i < mutations.length; i++) {
+        const mutation = mutations[i];
+        const addedNodes = Array.from(mutation.addedNodes);
+        for (let j = 0; j < addedNodes.length; j++) {
+          const node = addedNodes[j];
+          if (node instanceof HTMLElement) {
+            this.applyTagColoursToElement(node);
+          }
+        }
+      }
+    });
+
+    // Observe document body for tag elements being added
+    this.tagColourObserver.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
+    // Also apply to existing elements
+    this.applyTagColoursToElement(document.body);
+  }
+
+  /**
+   * Apply semantic tag colours to tags within an element.
+   * Targets Obsidian's tag classes in editor (.cm-hashtag) and reading mode (.tag).
+   */
+  private applyTagColoursToElement(el: HTMLElement): void {
+    // Find tags that don't already have colour attributes
+    const tagNodes = el.querySelectorAll('.tag:not([data-sc-tag-type]), a.tag:not([data-sc-tag-type]), .cm-hashtag:not([data-sc-tag-type])');
+    const tags = Array.from(tagNodes);
+
+    // Get project colour map for project tag lookups
+    const projectColourMap = this.getProjectColourMap();
+
+    for (let i = 0; i < tags.length; i++) {
+      const tagEl = tags[i] as HTMLElement;
+      let tagText = tagEl.textContent?.trim() || '';
+
+      // Handle .cm-hashtag which may be split across elements
+      // (.cm-hashtag-begin contains #, .cm-hashtag-end contains the tag name)
+      if (tagEl.classList.contains('cm-hashtag-end')) {
+        // Try to get the full tag by looking at previous sibling
+        const prev = tagEl.previousElementSibling;
+        if (prev?.classList.contains('cm-hashtag-begin')) {
+          tagText = (prev.textContent || '') + tagText;
+        }
+      } else if (tagEl.classList.contains('cm-hashtag-begin')) {
+        // Skip the begin element, we'll handle it when we see the end
+        continue;
+      }
+
+      // Normalize tag (ensure it starts with #)
+      if (!tagText.startsWith('#')) {
+        tagText = '#' + tagText;
+      }
+
+      const colourInfo = getTagColourInfo(tagText, projectColourMap);
+      tagEl.dataset.scTagType = colourInfo.type;
+      tagEl.dataset.scPriority = colourInfo.priority.toString();
+    }
+  }
+
+  /**
+   * Get project colour map for tag colouring.
+   */
+  private getProjectColourMap(): Map<string, number> {
+    const projects = this.projectManager.getProjects();
+    const map = new Map<string, number>();
+    for (const project of projects) {
+      map.set(project.tag.toLowerCase(), project.colourIndex);
+    }
+    return map;
   }
 }
 

@@ -5,7 +5,7 @@ import { ProjectManager } from "./ProjectManager";
 import { FilterParser } from "./FilterParser";
 import { ContextMenuHandler } from "./ContextMenuHandler";
 import { TodoItem } from "./types";
-import { compareTodoItems, renderTextWithTags, openFileAtLine } from "./utils";
+import { compareTodoItems, renderTextWithTags, openFileAtLine, getTagColourInfo } from "./utils";
 
 export class EmbedRenderer {
   private app: App;
@@ -22,6 +22,9 @@ export class EmbedRenderer {
 
   // Track TODONE visibility state per container
   private todoneVisibility: Map<HTMLElement, boolean> = new Map();
+
+  // Cache project colour map to avoid recalculating for each tag
+  private projectColourMapCache: Map<string, number> | null = null;
 
   constructor(
     app: App,
@@ -40,6 +43,23 @@ export class EmbedRenderer {
     this.focusListLimit = focusListLimit;
     this.priorityTags = priorityTags;
     this.contextMenuHandler = new ContextMenuHandler(app, processor, priorityTags);
+  }
+
+  // Get project colour map for tag colouring (cached per render cycle)
+  private getProjectColourMap(): Map<string, number> {
+    if (!this.projectColourMapCache) {
+      const projects = this.projectManager.getProjects();
+      this.projectColourMapCache = new Map<string, number>();
+      for (const project of projects) {
+        this.projectColourMapCache.set(project.tag.toLowerCase(), project.colourIndex);
+      }
+    }
+    return this.projectColourMapCache;
+  }
+
+  // Invalidate colour map cache (called when re-rendering)
+  private invalidateColourMapCache(): void {
+    this.projectColourMapCache = null;
   }
 
   // Cleanup method to remove event listeners for a specific container
@@ -755,12 +775,15 @@ export class EmbedRenderer {
     // Priority tags that should get muted-pill styling
     const mutedTags = ['#focus', '#future', '#p0', '#p1', '#p2', '#p3', '#p4'];
 
+    // Get project colour map for semantic tag colouring
+    const projectColourMap = this.getProjectColourMap();
+
     // Render tokens as DOM elements
     for (const token of tokens) {
       switch (token.type) {
         case 'text':
-          // Check for priority tags in text and style them
-          renderTextWithTags(token.content, container, mutedTags);
+          // Check for priority tags in text and style them with semantic colours
+          renderTextWithTags(token.content, container, mutedTags, projectColourMap);
           break;
         case 'bold':
           container.createEl('strong', { text: token.content });
@@ -911,6 +934,8 @@ export class EmbedRenderer {
     todoneFile: string,
     filterString: string
   ): void {
+    // Invalidate colour map cache on refresh
+    this.invalidateColourMapCache();
     const filters = FilterParser.parse(filterString);
     // Get both TODOs and TODONEs
     // Filter out #idea items - they should only appear in idea embeds
@@ -956,6 +981,8 @@ export class EmbedRenderer {
     container: HTMLElement,
     filterString: string
   ): void {
+    // Invalidate colour map cache on refresh
+    this.invalidateColourMapCache();
     const filters = FilterParser.parse(filterString);
     const allIdeas = this.scanner.getIdeas();
     const filteredIdeas = FilterParser.applyFilters(allIdeas, filters);
@@ -986,6 +1013,8 @@ export class EmbedRenderer {
     container: HTMLElement,
     filterString: string
   ): void {
+    // Invalidate colour map cache on refresh
+    this.invalidateColourMapCache();
     const filters = FilterParser.parse(filterString);
     const allPrinciples = this.scanner.getPrinciples();
     const filteredPrinciples = FilterParser.applyFilters(allPrinciples, filters);

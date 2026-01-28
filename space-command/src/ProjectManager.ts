@@ -26,7 +26,8 @@ export class ProjectManager {
 
   getProjects(): ProjectInfo[] {
     const todos = this.scanner.getTodos();
-    const projectMap = new Map<string, ProjectInfo>();
+    // Track projects with priority sum for weighted average calculation
+    const projectMap = new Map<string, ProjectInfo & { prioritySum: number }>();
 
     // Aggregate project data from all todos
     for (const todo of todos) {
@@ -59,6 +60,7 @@ export class ProjectManager {
         if (projectMap.has(tag)) {
           const project = projectMap.get(tag)!;
           project.count++;
+          project.prioritySum += todoPriority;
           // Update last activity to most recent
           project.lastActivity = Math.max(
             project.lastActivity,
@@ -75,13 +77,32 @@ export class ProjectManager {
             count: 1,
             lastActivity: todo.dateCreated,
             highestPriority: todoPriority,
+            prioritySum: todoPriority,
+            colourIndex: 4, // default, will be calculated below
           });
         }
       }
     }
 
-    // Convert to array and return
-    return Array.from(projectMap.values());
+    // Calculate colourIndex from weighted average priority for each project
+    // Priority values range from 0 (#focus) to 7 (#future)
+    // Map to colourIndex 0-6 for CSS styling
+    const projects: ProjectInfo[] = [];
+    for (const [, project] of projectMap) {
+      const avgPriority = project.prioritySum / project.count;
+      // Map avgPriority (0-7) to colourIndex (0-6)
+      // Use Math.round for reasonable mapping
+      const colourIndex = Math.min(6, Math.round(avgPriority * 6 / 7));
+      projects.push({
+        tag: project.tag,
+        count: project.count,
+        lastActivity: project.lastActivity,
+        highestPriority: project.highestPriority,
+        colourIndex,
+      });
+    }
+
+    return projects;
   }
 
   getFocusProjects(limit?: number): ProjectInfo[] {
