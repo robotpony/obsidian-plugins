@@ -19,12 +19,9 @@
 }
 
 /* Base pill styling for all semantic tags */
+/* Only sets background color, inherits dimensions from unified tag styling */
 [data-sc-tag-type] {
-  border-radius: 4px !important;
-  padding: 1px 5px !important;
-  vertical-align: middle !important;
   overflow: visible !important;
-  display: inline-block !important;
 }
 
 /* CodeMirror splits tags into begin (#) and end (tagname) elements */
@@ -805,13 +802,22 @@
 }
 
 /* Unified tag styling for all plugin contexts (sidebar, embeds, editor, reading mode) */
+/* Force consistent appearance across ALL tag contexts */
 .space-command-sidebar .tag,
 .space-command-embed .tag,
 .cm-line .cm-hashtag,
-.markdown-preview-view a.tag {
+.markdown-preview-view a.tag,
+.markdown-preview-view .tag,
+.cm-hashtag,
+a.tag {
   font-size: 9pt !important;
   font-family: var(--font-monospace) !important;
   opacity: 0.85 !important;
+  line-height: 1.2 !important;
+  padding: 1px 5px !important;
+  border-radius: 4px !important;
+  vertical-align: middle !important;
+  display: inline-block !important;
 }
 
 /* Focus highlighting for ideas and principles */

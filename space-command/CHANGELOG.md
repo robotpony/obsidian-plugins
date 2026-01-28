@@ -2,6 +2,23 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.41] - 2026-01-28
+
+### Fixed
+
+- **Consistent tag dimensions across all contexts**: All tags now have identical size, padding, and line-height regardless of location
+  - Reading Mode tags now match editing mode/embed tag appearance
+  - Fixed height differences between header tags and body tags
+  - Applied uniform styling to tags at beginning, middle, and end of lines
+  - Tags use consistent 9pt font, 1px vertical padding, 1.2 line-height across all contexts
+  - Embed tag styling (the most compact and clean appearance) is now the standard
+
+### Technical
+
+- Expanded unified tag styling to cover all tag selectors (`.tag`, `a.tag`, `.cm-hashtag`, etc.)
+- Added explicit `line-height`, `padding`, `border-radius`, `vertical-align` to base tag rules
+- Simplified `[data-sc-tag-type]` to only handle overflow, inheriting dimensions from unified rules
+
 ## [0.9.40] - 2026-01-28
 
 ### Fixed
