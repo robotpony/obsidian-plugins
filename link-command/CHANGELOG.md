@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.4.17
+All notable changes to the Link Command plugin will be documented in this file.
+
+## [0.4.17] - 2026-01-27
 
 ### Improved
 
@@ -8,7 +10,7 @@
   - Differentiates from Space Command (blue) and Hugo Command (orange)
   - All three plugins now have distinct, complementary colours
 
-## 0.4.16
+## [0.4.16] - 2026-01-27
 
 ### Improved
 
@@ -19,65 +21,65 @@
   - Authenticated Domains section (unchanged)
   - Consistent with Space Command and Hugo Command settings layout
 
-## 0.4.15
+## [0.4.15] - 2026-01-27
 
 ### Improved
 
 - **Settings page header**: Added about section with logo, plugin name, description, version, and author info
   - Consistent with Space Command and Hugo Command settings layout
 
-## 0.4.14
+## [0.4.14] - 2026-01-27
 
 ### Fixed
 
 - **Sidebar scrollbar no longer overlaps content**: Added right padding to content area so scrollbar sits beside content, not over it
 - **Scrollbar hugs right edge**: Scrollbar now positioned flush against the right edge of the sidebar
 
-## 0.4.13
+## [0.4.13] - 2026-01-27
 
 ### Fixed
 
 - **Sidebar scrollbar positioning**: Vertical scrollbar now hugs the right edge (0-1px gap instead of 4-6px)
 - **Horizontal scrollbar prevention**: Sidebar content no longer shows horizontal scrollbars when content overflows
 
-## 0.4.12
+## [0.4.12] - 2026-01-26
 
 ### Changed
 
 - **Sidebar scrollbar**: Semi-transparent (65% opacity) scrollbar thumb with transparent track
 
-## 0.4.11
+## [0.4.11] - 2026-01-26
 
 ### Fixed
 
 - **Sidebar layout padding**: Reduced header padding to 2px top/bottom, 4px left/right; scrollbar now flush with right edge
 
-## 0.4.10
+## [0.4.10] - 2026-01-26
 
 ### Fixed
 
 - **Sidebar button styling**: Removed visible borders and backgrounds from close/menu/clear buttons; added subtle hover effect
 
-## 0.4.9
+## [0.4.9] - 2026-01-26
 
 ### Fixed
 
 - **Sidebar header now stays pinned** while scrolling content below
 
-## 0.4.8
+## [0.4.8] - 2026-01-26
 
 ### Fixed
 
 - **Removed duplicate hover effect** from external link icon in sidebar rows (row hover is sufficient)
 
-## 0.4.7
+## [0.4.7] - 2026-01-26
 
 ### Fixed
 
 - **Clear button now on same line** as "Recent History" header (added flex layout to section header)
 - **Page Links now open in browser** when clicked, consistent with history items
 
-## 0.4.6
+## [0.4.6] - 2026-01-26
 
 ### Added
 
@@ -94,14 +96,14 @@
   - Previously required switching files or manual refresh
   - Now listens to editor changes with 300ms debounce for responsive updates
 
-## 0.4.5
+## [0.4.5] - 2026-01-26
 
 ### Fixed
 
 - **Trailing asterisks stripped from URLs**: URLs with trailing `**` (common in pasted Google search results) are now cleaned up correctly
   - Added `*` to the trailing punctuation cleanup pattern across all URL extraction points
 
-## 0.4.4
+## [0.4.4] - 2026-01-26
 
 ### Added
 
@@ -110,14 +112,14 @@
   - Works with all Google TLDs (google.com, google.ca, google.co.uk, etc.)
   - No network request needed - extracts query directly from URL
 
-## 0.4.3
+## [0.4.3] - 2026-01-26
 
 ### Fixed
 
 - **Recent History now loads correctly**: Fixed bug where the cache was never initialized on first run or when no cache data existed, causing "Recent History" to always show empty
   - Cache is now always initialized on plugin load, even when starting fresh
 
-## 0.4.2
+## [0.4.2] - 2026-01-26
 
 ### Added
 
@@ -126,7 +128,7 @@
   - Non-unfurled links still show the grey status dot
   - Falls back to status dot if favicon fails to load
 
-## 0.4.1
+## [0.4.1] - 2026-01-26
 
 ### Changed
 
@@ -138,7 +140,7 @@
   - Count badges use pill style with `background-primary`
   - Item hover states use negative margin for edge-to-edge highlight
 
-## 0.4.0
+## [0.4.0] - 2026-01-26
 
 ### Changed
 
@@ -156,7 +158,7 @@
   - Deleted `LinkCardProcessor.ts`
   - Removed `.link-card-*` styles
 
-## 0.3.1
+## [0.3.1] - 2026-01-25
 
 ### Changed
 
@@ -164,7 +166,7 @@
   - Same icon for all states (URL, Link, Card)
   - Consistent with Link Command branding
 
-## 0.3.0
+## [0.3.0] - 2026-01-25
 
 ### Changed
 
@@ -186,7 +188,7 @@
 - "Auto-unfurl on paste" setting (paste inserts plain URL, use toggle to convert)
 - "Default format" setting (user explicitly chooses via toggle)
 
-## 0.2.5
+## [0.2.5] - 2026-01-25
 
 ### Fixed
 
@@ -195,7 +197,7 @@
   - Added missing `render()` calls after "Insert link card" command
   - Added source page tracking to "Insert link card" command
 
-## 0.2.4
+## [0.2.4] - 2026-01-25
 
 ### Fixed
 
@@ -204,7 +206,7 @@
   - JSON API returns structured post data including title, subreddit, description, and images
   - Now correctly shows post titles like "Thank you Obsidian team (r/ObsidianMD)" instead of "Reddit - The heart of the internet"
 
-## 0.2.3
+## [0.2.3] - 2026-01-24
 
 ### Added
 
@@ -217,7 +219,7 @@
 
 - Auto-unfurl on paste now uses the formatted title (with subreddit if configured) instead of raw title
 
-## 0.2.2
+## [0.2.2] - 2026-01-24
 
 ### Added
 
@@ -231,7 +233,7 @@
 
 - `UrlMetadata` type now includes optional `subreddit` field for Reddit links
 
-## 0.2.1
+## [0.2.1] - 2026-01-24
 
 ### Added
 
@@ -244,7 +246,7 @@
 
 - Sidebar now matches the header style of other workflow-automation plugins
 
-## 0.2.0
+## [0.2.0] - 2026-01-24
 
 ### Added
 
@@ -264,7 +266,7 @@
 - Cache now tracks source pages where URLs were unfurled
 - Sidebar automatically updates when active file changes or links are unfurled
 
-## 0.1.0
+## [0.1.0] - 2026-01-23
 
 ### Added
 

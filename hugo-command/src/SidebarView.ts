@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, Menu, Modal, App, TextComponent } from "obsidian";
+import { ItemView, WorkspaceLeaf, Menu, Modal, App } from "obsidian";
 import { HugoScanner } from "./HugoScanner";
 import { HugoContentItem, StatusFilter, HugoCommandSettings } from "./types";
 import { formatDate, openFile, LOGO_PREFIX, slugify, generateHugoFrontmatter, showNotice } from "./utils";
