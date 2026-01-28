@@ -26,6 +26,7 @@ import { showNotice, getTagColourInfo, PLUGIN_TAGS, PRIORITY_TAG_MAP } from "./s
 import { LLMClient } from "./src/LLMClient";
 import { DefineTooltip } from "./src/DefineTooltip";
 import { TabLockManager } from "./src/TabLockManager";
+import { createHeaderSortPlugin } from "./src/HeaderSortExtension";
 
 export default class SpaceCommandPlugin extends Plugin {
   settings: SpaceCommandSettings;
@@ -100,6 +101,11 @@ export default class SpaceCommandPlugin extends Plugin {
 
     // Watch for file changes
     this.scanner.watchFiles();
+
+    // Register editor extension for header sort buttons
+    this.registerEditorExtension(
+      createHeaderSortPlugin(this.app, this.processor, this.scanner)
+    );
 
     // Register tag colour observer for editor and reading mode
     this.registerTagColourObserver();

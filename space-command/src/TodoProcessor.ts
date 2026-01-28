@@ -9,6 +9,7 @@ import {
   removeIdeaTag,
   replaceIdeaWithTodo,
   showNotice,
+  compareByStatusAndDate,
 } from "./utils";
 import { TodoScanner } from "./TodoScanner";
 
@@ -733,5 +734,90 @@ export class TodoProcessor {
       console.error("Error removing tag:", error);
       return false;
     }
+  }
+
+  /**
+   * Sort children of a header TODO by status (open first) then completion date (newest first).
+   * Modifies the underlying markdown file to persist the sort order.
+   */
+  async sortHeaderChildren(headerTodo: TodoItem): Promise<boolean> {
+    if (!headerTodo.isHeader || !headerTodo.childLineNumbers || headerTodo.childLineNumbers.length < 2) {
+      return false; // Nothing to sort
+    }
+
+    try {
+      const content = await this.app.vault.read(headerTodo.file);
+      const lines = content.split("\n");
+
+      // Get all child line numbers and their content
+      const childLines = headerTodo.childLineNumbers
+        .filter(lineNum => lineNum >= 0 && lineNum < lines.length)
+        .map(lineNum => ({
+          lineNumber: lineNum,
+          text: lines[lineNum],
+          itemType: this.detectItemType(lines[lineNum])
+        }));
+
+      // Sort by status and date
+      const sortedChildren = [...childLines].sort(compareByStatusAndDate);
+
+      // Check if order changed
+      const orderChanged = sortedChildren.some((child, idx) =>
+        child.lineNumber !== childLines[idx].lineNumber
+      );
+
+      if (!orderChanged) {
+        showNotice("Items already sorted");
+        return true;
+      }
+
+      // Extract the sorted line contents
+      const sortedLineContents = sortedChildren.map(c => c.text);
+
+      // Replace lines in the original array (in place, sorted order)
+      // We need to replace at the original positions with the sorted contents
+      const sortedLineNumbers = [...headerTodo.childLineNumbers].sort((a, b) => a - b);
+      for (let i = 0; i < sortedLineNumbers.length; i++) {
+        lines[sortedLineNumbers[i]] = sortedLineContents[i];
+      }
+
+      await this.app.vault.modify(headerTodo.file, lines.join("\n"));
+
+      if (this.scanner) {
+        await this.scanner.scanFile(headerTodo.file);
+      }
+
+      if (this.onComplete) {
+        this.onComplete();
+      }
+
+      showNotice("Sorted items");
+      return true;
+    } catch (error) {
+      console.error("Error sorting header children:", error);
+      showNotice("Failed to sort items");
+      return false;
+    }
+  }
+
+  /**
+   * Detect if a line is complete (todone) or open (todo) based on its content.
+   * For list items, checkbox state is the primary indicator.
+   */
+  private detectItemType(text: string): 'todo' | 'todone' {
+    const trimmed = text.trim();
+
+    // For list items, checkbox state is the most reliable indicator
+    if (/^-\s*\[x\]/i.test(trimmed)) return 'todone';
+    if (/^-\s*\[\s*\]/.test(trimmed)) return 'todo';
+
+    // Strip code spans before checking tags (tags in backticks aren't real tags)
+    const textWithoutCode = text.replace(/`[^`]*`/g, "");
+
+    // Check for #todone tag
+    if (/#todones?\b/.test(textWithoutCode)) return 'todone';
+
+    // Default to open
+    return 'todo';
   }
 }

@@ -991,6 +991,59 @@
   flex: 1;
 }
 
+/* Sort button for header TODOs */
+.todo-sort-btn {
+  opacity: 0.4;
+  background: transparent;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: var(--text-muted);
+}
+
+.todo-sort-btn:hover {
+  opacity: 1;
+  color: var(--text-accent);
+  background: var(--background-modifier-hover);
+}
+
+.todo-sort-btn:disabled {
+  opacity: 0.2;
+  cursor: not-allowed;
+}
+
+/* Editor inline sort button */
+.todo-sort-btn-editor {
+  opacity: 0.4;
+  background: transparent;
+  border: none;
+  padding: 2px 4px;
+  margin-left: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: var(--text-muted);
+  vertical-align: middle;
+}
+
+.todo-sort-btn-editor:hover {
+  opacity: 1;
+  color: var(--text-accent);
+  background: var(--background-modifier-hover);
+}
+
+.todo-sort-btn-editor:disabled {
+  opacity: 0.2;
+  cursor: not-allowed;
+}
+
 /* Child TODO container */
 .todo-children {
   list-style: none;

@@ -314,6 +314,30 @@ function highlightLine(editor, line) {
     editor.setCursor({ line, ch: 0 });
   }, 1500);
 }
+function extractCompletionDate(text5) {
+  const match = text5.match(/@(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : null;
+}
+function compareByStatusAndDate(a, b) {
+  const aIsComplete = a.itemType === "todone";
+  const bIsComplete = b.itemType === "todone";
+  if (!aIsComplete && bIsComplete)
+    return -1;
+  if (aIsComplete && !bIsComplete)
+    return 1;
+  if (!aIsComplete && !bIsComplete)
+    return 0;
+  const aDate = extractCompletionDate(a.text);
+  const bDate = extractCompletionDate(b.text);
+  if (aDate && !bDate)
+    return -1;
+  if (!aDate && bDate)
+    return 1;
+  if (aDate && bDate) {
+    return bDate.localeCompare(aDate);
+  }
+  return 0;
+}
 function openFileAtLine(app, file, line) {
   const leaf = app.workspace.getLeaf(false);
   leaf.openFile(file, { active: true }).then(() => {
@@ -1207,6 +1231,65 @@ ${todoneText}` : todoneText;
       console.error("Error removing tag:", error);
       return false;
     }
+  }
+  /**
+   * Sort children of a header TODO by status (open first) then completion date (newest first).
+   * Modifies the underlying markdown file to persist the sort order.
+   */
+  async sortHeaderChildren(headerTodo) {
+    if (!headerTodo.isHeader || !headerTodo.childLineNumbers || headerTodo.childLineNumbers.length < 2) {
+      return false;
+    }
+    try {
+      const content3 = await this.app.vault.read(headerTodo.file);
+      const lines = content3.split("\n");
+      const childLines = headerTodo.childLineNumbers.filter((lineNum) => lineNum >= 0 && lineNum < lines.length).map((lineNum) => ({
+        lineNumber: lineNum,
+        text: lines[lineNum],
+        itemType: this.detectItemType(lines[lineNum])
+      }));
+      const sortedChildren = [...childLines].sort(compareByStatusAndDate);
+      const orderChanged = sortedChildren.some(
+        (child, idx) => child.lineNumber !== childLines[idx].lineNumber
+      );
+      if (!orderChanged) {
+        showNotice("Items already sorted");
+        return true;
+      }
+      const sortedLineContents = sortedChildren.map((c) => c.text);
+      const sortedLineNumbers = [...headerTodo.childLineNumbers].sort((a, b) => a - b);
+      for (let i = 0; i < sortedLineNumbers.length; i++) {
+        lines[sortedLineNumbers[i]] = sortedLineContents[i];
+      }
+      await this.app.vault.modify(headerTodo.file, lines.join("\n"));
+      if (this.scanner) {
+        await this.scanner.scanFile(headerTodo.file);
+      }
+      if (this.onComplete) {
+        this.onComplete();
+      }
+      showNotice("Sorted items");
+      return true;
+    } catch (error) {
+      console.error("Error sorting header children:", error);
+      showNotice("Failed to sort items");
+      return false;
+    }
+  }
+  /**
+   * Detect if a line is complete (todone) or open (todo) based on its content.
+   * For list items, checkbox state is the primary indicator.
+   */
+  detectItemType(text5) {
+    const trimmed = text5.trim();
+    if (/^-\s*\[x\]/i.test(trimmed))
+      return "todone";
+    if (/^-\s*\[\s*\]/.test(trimmed))
+      return "todo";
+    const textWithoutCode = text5.replace(/`[^`]*`/g, "");
+    if (/#todones?\b/.test(textWithoutCode))
+      return "todone";
+    return "todo";
   }
 };
 
@@ -14766,6 +14849,118 @@ var TabLockManager = class {
   }
 };
 
+// src/HeaderSortExtension.ts
+var import_view = require("@codemirror/view");
+var import_state = require("@codemirror/state");
+var SORT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5h10"/><path d="M11 9h7"/><path d="M11 13h4"/><path d="m3 17 3 3 3-3"/><path d="M6 18V4"/></svg>`;
+var SortButtonWidget = class extends import_view.WidgetType {
+  constructor(app, processor, scanner, lineNumber, filePath) {
+    super();
+    this.app = app;
+    this.processor = processor;
+    this.scanner = scanner;
+    this.lineNumber = lineNumber;
+    this.filePath = filePath;
+  }
+  toDOM() {
+    const btn = document.createElement("button");
+    btn.className = "todo-sort-btn-editor clickable-icon";
+    btn.setAttribute("aria-label", "Sort children");
+    btn.innerHTML = SORT_ICON;
+    btn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const todos = this.scanner.getTodos();
+      const headerTodo = todos.find(
+        (t) => t.filePath === this.filePath && t.lineNumber === this.lineNumber && t.isHeader === true
+      );
+      if (headerTodo) {
+        btn.disabled = true;
+        await this.processor.sortHeaderChildren(headerTodo);
+        btn.disabled = false;
+      }
+    });
+    return btn;
+  }
+  eq(other) {
+    return this.lineNumber === other.lineNumber && this.filePath === other.filePath;
+  }
+  ignoreEvent() {
+    return false;
+  }
+};
+function isHeaderTodoWithChildren(line, lineNumber, scanner, filePath) {
+  if (!/^#{1,6}\s+.*#todos?\b/i.test(line)) {
+    return false;
+  }
+  const todos = scanner.getTodos();
+  const headerTodo = todos.find(
+    (t) => t.filePath === filePath && t.lineNumber === lineNumber && t.isHeader === true
+  );
+  return !!(headerTodo && headerTodo.childLineNumbers && headerTodo.childLineNumbers.length > 0);
+}
+function createHeaderSortPlugin(app, processor, scanner) {
+  return import_view.ViewPlugin.fromClass(
+    class {
+      constructor(view) {
+        this.app = app;
+        this.processor = processor;
+        this.scanner = scanner;
+        this.decorations = this.buildDecorations(view);
+      }
+      update(update) {
+        if (update.docChanged || update.viewportChanged) {
+          this.decorations = this.buildDecorations(update.view);
+        }
+      }
+      buildDecorations(view) {
+        const builder = new import_state.RangeSetBuilder();
+        const filePath = this.getFilePath(view);
+        if (!filePath) {
+          return builder.finish();
+        }
+        for (const { from, to } of view.visibleRanges) {
+          let pos = from;
+          while (pos < to) {
+            const line = view.state.doc.lineAt(pos);
+            const lineText = line.text;
+            const lineNumber = line.number - 1;
+            if (isHeaderTodoWithChildren(
+              lineText,
+              lineNumber,
+              this.scanner,
+              filePath
+            )) {
+              const widget = new SortButtonWidget(
+                this.app,
+                this.processor,
+                this.scanner,
+                lineNumber,
+                filePath
+              );
+              builder.add(
+                line.to,
+                line.to,
+                import_view.Decoration.widget({ widget, side: 1 })
+              );
+            }
+            pos = line.to + 1;
+          }
+        }
+        return builder.finish();
+      }
+      getFilePath(view) {
+        var _a;
+        const file = this.app.workspace.getActiveFile();
+        return (_a = file == null ? void 0 : file.path) != null ? _a : null;
+      }
+    },
+    {
+      decorations: (v) => v.decorations
+    }
+  );
+}
+
 // main.ts
 var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
   constructor() {
@@ -14816,6 +15011,9 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
     });
     await this.scanner.scanVault();
     this.scanner.watchFiles();
+    this.registerEditorExtension(
+      createHeaderSortPlugin(this.app, this.processor, this.scanner)
+    );
     this.registerTagColourObserver();
     this.registerDomEvent(document, "change", async (evt) => {
       const target = evt.target;

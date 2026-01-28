@@ -2,6 +2,34 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.35] - 2026-01-28
+
+### Fixed
+
+- **Sort button only in editor**: Removed sort buttons from sidebar and embeds; sort icon now only appears inline in the markdown editor
+- **Sort detection reliability**: Fixed detection logic to prioritize checkbox state over tags
+  - Checkbox `[x]` vs `[ ]` is now the primary indicator for completion status
+  - Tags inside backticks (code spans) are now ignored when detecting item type
+
+### Technical
+
+- `detectItemType()` now checks checkbox state first, then strips code spans before checking tags
+
+## [0.9.34] - 2026-01-27
+
+### Added
+
+- **Editor sort button**: Sort icon appears inline in the markdown editor after header TODO lines with children
+  - Click to reorder child items directly in the markdown file
+  - Sort order: Open TODOs first, then TODONEs by completion date (newest first), then undated TODONEs
+
+### Technical
+
+- New `HeaderSortExtension.ts` CodeMirror ViewPlugin for inline editor widget
+- New `compareByStatusAndDate()` function in `utils.ts` for status/date sorting
+- New `extractCompletionDate()` helper in `utils.ts`
+- New `sortHeaderChildren()` method in `TodoProcessor` for file modification
+
 ## [0.9.32] - 2026-01-27
 
 ### Fixed

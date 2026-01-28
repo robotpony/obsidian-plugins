@@ -288,8 +288,49 @@ export function highlightLine(
 }
 
 /**
- * Open a file at a specific line and highlight it.
+ * Extract completion date from TODONE text.
+ * Returns date string (YYYY-MM-DD) or null if not found.
  */
+export function extractCompletionDate(text: string): string | null {
+  const match = text.match(/@(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : null;
+}
+
+/**
+ * Compare items for sorting by status (open first) then completion date (newest first).
+ * Sort order: Open TODOs first, then TODONEs by date (newest first), then dateless TODONEs.
+ */
+export function compareByStatusAndDate(
+  a: { text: string; itemType?: string },
+  b: { text: string; itemType?: string }
+): number {
+  const aIsComplete = a.itemType === 'todone';
+  const bIsComplete = b.itemType === 'todone';
+
+  // Open items first
+  if (!aIsComplete && bIsComplete) return -1;
+  if (aIsComplete && !bIsComplete) return 1;
+
+  // Both open - maintain original order
+  if (!aIsComplete && !bIsComplete) return 0;
+
+  // Both complete - sort by date (newest first)
+  const aDate = extractCompletionDate(a.text);
+  const bDate = extractCompletionDate(b.text);
+
+  // Dated items before undated
+  if (aDate && !bDate) return -1;
+  if (!aDate && bDate) return 1;
+
+  // Both dated - newest first
+  if (aDate && bDate) {
+    return bDate.localeCompare(aDate);
+  }
+
+  // Both undated - maintain original order
+  return 0;
+}
+
 export function openFileAtLine(
   app: App,
   file: TFile,
