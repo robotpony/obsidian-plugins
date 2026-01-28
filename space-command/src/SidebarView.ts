@@ -904,7 +904,14 @@ export class TodoSidebarView extends ItemView {
     );
 
     // Filter out child items (they'll be rendered under their parent header)
-    todos = todos.filter(todo => todo.parentLineNumber === undefined);
+    // Exception: In focus mode, keep children with #focus so they appear standalone
+    if (this.focusModeEnabled) {
+      todos = todos.filter(todo =>
+        todo.parentLineNumber === undefined || todo.tags.includes("#focus")
+      );
+    } else {
+      todos = todos.filter(todo => todo.parentLineNumber === undefined);
+    }
 
     // Apply tag filter if active
     if (this.activeTagFilter) {

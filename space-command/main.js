@@ -3360,7 +3360,13 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     todos = todos.filter(
       (todo) => !todo.tags.includes("#idea") && !todo.tags.includes("#ideas") && !todo.tags.includes("#ideation")
     );
-    todos = todos.filter((todo) => todo.parentLineNumber === void 0);
+    if (this.focusModeEnabled) {
+      todos = todos.filter(
+        (todo) => todo.parentLineNumber === void 0 || todo.tags.includes("#focus")
+      );
+    } else {
+      todos = todos.filter((todo) => todo.parentLineNumber === void 0);
+    }
     if (this.activeTagFilter) {
       todos = todos.filter((todo) => todo.tags.includes(this.activeTagFilter));
     }

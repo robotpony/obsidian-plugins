@@ -2,6 +2,14 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.32] - 2026-01-27
+
+### Fixed
+
+- **Focus mode now shows block-level focused children**: When a child item under a header TODO has `#focus`, it now appears in focus mode as a standalone item
+  - Previously, children were filtered out before focus mode evaluation
+  - Example: `- Step B #focus` under `### Task #todo` now shows in focus mode
+
 ## [0.9.31] - 2026-01-27
 
 ### Improved
