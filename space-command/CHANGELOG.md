@@ -2,6 +2,22 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.45] - 2026-01-28
+
+### Fixed
+
+- **Grey uncolored tags in editing mode**: Tags in headings, paragraphs, and mid-line positions now receive proper coloring
+  - Previously, tags that weren't at line ends (in headings, beginning/middle of lines) appeared grey/uncolored
+  - Added periodic re-processing (every 2 seconds) to catch tags that load after initial render
+  - Added active-leaf-change listener to re-color tags when switching files or panes
+  - Ensures all tags get `[data-sc-tag-type]` attribute regardless of position or timing
+
+### Technical
+
+- Added `active-leaf-change` event listener with 100ms delay for CodeMirror rendering
+- Added interval-based reprocessing (every 2 seconds) to catch missed tags
+- Both properly use `registerEvent()` and `registerInterval()` for cleanup on plugin unload
+
 ## [0.9.44] - 2026-01-28
 
 ### Fixed

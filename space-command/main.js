@@ -15444,6 +15444,19 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
       subtree: true
     });
     this.applyTagColoursToElement(document.body);
+    this.registerEvent(
+      this.app.workspace.on("active-leaf-change", () => {
+        setTimeout(() => {
+          this.applyTagColoursToElement(document.body);
+        }, 100);
+      })
+    );
+    this.registerInterval(
+      window.setInterval(() => {
+        this.applyTagColoursToElement(document.body);
+      }, 2e3)
+      // Every 2 seconds
+    );
   }
   /**
    * Apply semantic tag colours to tags within an element.

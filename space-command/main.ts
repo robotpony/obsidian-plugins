@@ -523,8 +523,25 @@ export default class SpaceCommandPlugin extends Plugin {
       subtree: true
     });
 
-    // Also apply to existing elements
+    // Apply to existing elements immediately
     this.applyTagColoursToElement(document.body);
+
+    // Re-apply colors on active leaf change (file switch, pane change)
+    this.registerEvent(
+      this.app.workspace.on('active-leaf-change', () => {
+        // Small delay to let CodeMirror finish rendering
+        setTimeout(() => {
+          this.applyTagColoursToElement(document.body);
+        }, 100);
+      })
+    );
+
+    // Re-apply colors periodically to catch any missed tags
+    this.registerInterval(
+      window.setInterval(() => {
+        this.applyTagColoursToElement(document.body);
+      }, 2000) // Every 2 seconds
+    );
   }
 
   /**
