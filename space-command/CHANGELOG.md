@@ -2,6 +2,14 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.39] - 2026-01-28
+
+### Fixed
+
+- **Tag hash symbol visibility in bold text**: Hash symbols (#) now display correctly when tags appear inside bold text in Live Preview editor
+  - Previously, the # symbol would be clipped or hidden entirely when tags were inside bold formatting
+  - Added `overflow: visible` and `display: inline-block` to prevent element clipping
+
 ## [0.9.38] - 2026-01-28
 
 ### Fixed
