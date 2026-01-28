@@ -18,6 +18,7 @@ export class TodoSidebarView extends ItemView {
   private recentTodonesLimit: number;
   private activeTodosLimit: number;
   private focusListLimit: number;
+  private focusModeIncludeProjects: boolean;
   private activeTab: 'todos' | 'ideas' = 'todos';
   private activeTagFilter: string | null = null;
   private focusModeEnabled: boolean = false;
@@ -36,6 +37,7 @@ export class TodoSidebarView extends ItemView {
     recentTodonesLimit: number,
     activeTodosLimit: number,
     focusListLimit: number,
+    focusModeIncludeProjects: boolean,
     onShowAbout: () => void,
     onShowStats: () => void
   ) {
@@ -47,6 +49,7 @@ export class TodoSidebarView extends ItemView {
     this.recentTodonesLimit = recentTodonesLimit;
     this.activeTodosLimit = activeTodosLimit;
     this.focusListLimit = focusListLimit;
+    this.focusModeIncludeProjects = focusModeIncludeProjects;
     this.onShowAbout = onShowAbout;
     this.onShowStats = onShowStats;
 
@@ -889,6 +892,24 @@ export class TodoSidebarView extends ItemView {
       todos = todos.filter(todo => todo.tags.includes(this.activeTagFilter!));
     }
 
+    // Apply focus mode filter if enabled
+    if (this.focusModeEnabled) {
+      if (this.focusModeIncludeProjects) {
+        // Get project tags from focused projects
+        const focusedProjects = this.projectManager.getProjects()
+          .filter(p => p.highestPriority === 0)
+          .map(p => p.tag);
+        // Show #focus items or items from focused projects
+        todos = todos.filter(todo =>
+          todo.tags.includes("#focus") ||
+          todo.tags.some(tag => focusedProjects.includes(tag))
+        );
+      } else {
+        // Show only #focus items
+        todos = todos.filter(todo => todo.tags.includes("#focus"));
+      }
+    }
+
     // Sort by focus, priority, then tag count
     todos = this.sortTodosByPriority(todos);
 
@@ -908,8 +929,14 @@ export class TodoSidebarView extends ItemView {
     this.renderFilterIndicator(header);
 
     if (totalCount === 0) {
+      let emptyText = "No TODOs";
+      if (this.focusModeEnabled) {
+        emptyText = "No focused TODOs";
+      } else if (this.activeTagFilter) {
+        emptyText = `No TODOs matching ${this.activeTagFilter}`;
+      }
       section.createEl("div", {
-        text: this.activeTagFilter ? `No TODOs matching ${this.activeTagFilter}` : "No TODOs",
+        text: emptyText,
         cls: "todo-empty",
       });
       return;

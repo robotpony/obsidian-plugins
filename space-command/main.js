@@ -2671,7 +2671,7 @@ var DateSuggest = class extends import_obsidian7.EditorSuggest {
 var import_obsidian8 = require("obsidian");
 var VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 var TodoSidebarView = class extends import_obsidian8.ItemView {
-  constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, recentTodonesLimit, activeTodosLimit, focusListLimit, onShowAbout, onShowStats) {
+  constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, recentTodonesLimit, activeTodosLimit, focusListLimit, focusModeIncludeProjects, onShowAbout, onShowStats) {
     super(leaf);
     this.updateListener = null;
     this.activeTab = "todos";
@@ -2710,6 +2710,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     this.recentTodonesLimit = recentTodonesLimit;
     this.activeTodosLimit = activeTodosLimit;
     this.focusListLimit = focusListLimit;
+    this.focusModeIncludeProjects = focusModeIncludeProjects;
     this.onShowAbout = onShowAbout;
     this.onShowStats = onShowStats;
     this.contextMenuHandler = new ContextMenuHandler(
@@ -3277,6 +3278,16 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     if (this.activeTagFilter) {
       todos = todos.filter((todo) => todo.tags.includes(this.activeTagFilter));
     }
+    if (this.focusModeEnabled) {
+      if (this.focusModeIncludeProjects) {
+        const focusedProjects = this.projectManager.getProjects().filter((p) => p.highestPriority === 0).map((p) => p.tag);
+        todos = todos.filter(
+          (todo) => todo.tags.includes("#focus") || todo.tags.some((tag) => focusedProjects.includes(tag))
+        );
+      } else {
+        todos = todos.filter((todo) => todo.tags.includes("#focus"));
+      }
+    }
     todos = this.sortTodosByPriority(todos);
     const totalCount = todos.length;
     if (this.activeTodosLimit > 0) {
@@ -3288,8 +3299,14 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     titleSpan.textContent = "TODO";
     this.renderFilterIndicator(header);
     if (totalCount === 0) {
+      let emptyText = "No TODOs";
+      if (this.focusModeEnabled) {
+        emptyText = "No focused TODOs";
+      } else if (this.activeTagFilter) {
+        emptyText = `No TODOs matching ${this.activeTagFilter}`;
+      }
       section.createEl("div", {
-        text: this.activeTagFilter ? `No TODOs matching ${this.activeTagFilter}` : "No TODOs",
+        text: emptyText,
         cls: "todo-empty"
       });
       return;
@@ -3505,6 +3522,8 @@ var DEFAULT_SETTINGS = {
   priorityTags: ["#p0", "#p1", "#p2", "#p3", "#p4"],
   recentTodonesLimit: 5,
   excludeFoldersFromProjects: ["log"],
+  // Focus mode settings
+  focusModeIncludeProjects: false,
   // Tab lock settings
   showTabLockButton: false,
   // LLM/Define settings
@@ -14744,6 +14763,7 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
         this.settings.recentTodonesLimit,
         this.settings.activeTodosLimit,
         this.settings.focusListLimit,
+        this.settings.focusModeIncludeProjects,
         () => this.showAboutModal(),
         () => this.showStatsModal()
       )
@@ -15142,6 +15162,12 @@ var SpaceCommandSettingTab = class extends import_obsidian11.PluginSettingTab {
           this.plugin.settings.activeTodosLimit = num;
           await this.plugin.saveSettings();
         }
+      })
+    );
+    new import_obsidian11.Setting(containerEl).setName("Focus mode includes project TODOs").setDesc("When enabled, focus mode shows all TODOs from focused projects (not just #focus items)").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.focusModeIncludeProjects).onChange(async (value) => {
+        this.plugin.settings.focusModeIncludeProjects = value;
+        await this.plugin.saveSettings();
       })
     );
     new import_obsidian11.Setting(containerEl).setName("Exclude folders from projects").setDesc("Comma-separated folders to exclude from inferred project tags (e.g., log, archive)").addText(

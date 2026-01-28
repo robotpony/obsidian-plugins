@@ -55,6 +55,8 @@ export interface SpaceCommandSettings {
   priorityTags: string[];
   recentTodonesLimit: number;
   excludeFoldersFromProjects: string[];
+  // Focus mode settings
+  focusModeIncludeProjects: boolean;
   // Tab lock settings
   showTabLockButton: boolean;
   // LLM/Define settings
@@ -78,6 +80,8 @@ export const DEFAULT_SETTINGS: SpaceCommandSettings = {
   priorityTags: ["#p0", "#p1", "#p2", "#p3", "#p4"],
   recentTodonesLimit: 5,
   excludeFoldersFromProjects: ["log"],
+  // Focus mode settings
+  focusModeIncludeProjects: false,
   // Tab lock settings
   showTabLockButton: false,
   // LLM/Define settings

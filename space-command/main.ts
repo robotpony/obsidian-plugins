@@ -164,6 +164,7 @@ export default class SpaceCommandPlugin extends Plugin {
           this.settings.recentTodonesLimit,
           this.settings.activeTodosLimit,
           this.settings.focusListLimit,
+          this.settings.focusModeIncludeProjects,
           () => this.showAboutModal(),
           () => this.showStatsModal()
         )
@@ -739,6 +740,18 @@ class SpaceCommandSettingTab extends PluginSettingTab {
               this.plugin.settings.activeTodosLimit = num;
               await this.plugin.saveSettings();
             }
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Focus mode includes project TODOs")
+      .setDesc("When enabled, focus mode shows all TODOs from focused projects (not just #focus items)")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.focusModeIncludeProjects)
+          .onChange(async (value) => {
+            this.plugin.settings.focusModeIncludeProjects = value;
+            await this.plugin.saveSettings();
           })
       );
 

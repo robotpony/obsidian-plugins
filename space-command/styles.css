@@ -320,6 +320,9 @@
 }
 
 .todo-section-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   cursor: pointer;
   padding: 5px 0;
   margin-bottom: 10px;

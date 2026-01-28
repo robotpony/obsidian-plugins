@@ -2,6 +2,28 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.26] - 2026-01-27
+
+### Added
+
+- **Focus mode filters TODO list**: When focus mode is enabled, the TODO section now also filters to show only focused items
+  - Default: shows only `#focus` tagged TODOs
+  - Optional: show all TODOs from focused projects (configure in Settings → "Focus mode includes project TODOs")
+  - Empty state shows "No focused TODOs" when focus mode is active
+
+### Settings
+
+- **Focus mode includes project TODOs**: New toggle to expand focus mode filtering
+  - OFF (default): Focus mode shows only `#focus` items
+  - ON: Focus mode shows `#focus` items plus all TODOs from projects that have focused items
+
+## [0.9.25] - 2026-01-27
+
+### Fixed
+
+- **Focus mode icon layout**: Eye icon now displays inline beside the "Focus" heading instead of on a separate line
+  - Added flexbox layout to section headers
+
 ## [0.9.24] - 2026-01-27
 
 ### Added
