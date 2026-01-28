@@ -290,6 +290,7 @@ var HugoScanner = class extends import_obsidian2.Events {
   constructor(app, contentPaths) {
     super();
     this.contentCache = /* @__PURE__ */ new Map();
+    this.folderCache = /* @__PURE__ */ new Set();
     this.app = app;
     this.contentPaths = contentPaths;
     this.debouncedScanFile = (0, import_obsidian2.debounce)(
@@ -325,13 +326,26 @@ var HugoScanner = class extends import_obsidian2.Events {
    */
   async scanVault() {
     this.contentCache.clear();
+    this.folderCache.clear();
     const files = this.app.vault.getMarkdownFiles();
     for (const file of files) {
       if (this.isInContentPath(file.path)) {
         await this.scanFile(file);
       }
     }
+    this.scanFolders();
     this.trigger("content-updated");
+  }
+  /**
+   * Scan all folders in the vault that match content paths
+   */
+  scanFolders() {
+    const folders = this.app.vault.getAllFolders();
+    for (const folder of folders) {
+      if (this.isInContentPath(folder.path)) {
+        this.folderCache.add(folder.path);
+      }
+    }
   }
   /**
    * Scan a single file and update the cache
@@ -389,11 +403,19 @@ var HugoScanner = class extends import_obsidian2.Events {
       if (file instanceof import_obsidian2.TFile && file.extension === "md") {
         this.debouncedScanFile(file);
         this.trigger("content-updated");
+      } else if (file instanceof import_obsidian2.TFolder) {
+        if (this.isInContentPath(file.path)) {
+          this.folderCache.add(file.path);
+          this.trigger("content-updated");
+        }
       }
     });
     this.app.vault.on("delete", (file) => {
       if (file instanceof import_obsidian2.TFile) {
         this.contentCache.delete(file.path);
+        this.trigger("content-updated");
+      } else if (file instanceof import_obsidian2.TFolder) {
+        this.folderCache.delete(file.path);
         this.trigger("content-updated");
       }
     });
@@ -401,6 +423,12 @@ var HugoScanner = class extends import_obsidian2.Events {
       if (file instanceof import_obsidian2.TFile && file.extension === "md") {
         this.contentCache.delete(oldPath);
         this.debouncedScanFile(file);
+        this.trigger("content-updated");
+      } else if (file instanceof import_obsidian2.TFolder) {
+        this.folderCache.delete(oldPath);
+        if (this.isInContentPath(file.path)) {
+          this.folderCache.add(file.path);
+        }
         this.trigger("content-updated");
       }
     });
@@ -494,6 +522,7 @@ var HugoScanner = class extends import_obsidian2.Events {
   /**
    * Get folder hierarchy as a flat list with depth for display
    * Returns folders with their full path and nesting depth
+   * Merges folders derived from files with actual folders from the vault
    */
   getFolderHierarchy() {
     const pathSet = /* @__PURE__ */ new Set();
@@ -504,6 +533,15 @@ var HugoScanner = class extends import_obsidian2.Events {
       pathSet.add(currentPath);
       for (const subFolder of item.folderTags) {
         currentPath = `${currentPath}/${subFolder}`;
+        pathSet.add(currentPath);
+      }
+    }
+    for (const folderPath of this.folderCache) {
+      pathSet.add(folderPath);
+      const parts = folderPath.split("/");
+      let currentPath = "";
+      for (const part of parts) {
+        currentPath = currentPath ? `${currentPath}/${part}` : part;
         pathSet.add(currentPath);
       }
     }
@@ -561,6 +599,7 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
     this.activeFolderTagFilter = null;
     this.searchQuery = "";
     this.openDropdown = null;
+    this.openDropdownTrigger = null;
     this.openInfoPopup = null;
     this.scanner = scanner;
     this.settings = settings;
@@ -601,6 +640,7 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
       this.openDropdown.remove();
       this.openDropdown = null;
     }
+    this.openDropdownTrigger = null;
   }
   closeInfoPopup() {
     if (this.openInfoPopup) {
@@ -1017,6 +1057,10 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
     });
     trigger.addEventListener("click", (e) => {
       e.stopPropagation();
+      if (this.openDropdownTrigger === trigger) {
+        this.closeDropdown();
+        return;
+      }
       this.closeDropdown();
       const dropdown = document.createElement("div");
       dropdown.className = "hugo-command-tag-dropdown";
@@ -1094,6 +1138,7 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
       }
       document.body.appendChild(dropdown);
       this.openDropdown = dropdown;
+      this.openDropdownTrigger = trigger;
       const closeHandler = (e2) => {
         if (!dropdown.contains(e2.target) && e2.target !== trigger) {
           this.closeDropdown();
