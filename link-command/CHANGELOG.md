@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.17
+
+### Improved
+
+- **Distinct logo colour**: Changed logo badge from blue (#689fd6) to green (#5da65d)
+  - Differentiates from Space Command (blue) and Hugo Command (orange)
+  - All three plugins now have distinct, complementary colours
+
 ## 0.4.16
 
 ### Improved

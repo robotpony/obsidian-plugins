@@ -69,10 +69,10 @@
   overflow: hidden;
 }
 
-/* Logo styling - matches space-command */
+/* Logo styling - green to differentiate from space-command (blue) and hugo-command (orange) */
 .link-command-logo {
   display: inline-block;
-  background-color: #689fd6;
+  background-color: #5da65d;
   color: white;
   border-radius: 4px;
   padding: 3px 3px 2px;

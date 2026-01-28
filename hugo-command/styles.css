@@ -128,11 +128,28 @@
 .hugo-command-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
   padding: 2px 4px;
   background-color: var(--background-secondary);
   flex-shrink: 0;
   z-index: 1;
+}
+
+.hugo-command-header-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.hugo-command-header-title h4 {
+  margin: 0;
+}
+
+.hugo-command-button-group {
+  display: flex;
+  gap: 4px;
+  align-items: center;
 }
 
 .hugo-command-content {
@@ -156,11 +173,6 @@
 .hugo-command-sidebar ::-webkit-scrollbar-thumb {
   background-color: color-mix(in srgb, var(--text-muted) 65%, transparent);
   border-radius: 4px;
-}
-
-.hugo-command-title {
-  font-weight: 600;
-  flex: 1;
 }
 
 /* New post button */

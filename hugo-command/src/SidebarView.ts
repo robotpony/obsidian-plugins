@@ -99,22 +99,22 @@ export class HugoSidebarView extends ItemView {
   private renderHeader(container: HTMLElement): void {
     const header = container.createEl("div", { cls: "hugo-command-header" });
 
-    const logo = header.createEl("span", {
+    // Title container with logo
+    const titleEl = header.createEl("div", { cls: "hugo-command-header-title" });
+    const logo = titleEl.createEl("span", {
       cls: "hugo-command-logo clickable-logo",
       text: LOGO_PREFIX,
     });
-
     logo.addEventListener("click", () => {
       this.onShowAbout();
     });
+    titleEl.createEl("h4", { text: "Hugo" });
 
-    header.createEl("span", {
-      cls: "hugo-command-title",
-      text: "Hugo Command",
-    });
+    // Button group
+    const buttonGroup = header.createEl("div", { cls: "hugo-command-button-group" });
 
     // New post button (plus icon)
-    const newBtn = header.createEl("button", {
+    const newBtn = buttonGroup.createEl("button", {
       cls: "clickable-icon hugo-command-new-btn",
       attr: { "aria-label": "New post" },
     });
@@ -126,7 +126,7 @@ export class HugoSidebarView extends ItemView {
     });
 
     // Kebab menu button (three vertical dots)
-    const menuBtn = header.createEl("button", {
+    const menuBtn = buttonGroup.createEl("button", {
       cls: "clickable-icon hugo-command-menu-btn",
       attr: { "aria-label": "Menu" },
     });

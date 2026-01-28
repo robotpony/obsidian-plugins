@@ -619,18 +619,17 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
   }
   renderHeader(container) {
     const header = container.createEl("div", { cls: "hugo-command-header" });
-    const logo = header.createEl("span", {
+    const titleEl = header.createEl("div", { cls: "hugo-command-header-title" });
+    const logo = titleEl.createEl("span", {
       cls: "hugo-command-logo clickable-logo",
       text: LOGO_PREFIX
     });
     logo.addEventListener("click", () => {
       this.onShowAbout();
     });
-    header.createEl("span", {
-      cls: "hugo-command-title",
-      text: "Hugo Command"
-    });
-    const newBtn = header.createEl("button", {
+    titleEl.createEl("h4", { text: "Hugo" });
+    const buttonGroup = header.createEl("div", { cls: "hugo-command-button-group" });
+    const newBtn = buttonGroup.createEl("button", {
       cls: "clickable-icon hugo-command-new-btn",
       attr: { "aria-label": "New post" }
     });
@@ -639,7 +638,7 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
       e.stopPropagation();
       this.showNewPostDropdown(newBtn);
     });
-    const menuBtn = header.createEl("button", {
+    const menuBtn = buttonGroup.createEl("button", {
       cls: "clickable-icon hugo-command-menu-btn",
       attr: { "aria-label": "Menu" }
     });

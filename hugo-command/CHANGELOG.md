@@ -2,6 +2,16 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.4.14] - 2026-01-27
+
+### Improved
+
+- **Sidebar header consistency**: Header layout now matches Space Command and Link Command
+  - Uses `justify-content: space-between` layout instead of `gap: 8px`
+  - Title uses h4 element wrapped with logo in a flex container
+  - Buttons grouped in a button-group container
+  - Shortened title from "Hugo Command" to "Hugo" for consistency
+
 ## [0.4.13] - 2026-01-27
 
 ### Improved
