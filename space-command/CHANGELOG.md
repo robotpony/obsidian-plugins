@@ -2,6 +2,22 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.40] - 2026-01-28
+
+### Fixed
+
+- **Unified tag styling across all contexts**: Tags now display consistently in editor (Live Preview/Source mode), Reading Mode, embeds, and sidebar
+  - Fixed hash symbol (#) being hidden in bold text - now fully visible
+  - Fixed hash symbol background color mismatch - hash and tag name now share the same colored background
+  - Fixed height inconsistencies between Reading Mode and editing mode tags
+  - In CodeMirror editor, both the hash symbol and tag name elements now receive unified styling
+  - Tags appear as a single cohesive chicklet regardless of context
+
+### Technical
+
+- Apply `data-sc-tag-type` and `data-sc-priority` to both `.cm-hashtag-begin` and `.cm-hashtag-end` elements
+- Added CSS rules to merge begin/end elements visually (removed internal padding and border radius)
+
 ## [0.9.39] - 2026-01-28
 
 ### Fixed

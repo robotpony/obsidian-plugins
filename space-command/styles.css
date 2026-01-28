@@ -27,6 +27,20 @@
   display: inline-block !important;
 }
 
+/* CodeMirror splits tags into begin (#) and end (tagname) elements */
+/* Style them as a unified chicklet by removing internal padding/borders */
+.cm-hashtag-begin[data-sc-tag-type] {
+  padding-right: 0 !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+.cm-hashtag-end[data-sc-tag-type] {
+  padding-left: 0 !important;
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+}
+
 /* Plugin tags (system tags like #todo, #idea, etc.) */
 /* At 62% lightness, dark text provides better contrast */
 [data-sc-tag-type="plugin"] {

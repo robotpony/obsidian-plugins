@@ -15461,6 +15461,12 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
         const prev = tagEl.previousElementSibling;
         if (prev == null ? void 0 : prev.classList.contains("cm-hashtag-begin")) {
           tagText = (prev.textContent || "") + tagText;
+          const colourInfo2 = getTagColourInfo(tagText.startsWith("#") ? tagText : "#" + tagText, projectColourMap);
+          tagEl.dataset.scTagType = colourInfo2.type;
+          tagEl.dataset.scPriority = colourInfo2.priority.toString();
+          prev.dataset.scTagType = colourInfo2.type;
+          prev.dataset.scPriority = colourInfo2.priority.toString();
+          continue;
         }
       } else if (tagEl.classList.contains("cm-hashtag-begin")) {
         continue;

@@ -550,6 +550,14 @@ export default class SpaceCommandPlugin extends Plugin {
         const prev = tagEl.previousElementSibling;
         if (prev?.classList.contains('cm-hashtag-begin')) {
           tagText = (prev.textContent || '') + tagText;
+
+          // Apply styling to both begin and end elements for unified appearance
+          const colourInfo = getTagColourInfo(tagText.startsWith('#') ? tagText : '#' + tagText, projectColourMap);
+          tagEl.dataset.scTagType = colourInfo.type;
+          tagEl.dataset.scPriority = colourInfo.priority.toString();
+          (prev as HTMLElement).dataset.scTagType = colourInfo.type;
+          (prev as HTMLElement).dataset.scPriority = colourInfo.priority.toString();
+          continue;
         }
       } else if (tagEl.classList.contains('cm-hashtag-begin')) {
         // Skip the begin element, we'll handle it when we see the end
