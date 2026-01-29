@@ -554,20 +554,6 @@ export default class SpaceCommandPlugin extends Plugin {
     const tagNodes = el.querySelectorAll('.tag:not([data-sc-tag-type]), a.tag:not([data-sc-tag-type]), span.tag:not([data-sc-tag-type]), .cm-hashtag:not([data-sc-tag-type]), .cm-tag:not([data-sc-tag-type])');
     const tags = Array.from(tagNodes);
 
-    // Debug: log tag count periodically
-    if (tags.length > 0) {
-      console.log('[SC Debug] Processing', tags.length, 'tags');
-    }
-
-    // Also check for focus tags specifically with a broader query
-    const allFocusTags = el.querySelectorAll('.cm-tag-focus');
-    if (allFocusTags.length > 0) {
-      console.log('[SC Debug] Found cm-tag-focus elements:', allFocusTags.length);
-      allFocusTags.forEach((t, i) => {
-        console.log(`[SC Debug] Focus tag ${i}:`, t.className, 'has data-sc-tag-type:', t.hasAttribute('data-sc-tag-type'));
-      });
-    }
-
     // Get project colour map for project tag lookups
     const projectColourMap = this.getProjectColourMap();
 
@@ -602,18 +588,21 @@ export default class SpaceCommandPlugin extends Plugin {
         continue;
       } else if (tagEl.classList.contains('cm-hashtag-begin')) {
         // For begin elements, find the matching end element by looking at next sibling
-        // This ensures both get styled even if the end element iteration missed them
         const next = tagEl.nextElementSibling;
-        if (next?.classList.contains('cm-hashtag-end') && !next.hasAttribute('data-sc-tag-type')) {
+        if (next?.classList.contains('cm-hashtag-end')) {
           tagText = tagText + (next.textContent?.trim() || '');
           if (!tagText.startsWith('#')) {
             tagText = '#' + tagText;
           }
           const colourInfo = getTagColourInfo(tagText, projectColourMap);
+          // Always set on begin element
           tagEl.dataset.scTagType = colourInfo.type;
           tagEl.dataset.scPriority = colourInfo.priority.toString();
-          (next as HTMLElement).dataset.scTagType = colourInfo.type;
-          (next as HTMLElement).dataset.scPriority = colourInfo.priority.toString();
+          // Also set on end element if it doesn't have it yet
+          if (!next.hasAttribute('data-sc-tag-type')) {
+            (next as HTMLElement).dataset.scTagType = colourInfo.type;
+            (next as HTMLElement).dataset.scPriority = colourInfo.priority.toString();
+          }
         }
         continue;
       }

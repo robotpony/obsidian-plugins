@@ -15500,16 +15500,6 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
     var _a, _b;
     const tagNodes = el.querySelectorAll(".tag:not([data-sc-tag-type]), a.tag:not([data-sc-tag-type]), span.tag:not([data-sc-tag-type]), .cm-hashtag:not([data-sc-tag-type]), .cm-tag:not([data-sc-tag-type])");
     const tags = Array.from(tagNodes);
-    if (tags.length > 0) {
-      console.log("[SC Debug] Processing", tags.length, "tags");
-    }
-    const allFocusTags = el.querySelectorAll(".cm-tag-focus");
-    if (allFocusTags.length > 0) {
-      console.log("[SC Debug] Found cm-tag-focus elements:", allFocusTags.length);
-      allFocusTags.forEach((t, i) => {
-        console.log(`[SC Debug] Focus tag ${i}:`, t.className, "has data-sc-tag-type:", t.hasAttribute("data-sc-tag-type"));
-      });
-    }
     const projectColourMap = this.getProjectColourMap();
     for (let i = 0; i < tags.length; i++) {
       const tagEl = tags[i];
@@ -15534,7 +15524,7 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
         continue;
       } else if (tagEl.classList.contains("cm-hashtag-begin")) {
         const next = tagEl.nextElementSibling;
-        if ((next == null ? void 0 : next.classList.contains("cm-hashtag-end")) && !next.hasAttribute("data-sc-tag-type")) {
+        if (next == null ? void 0 : next.classList.contains("cm-hashtag-end")) {
           tagText = tagText + (((_b = next.textContent) == null ? void 0 : _b.trim()) || "");
           if (!tagText.startsWith("#")) {
             tagText = "#" + tagText;
@@ -15542,8 +15532,10 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
           const colourInfo2 = getTagColourInfo(tagText, projectColourMap);
           tagEl.dataset.scTagType = colourInfo2.type;
           tagEl.dataset.scPriority = colourInfo2.priority.toString();
-          next.dataset.scTagType = colourInfo2.type;
-          next.dataset.scPriority = colourInfo2.priority.toString();
+          if (!next.hasAttribute("data-sc-tag-type")) {
+            next.dataset.scTagType = colourInfo2.type;
+            next.dataset.scPriority = colourInfo2.priority.toString();
+          }
         }
         continue;
       }

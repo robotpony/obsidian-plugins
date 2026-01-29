@@ -2,6 +2,20 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.49] - 2026-01-28
+
+### Fixed
+
+- **Tag colouring consistency**: Fixed tags like `#focus`, `#p0` appearing grey instead of styled blue
+  - Root cause: When Obsidian recreated DOM elements (e.g., during scrolling), the `cm-hashtag-begin` element (the `#`) could be recreated without the styling attribute, while its paired `cm-hashtag-end` element still had it
+  - The logic previously skipped styling the begin element if the end element already had the attribute
+  - Now always styles the begin element when a matching end element is found
+
+### Technical
+
+- Changed `cm-hashtag-begin` processing to always set `data-sc-tag-type` regardless of whether the paired end element already has it
+- This handles Obsidian's virtual scrolling which can recreate individual DOM elements
+
 ## [0.9.48] - 2026-01-28
 
 ### Fixed
