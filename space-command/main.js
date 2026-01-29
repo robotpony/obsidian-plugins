@@ -15502,9 +15502,19 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
     const tags = Array.from(tagNodes);
     const allFocusTags = el.querySelectorAll(".cm-tag-focus");
     if (allFocusTags.length > 0) {
-      const unstyledCount = Array.from(allFocusTags).filter((t) => !t.hasAttribute("data-sc-tag-type")).length;
-      if (unstyledCount > 0) {
-        console.log(`[SC Debug] ${unstyledCount}/${allFocusTags.length} focus tags unstyled`);
+      const unstyled = Array.from(allFocusTags).filter((t) => !t.hasAttribute("data-sc-tag-type"));
+      if (unstyled.length > 0) {
+        console.log(`[SC Debug] ${unstyled.length}/${allFocusTags.length} focus tags unstyled:`);
+        unstyled.forEach((t, i) => {
+          const isBegin = t.classList.contains("cm-hashtag-begin");
+          const isEnd = t.classList.contains("cm-hashtag-end");
+          const prev = t.previousElementSibling;
+          const next = t.nextElementSibling;
+          console.log(`[SC Debug]   ${i}: ${isBegin ? "BEGIN" : isEnd ? "END" : "OTHER"}`);
+          console.log(`[SC Debug]     prev: ${(prev == null ? void 0 : prev.className) || "null"}, hasAttr: ${prev == null ? void 0 : prev.hasAttribute("data-sc-tag-type")}`);
+          console.log(`[SC Debug]     next: ${(next == null ? void 0 : next.className) || "null"}, hasAttr: ${next == null ? void 0 : next.hasAttribute("data-sc-tag-type")}`);
+          console.log(`[SC Debug]     inQuery: ${tags.includes(t)}`);
+        });
       }
     }
     const projectColourMap = this.getProjectColourMap();
