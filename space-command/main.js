@@ -2098,7 +2098,8 @@ var EmbedRenderer = class {
     }
   }
   // Render a single todo item (and its children if it's a header)
-  renderTodoItem(list4, todo, allTodos, showTodones, todoneFile, filterString, isChild = false) {
+  // parentTags: optional tags inherited from a parent header block (for child items)
+  renderTodoItem(list4, todo, allTodos, showTodones, todoneFile, filterString, isChild = false, parentTags = []) {
     const isCompleted = todo.itemType === "todone";
     const isHeader = todo.isHeader === true;
     const hasChildren = isHeader && todo.childLineNumbers && todo.childLineNumbers.length > 0;
@@ -2152,6 +2153,13 @@ var EmbedRenderer = class {
     }
     let displayText = cleanText.replace(/^-\s*\[\s*\]\s*/, "").replace(/^-\s*\[x\]\s*/i, "");
     displayText = displayText.replace(/^#{1,6}\s+/, "").replace(/^[*\-+]\s+/, "").replace(/^>\s+/, "");
+    if (parentTags.length > 0) {
+      const existingTags = new Set(displayText.match(/#[\w-]+/g) || []);
+      const newTags = parentTags.filter((tag) => !existingTags.has(tag));
+      if (newTags.length > 0) {
+        displayText = displayText.trim() + " " + newTags.join(" ");
+      }
+    }
     this.renderInlineMarkdown(displayText, textSpan);
     textSpan.append(" ");
     if (completionDate) {
@@ -2171,6 +2179,7 @@ var EmbedRenderer = class {
     });
     if (isHeader && todo.childLineNumbers && todo.childLineNumbers.length > 0) {
       const childrenContainer = item.createEl("ul", { cls: "todo-children contains-task-list" });
+      const headerTags = extractTags(todo.text).filter((tag) => !/#todos?\b/.test(tag) && !/#todones?\b/.test(tag));
       for (const childLine of todo.childLineNumbers) {
         const childTodo = allTodos.find(
           (t) => t.filePath === todo.filePath && t.lineNumber === childLine
@@ -2179,7 +2188,7 @@ var EmbedRenderer = class {
           if (!showTodones && childTodo.itemType === "todone") {
             continue;
           }
-          this.renderTodoItem(childrenContainer, childTodo, allTodos, showTodones, todoneFile, filterString, true);
+          this.renderTodoItem(childrenContainer, childTodo, allTodos, showTodones, todoneFile, filterString, true, headerTags);
         }
       }
     }
@@ -2213,7 +2222,8 @@ var EmbedRenderer = class {
     }
   }
   // Render a single idea item (and its children if it's a header)
-  renderIdeaItem(list4, idea, allIdeas, filterString, isChild = false) {
+  // parentTags: optional tags inherited from a parent header block (for child items)
+  renderIdeaItem(list4, idea, allIdeas, filterString, isChild = false, parentTags = []) {
     const isHeader = idea.isHeader === true;
     const hasChildren = isHeader && idea.childLineNumbers && idea.childLineNumbers.length > 0;
     const itemClasses = [
@@ -2228,6 +2238,13 @@ var EmbedRenderer = class {
     let cleanText = idea.text.replace(/#idea(?:s|tion)?\b/g, "").trim();
     let displayText = cleanText.replace(/^-\s*\[\s*\]\s*/, "").replace(/^-\s*\[x\]\s*/i, "");
     displayText = displayText.replace(/^#{1,6}\s+/, "").replace(/^[*\-+]\s+/, "").replace(/^>\s+/, "");
+    if (parentTags.length > 0) {
+      const existingTags = new Set(displayText.match(/#[\w-]+/g) || []);
+      const newTags = parentTags.filter((tag) => !existingTags.has(tag));
+      if (newTags.length > 0) {
+        displayText = displayText.trim() + " " + newTags.join(" ");
+      }
+    }
     this.renderInlineMarkdown(displayText, textSpan);
     textSpan.append(" ");
     const link2 = rowContainer.createEl("a", {
@@ -2241,12 +2258,13 @@ var EmbedRenderer = class {
     });
     if (isHeader && idea.childLineNumbers && idea.childLineNumbers.length > 0) {
       const childrenContainer = item.createEl("ul", { cls: "idea-children" });
+      const headerTags = extractTags(idea.text).filter((tag) => !/#idea(?:s|tion)?\b/.test(tag));
       for (const childLine of idea.childLineNumbers) {
         const childIdea = allIdeas.find(
           (i) => i.filePath === idea.filePath && i.lineNumber === childLine
         );
         if (childIdea) {
-          this.renderIdeaItem(childrenContainer, childIdea, allIdeas, filterString, true);
+          this.renderIdeaItem(childrenContainer, childIdea, allIdeas, filterString, true, headerTags);
         }
       }
     }
@@ -2280,7 +2298,8 @@ var EmbedRenderer = class {
     }
   }
   // Render a single principle item (and its children if it's a header)
-  renderPrincipleItem(list4, principle, allPrinciples, filterString, isChild = false) {
+  // parentTags: optional tags inherited from a parent header block (for child items)
+  renderPrincipleItem(list4, principle, allPrinciples, filterString, isChild = false, parentTags = []) {
     const isHeader = principle.isHeader === true;
     const hasChildren = isHeader && principle.childLineNumbers && principle.childLineNumbers.length > 0;
     const itemClasses = [
@@ -2295,6 +2314,13 @@ var EmbedRenderer = class {
     let cleanText = principle.text.replace(/#principles?\b/g, "").trim();
     let displayText = cleanText.replace(/^-\s*\[\s*\]\s*/, "").replace(/^-\s*\[x\]\s*/i, "");
     displayText = displayText.replace(/^#{1,6}\s+/, "").replace(/^[*\-+]\s+/, "").replace(/^>\s+/, "");
+    if (parentTags.length > 0) {
+      const existingTags = new Set(displayText.match(/#[\w-]+/g) || []);
+      const newTags = parentTags.filter((tag) => !existingTags.has(tag));
+      if (newTags.length > 0) {
+        displayText = displayText.trim() + " " + newTags.join(" ");
+      }
+    }
     this.renderInlineMarkdown(displayText, textSpan);
     textSpan.append(" ");
     const link2 = rowContainer.createEl("a", {
@@ -2308,12 +2334,13 @@ var EmbedRenderer = class {
     });
     if (isHeader && principle.childLineNumbers && principle.childLineNumbers.length > 0) {
       const childrenContainer = item.createEl("ul", { cls: "principle-children" });
+      const headerTags = extractTags(principle.text).filter((tag) => !/#principles?\b/.test(tag));
       for (const childLine of principle.childLineNumbers) {
         const childPrinciple = allPrinciples.find(
           (p) => p.filePath === principle.filePath && p.lineNumber === childLine
         );
         if (childPrinciple) {
-          this.renderPrincipleItem(childrenContainer, childPrinciple, allPrinciples, filterString, true);
+          this.renderPrincipleItem(childrenContainer, childPrinciple, allPrinciples, filterString, true, headerTags);
         }
       }
     }
@@ -3013,7 +3040,8 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     }
   }
   // Unified list item renderer for todos, ideas, and principles
-  renderListItem(list4, item, config, isChild = false) {
+  // parentTags: optional tags inherited from a parent header block (for child items)
+  renderListItem(list4, item, config, isChild = false, parentTags = []) {
     const hasFocus = item.tags.includes("#focus");
     const isHeader = item.isHeader === true;
     const hasChildren = isHeader && item.childLineNumbers && item.childLineNumbers.length > 0;
@@ -3055,9 +3083,10 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       const finalText = displayText.replace(/\s+/g, " ").trim();
       textSpan.appendText(finalText);
     }
-    const tags = extractTags(cleanText).filter((tag) => !config.tagToStrip.test(tag));
-    if (tags.length > 0) {
-      this.renderTagDropdown(tags, rowContainer, item);
+    const itemTags = extractTags(cleanText).filter((tag) => !config.tagToStrip.test(tag));
+    const mergedTags = [.../* @__PURE__ */ new Set([...parentTags, ...itemTags])];
+    if (mergedTags.length > 0) {
+      this.renderTagDropdown(mergedTags, rowContainer, item);
     }
     const link2 = rowContainer.createEl("a", {
       text: "\u2192",
@@ -3071,12 +3100,13 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     if (hasChildren) {
       const childrenContainer = listItem2.createEl("ul", { cls: `${config.classPrefix}-children` });
       const allItems = this.getItemsForType(config.type);
+      const headerTags = extractTags(item.text).filter((tag) => !config.tagToStrip.test(tag));
       for (const childLine of item.childLineNumbers) {
         const childItem = allItems.find(
           (t) => t.filePath === item.filePath && t.lineNumber === childLine
         );
         if (childItem) {
-          this.renderListItem(childrenContainer, childItem, config, true);
+          this.renderListItem(childrenContainer, childItem, config, true, headerTags);
         }
       }
     }

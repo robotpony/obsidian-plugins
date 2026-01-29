@@ -2,6 +2,23 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.46] - 2026-01-28
+
+### Fixed
+
+- **Child items now inherit parent header tags**: Items under a block header (TODO, Idea, Principle) now display both their own tags and their parent header's tags
+  - Previously, child items only showed tags from their own line, not the header's tags
+  - Sidebar tag dropdown now shows merged parent + child tags
+  - Embed renders now append parent header tags to child item display
+  - Duplicate tags are automatically filtered out
+
+### Technical
+
+- Added `parentTags` parameter to `renderListItem()` in SidebarView
+- Added `parentTags` parameter to `renderTodoItem()`, `renderIdeaItem()`, `renderPrincipleItem()` in EmbedRenderer
+- Header tags are extracted and passed to child render calls
+- Tags are merged with Set deduplication for clean display
+
 ## [0.9.45] - 2026-01-28
 
 ### Fixed

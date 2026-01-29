@@ -260,11 +260,13 @@ export class TodoSidebarView extends ItemView {
 
 
   // Unified list item renderer for todos, ideas, and principles
+  // parentTags: optional tags inherited from a parent header block (for child items)
   private renderListItem(
     list: HTMLElement,
     item: TodoItem,
     config: ItemRenderConfig,
-    isChild: boolean = false
+    isChild: boolean = false,
+    parentTags: string[] = []
   ): void {
     const hasFocus = item.tags.includes("#focus");
     const isHeader = item.isHeader === true;
@@ -326,10 +328,12 @@ export class TodoSidebarView extends ItemView {
       textSpan.appendText(finalText);
     }
 
-    // Get tags (excluding the type tag) and render dropdown on the row container (right-aligned before link)
-    const tags = extractTags(cleanText).filter(tag => !config.tagToStrip.test(tag));
-    if (tags.length > 0) {
-      this.renderTagDropdown(tags, rowContainer, item);
+    // Get tags (excluding the type tag) and merge with parent header tags for child items
+    const itemTags = extractTags(cleanText).filter(tag => !config.tagToStrip.test(tag));
+    // Merge parent tags with item tags, avoiding duplicates
+    const mergedTags = [...new Set([...parentTags, ...itemTags])];
+    if (mergedTags.length > 0) {
+      this.renderTagDropdown(mergedTags, rowContainer, item);
     }
 
     // Link to source
@@ -348,12 +352,14 @@ export class TodoSidebarView extends ItemView {
     if (hasChildren) {
       const childrenContainer = listItem.createEl("ul", { cls: `${config.classPrefix}-children` });
       const allItems = this.getItemsForType(config.type);
+      // Get parent header's tags to pass to children (excluding the type tag)
+      const headerTags = extractTags(item.text).filter(tag => !config.tagToStrip.test(tag));
       for (const childLine of item.childLineNumbers!) {
         const childItem = allItems.find(
           t => t.filePath === item.filePath && t.lineNumber === childLine
         );
         if (childItem) {
-          this.renderListItem(childrenContainer, childItem, config, true);
+          this.renderListItem(childrenContainer, childItem, config, true, headerTags);
         }
       }
     }

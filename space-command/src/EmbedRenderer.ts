@@ -5,7 +5,7 @@ import { ProjectManager } from "./ProjectManager";
 import { FilterParser } from "./FilterParser";
 import { ContextMenuHandler } from "./ContextMenuHandler";
 import { TodoItem } from "./types";
-import { compareTodoItems, renderTextWithTags, openFileAtLine, getTagColourInfo } from "./utils";
+import { compareTodoItems, renderTextWithTags, openFileAtLine, getTagColourInfo, extractTags } from "./utils";
 
 export class EmbedRenderer {
   private app: App;
@@ -415,6 +415,7 @@ export class EmbedRenderer {
   }
 
   // Render a single todo item (and its children if it's a header)
+  // parentTags: optional tags inherited from a parent header block (for child items)
   private renderTodoItem(
     list: HTMLElement,
     todo: TodoItem,
@@ -422,7 +423,8 @@ export class EmbedRenderer {
     showTodones: boolean,
     todoneFile: string,
     filterString: string,
-    isChild: boolean = false
+    isChild: boolean = false,
+    parentTags: string[] = []
   ): void {
     const isCompleted = todo.itemType === 'todone';
     const isHeader = todo.isHeader === true;
@@ -500,6 +502,15 @@ export class EmbedRenderer {
       .replace(/^[*\-+]\s+/, "")   // Remove list markers
       .replace(/^>\s+/, "");        // Remove quote markers
 
+    // Append parent header tags to child items (excluding duplicates already in displayText)
+    if (parentTags.length > 0) {
+      const existingTags = new Set(displayText.match(/#[\w-]+/g) || []);
+      const newTags = parentTags.filter(tag => !existingTags.has(tag));
+      if (newTags.length > 0) {
+        displayText = displayText.trim() + " " + newTags.join(" ");
+      }
+    }
+
     // Render inline markdown manually to avoid extra <p> tags
     this.renderInlineMarkdown(displayText, textSpan);
     textSpan.append(" ");
@@ -527,6 +538,8 @@ export class EmbedRenderer {
     // If this is a header with children, render children indented below
     if (isHeader && todo.childLineNumbers && todo.childLineNumbers.length > 0) {
       const childrenContainer = item.createEl("ul", { cls: "todo-children contains-task-list" });
+      // Extract parent header tags to pass to children (excluding #todo/#todone)
+      const headerTags = extractTags(todo.text).filter(tag => !/#todos?\b/.test(tag) && !/#todones?\b/.test(tag));
       for (const childLine of todo.childLineNumbers) {
         const childTodo = allTodos.find(
           t => t.filePath === todo.filePath && t.lineNumber === childLine
@@ -536,7 +549,7 @@ export class EmbedRenderer {
           if (!showTodones && childTodo.itemType === 'todone') {
             continue;
           }
-          this.renderTodoItem(childrenContainer, childTodo, allTodos, showTodones, todoneFile, filterString, true);
+          this.renderTodoItem(childrenContainer, childTodo, allTodos, showTodones, todoneFile, filterString, true, headerTags);
         }
       }
     }
@@ -590,12 +603,14 @@ export class EmbedRenderer {
   }
 
   // Render a single idea item (and its children if it's a header)
+  // parentTags: optional tags inherited from a parent header block (for child items)
   private renderIdeaItem(
     list: HTMLElement,
     idea: TodoItem,
     allIdeas: TodoItem[],
     filterString: string,
-    isChild: boolean = false
+    isChild: boolean = false,
+    parentTags: string[] = []
   ): void {
     const isHeader = idea.isHeader === true;
     const hasChildren = isHeader && idea.childLineNumbers && idea.childLineNumbers.length > 0;
@@ -625,6 +640,15 @@ export class EmbedRenderer {
       .replace(/^[*\-+]\s+/, "")
       .replace(/^>\s+/, "");
 
+    // Append parent header tags to child items (excluding duplicates already in displayText)
+    if (parentTags.length > 0) {
+      const existingTags = new Set(displayText.match(/#[\w-]+/g) || []);
+      const newTags = parentTags.filter(tag => !existingTags.has(tag));
+      if (newTags.length > 0) {
+        displayText = displayText.trim() + " " + newTags.join(" ");
+      }
+    }
+
     this.renderInlineMarkdown(displayText, textSpan);
     textSpan.append(" ");
 
@@ -643,12 +667,14 @@ export class EmbedRenderer {
     // If this is a header with children, render children indented below
     if (isHeader && idea.childLineNumbers && idea.childLineNumbers.length > 0) {
       const childrenContainer = item.createEl("ul", { cls: "idea-children" });
+      // Extract parent header tags to pass to children (excluding #idea/#ideas/#ideation)
+      const headerTags = extractTags(idea.text).filter(tag => !/#idea(?:s|tion)?\b/.test(tag));
       for (const childLine of idea.childLineNumbers) {
         const childIdea = allIdeas.find(
           i => i.filePath === idea.filePath && i.lineNumber === childLine
         );
         if (childIdea) {
-          this.renderIdeaItem(childrenContainer, childIdea, allIdeas, filterString, true);
+          this.renderIdeaItem(childrenContainer, childIdea, allIdeas, filterString, true, headerTags);
         }
       }
     }
@@ -702,12 +728,14 @@ export class EmbedRenderer {
   }
 
   // Render a single principle item (and its children if it's a header)
+  // parentTags: optional tags inherited from a parent header block (for child items)
   private renderPrincipleItem(
     list: HTMLElement,
     principle: TodoItem,
     allPrinciples: TodoItem[],
     filterString: string,
-    isChild: boolean = false
+    isChild: boolean = false,
+    parentTags: string[] = []
   ): void {
     const isHeader = principle.isHeader === true;
     const hasChildren = isHeader && principle.childLineNumbers && principle.childLineNumbers.length > 0;
@@ -737,6 +765,15 @@ export class EmbedRenderer {
       .replace(/^[*\-+]\s+/, "")
       .replace(/^>\s+/, "");
 
+    // Append parent header tags to child items (excluding duplicates already in displayText)
+    if (parentTags.length > 0) {
+      const existingTags = new Set(displayText.match(/#[\w-]+/g) || []);
+      const newTags = parentTags.filter(tag => !existingTags.has(tag));
+      if (newTags.length > 0) {
+        displayText = displayText.trim() + " " + newTags.join(" ");
+      }
+    }
+
     this.renderInlineMarkdown(displayText, textSpan);
     textSpan.append(" ");
 
@@ -755,12 +792,14 @@ export class EmbedRenderer {
     // If this is a header with children, render children indented below
     if (isHeader && principle.childLineNumbers && principle.childLineNumbers.length > 0) {
       const childrenContainer = item.createEl("ul", { cls: "principle-children" });
+      // Extract parent header tags to pass to children (excluding #principle/#principles)
+      const headerTags = extractTags(principle.text).filter(tag => !/#principles?\b/.test(tag));
       for (const childLine of principle.childLineNumbers) {
         const childPrinciple = allPrinciples.find(
           p => p.filePath === principle.filePath && p.lineNumber === childLine
         );
         if (childPrinciple) {
-          this.renderPrincipleItem(childrenContainer, childPrinciple, allPrinciples, filterString, true);
+          this.renderPrincipleItem(childrenContainer, childPrinciple, allPrinciples, filterString, true, headerTags);
         }
       }
     }
