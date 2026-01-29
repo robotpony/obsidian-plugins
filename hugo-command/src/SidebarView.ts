@@ -688,47 +688,30 @@ export class HugoSidebarView extends ItemView {
         dropdown.style.left = `${rect.left}px`;
       }
 
-      // Date section (always first if present)
+      // Header section: title + metadata
+      const headerSection = dropdown.createEl("div", {
+        cls: "hugo-command-info-header",
+      });
+
+      // Post title
+      headerSection.createEl("div", {
+        cls: "hugo-command-info-title",
+        text: item.title,
+      });
+
+      // Metadata line: date and folder
+      const metaParts: string[] = [];
       if (date) {
-        dropdown.createEl("div", {
-          cls: "hugo-command-info-date",
-          text: formatDate(date),
-        });
+        metaParts.push(formatDate(date));
       }
-
-      // Folder tags section
       if (folderTags.length > 0) {
-        if (date) {
-          dropdown.createEl("div", { cls: "hugo-command-tag-separator" });
-        }
-
-        dropdown.createEl("div", {
-          cls: "hugo-command-tag-section-header",
-          text: "Folders",
+        metaParts.push(folderTags.join("/"));
+      }
+      if (metaParts.length > 0) {
+        headerSection.createEl("div", {
+          cls: "hugo-command-info-meta",
+          text: metaParts.join(" · "),
         });
-
-        for (const tag of folderTags) {
-          const tagItem = dropdown.createEl("div", {
-            cls: "hugo-command-tag-item folder-tag",
-          });
-
-          tagItem.createEl("span", {
-            cls: "hugo-command-tag-label",
-            text: tag,
-          });
-
-          const filterBtn = tagItem.createEl("span", {
-            cls: "hugo-command-tag-action",
-            text: "Filter",
-          });
-
-          filterBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            this.activeFolderTagFilter = tag;
-            this.closeDropdown();
-            this.render();
-          });
-        }
       }
 
       // Frontmatter tags section

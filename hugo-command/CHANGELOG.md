@@ -2,6 +2,21 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.5.3] - 2026-01-28
+
+### Improved
+
+- **Post info dropdown redesign**: Title-first layout with date and folder as metadata
+  - Post title displayed prominently at top
+  - Date and folder shown as secondary metadata line below title
+  - Review section now has proper padding for readability
+
+## [0.5.2] - 2026-01-28
+
+### Improved
+
+- **Review loading indicator**: Centred with padding for better visual balance
+
 ## [0.5.1] - 2026-01-28
 
 ### Improved

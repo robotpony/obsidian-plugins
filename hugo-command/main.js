@@ -1078,39 +1078,25 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
       } else {
         dropdown.style.left = `${rect.left}px`;
       }
+      const headerSection = dropdown.createEl("div", {
+        cls: "hugo-command-info-header"
+      });
+      headerSection.createEl("div", {
+        cls: "hugo-command-info-title",
+        text: item.title
+      });
+      const metaParts = [];
       if (date) {
-        dropdown.createEl("div", {
-          cls: "hugo-command-info-date",
-          text: formatDate(date)
-        });
+        metaParts.push(formatDate(date));
       }
       if (folderTags.length > 0) {
-        if (date) {
-          dropdown.createEl("div", { cls: "hugo-command-tag-separator" });
-        }
-        dropdown.createEl("div", {
-          cls: "hugo-command-tag-section-header",
-          text: "Folders"
+        metaParts.push(folderTags.join("/"));
+      }
+      if (metaParts.length > 0) {
+        headerSection.createEl("div", {
+          cls: "hugo-command-info-meta",
+          text: metaParts.join(" \xB7 ")
         });
-        for (const tag of folderTags) {
-          const tagItem = dropdown.createEl("div", {
-            cls: "hugo-command-tag-item folder-tag"
-          });
-          tagItem.createEl("span", {
-            cls: "hugo-command-tag-label",
-            text: tag
-          });
-          const filterBtn = tagItem.createEl("span", {
-            cls: "hugo-command-tag-action",
-            text: "Filter"
-          });
-          filterBtn.addEventListener("click", (e2) => {
-            e2.stopPropagation();
-            this.activeFolderTagFilter = tag;
-            this.closeDropdown();
-            this.render();
-          });
-        }
       }
       if (frontmatterTags.length > 0) {
         if (date || folderTags.length > 0) {
