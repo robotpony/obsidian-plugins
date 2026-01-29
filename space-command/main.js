@@ -152,12 +152,13 @@ var PLUGIN_TAGS = /* @__PURE__ */ new Set([
 ]);
 var PRIORITY_TAG_MAP = {
   "#focus": 0,
-  "#p0": 1,
-  "#p1": 2,
-  "#p2": 3,
-  "#p3": 4,
-  "#p4": 5,
-  "#future": 6
+  "#today": 1,
+  "#p0": 2,
+  "#p1": 3,
+  "#p2": 4,
+  "#p3": 5,
+  "#p4": 6,
+  "#future": 7
 };
 function getTagColourInfo(tag, projectColourMap) {
   var _a;
@@ -186,19 +187,21 @@ function formatDate(date, format) {
 function getPriorityValue(tags) {
   if (tags.includes("#focus"))
     return 0;
-  if (tags.includes("#p0"))
+  if (tags.includes("#today"))
     return 1;
-  if (tags.includes("#p1"))
+  if (tags.includes("#p0"))
     return 2;
-  if (tags.includes("#p2"))
+  if (tags.includes("#p1"))
     return 3;
+  if (tags.includes("#p2"))
+    return 4;
   if (tags.includes("#p3"))
-    return 5;
-  if (tags.includes("#p4"))
     return 6;
-  if (tags.includes("#future"))
+  if (tags.includes("#p4"))
     return 7;
-  return 4;
+  if (tags.includes("#future"))
+    return 8;
+  return 5;
 }
 function getTagCount(tags) {
   const systemTags = /* @__PURE__ */ new Set([
@@ -212,6 +215,7 @@ function getTagCount(tags) {
     "#principle",
     "#principles",
     "#focus",
+    "#today",
     "#future",
     "#p0",
     "#p1",
@@ -15117,10 +15121,6 @@ function createHeaderSortPlugin(app, processor, scanner) {
 
 // main.ts
 var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
-  constructor() {
-    super(...arguments);
-    this.tagColourObserver = null;
-  }
   async onload() {
     await this.loadSettings();
     this.scanner = new TodoScanner(this.app);
@@ -15169,7 +15169,6 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
     this.registerEditorExtension(
       createHeaderSortPlugin(this.app, this.processor, this.scanner)
     );
-    this.registerTagColourObserver();
     this.registerDomEvent(document, "change", async (evt) => {
       const target = evt.target;
       if (!target.matches('input[type="checkbox"].task-list-item-checkbox')) {
@@ -15396,10 +15395,6 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_TODO_SIDEBAR);
     this.defineTooltip.close();
     this.tabLockManager.destroy();
-    if (this.tagColourObserver) {
-      this.tagColourObserver.disconnect();
-      this.tagColourObserver = null;
-    }
   }
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
@@ -15455,126 +15450,6 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
   openLLMSettings() {
     this.app.setting.open();
     this.app.setting.openTabById("space-command");
-  }
-  /**
-   * Register MutationObserver to apply semantic colours to Obsidian-rendered tags.
-   * This handles tags in editor (Live Preview) and reading mode.
-   */
-  registerTagColourObserver() {
-    this.tagColourObserver = new MutationObserver((mutations) => {
-      for (let i = 0; i < mutations.length; i++) {
-        const mutation = mutations[i];
-        const addedNodes = Array.from(mutation.addedNodes);
-        for (let j = 0; j < addedNodes.length; j++) {
-          const node2 = addedNodes[j];
-          if (node2 instanceof HTMLElement) {
-            this.applyTagColoursToElement(node2);
-          }
-        }
-      }
-    });
-    this.tagColourObserver.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-    this.applyTagColoursToElement(document.body);
-    this.registerEvent(
-      this.app.workspace.on("active-leaf-change", () => {
-        setTimeout(() => {
-          this.applyTagColoursToElement(document.body);
-        }, 100);
-      })
-    );
-    this.registerInterval(
-      window.setInterval(() => {
-        this.applyTagColoursToElement(document.body);
-      }, 2e3)
-      // Every 2 seconds
-    );
-  }
-  /**
-   * Apply semantic tag colours to tags within an element.
-   * Targets Obsidian's tag classes in editor (.cm-hashtag) and reading mode (.tag).
-   */
-  applyTagColoursToElement(el) {
-    var _a, _b;
-    const selector = ".tag:not([data-sc-tag-type]), a.tag:not([data-sc-tag-type]), span.tag:not([data-sc-tag-type]), .cm-hashtag:not([data-sc-tag-type]), .cm-tag:not([data-sc-tag-type])";
-    const tagNodes = el.querySelectorAll(selector);
-    const tags = Array.from(tagNodes);
-    if (el.matches && el.matches(selector)) {
-      tags.unshift(el);
-    }
-    const projectColourMap = this.getProjectColourMap();
-    for (let i = 0; i < tags.length; i++) {
-      const tagEl = tags[i];
-      let tagText = ((_a = tagEl.textContent) == null ? void 0 : _a.trim()) || "";
-      if (tagEl.classList.contains("cm-hashtag-end")) {
-        const prev = tagEl.previousElementSibling;
-        if (prev == null ? void 0 : prev.classList.contains("cm-hashtag-begin")) {
-          tagText = (prev.textContent || "") + tagText;
-          const colourInfo3 = getTagColourInfo(tagText.startsWith("#") ? tagText : "#" + tagText, projectColourMap);
-          tagEl.dataset.scTagType = colourInfo3.type;
-          tagEl.dataset.scPriority = colourInfo3.priority.toString();
-          prev.dataset.scTagType = colourInfo3.type;
-          prev.dataset.scPriority = colourInfo3.priority.toString();
-          continue;
-        }
-        if (!tagText.startsWith("#")) {
-          tagText = "#" + tagText;
-        }
-        const colourInfo2 = getTagColourInfo(tagText, projectColourMap);
-        tagEl.dataset.scTagType = colourInfo2.type;
-        tagEl.dataset.scPriority = colourInfo2.priority.toString();
-        continue;
-      } else if (tagEl.classList.contains("cm-hashtag-begin")) {
-        const next = tagEl.nextElementSibling;
-        if (tagEl.classList.contains("cm-tag-focus")) {
-          console.log("[SC Debug] Processing focus BEGIN:", {
-            hasEnd: next == null ? void 0 : next.classList.contains("cm-hashtag-end"),
-            nextClass: next == null ? void 0 : next.className,
-            tagText
-          });
-        }
-        if (next == null ? void 0 : next.classList.contains("cm-hashtag-end")) {
-          tagText = tagText + (((_b = next.textContent) == null ? void 0 : _b.trim()) || "");
-          if (!tagText.startsWith("#")) {
-            tagText = "#" + tagText;
-          }
-          const colourInfo2 = getTagColourInfo(tagText, projectColourMap);
-          if (tagEl.classList.contains("cm-tag-focus")) {
-            console.log("[SC Debug] Setting focus BEGIN attr:", colourInfo2);
-          }
-          tagEl.dataset.scTagType = colourInfo2.type;
-          tagEl.dataset.scPriority = colourInfo2.priority.toString();
-          if (!next.hasAttribute("data-sc-tag-type")) {
-            next.dataset.scTagType = colourInfo2.type;
-            next.dataset.scPriority = colourInfo2.priority.toString();
-          }
-        } else {
-          if (tagEl.classList.contains("cm-tag-focus")) {
-            console.log("[SC Debug] Focus BEGIN has no matching END sibling!");
-          }
-        }
-        continue;
-      }
-      if (!tagText.startsWith("#")) {
-        tagText = "#" + tagText;
-      }
-      const colourInfo = getTagColourInfo(tagText, projectColourMap);
-      tagEl.dataset.scTagType = colourInfo.type;
-      tagEl.dataset.scPriority = colourInfo.priority.toString();
-    }
-  }
-  /**
-   * Get project colour map for tag colouring.
-   */
-  getProjectColourMap() {
-    const projects = this.projectManager.getProjects();
-    const map4 = /* @__PURE__ */ new Map();
-    for (const project of projects) {
-      map4.set(project.tag.toLowerCase(), project.colourIndex);
-    }
-    return map4;
   }
 };
 var AboutModal = class extends import_obsidian11.Modal {

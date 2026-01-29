@@ -1,98 +1,5 @@
 /* Space Command Plugin Styles */
 
-/* ========================================
-   Tag Colour System
-   Base: #689fd6 = hsl(210, 55%, 62%)
-   Gradient from dark (focus) to light (future)
-   ======================================== */
-:root {
-  --sc-tag-hue: 210;
-  --sc-tag-sat: 55%;
-  --sc-tag-plugin: hsl(var(--sc-tag-hue), var(--sc-tag-sat), 62%);
-  --sc-tag-priority-0: hsl(var(--sc-tag-hue), var(--sc-tag-sat), 42%);
-  --sc-tag-priority-1: hsl(var(--sc-tag-hue), var(--sc-tag-sat), 47%);
-  --sc-tag-priority-2: hsl(var(--sc-tag-hue), var(--sc-tag-sat), 52%);
-  --sc-tag-priority-3: hsl(var(--sc-tag-hue), var(--sc-tag-sat), 57%);
-  --sc-tag-priority-4: hsl(var(--sc-tag-hue), var(--sc-tag-sat), 67%);
-  --sc-tag-priority-5: hsl(var(--sc-tag-hue), var(--sc-tag-sat), 72%);
-  --sc-tag-priority-6: hsl(var(--sc-tag-hue), var(--sc-tag-sat), 77%);
-}
-
-/* Base pill styling for all semantic tags */
-/* Colored tags should be fully opaque to show colors properly */
-[data-sc-tag-type] {
-  overflow: visible !important;
-  opacity: 1 !important;
-  padding: 2px 5px !important;
-  border-radius: 4px !important;
-}
-
-/* CodeMirror splits tags into begin (#) and end (tagname) elements */
-/* Style them as a unified chicklet by adjusting padding and borders */
-.cm-hashtag-begin[data-sc-tag-type] {
-  padding: 2px 0 2px 5px !important;
-  border-top-right-radius: 0 !important;
-  border-bottom-right-radius: 0 !important;
-  margin-right: 0 !important;
-}
-
-.cm-hashtag-end[data-sc-tag-type] {
-  padding: 2px 5px 2px 0 !important;
-  border-top-left-radius: 0 !important;
-  border-bottom-left-radius: 0 !important;
-  margin-left: 0 !important;
-}
-
-/* Plugin tags (system tags like #todo, #idea, etc.) */
-/* At 62% lightness, white text provides better contrast for readability */
-[data-sc-tag-type="plugin"] {
-  background-color: var(--sc-tag-plugin) !important;
-  color: white !important;
-}
-
-/* Priority tags (from #focus/dark to #future/light) */
-[data-sc-tag-type="priority"][data-sc-priority="0"],
-[data-sc-tag-type="project"][data-sc-priority="0"] {
-  background-color: var(--sc-tag-priority-0) !important;
-  color: white !important;
-}
-
-[data-sc-tag-type="priority"][data-sc-priority="1"],
-[data-sc-tag-type="project"][data-sc-priority="1"] {
-  background-color: var(--sc-tag-priority-1) !important;
-  color: white !important;
-}
-
-[data-sc-tag-type="priority"][data-sc-priority="2"],
-[data-sc-tag-type="project"][data-sc-priority="2"] {
-  background-color: var(--sc-tag-priority-2) !important;
-  color: white !important;
-}
-
-[data-sc-tag-type="priority"][data-sc-priority="3"],
-[data-sc-tag-type="project"][data-sc-priority="3"] {
-  background-color: var(--sc-tag-priority-3) !important;
-  color: white !important;
-}
-
-[data-sc-tag-type="priority"][data-sc-priority="4"],
-[data-sc-tag-type="project"][data-sc-priority="4"] {
-  background-color: var(--sc-tag-priority-4) !important;
-  color: var(--text-normal) !important;
-}
-
-[data-sc-tag-type="priority"][data-sc-priority="5"],
-[data-sc-tag-type="project"][data-sc-priority="5"] {
-  background-color: var(--sc-tag-priority-5) !important;
-  color: var(--text-normal) !important;
-}
-
-[data-sc-tag-type="priority"][data-sc-priority="6"],
-[data-sc-tag-type="project"][data-sc-priority="6"] {
-  background-color: var(--sc-tag-priority-6) !important;
-  color: var(--text-normal) !important;
-}
-
 /* Logo styling */
 .space-command-logo {
   display: inline-block;
@@ -806,41 +713,15 @@
   background-color: var(--background-primary);
 }
 
-/* Unified tag styling for all plugin contexts */
-/* Base styling for all tags - font, opacity, alignment */
-/* Exclude dropdown/popup tags from global overrides */
+/* Tag styling for sidebar and embed contexts */
 .space-command-sidebar .tag:not(.project-info-principle-tag),
-.space-command-embed .tag,
-.cm-line .cm-hashtag,
-.cm-line .cm-tag,
-.markdown-preview-view a.tag,
-.markdown-preview-view .tag,
-.cm-hashtag,
-.cm-tag,
-a.tag:not(.project-info-principle-tag):not(.tag-dropdown-trigger) {
+.space-command-embed .tag {
   font-size: 9pt !important;
   font-family: var(--font-monospace) !important;
   opacity: 0.85;
   vertical-align: middle !important;
-}
-
-/* Reading Mode tags - single element, normal padding */
-.markdown-preview-view a.tag,
-.markdown-preview-view .tag,
-.space-command-sidebar .tag:not(.project-info-principle-tag),
-.space-command-embed .tag,
-a.tag:not(.cm-hashtag):not(.project-info-principle-tag):not(.tag-dropdown-trigger) {
   padding: 2px 5px !important;
   border-radius: 4px !important;
-  display: inline-block !important;
-  line-height: 1.3 !important;
-}
-
-/* Editor tags - split elements, adjusted padding handled by data attributes */
-.cm-line .cm-hashtag,
-.cm-hashtag,
-.cm-tag {
-  /* Don't set padding/border-radius here - handled by [data-sc-tag-type] rules */
   display: inline-block !important;
   line-height: 1.3 !important;
 }

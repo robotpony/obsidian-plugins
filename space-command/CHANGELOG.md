@@ -2,6 +2,30 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.51] - 2026-01-28
+
+### Added
+
+- **`#today` priority tag**: New priority tag for items that need attention today
+  - Ranks between `#focus` and `#p0` in sort order
+  - Priority order is now: `#focus` → `#today` → `#p0` → `#p1` → `#p2` → (no tag) → `#p3` → `#p4` → `#future`
+
+## [0.9.50] - 2026-01-28
+
+### Removed
+
+- **Custom tag colouring for editor/reading mode**: Removed the MutationObserver-based tag colouring system
+  - This was causing tags to flash on load and inconsistent styling between panes
+  - Tags in the editor and reading mode now use Obsidian's native tag styling
+  - Sidebar and embed tag styling remains unchanged
+
+### Technical
+
+- Removed `registerTagColourObserver()`, `applyTagColoursToElement()`, and `getProjectColourMap()` methods from main.ts
+- Removed ~90 lines of CSS for `[data-sc-tag-type]` attribute selectors and `--sc-tag-*` colour variables
+- Removed periodic 2-second re-application of tag colours
+- Simplified tag CSS to only style sidebar and embed contexts
+
 ## [0.9.49] - 2026-01-28
 
 ### Fixed

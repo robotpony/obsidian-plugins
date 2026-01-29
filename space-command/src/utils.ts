@@ -20,12 +20,13 @@ export const PLUGIN_TAGS = new Set([
  */
 export const PRIORITY_TAG_MAP: Record<string, number> = {
   '#focus': 0,
-  '#p0': 1,
-  '#p1': 2,
-  '#p2': 3,
-  '#p3': 4,
-  '#p4': 5,
-  '#future': 6
+  '#today': 1,
+  '#p0': 2,
+  '#p1': 3,
+  '#p2': 4,
+  '#p3': 5,
+  '#p4': 6,
+  '#future': 7
 };
 
 /**
@@ -85,17 +86,18 @@ export function formatDate(date: Date, format: string): string {
 /**
  * Get the priority value for sorting TODOs.
  * Lower values = higher priority.
- * Priority order: #focus=0, #p0=1, #p1=2, #p2=3, no priority=4, #p3=5, #p4=6, #future=7
+ * Priority order: #focus=0, #today=1, #p0=2, #p1=3, #p2=4, no priority=5, #p3=6, #p4=7, #future=8
  */
 export function getPriorityValue(tags: string[]): number {
   if (tags.includes("#focus")) return 0;
-  if (tags.includes("#p0")) return 1;
-  if (tags.includes("#p1")) return 2;
-  if (tags.includes("#p2")) return 3;
-  if (tags.includes("#p3")) return 5;
-  if (tags.includes("#p4")) return 6;
-  if (tags.includes("#future")) return 7;
-  return 4; // No priority = medium (between #p2 and #p3)
+  if (tags.includes("#today")) return 1;
+  if (tags.includes("#p0")) return 2;
+  if (tags.includes("#p1")) return 3;
+  if (tags.includes("#p2")) return 4;
+  if (tags.includes("#p3")) return 6;
+  if (tags.includes("#p4")) return 7;
+  if (tags.includes("#future")) return 8;
+  return 5; // No priority = medium (between #p2 and #p3)
 }
 
 /**
@@ -107,7 +109,7 @@ export function getTagCount(tags: string[]): number {
     "#todo", "#todos", "#todone", "#todones",
     "#idea", "#ideas", "#ideation",
     "#principle", "#principles",
-    "#focus", "#future",
+    "#focus", "#today", "#future",
     "#p0", "#p1", "#p2", "#p3", "#p4"
   ]);
   return tags.filter(tag => !systemTags.has(tag)).length;

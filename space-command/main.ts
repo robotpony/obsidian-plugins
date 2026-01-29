@@ -22,7 +22,7 @@ import {
   DEFAULT_SETTINGS,
 } from "./src/types";
 import { convertToSlackMarkdown } from "./src/SlackConverter";
-import { showNotice, getTagColourInfo, PLUGIN_TAGS, PRIORITY_TAG_MAP } from "./src/utils";
+import { showNotice } from "./src/utils";
 import { LLMClient } from "./src/LLMClient";
 import { DefineTooltip } from "./src/DefineTooltip";
 import { TabLockManager } from "./src/TabLockManager";
@@ -37,7 +37,6 @@ export default class SpaceCommandPlugin extends Plugin {
   llmClient: LLMClient;
   defineTooltip: DefineTooltip;
   tabLockManager: TabLockManager;
-  private tagColourObserver: MutationObserver | null = null;
 
   async onload() {
     await this.loadSettings();
@@ -107,9 +106,6 @@ export default class SpaceCommandPlugin extends Plugin {
     this.registerEditorExtension(
       createHeaderSortPlugin(this.app, this.processor, this.scanner)
     );
-
-    // Register tag colour observer for editor and reading mode
-    this.registerTagColourObserver();
 
     // Watch for native checkbox clicks on #todo lines
     this.registerDomEvent(document, "change", async (evt) => {
@@ -419,11 +415,6 @@ export default class SpaceCommandPlugin extends Plugin {
     this.defineTooltip.close();
     // Clean up tab lock manager
     this.tabLockManager.destroy();
-    // Clean up tag colour observer
-    if (this.tagColourObserver) {
-      this.tagColourObserver.disconnect();
-      this.tagColourObserver = null;
-    }
   }
 
   async loadSettings() {
@@ -497,161 +488,6 @@ export default class SpaceCommandPlugin extends Plugin {
     // Open Obsidian settings and navigate to Space Command tab
     (this.app as any).setting.open();
     (this.app as any).setting.openTabById("space-command");
-  }
-
-  /**
-   * Register MutationObserver to apply semantic colours to Obsidian-rendered tags.
-   * This handles tags in editor (Live Preview) and reading mode.
-   */
-  private registerTagColourObserver(): void {
-    this.tagColourObserver = new MutationObserver((mutations) => {
-      for (let i = 0; i < mutations.length; i++) {
-        const mutation = mutations[i];
-        const addedNodes = Array.from(mutation.addedNodes);
-        for (let j = 0; j < addedNodes.length; j++) {
-          const node = addedNodes[j];
-          if (node instanceof HTMLElement) {
-            this.applyTagColoursToElement(node);
-          }
-        }
-      }
-    });
-
-    // Observe document body for tag elements being added
-    this.tagColourObserver.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-
-    // Apply to existing elements immediately
-    this.applyTagColoursToElement(document.body);
-
-    // Re-apply colors on active leaf change (file switch, pane change)
-    this.registerEvent(
-      this.app.workspace.on('active-leaf-change', () => {
-        // Small delay to let CodeMirror finish rendering
-        setTimeout(() => {
-          this.applyTagColoursToElement(document.body);
-        }, 100);
-      })
-    );
-
-    // Re-apply colors periodically to catch any missed tags
-    this.registerInterval(
-      window.setInterval(() => {
-        this.applyTagColoursToElement(document.body);
-      }, 2000) // Every 2 seconds
-    );
-  }
-
-  /**
-   * Apply semantic tag colours to tags within an element.
-   * Targets Obsidian's tag classes in editor (.cm-hashtag) and reading mode (.tag).
-   */
-  private applyTagColoursToElement(el: HTMLElement): void {
-    // Find tags that don't already have colour attributes
-    // Include various Obsidian tag selectors: .tag, a.tag, span.tag, .cm-hashtag, .cm-tag
-    const selector = '.tag:not([data-sc-tag-type]), a.tag:not([data-sc-tag-type]), span.tag:not([data-sc-tag-type]), .cm-hashtag:not([data-sc-tag-type]), .cm-tag:not([data-sc-tag-type])';
-    const tagNodes = el.querySelectorAll(selector);
-    const tags = Array.from(tagNodes);
-
-    // Also check if el itself is a tag that needs processing
-    // (mutation observer might pass the tag element itself, not a parent)
-    if (el.matches && el.matches(selector)) {
-      tags.unshift(el);
-    }
-
-    // Get project colour map for project tag lookups
-    const projectColourMap = this.getProjectColourMap();
-
-    for (let i = 0; i < tags.length; i++) {
-      const tagEl = tags[i] as HTMLElement;
-      let tagText = tagEl.textContent?.trim() || '';
-
-      // Handle .cm-hashtag which may be split across elements
-      // (.cm-hashtag-begin contains #, .cm-hashtag-end contains the tag name)
-      if (tagEl.classList.contains('cm-hashtag-end')) {
-        // Try to get the full tag by looking at previous sibling
-        const prev = tagEl.previousElementSibling;
-        if (prev?.classList.contains('cm-hashtag-begin')) {
-          tagText = (prev.textContent || '') + tagText;
-
-          // Apply styling to both begin and end elements for unified appearance
-          const colourInfo = getTagColourInfo(tagText.startsWith('#') ? tagText : '#' + tagText, projectColourMap);
-          tagEl.dataset.scTagType = colourInfo.type;
-          tagEl.dataset.scPriority = colourInfo.priority.toString();
-          (prev as HTMLElement).dataset.scTagType = colourInfo.type;
-          (prev as HTMLElement).dataset.scPriority = colourInfo.priority.toString();
-          continue;
-        }
-        // Fallback: if prev sibling isn't the begin element, still try to style this tag
-        // This handles cases where DOM structure is different than expected
-        if (!tagText.startsWith('#')) {
-          tagText = '#' + tagText;
-        }
-        const colourInfo = getTagColourInfo(tagText, projectColourMap);
-        tagEl.dataset.scTagType = colourInfo.type;
-        tagEl.dataset.scPriority = colourInfo.priority.toString();
-        continue;
-      } else if (tagEl.classList.contains('cm-hashtag-begin')) {
-        // For begin elements, find the matching end element by looking at next sibling
-        const next = tagEl.nextElementSibling;
-        // Debug: trace focus tag processing
-        if (tagEl.classList.contains('cm-tag-focus')) {
-          console.log('[SC Debug] Processing focus BEGIN:', {
-            hasEnd: next?.classList.contains('cm-hashtag-end'),
-            nextClass: next?.className,
-            tagText: tagText
-          });
-        }
-        if (next?.classList.contains('cm-hashtag-end')) {
-          tagText = tagText + (next.textContent?.trim() || '');
-          if (!tagText.startsWith('#')) {
-            tagText = '#' + tagText;
-          }
-          const colourInfo = getTagColourInfo(tagText, projectColourMap);
-          // Debug
-          if (tagEl.classList.contains('cm-tag-focus')) {
-            console.log('[SC Debug] Setting focus BEGIN attr:', colourInfo);
-          }
-          // Always set on begin element
-          tagEl.dataset.scTagType = colourInfo.type;
-          tagEl.dataset.scPriority = colourInfo.priority.toString();
-          // Also set on end element if it doesn't have it yet
-          if (!next.hasAttribute('data-sc-tag-type')) {
-            (next as HTMLElement).dataset.scTagType = colourInfo.type;
-            (next as HTMLElement).dataset.scPriority = colourInfo.priority.toString();
-          }
-        } else {
-          // Debug: why didn't we find the end?
-          if (tagEl.classList.contains('cm-tag-focus')) {
-            console.log('[SC Debug] Focus BEGIN has no matching END sibling!');
-          }
-        }
-        continue;
-      }
-
-      // Normalize tag (ensure it starts with #)
-      if (!tagText.startsWith('#')) {
-        tagText = '#' + tagText;
-      }
-
-      const colourInfo = getTagColourInfo(tagText, projectColourMap);
-      tagEl.dataset.scTagType = colourInfo.type;
-      tagEl.dataset.scPriority = colourInfo.priority.toString();
-    }
-  }
-
-  /**
-   * Get project colour map for tag colouring.
-   */
-  private getProjectColourMap(): Map<string, number> {
-    const projects = this.projectManager.getProjects();
-    const map = new Map<string, number>();
-    for (const project of projects) {
-      map.set(project.tag.toLowerCase(), project.colourIndex);
-    }
-    return map;
   }
 }
 
