@@ -398,7 +398,21 @@ export class EmbedRenderer {
     }
 
     // Filter out child items (they'll be rendered under their parent header)
-    const topLevelTodos = displayTodos.filter(t => t.parentLineNumber === undefined);
+    let topLevelTodos = displayTodos.filter(t => t.parentLineNumber === undefined);
+
+    // Filter out header TODOs where all children are complete
+    // This prevents users from having to mark headers done redundantly
+    const allTodones = this.scanner.getTodones();
+    topLevelTodos = topLevelTodos.filter(todo => {
+      if (!todo.isHeader || !todo.childLineNumbers || todo.childLineNumbers.length === 0) {
+        return true; // Not a header with children, keep it
+      }
+      // Check if all children are in todones
+      const allChildrenComplete = todo.childLineNumbers.every(childLine =>
+        allTodones.some(t => t.filePath === todo.filePath && t.lineNumber === childLine)
+      );
+      return !allChildrenComplete; // Keep if NOT all children are complete
+    });
 
     // Sort todos: active by priority/project, completed at end
     const sortedTodos = this.sortTodos(topLevelTodos);

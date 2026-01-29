@@ -1360,6 +1360,7 @@ var ProjectManager = class {
         "#principles",
         "#future",
         "#focus",
+        "#today",
         ...this.priorityTags
       ]);
       const explicitProjectTags = todo.tags.filter((tag) => !excludedTags.has(tag));
@@ -2147,7 +2148,17 @@ var EmbedRenderer = class {
       });
       return;
     }
-    const topLevelTodos = displayTodos.filter((t) => t.parentLineNumber === void 0);
+    let topLevelTodos = displayTodos.filter((t) => t.parentLineNumber === void 0);
+    const allTodones = this.scanner.getTodones();
+    topLevelTodos = topLevelTodos.filter((todo) => {
+      if (!todo.isHeader || !todo.childLineNumbers || todo.childLineNumbers.length === 0) {
+        return true;
+      }
+      const allChildrenComplete = todo.childLineNumbers.every(
+        (childLine) => allTodones.some((t) => t.filePath === todo.filePath && t.lineNumber === childLine)
+      );
+      return !allChildrenComplete;
+    });
     const sortedTodos = this.sortTodos(topLevelTodos);
     const list4 = container.createEl("ul", { cls: "contains-task-list" });
     const allTodosForLookup = unfilteredTodos || todos;
@@ -3654,6 +3665,16 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     } else {
       todos = todos.filter((todo) => todo.parentLineNumber === void 0);
     }
+    const allTodones = this.scanner.getTodones();
+    todos = todos.filter((todo) => {
+      if (!todo.isHeader || !todo.childLineNumbers || todo.childLineNumbers.length === 0) {
+        return true;
+      }
+      const allChildrenComplete = todo.childLineNumbers.every(
+        (childLine) => allTodones.some((t) => t.filePath === todo.filePath && t.lineNumber === childLine)
+      );
+      return !allChildrenComplete;
+    });
     if (this.activeTagFilter) {
       todos = todos.filter((todo) => todo.tags.includes(this.activeTagFilter));
     }

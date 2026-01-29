@@ -2,6 +2,22 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.59] - 2026-01-29
+
+### Improved
+
+- **Header TODOs auto-hide when complete**: Header TODOs (block-tagged lists) now automatically disappear from sidebar and embeds once all their children are marked as #todone
+  - Eliminates the need to manually mark headers as done
+  - Headers reappear if any child is reverted to active
+
+## [0.9.58] - 2026-01-29
+
+### Fixed
+
+- **#today excluded from project list**: The `#today` priority tag no longer appears as a project in the Focus section
+  - `#today` is a priority tag (like `#focus`, `#p0`-`#p4`) and should not group items as a project
+  - Still displays on individual items to show their priority level
+
 ## [0.9.57] - 2026-01-29
 
 ### Improved

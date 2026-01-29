@@ -1059,6 +1059,20 @@ export class TodoSidebarView extends ItemView {
       todos = todos.filter(todo => todo.parentLineNumber === undefined);
     }
 
+    // Filter out header TODOs where all children are complete
+    // This prevents users from having to mark headers done redundantly
+    const allTodones = this.scanner.getTodones();
+    todos = todos.filter(todo => {
+      if (!todo.isHeader || !todo.childLineNumbers || todo.childLineNumbers.length === 0) {
+        return true; // Not a header with children, keep it
+      }
+      // Check if all children are in todones
+      const allChildrenComplete = todo.childLineNumbers.every(childLine =>
+        allTodones.some(t => t.filePath === todo.filePath && t.lineNumber === childLine)
+      );
+      return !allChildrenComplete; // Keep if NOT all children are complete
+    });
+
     // Apply tag filter if active
     if (this.activeTagFilter) {
       todos = todos.filter(todo => todo.tags.includes(this.activeTagFilter!));
