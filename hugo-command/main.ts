@@ -6,6 +6,9 @@ import {
   Setting,
   WorkspaceLeaf,
   TFile,
+  MarkdownView,
+  Notice,
+  editorViewField,
 } from "obsidian";
 import { HugoScanner } from "./src/HugoScanner";
 import {
@@ -16,6 +19,7 @@ import {
   HugoCommandSettings,
   DEFAULT_SETTINGS,
   DEFAULT_REVIEW_SETTINGS,
+  DEFAULT_OUTLINE_SETTINGS,
   ReviewResult,
   StatusFilter,
 } from "./src/types";
@@ -23,13 +27,17 @@ import { showNotice, LOGO_PREFIX } from "./src/utils";
 import { SiteSettingsModal } from "./src/SiteSettingsModal";
 import { ReviewCache } from "./src/ReviewCache";
 import { ReviewLLMClient } from "./src/ReviewLLMClient";
+import { OutlineLLMClient } from "./src/OutlineLLMClient";
+import { commentBubblesPlugin } from "./src/CommentBubbles";
 
 export default class HugoCommandPlugin extends Plugin {
   settings: HugoCommandSettings;
   scanner: HugoScanner;
   reviewCache: ReviewCache;
   reviewClient: ReviewLLMClient;
+  outlineClient: OutlineLLMClient;
   private reviewCacheData: Record<string, ReviewResult> = {};
+  private isEnhancingOutline: boolean = false;
 
   async onload() {
     await this.loadSettings();
@@ -45,6 +53,7 @@ export default class HugoCommandPlugin extends Plugin {
     // Load cached review data
     this.reviewCache.load(this.reviewCacheData);
     this.reviewClient = new ReviewLLMClient(this.settings.review);
+    this.outlineClient = new OutlineLLMClient(this.settings.review, this.settings.outline);
 
     // Scan vault on load
     await this.scanner.scanVault();
@@ -106,8 +115,83 @@ export default class HugoCommandPlugin extends Plugin {
       this.toggleSidebar();
     });
 
+    // Register CodeMirror extension for comment bubbles (if outline enabled)
+    if (this.settings.outline.enabled) {
+      this.registerEditorExtension(commentBubblesPlugin);
+    }
+
+    // Add enhance outline command
+    this.addCommand({
+      id: "enhance-outline",
+      name: "Enhance Outline with Suggestions",
+      editorCallback: async (editor, view) => {
+        if (!this.settings.outline.enabled) {
+          new Notice("Outline enhancement is not enabled in settings");
+          return;
+        }
+        await this.enhanceCurrentOutline();
+      },
+    });
+
+    // Register file-menu item for sparkles button
+    this.registerEvent(
+      this.app.workspace.on("file-menu", (menu, file) => {
+        if (!this.settings.outline.enabled) return;
+        if (!(file instanceof TFile) || file.extension !== "md") return;
+
+        menu.addItem((item) => {
+          item
+            .setTitle("Enhance outline")
+            .setIcon("sparkles")
+            .onClick(async () => {
+              // Open the file first if not already open
+              const leaf = this.app.workspace.getLeaf();
+              await leaf.openFile(file);
+              await this.enhanceCurrentOutline();
+            });
+        });
+      })
+    );
+
     // Add settings tab
     this.addSettingTab(new HugoCommandSettingTab(this.app, this));
+  }
+
+  /**
+   * Enhance the current document outline using LLM
+   */
+  private async enhanceCurrentOutline(): Promise<void> {
+    if (this.isEnhancingOutline) {
+      return;
+    }
+
+    const activeFile = this.app.workspace.getActiveFile();
+    if (!activeFile) {
+      new Notice("No file is currently open");
+      return;
+    }
+
+    if (activeFile.extension !== "md") {
+      new Notice("Outline enhancement only works on markdown files");
+      return;
+    }
+
+    this.isEnhancingOutline = true;
+    new Notice("Enhancing outline...");
+
+    try {
+      const content = await this.app.vault.read(activeFile);
+      const styleGuide = await this.getStyleGuide();
+      const enhanced = await this.outlineClient.enhance(content, styleGuide);
+      await this.app.vault.modify(activeFile, enhanced);
+      new Notice("Outline enhanced with suggestions");
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Enhancement failed";
+      new Notice(`Error: ${msg}`);
+      console.error("[Hugo Outline] Enhancement failed:", error);
+    } finally {
+      this.isEnhancingOutline = false;
+    }
   }
 
   onunload() {
@@ -123,6 +207,10 @@ export default class HugoCommandPlugin extends Plugin {
     if (!this.settings.review) {
       this.settings.review = DEFAULT_REVIEW_SETTINGS;
     }
+    // Ensure outline settings exist
+    if (!this.settings.outline) {
+      this.settings.outline = DEFAULT_OUTLINE_SETTINGS;
+    }
     // Load review cache after reviewCache is initialized
     this.reviewCacheData = _reviewCache || {};
   }
@@ -131,8 +219,9 @@ export default class HugoCommandPlugin extends Plugin {
     await this.saveData({ ...this.settings, _reviewCache: this.reviewCacheData });
     // Update scanner with new content paths
     this.scanner.setContentPaths(this.settings.contentPaths);
-    // Update review client with new settings
+    // Update LLM clients with new settings
     this.reviewClient.updateSettings(this.settings.review);
+    this.outlineClient.updateSettings(this.settings.review, this.settings.outline);
     // Rescan with new paths
     await this.scanner.scanVault();
     // Update sidebar views
@@ -604,6 +693,37 @@ class HugoCommandSettingTab extends PluginSettingTab {
             .onClick(async () => {
               this.plugin.reviewCache.clearAll();
               showNotice("Review cache cleared");
+            })
+        );
+    }
+
+    // Outline Enhancement section
+    containerEl.createEl("h3", { text: "Outline Enhancement" });
+
+    new Setting(containerEl)
+      .setName("Enable outline enhancement")
+      .setDesc("Use an LLM to add questions and suggestions to document outlines (uses same LLM settings as Content Review)")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.outline.enabled)
+          .onChange(async (value) => {
+            this.plugin.settings.outline.enabled = value;
+            await this.plugin.saveSettings();
+            this.display();
+          })
+      );
+
+    if (this.plugin.settings.outline.enabled) {
+      new Setting(containerEl)
+        .setName("Enhancement prompt")
+        .setDesc("Instructions for the LLM when enhancing outlines")
+        .addTextArea((text) =>
+          text
+            .setPlaceholder("Analyze this outline and add questions...")
+            .setValue(this.plugin.settings.outline.prompt)
+            .onChange(async (value) => {
+              this.plugin.settings.outline.prompt = value;
+              await this.plugin.saveSettings();
             })
         );
     }

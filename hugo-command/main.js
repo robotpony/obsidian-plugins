@@ -27,7 +27,7 @@ __export(main_exports, {
   default: () => HugoCommandPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian6 = require("obsidian");
+var import_obsidian7 = require("obsidian");
 
 // src/HugoScanner.ts
 var import_obsidian2 = require("obsidian");
@@ -1438,6 +1438,16 @@ var TitlePromptModal = class extends import_obsidian3.Modal {
 };
 
 // src/types.ts
+var DEFAULT_OUTLINE_SETTINGS = {
+  enabled: false,
+  prompt: `Analyze this blog post outline/draft and enhance it by:
+1. Adding inline questions as HTML comments (<!-- Q: question here -->) where more detail or examples would help
+2. Suggesting missing sections that would strengthen the piece
+3. Noting any structural improvements
+4. If a style guide is provided, flag specific places where the writing doesn't follow the guidelines, citing the relevant rule
+
+Keep the original content intact. Add your suggestions as HTML comments so they're invisible when rendered.`
+};
 var DEFAULT_REVIEW_SETTINGS = {
   enabled: false,
   provider: "ollama",
@@ -1460,7 +1470,8 @@ var DEFAULT_SETTINGS = {
   showDrafts: true,
   defaultSortOrder: "date-desc",
   defaultStatusFilter: "draft",
-  review: DEFAULT_REVIEW_SETTINGS
+  review: DEFAULT_REVIEW_SETTINGS,
+  outline: DEFAULT_OUTLINE_SETTINGS
 };
 
 // src/SiteSettingsModal.ts
@@ -1989,11 +2000,261 @@ Do not include any other text, just the JSON array.`;
   }
 };
 
+// src/OutlineLLMClient.ts
+var import_obsidian6 = require("obsidian");
+var OutlineLLMClient = class {
+  constructor(reviewSettings, outlineSettings) {
+    this.reviewSettings = reviewSettings;
+    this.outlineSettings = outlineSettings;
+  }
+  updateSettings(reviewSettings, outlineSettings) {
+    this.reviewSettings = reviewSettings;
+    this.outlineSettings = outlineSettings;
+  }
+  /**
+   * Enhance a document outline with questions and suggestions.
+   * Returns the modified markdown content.
+   */
+  async enhance(content, styleGuide) {
+    const prompt = this.buildPrompt(content, styleGuide);
+    try {
+      const response = await this.callLLM(prompt);
+      return this.extractMarkdown(response);
+    } catch (error) {
+      console.error("[Hugo Outline] LLM call failed:", error);
+      throw error;
+    }
+  }
+  buildPrompt(content, styleGuide) {
+    let styleSection = "";
+    if (styleGuide.trim()) {
+      styleSection = `
+## Style Guidelines
+
+${styleGuide}
+
+`;
+    }
+    const hasStyleGuide = styleGuide.trim().length > 0;
+    const styleInstructions = hasStyleGuide ? `When the content doesn't follow a style guide rule, cite the specific rule in your comment (e.g., "<!-- Style: 'Avoid corporate jargon' - consider replacing 'leverage' with 'use' -->").` : "";
+    return `${this.outlineSettings.prompt}
+${styleSection}
+## Document to Enhance
+
+${content}
+
+## Instructions
+
+Return the enhanced document as markdown. Keep all original content intact.
+Add your questions and suggestions as HTML comments (<!-- Q: question here --> for questions, <!-- suggestion here --> for suggestions).
+${styleInstructions}
+Return ONLY the enhanced markdown, no explanations or preamble.`;
+  }
+  async callLLM(prompt) {
+    switch (this.reviewSettings.provider) {
+      case "ollama":
+        return this.callOllama(prompt);
+      case "openai":
+        return this.callOpenAI(prompt);
+      case "gemini":
+        return this.callGemini(prompt);
+      case "anthropic":
+        return this.callAnthropic(prompt);
+      default:
+        throw new Error(`Unknown provider: ${this.reviewSettings.provider}`);
+    }
+  }
+  async callOllama(prompt) {
+    const response = await (0, import_obsidian6.requestUrl)({
+      url: `${this.reviewSettings.ollamaEndpoint}/api/generate`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: this.reviewSettings.ollamaModel,
+        prompt,
+        stream: false
+      })
+    });
+    if (response.status !== 200) {
+      throw new Error(`Ollama error: ${response.status}`);
+    }
+    return response.json.response;
+  }
+  async callOpenAI(prompt) {
+    if (!this.reviewSettings.openaiApiKey) {
+      throw new Error("OpenAI API key not configured");
+    }
+    const response = await (0, import_obsidian6.requestUrl)({
+      url: "https://api.openai.com/v1/chat/completions",
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${this.reviewSettings.openaiApiKey}`
+      },
+      body: JSON.stringify({
+        model: this.reviewSettings.openaiModel,
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+    if (response.status !== 200) {
+      throw new Error(`OpenAI error: ${response.status}`);
+    }
+    return response.json.choices[0].message.content;
+  }
+  async callGemini(prompt) {
+    if (!this.reviewSettings.geminiApiKey) {
+      throw new Error("Gemini API key not configured");
+    }
+    const response = await (0, import_obsidian6.requestUrl)({
+      url: `https://generativelanguage.googleapis.com/v1beta/models/${this.reviewSettings.geminiModel}:generateContent?key=${this.reviewSettings.geminiApiKey}`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }]
+      })
+    });
+    if (response.status !== 200) {
+      throw new Error(`Gemini error: ${response.status}`);
+    }
+    return response.json.candidates[0].content.parts[0].text;
+  }
+  async callAnthropic(prompt) {
+    if (!this.reviewSettings.anthropicApiKey) {
+      throw new Error("Anthropic API key not configured");
+    }
+    const response = await (0, import_obsidian6.requestUrl)({
+      url: "https://api.anthropic.com/v1/messages",
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": this.reviewSettings.anthropicApiKey,
+        "anthropic-version": "2023-06-01"
+      },
+      body: JSON.stringify({
+        model: this.reviewSettings.anthropicModel,
+        max_tokens: 4096,
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+    if (response.status !== 200) {
+      throw new Error(`Anthropic error: ${response.status}`);
+    }
+    return response.json.content[0].text;
+  }
+  /**
+   * Extract markdown from the response, handling code blocks if present.
+   */
+  extractMarkdown(response) {
+    let content = response.trim();
+    const codeBlockMatch = content.match(/^```(?:markdown|md)?\s*\n([\s\S]*?)\n```$/);
+    if (codeBlockMatch) {
+      content = codeBlockMatch[1];
+    }
+    return content;
+  }
+};
+
+// src/CommentBubbles.ts
+var import_view = require("@codemirror/view");
+var import_state = require("@codemirror/state");
+var CommentBubbleWidget = class extends import_view.WidgetType {
+  constructor(content, commentType) {
+    super();
+    this.content = content;
+    this.commentType = commentType;
+  }
+  toDOM() {
+    const bubble = document.createElement("span");
+    bubble.className = `hugo-comment-bubble ${this.commentType}`;
+    const icon = document.createElement("span");
+    icon.className = "hugo-comment-icon";
+    switch (this.commentType) {
+      case "question":
+        icon.textContent = "?";
+        break;
+      case "style":
+        icon.textContent = "\u{1F4DD}";
+        break;
+      default:
+        icon.textContent = "\u{1F4A1}";
+    }
+    bubble.appendChild(icon);
+    const text = document.createElement("span");
+    text.className = "hugo-comment-text";
+    text.textContent = this.content;
+    bubble.appendChild(text);
+    return bubble;
+  }
+  eq(other) {
+    return other.content === this.content && other.commentType === this.commentType;
+  }
+  ignoreEvent() {
+    return false;
+  }
+};
+var hideDecoration = import_view.Decoration.replace({});
+function getCommentType(prefix, content) {
+  if (prefix == null ? void 0 : prefix.startsWith("Q:"))
+    return "question";
+  if ((prefix == null ? void 0 : prefix.startsWith("Style:")) || content.toLowerCase().startsWith("style:"))
+    return "style";
+  return "suggestion";
+}
+function buildDecorations(view) {
+  const builder = new import_state.RangeSetBuilder();
+  const doc = view.state.doc;
+  const text = doc.toString();
+  const commentRegex = /<!--\s*(Q:\s*|Style:\s*)?(.+?)\s*-->/gs;
+  let match;
+  while ((match = commentRegex.exec(text)) !== null) {
+    const prefix = match[1];
+    const content = match[2].trim();
+    const commentType = getCommentType(prefix, content);
+    const from = match.index;
+    const to = match.index + match[0].length;
+    const line = doc.lineAt(from);
+    const lineText = line.text;
+    const commentStartInLine = from - line.from;
+    const beforeComment = lineText.substring(0, commentStartInLine).trim();
+    const afterComment = lineText.substring(commentStartInLine + match[0].length).trim();
+    const isStandalone = !beforeComment && !afterComment;
+    if (isStandalone) {
+      builder.add(from, to, import_view.Decoration.replace({
+        widget: new CommentBubbleWidget(content, commentType)
+      }));
+    } else {
+      builder.add(from, to, hideDecoration);
+      builder.add(to, to, import_view.Decoration.widget({
+        widget: new CommentBubbleWidget(content, commentType),
+        side: 1
+        // After the position
+      }));
+    }
+  }
+  return builder.finish();
+}
+var commentBubblesPlugin = import_view.ViewPlugin.fromClass(
+  class {
+    constructor(view) {
+      this.decorations = buildDecorations(view);
+    }
+    update(update) {
+      if (update.docChanged || update.viewportChanged) {
+        this.decorations = buildDecorations(update.view);
+      }
+    }
+  },
+  {
+    decorations: (v) => v.decorations
+  }
+);
+
 // main.ts
-var HugoCommandPlugin = class extends import_obsidian6.Plugin {
+var HugoCommandPlugin = class extends import_obsidian7.Plugin {
   constructor() {
     super(...arguments);
     this.reviewCacheData = {};
+    this.isEnhancingOutline = false;
   }
   async onload() {
     await this.loadSettings();
@@ -2004,6 +2265,7 @@ var HugoCommandPlugin = class extends import_obsidian6.Plugin {
     });
     this.reviewCache.load(this.reviewCacheData);
     this.reviewClient = new ReviewLLMClient(this.settings.review);
+    this.outlineClient = new OutlineLLMClient(this.settings.review, this.settings.outline);
     await this.scanner.scanVault();
     this.scanner.watchFiles();
     this.registerView(
@@ -2050,7 +2312,68 @@ var HugoCommandPlugin = class extends import_obsidian6.Plugin {
     this.addRibbonIcon("file-text", "Toggle Hugo Sidebar", () => {
       this.toggleSidebar();
     });
+    if (this.settings.outline.enabled) {
+      this.registerEditorExtension(commentBubblesPlugin);
+    }
+    this.addCommand({
+      id: "enhance-outline",
+      name: "Enhance Outline with Suggestions",
+      editorCallback: async (editor, view) => {
+        if (!this.settings.outline.enabled) {
+          new import_obsidian7.Notice("Outline enhancement is not enabled in settings");
+          return;
+        }
+        await this.enhanceCurrentOutline();
+      }
+    });
+    this.registerEvent(
+      this.app.workspace.on("file-menu", (menu, file) => {
+        if (!this.settings.outline.enabled)
+          return;
+        if (!(file instanceof import_obsidian7.TFile) || file.extension !== "md")
+          return;
+        menu.addItem((item) => {
+          item.setTitle("Enhance outline").setIcon("sparkles").onClick(async () => {
+            const leaf = this.app.workspace.getLeaf();
+            await leaf.openFile(file);
+            await this.enhanceCurrentOutline();
+          });
+        });
+      })
+    );
     this.addSettingTab(new HugoCommandSettingTab(this.app, this));
+  }
+  /**
+   * Enhance the current document outline using LLM
+   */
+  async enhanceCurrentOutline() {
+    if (this.isEnhancingOutline) {
+      return;
+    }
+    const activeFile = this.app.workspace.getActiveFile();
+    if (!activeFile) {
+      new import_obsidian7.Notice("No file is currently open");
+      return;
+    }
+    if (activeFile.extension !== "md") {
+      new import_obsidian7.Notice("Outline enhancement only works on markdown files");
+      return;
+    }
+    this.isEnhancingOutline = true;
+    new import_obsidian7.Notice("Enhancing outline...");
+    try {
+      const content = await this.app.vault.read(activeFile);
+      const styleGuide = await this.getStyleGuide();
+      const enhanced = await this.outlineClient.enhance(content, styleGuide);
+      await this.app.vault.modify(activeFile, enhanced);
+      new import_obsidian7.Notice("Outline enhanced with suggestions");
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Enhancement failed";
+      new import_obsidian7.Notice(`Error: ${msg}`);
+      console.error("[Hugo Outline] Enhancement failed:", error);
+    } finally {
+      this.isEnhancingOutline = false;
+    }
   }
   onunload() {
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_HUGO_SIDEBAR);
@@ -2062,12 +2385,16 @@ var HugoCommandPlugin = class extends import_obsidian6.Plugin {
     if (!this.settings.review) {
       this.settings.review = DEFAULT_REVIEW_SETTINGS;
     }
+    if (!this.settings.outline) {
+      this.settings.outline = DEFAULT_OUTLINE_SETTINGS;
+    }
     this.reviewCacheData = _reviewCache || {};
   }
   async saveSettings() {
     await this.saveData({ ...this.settings, _reviewCache: this.reviewCacheData });
     this.scanner.setContentPaths(this.settings.contentPaths);
     this.reviewClient.updateSettings(this.settings.review);
+    this.outlineClient.updateSettings(this.settings.review, this.settings.outline);
     await this.scanner.scanVault();
     this.updateSidebarSettings();
   }
@@ -2137,7 +2464,7 @@ var HugoCommandPlugin = class extends import_obsidian6.Plugin {
     const parts = [];
     if (this.settings.review.styleGuideFile) {
       const file = this.app.vault.getAbstractFileByPath(this.settings.review.styleGuideFile);
-      if (file instanceof import_obsidian6.TFile) {
+      if (file instanceof import_obsidian7.TFile) {
         try {
           const content = await this.app.vault.read(file);
           parts.push(content);
@@ -2152,7 +2479,7 @@ var HugoCommandPlugin = class extends import_obsidian6.Plugin {
     return parts.join("\n\n");
   }
 };
-var AboutModal = class extends import_obsidian6.Modal {
+var AboutModal = class extends import_obsidian7.Modal {
   constructor(app, version) {
     super(app);
     this.version = version;
@@ -2183,7 +2510,7 @@ var AboutModal = class extends import_obsidian6.Modal {
     this.contentEl.empty();
   }
 };
-var HugoCommandSettingTab = class extends import_obsidian6.PluginSettingTab {
+var HugoCommandSettingTab = class extends import_obsidian7.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -2209,45 +2536,45 @@ var HugoCommandSettingTab = class extends import_obsidian6.PluginSettingTab {
       href: "https://github.com/robotpony/obsidian-plugins"
     });
     containerEl.createEl("h3", { text: "Sidebar" });
-    new import_obsidian6.Setting(containerEl).setName("Show sidebar by default").setDesc("Show the Hugo sidebar when Obsidian starts").addToggle(
+    new import_obsidian7.Setting(containerEl).setName("Show sidebar by default").setDesc("Show the Hugo sidebar when Obsidian starts").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.showSidebarByDefault).onChange(async (value) => {
         this.plugin.settings.showSidebarByDefault = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian6.Setting(containerEl).setName("Default status filter").setDesc("Which posts to show by default when opening the sidebar").addDropdown(
+    new import_obsidian7.Setting(containerEl).setName("Default status filter").setDesc("Which posts to show by default when opening the sidebar").addDropdown(
       (dropdown) => dropdown.addOption("all", "All").addOption("published", "Published").addOption("draft", "Drafts").setValue(this.plugin.settings.defaultStatusFilter).onChange(async (value) => {
         this.plugin.settings.defaultStatusFilter = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian6.Setting(containerEl).setName("Default sort order").setDesc("How to sort content in the sidebar").addDropdown(
+    new import_obsidian7.Setting(containerEl).setName("Default sort order").setDesc("How to sort content in the sidebar").addDropdown(
       (dropdown) => dropdown.addOption("date-desc", "Date (newest first)").addOption("date-asc", "Date (oldest first)").addOption("title", "Title (A-Z)").setValue(this.plugin.settings.defaultSortOrder).onChange(async (value) => {
         this.plugin.settings.defaultSortOrder = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian6.Setting(containerEl).setName("Show drafts").setDesc("Include draft posts in the content list").addToggle(
+    new import_obsidian7.Setting(containerEl).setName("Show drafts").setDesc("Include draft posts in the content list").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.showDrafts).onChange(async (value) => {
         this.plugin.settings.showDrafts = value;
         await this.plugin.saveSettings();
       })
     );
     containerEl.createEl("h3", { text: "Content" });
-    new import_obsidian6.Setting(containerEl).setName("Content paths").setDesc("Folders to scan for Hugo content (one per line, e.g., content/posts)").addTextArea(
+    new import_obsidian7.Setting(containerEl).setName("Content paths").setDesc("Folders to scan for Hugo content (one per line, e.g., content/posts)").addTextArea(
       (text) => text.setPlaceholder("content\ncontent/posts").setValue(this.plugin.settings.contentPaths.join("\n")).onChange(async (value) => {
         this.plugin.settings.contentPaths = value.split("\n").map((p) => p.trim()).filter((p) => p.length > 0);
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian6.Setting(containerEl).setName("Trash folder").setDesc("Folder for trashed posts (relative to vault root)").addText(
+    new import_obsidian7.Setting(containerEl).setName("Trash folder").setDesc("Folder for trashed posts (relative to vault root)").addText(
       (text) => text.setPlaceholder("_trash").setValue(this.plugin.settings.trashFolder).onChange(async (value) => {
         this.plugin.settings.trashFolder = value.trim() || "_trash";
         await this.plugin.saveSettings();
       })
     );
     containerEl.createEl("h3", { text: "Content Review" });
-    new import_obsidian6.Setting(containerEl).setName("Enable content review").setDesc("Use an LLM to review posts against a checklist of criteria").addToggle(
+    new import_obsidian7.Setting(containerEl).setName("Enable content review").setDesc("Use an LLM to review posts against a checklist of criteria").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.review.enabled).onChange(async (value) => {
         this.plugin.settings.review.enabled = value;
         await this.plugin.saveSettings();
@@ -2255,7 +2582,7 @@ var HugoCommandSettingTab = class extends import_obsidian6.PluginSettingTab {
       })
     );
     if (this.plugin.settings.review.enabled) {
-      new import_obsidian6.Setting(containerEl).setName("LLM provider").setDesc("Which LLM service to use for reviews").addDropdown(
+      new import_obsidian7.Setting(containerEl).setName("LLM provider").setDesc("Which LLM service to use for reviews").addDropdown(
         (dropdown) => dropdown.addOption("ollama", "Ollama (local)").addOption("openai", "OpenAI").addOption("gemini", "Google Gemini").addOption("anthropic", "Anthropic Claude").setValue(this.plugin.settings.review.provider).onChange(async (value) => {
           this.plugin.settings.review.provider = value;
           await this.plugin.saveSettings();
@@ -2264,80 +2591,96 @@ var HugoCommandSettingTab = class extends import_obsidian6.PluginSettingTab {
       );
       const provider = this.plugin.settings.review.provider;
       if (provider === "ollama") {
-        new import_obsidian6.Setting(containerEl).setName("Ollama endpoint").setDesc("URL of your Ollama server").addText(
+        new import_obsidian7.Setting(containerEl).setName("Ollama endpoint").setDesc("URL of your Ollama server").addText(
           (text) => text.setPlaceholder("http://localhost:11434").setValue(this.plugin.settings.review.ollamaEndpoint).onChange(async (value) => {
             this.plugin.settings.review.ollamaEndpoint = value.trim() || "http://localhost:11434";
             await this.plugin.saveSettings();
           })
         );
-        new import_obsidian6.Setting(containerEl).setName("Ollama model").setDesc("Model to use (e.g., llama3.2, mistral)").addText(
+        new import_obsidian7.Setting(containerEl).setName("Ollama model").setDesc("Model to use (e.g., llama3.2, mistral)").addText(
           (text) => text.setPlaceholder("llama3.2").setValue(this.plugin.settings.review.ollamaModel).onChange(async (value) => {
             this.plugin.settings.review.ollamaModel = value.trim() || "llama3.2";
             await this.plugin.saveSettings();
           })
         );
       } else if (provider === "openai") {
-        new import_obsidian6.Setting(containerEl).setName("OpenAI API key").setDesc("Your OpenAI API key").addText(
+        new import_obsidian7.Setting(containerEl).setName("OpenAI API key").setDesc("Your OpenAI API key").addText(
           (text) => text.setPlaceholder("sk-...").setValue(this.plugin.settings.review.openaiApiKey).onChange(async (value) => {
             this.plugin.settings.review.openaiApiKey = value.trim();
             await this.plugin.saveSettings();
           })
         );
-        new import_obsidian6.Setting(containerEl).setName("OpenAI model").setDesc("Model to use (e.g., gpt-4o-mini, gpt-4o)").addText(
+        new import_obsidian7.Setting(containerEl).setName("OpenAI model").setDesc("Model to use (e.g., gpt-4o-mini, gpt-4o)").addText(
           (text) => text.setPlaceholder("gpt-4o-mini").setValue(this.plugin.settings.review.openaiModel).onChange(async (value) => {
             this.plugin.settings.review.openaiModel = value.trim() || "gpt-4o-mini";
             await this.plugin.saveSettings();
           })
         );
       } else if (provider === "gemini") {
-        new import_obsidian6.Setting(containerEl).setName("Gemini API key").setDesc("Your Google AI Studio API key").addText(
+        new import_obsidian7.Setting(containerEl).setName("Gemini API key").setDesc("Your Google AI Studio API key").addText(
           (text) => text.setPlaceholder("AI...").setValue(this.plugin.settings.review.geminiApiKey).onChange(async (value) => {
             this.plugin.settings.review.geminiApiKey = value.trim();
             await this.plugin.saveSettings();
           })
         );
-        new import_obsidian6.Setting(containerEl).setName("Gemini model").setDesc("Model to use (e.g., gemini-1.5-flash, gemini-1.5-pro)").addText(
+        new import_obsidian7.Setting(containerEl).setName("Gemini model").setDesc("Model to use (e.g., gemini-1.5-flash, gemini-1.5-pro)").addText(
           (text) => text.setPlaceholder("gemini-1.5-flash").setValue(this.plugin.settings.review.geminiModel).onChange(async (value) => {
             this.plugin.settings.review.geminiModel = value.trim() || "gemini-1.5-flash";
             await this.plugin.saveSettings();
           })
         );
       } else if (provider === "anthropic") {
-        new import_obsidian6.Setting(containerEl).setName("Anthropic API key").setDesc("Your Anthropic API key").addText(
+        new import_obsidian7.Setting(containerEl).setName("Anthropic API key").setDesc("Your Anthropic API key").addText(
           (text) => text.setPlaceholder("sk-ant-...").setValue(this.plugin.settings.review.anthropicApiKey).onChange(async (value) => {
             this.plugin.settings.review.anthropicApiKey = value.trim();
             await this.plugin.saveSettings();
           })
         );
-        new import_obsidian6.Setting(containerEl).setName("Anthropic model").setDesc("Model to use (e.g., claude-3-haiku-20240307)").addText(
+        new import_obsidian7.Setting(containerEl).setName("Anthropic model").setDesc("Model to use (e.g., claude-3-haiku-20240307)").addText(
           (text) => text.setPlaceholder("claude-3-haiku-20240307").setValue(this.plugin.settings.review.anthropicModel).onChange(async (value) => {
             this.plugin.settings.review.anthropicModel = value.trim() || "claude-3-haiku-20240307";
             await this.plugin.saveSettings();
           })
         );
       }
-      new import_obsidian6.Setting(containerEl).setName("Review criteria").setDesc("Checklist items to evaluate (one per line)").addTextArea(
+      new import_obsidian7.Setting(containerEl).setName("Review criteria").setDesc("Checklist items to evaluate (one per line)").addTextArea(
         (text) => text.setPlaceholder("Has a clear title\nIncludes an introduction\nHas a conclusion").setValue(this.plugin.settings.review.criteria).onChange(async (value) => {
           this.plugin.settings.review.criteria = value;
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian6.Setting(containerEl).setName("Style guide file").setDesc("Path to a markdown file containing style guidelines (optional)").addText(
+      new import_obsidian7.Setting(containerEl).setName("Style guide file").setDesc("Path to a markdown file containing style guidelines (optional)").addText(
         (text) => text.setPlaceholder("Resources/Style Guide.md").setValue(this.plugin.settings.review.styleGuideFile).onChange(async (value) => {
           this.plugin.settings.review.styleGuideFile = value.trim();
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian6.Setting(containerEl).setName("Inline style guidelines").setDesc("Additional style guidelines (combined with file if both specified)").addTextArea(
+      new import_obsidian7.Setting(containerEl).setName("Inline style guidelines").setDesc("Additional style guidelines (combined with file if both specified)").addTextArea(
         (text) => text.setPlaceholder("Write in active voice. Keep paragraphs short.").setValue(this.plugin.settings.review.styleGuideInline).onChange(async (value) => {
           this.plugin.settings.review.styleGuideInline = value;
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian6.Setting(containerEl).setName("Clear review cache").setDesc("Remove all cached review results").addButton(
+      new import_obsidian7.Setting(containerEl).setName("Clear review cache").setDesc("Remove all cached review results").addButton(
         (button) => button.setButtonText("Clear Cache").onClick(async () => {
           this.plugin.reviewCache.clearAll();
           showNotice("Review cache cleared");
+        })
+      );
+    }
+    containerEl.createEl("h3", { text: "Outline Enhancement" });
+    new import_obsidian7.Setting(containerEl).setName("Enable outline enhancement").setDesc("Use an LLM to add questions and suggestions to document outlines (uses same LLM settings as Content Review)").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.outline.enabled).onChange(async (value) => {
+        this.plugin.settings.outline.enabled = value;
+        await this.plugin.saveSettings();
+        this.display();
+      })
+    );
+    if (this.plugin.settings.outline.enabled) {
+      new import_obsidian7.Setting(containerEl).setName("Enhancement prompt").setDesc("Instructions for the LLM when enhancing outlines").addTextArea(
+        (text) => text.setPlaceholder("Analyze this outline and add questions...").setValue(this.plugin.settings.outline.prompt).onChange(async (value) => {
+          this.plugin.settings.outline.prompt = value;
+          await this.plugin.saveSettings();
         })
       );
     }

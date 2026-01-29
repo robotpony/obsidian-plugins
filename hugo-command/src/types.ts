@@ -82,6 +82,26 @@ export interface ReviewSettings {
   styleGuideInline: string;
 }
 
+/**
+ * Outline enhancement settings
+ */
+export interface OutlineSettings {
+  enabled: boolean;
+  // Custom prompt/instructions for the LLM
+  prompt: string;
+}
+
+export const DEFAULT_OUTLINE_SETTINGS: OutlineSettings = {
+  enabled: false,
+  prompt: `Analyze this blog post outline/draft and enhance it by:
+1. Adding inline questions as HTML comments (<!-- Q: question here -->) where more detail or examples would help
+2. Suggesting missing sections that would strengthen the piece
+3. Noting any structural improvements
+4. If a style guide is provided, flag specific places where the writing doesn't follow the guidelines, citing the relevant rule
+
+Keep the original content intact. Add your suggestions as HTML comments so they're invisible when rendered.`,
+};
+
 export const DEFAULT_REVIEW_SETTINGS: ReviewSettings = {
   enabled: false,
   provider: "ollama",
@@ -109,6 +129,7 @@ export interface HugoCommandSettings {
   defaultSortOrder: "date-desc" | "date-asc" | "title";
   defaultStatusFilter: StatusFilter;
   review: ReviewSettings;
+  outline: OutlineSettings;
 }
 
 export const DEFAULT_SETTINGS: HugoCommandSettings = {
@@ -119,6 +140,7 @@ export const DEFAULT_SETTINGS: HugoCommandSettings = {
   defaultSortOrder: "date-desc",
   defaultStatusFilter: "draft",
   review: DEFAULT_REVIEW_SETTINGS,
+  outline: DEFAULT_OUTLINE_SETTINGS,
 };
 
 export type StatusFilter = "all" | "draft" | "published";

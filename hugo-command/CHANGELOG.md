@@ -2,6 +2,38 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.6.2] - 2026-01-28
+
+### Improved
+
+- **Style guide integration in outline enhancement**: LLM now cites specific style guide rules
+  - When style guide is configured, suggestions reference the violated rule
+  - Format: `<!-- Style: 'rule name' - specific suggestion -->`
+  - Style violations shown as purple bubbles with pencil icon
+  - Questions (blue), style issues (purple), and suggestions (yellow) now visually distinct
+
+## [0.6.1] - 2026-01-28
+
+### Improved
+
+- **Outline enhancement UX**: Better access and visual feedback
+  - Moved sparkles button from sidebar to file context menu (right-click on file)
+  - Added "Enhance Outline with Suggestions" command (accessible via command palette)
+  - Comment bubbles: HTML comments (`<!-- Q: ... -->`) now render as styled bubbles inline
+    - Questions (Q:) shown with blue background and "?" icon
+    - Suggestions shown with yellow background and lightbulb icon
+  - Original comment text is hidden, replaced by readable bubble
+
+## [0.6.0] - 2026-01-28
+
+### Added
+
+- **Outline enhancement**: LLM-powered feature to add questions and suggestions to document outlines
+  - Reads current document, enhances with inline HTML comments containing questions and suggestions
+  - Replaces document content directly with enhanced version
+  - Uses same LLM provider settings as Content Review
+  - Configurable enhancement prompt in settings
+
 ## [0.5.3] - 2026-01-28
 
 ### Improved

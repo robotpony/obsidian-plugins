@@ -211,6 +211,35 @@
   background-color: var(--background-modifier-hover) !important;
 }
 
+/* Enhance outline button (sparkles) */
+.hugo-command-enhance-btn {
+  padding: 4px;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s, background-color 0.15s;
+  flex-shrink: 0;
+  border-radius: 4px;
+}
+
+.hugo-command-enhance-btn:hover {
+  opacity: 1;
+  background-color: var(--background-modifier-hover) !important;
+}
+
+.hugo-command-enhance-btn.loading {
+  opacity: 0.4;
+  cursor: wait;
+  animation: hugo-enhance-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes hugo-enhance-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+
 /* Filter bar */
 .hugo-command-filters {
   display: flex;
@@ -1029,4 +1058,55 @@
   color: var(--text-error);
   font-size: 0.9em;
   padding: 4px 0;
+}
+
+/* Comment Bubbles */
+.hugo-comment-bubble {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  margin: 2px 0 2px 8px;
+  border-radius: 12px;
+  font-size: 0.85em;
+  line-height: 1.4;
+  max-width: 300px;
+  vertical-align: middle;
+}
+
+.hugo-comment-bubble.question {
+  background-color: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: var(--text-normal);
+}
+
+.hugo-comment-bubble.suggestion {
+  background-color: rgba(234, 179, 8, 0.15);
+  border: 1px solid rgba(234, 179, 8, 0.3);
+  color: var(--text-normal);
+}
+
+.hugo-comment-bubble.style {
+  background-color: rgba(168, 85, 247, 0.15);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  color: var(--text-normal);
+}
+
+.hugo-comment-icon {
+  flex-shrink: 0;
+  font-weight: 600;
+  font-size: 0.9em;
+}
+
+.hugo-comment-bubble.question .hugo-comment-icon {
+  color: #3b82f6;
+}
+
+.hugo-comment-bubble.suggestion .hugo-comment-icon {
+  font-size: 0.8em;
+}
+
+.hugo-comment-text {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
