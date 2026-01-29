@@ -15868,18 +15868,18 @@ var TriageModal = class extends import_obsidian11.Modal {
     const todos = this.scanner.getTodos();
     const ideas = this.scanner.getIdeas();
     const activeTodos = todos.filter(
-      (t) => !t.tags.includes("#future") && !t.tags.includes("#snooze") && !t.tags.includes("#snoozed") && !t.tags.includes("#idea") && !t.tags.includes("#ideas") && !t.tags.includes("#ideation") && !t.tags.includes("#focus")
+      (t) => !t.isHeader && !t.tags.includes("#future") && !t.tags.includes("#snooze") && !t.tags.includes("#snoozed") && !t.tags.includes("#idea") && !t.tags.includes("#ideas") && !t.tags.includes("#ideation") && !t.tags.includes("#focus")
       // Skip already focused
     );
     const activeIdeas = ideas.filter(
-      (i) => !i.tags.includes("#future") && !i.tags.includes("#snooze") && !i.tags.includes("#snoozed") && !i.tags.includes("#focus")
+      (i) => !i.isHeader && !i.tags.includes("#future") && !i.tags.includes("#snooze") && !i.tags.includes("#snoozed") && !i.tags.includes("#focus")
       // Skip already focused
     );
     const snoozedTodos = todos.filter(
-      (t) => (t.tags.includes("#future") || t.tags.includes("#snooze") || t.tags.includes("#snoozed")) && !t.tags.includes("#idea") && !t.tags.includes("#ideas") && !t.tags.includes("#ideation")
+      (t) => !t.isHeader && (t.tags.includes("#future") || t.tags.includes("#snooze") || t.tags.includes("#snoozed")) && !t.tags.includes("#idea") && !t.tags.includes("#ideas") && !t.tags.includes("#ideation")
     );
     const snoozedIdeas = ideas.filter(
-      (i) => i.tags.includes("#future") || i.tags.includes("#snooze") || i.tags.includes("#snoozed")
+      (i) => !i.isHeader && (i.tags.includes("#future") || i.tags.includes("#snooze") || i.tags.includes("#snoozed"))
     );
     this.items = [...activeTodos, ...activeIdeas, ...snoozedTodos, ...snoozedIdeas];
     this.currentIndex = 0;
@@ -15891,7 +15891,7 @@ var TriageModal = class extends import_obsidian11.Modal {
     const header = contentEl.createEl("div", { cls: "triage-header" });
     const titleGroup = header.createEl("div", { cls: "triage-title-group" });
     titleGroup.createEl("span", { cls: "space-command-logo", text: "\u2423\u2318" });
-    titleGroup.createEl("span", { cls: "triage-title", text: "Triage" });
+    titleGroup.createEl("span", { cls: "triage-title", text: "Triage your tasks" });
     const progress = header.createEl("div", { cls: "triage-progress" });
     progress.appendText(`${this.currentIndex + 1} of ${this.items.length}`);
     if (this.items.length === 0 || this.currentIndex >= this.items.length) {

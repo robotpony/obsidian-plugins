@@ -646,7 +646,9 @@ class TriageModal extends Modal {
     const todos = this.scanner.getTodos();
     const ideas = this.scanner.getIdeas();
 
+    // Skip header items - they represent groups of subtasks and shouldn't be triaged individually
     const activeTodos = todos.filter(t =>
+      !t.isHeader &&
       !t.tags.includes("#future") &&
       !t.tags.includes("#snooze") &&
       !t.tags.includes("#snoozed") &&
@@ -657,6 +659,7 @@ class TriageModal extends Modal {
     );
 
     const activeIdeas = ideas.filter(i =>
+      !i.isHeader &&
       !i.tags.includes("#future") &&
       !i.tags.includes("#snooze") &&
       !i.tags.includes("#snoozed") &&
@@ -664,6 +667,7 @@ class TriageModal extends Modal {
     );
 
     const snoozedTodos = todos.filter(t =>
+      !t.isHeader &&
       (t.tags.includes("#future") ||
        t.tags.includes("#snooze") ||
        t.tags.includes("#snoozed")) &&
@@ -673,9 +677,10 @@ class TriageModal extends Modal {
     );
 
     const snoozedIdeas = ideas.filter(i =>
-      i.tags.includes("#future") ||
-      i.tags.includes("#snooze") ||
-      i.tags.includes("#snoozed")
+      !i.isHeader &&
+      (i.tags.includes("#future") ||
+       i.tags.includes("#snooze") ||
+       i.tags.includes("#snoozed"))
     );
 
     // Combine in order: active TODOs, active Ideas, snoozed TODOs, snoozed Ideas
@@ -693,7 +698,7 @@ class TriageModal extends Modal {
     const header = contentEl.createEl("div", { cls: "triage-header" });
     const titleGroup = header.createEl("div", { cls: "triage-title-group" });
     titleGroup.createEl("span", { cls: "space-command-logo", text: "␣⌘" });
-    titleGroup.createEl("span", { cls: "triage-title", text: "Triage" });
+    titleGroup.createEl("span", { cls: "triage-title", text: "Triage your tasks" });
 
     // Progress indicator (top-right)
     const progress = header.createEl("div", { cls: "triage-progress" });

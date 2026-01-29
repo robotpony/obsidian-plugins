@@ -2,6 +2,22 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.71] - 2026-01-29
+
+### Improved
+
+- **Triage modal layout polish**:
+  - Title changed to "Triage your tasks"
+  - Header row aligned with modal close button for better visual balance
+  - Equal padding above and below the separator line
+  - Separator line colour now matches text for subtler appearance
+
+## [0.9.70] - 2026-01-29
+
+### Improved
+
+- **Triage skips header items**: Header TODOs/Ideas (e.g., `## Project #todo`) are now excluded from triage. These represent groups of subtasks and triaging them individually causes confusion since their children aren't visible in the modal. Subtasks under headers are still included.
+
 ## [0.9.69] - 2026-01-29
 
 ### Fixed

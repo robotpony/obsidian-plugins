@@ -1654,6 +1654,10 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: 16px;
+  /* Align with modal close button (X) by extending into modal padding area */
+  margin-left: -20px;
+  margin-right: -20px;
+  padding: 0 20px;
 }
 
 .space-command-triage-modal .triage-title-group {
@@ -1750,8 +1754,8 @@
 
 .space-command-triage-modal .triage-separator {
   height: 1px;
-  background-color: var(--background-modifier-border);
-  margin: 16px 0;
+  background-color: var(--text-muted);
+  margin: 16px 0 16px 0;
 }
 
 .space-command-triage-modal .triage-actions {
