@@ -959,7 +959,10 @@ export class TodoSidebarView extends ItemView {
             .trim();
           // Remove leading list markers (-, *, +) if present
           displayText = displayText.replace(/^[-*+]\s*/, "");
-          li.appendText(displayText);
+          // Render as markdown for styling (bold, italic, links, etc.)
+          const principleComponent = new Component();
+          principleComponent.load();
+          await MarkdownRenderer.render(this.app, displayText, li, info?.filepath || "", principleComponent);
         }
       }
 

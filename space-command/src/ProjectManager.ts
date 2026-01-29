@@ -256,6 +256,28 @@ export class ProjectManager {
       blocks.push(currentBlock.trim());
     }
 
+    // Post-process: trim any trailing heading from the last block
+    // (headings without following content don't make sense in a summary)
+    if (blocks.length > 0) {
+      const lastBlock = blocks[blocks.length - 1];
+      const blockLines = lastBlock.split("\n");
+      // Check if last line is a heading
+      while (blockLines.length > 0) {
+        const lastLine = blockLines[blockLines.length - 1].trim();
+        if (lastLine.match(/^#+\s/)) {
+          blockLines.pop();
+        } else {
+          break;
+        }
+      }
+      if (blockLines.length === 0) {
+        // The entire block was headings, remove it
+        blocks.pop();
+      } else {
+        blocks[blocks.length - 1] = blockLines.join("\n").trim();
+      }
+    }
+
     // Extract all #principle or #principles tags from the entire content
     const principleRegex = /#principles?\b/gi;
     const principlesInFile: string[] = [];

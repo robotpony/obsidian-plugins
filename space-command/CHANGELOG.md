@@ -2,6 +2,13 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.56] - 2026-01-29
+
+### Improved
+
+- **Principle items now render markdown**: Principle text in the project info popup now renders bold, italic, links, and code formatting
+- **Cleaner description extraction**: Trailing headings are now trimmed from project descriptions (headings without following content don't belong in summaries)
+
 ## [0.9.55] - 2026-01-29
 
 ### Added

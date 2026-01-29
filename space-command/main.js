@@ -1523,6 +1523,23 @@ var ProjectManager = class {
     if (currentBlock && blocks.length < 2) {
       blocks.push(currentBlock.trim());
     }
+    if (blocks.length > 0) {
+      const lastBlock = blocks[blocks.length - 1];
+      const blockLines = lastBlock.split("\n");
+      while (blockLines.length > 0) {
+        const lastLine = blockLines[blockLines.length - 1].trim();
+        if (lastLine.match(/^#+\s/)) {
+          blockLines.pop();
+        } else {
+          break;
+        }
+      }
+      if (blockLines.length === 0) {
+        blocks.pop();
+      } else {
+        blocks[blocks.length - 1] = blockLines.join("\n").trim();
+      }
+    }
     const principleRegex = /#principles?\b/gi;
     const principlesInFile = [];
     for (const line of lines) {
@@ -3565,7 +3582,9 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
           const li = principlesList.createEl("li", { cls: "project-info-principle-item" });
           let displayText = principle.text.replace(/#principles?\b/gi, "").replace(new RegExp(project.tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "gi"), "").replace(/\s+/g, " ").trim();
           displayText = displayText.replace(/^[-*+]\s*/, "");
-          li.appendText(displayText);
+          const principleComponent = new import_obsidian8.Component();
+          principleComponent.load();
+          await import_obsidian8.MarkdownRenderer.render(this.app, displayText, li, (info == null ? void 0 : info.filepath) || "", principleComponent);
         }
       }
       if (info.principles.length > 0) {
