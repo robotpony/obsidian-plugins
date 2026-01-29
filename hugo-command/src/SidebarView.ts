@@ -1,13 +1,18 @@
 import { ItemView, WorkspaceLeaf, Menu, Modal, App } from "obsidian";
 import { HugoScanner } from "./HugoScanner";
-import { HugoContentItem, StatusFilter, HugoCommandSettings } from "./types";
+import { HugoContentItem, StatusFilter, HugoCommandSettings, ReviewResult } from "./types";
 import { formatDate, openFile, LOGO_PREFIX, slugify, generateHugoFrontmatter, showNotice } from "./utils";
+import { ReviewCache } from "./ReviewCache";
+import { ReviewLLMClient } from "./ReviewLLMClient";
 
 export const VIEW_TYPE_HUGO_SIDEBAR = "hugo-command-sidebar";
 
 export class HugoSidebarView extends ItemView {
   private scanner: HugoScanner;
   private settings: HugoCommandSettings;
+  private reviewCache: ReviewCache;
+  private reviewClient: ReviewLLMClient;
+  private getStyleGuide: () => Promise<string>;
   private updateListener: (() => void) | null = null;
   private activeTagFilter: string | null = null;
   private activeFolderTagFilter: string | null = null;
@@ -24,6 +29,9 @@ export class HugoSidebarView extends ItemView {
     leaf: WorkspaceLeaf,
     scanner: HugoScanner,
     settings: HugoCommandSettings,
+    reviewCache: ReviewCache,
+    reviewClient: ReviewLLMClient,
+    getStyleGuide: () => Promise<string>,
     onShowAbout: () => void,
     onOpenSettings: () => void,
     onOpenSiteSettings: () => void
@@ -31,6 +39,9 @@ export class HugoSidebarView extends ItemView {
     super(leaf);
     this.scanner = scanner;
     this.settings = settings;
+    this.reviewCache = reviewCache;
+    this.reviewClient = reviewClient;
+    this.getStyleGuide = getStyleGuide;
     this.activeStatusFilter = settings.defaultStatusFilter;
     this.onShowAbout = onShowAbout;
     this.onOpenSettings = onOpenSettings;
@@ -632,18 +643,19 @@ export class HugoSidebarView extends ItemView {
       });
     }
 
-    // Info dropdown (always show - contains date, folder tags, frontmatter tags)
+    // Info dropdown (always show - contains date, folder tags, frontmatter tags, review)
     const frontmatterTags = [...item.tags, ...item.categories];
     const folderTags = item.folderTags;
-    this.renderItemInfoDropdown(listItem, item.date, frontmatterTags, folderTags);
+    this.renderItemInfoDropdown(listItem, item, frontmatterTags, folderTags);
   }
 
   private renderItemInfoDropdown(
     container: HTMLElement,
-    date: Date | null,
+    item: HugoContentItem,
     frontmatterTags: string[],
     folderTags: string[]
   ): void {
+    const date = item.date;
     const trigger = container.createEl("span", {
       cls: "hugo-command-item-info-trigger",
       text: "\u24d8",
@@ -754,6 +766,11 @@ export class HugoSidebarView extends ItemView {
         }
       }
 
+      // Review section (if enabled)
+      if (this.settings.review.enabled) {
+        this.renderReviewSection(dropdown, item);
+      }
+
       document.body.appendChild(dropdown);
       this.openDropdown = dropdown;
       this.openDropdownTrigger = trigger;
@@ -766,6 +783,159 @@ export class HugoSidebarView extends ItemView {
       };
       setTimeout(() => document.addEventListener("click", closeHandler), 0);
     });
+  }
+
+  /**
+   * Render review section in item info dropdown
+   */
+  private renderReviewSection(dropdown: HTMLElement, item: HugoContentItem): void {
+    // Add separator
+    dropdown.createEl("div", { cls: "hugo-command-tag-separator" });
+
+    // Section header
+    dropdown.createEl("div", {
+      cls: "hugo-command-tag-section-header",
+      text: "Review",
+    });
+
+    // Check for cached review
+    const cachedReview = this.reviewCache.get(item.filePath);
+
+    // Container for review content (will be updated)
+    const reviewContainer = dropdown.createEl("div", {
+      cls: "hugo-command-review-container",
+    });
+
+    if (cachedReview && !cachedReview.error) {
+      this.renderReviewResults(reviewContainer, cachedReview);
+    } else if (cachedReview?.error) {
+      reviewContainer.createEl("div", {
+        cls: "hugo-command-review-error",
+        text: cachedReview.error,
+      });
+    }
+
+    // Run/Re-run button
+    const buttonText = cachedReview ? "Re-run Review" : "Run Review";
+    const runBtn = dropdown.createEl("div", {
+      cls: "hugo-command-review-btn",
+      text: buttonText,
+    });
+
+    runBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+
+      // Show loading state
+      runBtn.textContent = "Reviewing...";
+      runBtn.addClass("loading");
+      reviewContainer.empty();
+      reviewContainer.createEl("div", {
+        cls: "hugo-command-review-loading",
+        text: "Analyzing content...",
+      });
+
+      try {
+        // Read file content
+        const content = await this.app.vault.read(item.file);
+
+        // Get style guide
+        const styleGuide = await this.getStyleGuide();
+
+        // Run review
+        const criteria = await this.reviewClient.review(content, styleGuide);
+
+        // Cache result
+        const result: ReviewResult = {
+          filePath: item.filePath,
+          criteria,
+          timestamp: Date.now(),
+        };
+        this.reviewCache.set(result);
+
+        // Update display
+        reviewContainer.empty();
+        this.renderReviewResults(reviewContainer, result);
+        runBtn.textContent = "Re-run Review";
+        runBtn.removeClass("loading");
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : "Review failed";
+        const result: ReviewResult = {
+          filePath: item.filePath,
+          criteria: [],
+          timestamp: Date.now(),
+          error: errorMsg,
+        };
+        this.reviewCache.set(result);
+
+        reviewContainer.empty();
+        reviewContainer.createEl("div", {
+          cls: "hugo-command-review-error",
+          text: errorMsg,
+        });
+        runBtn.textContent = "Retry Review";
+        runBtn.removeClass("loading");
+      }
+    });
+  }
+
+  /**
+   * Render review results checklist
+   */
+  private renderReviewResults(container: HTMLElement, result: ReviewResult): void {
+    const list = container.createEl("div", { cls: "hugo-command-review-list" });
+
+    for (const criterion of result.criteria) {
+      const item = list.createEl("div", { cls: "hugo-command-review-item" });
+
+      // Status icon
+      let statusIcon: string;
+      let statusClass: string;
+      if (criterion.passed === true) {
+        statusIcon = "✓";
+        statusClass = "passed";
+      } else if (criterion.passed === false) {
+        statusIcon = "✗";
+        statusClass = "failed";
+      } else {
+        statusIcon = "—";
+        statusClass = "unknown";
+      }
+
+      item.createEl("span", {
+        cls: `hugo-command-review-status ${statusClass}`,
+        text: statusIcon,
+      });
+
+      // Criterion text
+      const textEl = item.createEl("span", {
+        cls: "hugo-command-review-text",
+        text: criterion.text,
+      });
+
+      // Note (if present, show on hover via title)
+      if (criterion.note) {
+        textEl.setAttribute("title", criterion.note);
+      }
+    }
+
+    // Timestamp
+    const timestamp = new Date(result.timestamp);
+    container.createEl("div", {
+      cls: "hugo-command-review-timestamp",
+      text: `Reviewed ${this.formatTimeAgo(timestamp)}`,
+    });
+  }
+
+  /**
+   * Format a date as relative time (e.g., "2 hours ago")
+   */
+  private formatTimeAgo(date: Date): string {
+    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+
+    if (seconds < 60) return "just now";
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    return `${Math.floor(seconds / 86400)}d ago`;
   }
 
   /**

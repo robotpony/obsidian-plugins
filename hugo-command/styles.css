@@ -876,3 +876,88 @@
   border-top: 1px solid var(--background-modifier-border);
   margin: 20px 0;
 }
+
+/* Review Section in Item Info Dropdown */
+.hugo-command-review-container {
+  padding: 4px 0;
+}
+
+.hugo-command-review-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hugo-command-review-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.9em;
+  line-height: 1.4;
+}
+
+.hugo-command-review-status {
+  flex-shrink: 0;
+  font-weight: 600;
+  width: 16px;
+  text-align: center;
+}
+
+.hugo-command-review-status.passed {
+  color: #22c55e;
+}
+
+.hugo-command-review-status.failed {
+  color: #ef4444;
+}
+
+.hugo-command-review-status.unknown {
+  color: var(--text-muted);
+}
+
+.hugo-command-review-text {
+  flex: 1;
+  color: var(--text-normal);
+  cursor: help;
+}
+
+.hugo-command-review-timestamp {
+  font-size: 0.8em;
+  color: var(--text-muted);
+  margin-top: 6px;
+  padding-top: 4px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.hugo-command-review-btn {
+  padding: 6px 12px;
+  margin-top: 8px;
+  cursor: pointer;
+  font-size: 0.9em;
+  color: var(--text-normal);
+  background-color: var(--interactive-normal);
+  border-radius: 4px;
+  text-align: center;
+  transition: background-color 0.15s;
+}
+
+.hugo-command-review-btn:hover {
+  background-color: var(--interactive-hover);
+}
+
+.hugo-command-review-btn.loading {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.hugo-command-review-loading {
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 8px 0;
+}
+
+.hugo-command-review-error {
+  color: var(--text-error);
+  font-size: 0.9em;
+  padding: 4px 0;
+}

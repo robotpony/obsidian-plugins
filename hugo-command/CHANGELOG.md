@@ -2,6 +2,22 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.5.0] - 2026-01-28
+
+### Added
+
+- **Content review checklist**: LLM-powered review of posts against configurable criteria
+  - Accessible from the (i) info dropdown on each post
+  - Shows pass/fail status for each criterion with explanatory notes
+  - Results are cached per-file and can be re-run anytime
+  - Supports multiple LLM providers:
+    - **Ollama** (default) - local models like llama3.2, mistral
+    - **OpenAI** - gpt-4o-mini, gpt-4o
+    - **Google Gemini** - gemini-1.5-flash, gemini-1.5-pro
+    - **Anthropic Claude** - claude-3-haiku, claude-3-sonnet
+  - Configurable review criteria (one per line in settings)
+  - Style guide support via file reference and/or inline text
+
 ## [0.4.15] - 2026-01-28
 
 ### Added

@@ -34,6 +34,71 @@ export interface HugoContentItem {
 }
 
 /**
+ * LLM provider options
+ */
+export type LLMProvider = "ollama" | "openai" | "gemini" | "anthropic";
+
+/**
+ * Review criterion result
+ */
+export interface ReviewCriterion {
+  text: string;
+  passed: boolean | null;
+  note?: string;
+}
+
+/**
+ * Review result for a file
+ */
+export interface ReviewResult {
+  filePath: string;
+  criteria: ReviewCriterion[];
+  timestamp: number;
+  error?: string;
+}
+
+/**
+ * Review settings
+ */
+export interface ReviewSettings {
+  enabled: boolean;
+  provider: LLMProvider;
+  // Ollama settings
+  ollamaEndpoint: string;
+  ollamaModel: string;
+  // OpenAI settings
+  openaiApiKey: string;
+  openaiModel: string;
+  // Gemini settings
+  geminiApiKey: string;
+  geminiModel: string;
+  // Anthropic settings
+  anthropicApiKey: string;
+  anthropicModel: string;
+  // Review criteria (one per line)
+  criteria: string;
+  // Style guide reference
+  styleGuideFile: string;
+  styleGuideInline: string;
+}
+
+export const DEFAULT_REVIEW_SETTINGS: ReviewSettings = {
+  enabled: false,
+  provider: "ollama",
+  ollamaEndpoint: "http://localhost:11434",
+  ollamaModel: "llama3.2",
+  openaiApiKey: "",
+  openaiModel: "gpt-4o-mini",
+  geminiApiKey: "",
+  geminiModel: "gemini-1.5-flash",
+  anthropicApiKey: "",
+  anthropicModel: "claude-3-haiku-20240307",
+  criteria: "Has a clear, descriptive title\nIncludes an introduction\nHas a conclusion or summary\nUses proper headings structure\nIncludes relevant tags",
+  styleGuideFile: "",
+  styleGuideInline: "",
+};
+
+/**
  * Plugin settings
  */
 export interface HugoCommandSettings {
@@ -43,6 +108,7 @@ export interface HugoCommandSettings {
   showDrafts: boolean;
   defaultSortOrder: "date-desc" | "date-asc" | "title";
   defaultStatusFilter: StatusFilter;
+  review: ReviewSettings;
 }
 
 export const DEFAULT_SETTINGS: HugoCommandSettings = {
@@ -52,6 +118,7 @@ export const DEFAULT_SETTINGS: HugoCommandSettings = {
   showDrafts: true,
   defaultSortOrder: "date-desc",
   defaultStatusFilter: "draft",
+  review: DEFAULT_REVIEW_SETTINGS,
 };
 
 export type StatusFilter = "all" | "draft" | "published";
