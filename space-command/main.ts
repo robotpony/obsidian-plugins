@@ -400,7 +400,7 @@ export default class SpaceCommandPlugin extends Plugin {
     );
 
     // Add ribbon icon
-    this.addRibbonIcon("checkbox-glyph", "Toggle TODO Sidebar", () => {
+    this.addRibbonIcon("square-check-big", "Toggle TODO Sidebar", () => {
       this.toggleSidebar();
     });
 

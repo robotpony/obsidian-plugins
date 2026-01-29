@@ -2942,7 +2942,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     return this.activeTab === "todos" ? "TODOs" : "IDEAs";
   }
   getIcon() {
-    return "checkbox-glyph";
+    return "square-check-big";
   }
   stripMarkdownSyntax(text5) {
     let cleaned = text5;
@@ -15386,7 +15386,7 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
         }
       })
     );
-    this.addRibbonIcon("checkbox-glyph", "Toggle TODO Sidebar", () => {
+    this.addRibbonIcon("square-check-big", "Toggle TODO Sidebar", () => {
       this.toggleSidebar();
     });
     this.addSettingTab(new SpaceCommandSettingTab(this.app, this));

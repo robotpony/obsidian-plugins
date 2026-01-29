@@ -73,7 +73,7 @@ export class TodoSidebarView extends ItemView {
   }
 
   getIcon(): string {
-    return "checkbox-glyph";
+    return "square-check-big";
   }
 
   private stripMarkdownSyntax(text: string): string {
