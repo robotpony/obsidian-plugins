@@ -342,6 +342,56 @@
    -------------------------------------------- */
 
 /* About Section in Settings */
+/* About Modal */
+.link-command-about-modal {
+  text-align: center;
+  padding: 20px;
+}
+
+.link-command-about-modal .about-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.link-command-about-modal .about-logo {
+  font-size: 2em;
+  padding: 8px 10px 6px;
+}
+
+.link-command-about-modal .about-header h2 {
+  margin: 0;
+  font-size: 1.5em;
+}
+
+.link-command-about-modal .about-blurb {
+  color: var(--text-muted);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.link-command-about-modal .about-stats {
+  font-size: 0.9em;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+.link-command-about-modal .about-stats p {
+  margin: 4px 0;
+}
+
+.link-command-about-modal .about-details {
+  font-size: 0.9em;
+  color: var(--text-muted);
+}
+
+.link-command-about-modal .about-details a {
+  color: var(--text-accent);
+}
+
+/* About Section in Settings */
 .link-command-about-section {
   background-color: var(--background-secondary);
   border-radius: 8px;

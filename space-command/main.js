@@ -15510,6 +15510,7 @@ var AboutModal = class extends import_obsidian11.Modal {
       text: "github.com/robotpony/obsidian-plugins",
       href: "https://github.com/robotpony/obsidian-plugins"
     });
+    details.createEl("p", { text: "Made in \u{1F1E8}\u{1F1E6}", cls: "about-made-in" });
   }
   onClose() {
     this.contentEl.empty();

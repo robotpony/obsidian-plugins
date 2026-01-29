@@ -2,6 +2,12 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.4.15] - 2026-01-28
+
+### Added
+
+- **Made in 🇨🇦**: Added "Made in 🇨🇦" to the About popup
+
 ## [0.4.14] - 2026-01-27
 
 ### Improved

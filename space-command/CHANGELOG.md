@@ -2,6 +2,12 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.54] - 2026-01-28
+
+### Added
+
+- **Made in 🇨🇦**: Added "Made in 🇨🇦" to the About popup
+
 ## [0.9.53] - 2026-01-28
 
 ### Improved

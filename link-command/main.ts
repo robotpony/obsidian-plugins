@@ -1,6 +1,7 @@
 import {
   App,
   Editor,
+  Modal,
   Notice,
   Plugin,
   PluginSettingTab,
@@ -170,13 +171,7 @@ export default class LinkCommandPlugin extends Plugin {
    * Show the About modal
    */
   private showAbout(): void {
-    const stats = this.unfurlService.getCacheStats();
-    new Notice(
-      `L⌘ Link Command v${this.manifest.version}\n\n` +
-      `Cached links: ${stats.persistentSize}\n` +
-      `Memory cache: ${stats.memorySize}`,
-      5000
-    );
+    new AboutModal(this.app, this.manifest.version, this.unfurlService).open();
   }
 
   /**
@@ -518,5 +513,60 @@ class LinkCommandSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
       );
+  }
+}
+
+// About modal for displaying plugin information
+class AboutModal extends Modal {
+  private version: string;
+  private unfurlService: UrlUnfurlService;
+
+  constructor(app: App, version: string, unfurlService: UrlUnfurlService) {
+    super(app);
+    this.version = version;
+    this.unfurlService = unfurlService;
+  }
+
+  onOpen(): void {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass("link-command-about-modal");
+
+    // Logo and title
+    const header = contentEl.createEl("div", { cls: "about-header" });
+    header.createEl("span", { cls: "link-command-logo about-logo", text: "L⌘" });
+    header.createEl("h2", { text: "Link Command" });
+
+    // Version
+    contentEl.createEl("p", { cls: "about-version", text: `Version ${this.version}` });
+
+    // Blurb
+    contentEl.createEl("p", {
+      cls: "about-blurb",
+      text: "URL unfurling for Obsidian. Paste a link, get the title.",
+    });
+
+    // Cache stats
+    const stats = this.unfurlService.getCacheStats();
+    const statsEl = contentEl.createEl("div", { cls: "about-stats" });
+    statsEl.createEl("p", { text: `Cached links: ${stats.persistentSize}` });
+    statsEl.createEl("p", { text: `Memory cache: ${stats.memorySize}` });
+
+    // Details
+    const details = contentEl.createEl("div", { cls: "about-details" });
+    details.createEl("p", { text: "Author: Bruce Alderson" });
+
+    const repoLink = details.createEl("p");
+    repoLink.appendText("Repository: ");
+    repoLink.createEl("a", {
+      text: "github.com/robotpony/obsidian-plugins",
+      href: "https://github.com/robotpony/obsidian-plugins",
+    });
+
+    details.createEl("p", { text: "Made in 🇨🇦", cls: "about-made-in" });
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
   }
 }

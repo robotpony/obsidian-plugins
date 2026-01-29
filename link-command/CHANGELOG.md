@@ -2,6 +2,15 @@
 
 All notable changes to the Link Command plugin will be documented in this file.
 
+## [0.4.18] - 2026-01-28
+
+### Added
+
+- **About modal**: Converted About from simple Notice toast to proper modal dialog
+  - Shows version, blurb, cache statistics, and repository link
+  - Matches style of Space Command and Hugo Command About modals
+- **Made in 🇨🇦**: Added "Made in 🇨🇦" to the About popup
+
 ## [0.4.17] - 2026-01-27
 
 ### Improved

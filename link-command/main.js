@@ -1448,14 +1448,7 @@ var LinkCommandPlugin = class extends import_obsidian4.Plugin {
    * Show the About modal
    */
   showAbout() {
-    const stats = this.unfurlService.getCacheStats();
-    new import_obsidian4.Notice(
-      `L\u2318 Link Command v${this.manifest.version}
-
-Cached links: ${stats.persistentSize}
-Memory cache: ${stats.memorySize}`,
-      5e3
-    );
+    new AboutModal(this.app, this.manifest.version, this.unfurlService).open();
   }
   /**
    * Open plugin settings
@@ -1683,5 +1676,41 @@ var LinkCommandSettingTab = class extends import_obsidian4.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
+  }
+};
+var AboutModal = class extends import_obsidian4.Modal {
+  constructor(app, version, unfurlService) {
+    super(app);
+    this.version = version;
+    this.unfurlService = unfurlService;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass("link-command-about-modal");
+    const header = contentEl.createEl("div", { cls: "about-header" });
+    header.createEl("span", { cls: "link-command-logo about-logo", text: "L\u2318" });
+    header.createEl("h2", { text: "Link Command" });
+    contentEl.createEl("p", { cls: "about-version", text: `Version ${this.version}` });
+    contentEl.createEl("p", {
+      cls: "about-blurb",
+      text: "URL unfurling for Obsidian. Paste a link, get the title."
+    });
+    const stats = this.unfurlService.getCacheStats();
+    const statsEl = contentEl.createEl("div", { cls: "about-stats" });
+    statsEl.createEl("p", { text: `Cached links: ${stats.persistentSize}` });
+    statsEl.createEl("p", { text: `Memory cache: ${stats.memorySize}` });
+    const details = contentEl.createEl("div", { cls: "about-details" });
+    details.createEl("p", { text: "Author: Bruce Alderson" });
+    const repoLink = details.createEl("p");
+    repoLink.appendText("Repository: ");
+    repoLink.createEl("a", {
+      text: "github.com/robotpony/obsidian-plugins",
+      href: "https://github.com/robotpony/obsidian-plugins"
+    });
+    details.createEl("p", { text: "Made in \u{1F1E8}\u{1F1E6}", cls: "about-made-in" });
+  }
+  onClose() {
+    this.contentEl.empty();
   }
 };

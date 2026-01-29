@@ -529,6 +529,8 @@ class AboutModal extends Modal {
       text: "github.com/robotpony/obsidian-plugins",
       href: "https://github.com/robotpony/obsidian-plugins",
     });
+
+    details.createEl("p", { text: "Made in 🇨🇦", cls: "about-made-in" });
   }
 
   onClose(): void {
