@@ -1616,3 +1616,175 @@
   cursor: pointer;
 }
 
+/* Triage Alert Button */
+.triage-alert-btn {
+  color: var(--text-warning) !important;
+  animation: triage-pulse 2s ease-in-out infinite;
+}
+
+.triage-alert-btn:hover {
+  animation: none;
+  opacity: 1;
+}
+
+@keyframes triage-pulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Triage Modal */
+.space-command-triage-modal {
+  text-align: center;
+  padding: 20px;
+  min-width: 350px;
+  max-width: 500px;
+}
+
+.space-command-triage-modal .triage-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.space-command-triage-modal .triage-logo {
+  font-size: 2em;
+  padding: 8px 10px 6px;
+}
+
+.space-command-triage-modal .triage-header h2 {
+  margin: 0;
+  font-size: 1.5em;
+}
+
+.space-command-triage-modal .triage-progress {
+  font-size: 0.85em;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+}
+
+.space-command-triage-modal .triage-type {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.space-command-triage-modal .triage-item-content {
+  font-size: 1.1em;
+  color: var(--text-normal);
+  line-height: 1.5;
+  padding: 16px;
+  background-color: var(--background-secondary);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  text-align: left;
+}
+
+.space-command-triage-modal .triage-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.space-command-triage-modal .triage-tag {
+  font-size: 11px !important;
+}
+
+.space-command-triage-modal .triage-source {
+  font-size: 0.8em;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+}
+
+.space-command-triage-modal .triage-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.space-command-triage-modal .triage-btn {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.95em;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s, opacity 0.15s, transform 0.1s;
+}
+
+.space-command-triage-modal .triage-btn:hover {
+  transform: translateY(-1px);
+}
+
+.space-command-triage-modal .triage-btn:active {
+  transform: translateY(0);
+}
+
+.space-command-triage-modal .triage-btn-skip {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-muted);
+}
+
+.space-command-triage-modal .triage-btn-skip:hover {
+  background-color: var(--background-modifier-border);
+  color: var(--text-normal);
+}
+
+.space-command-triage-modal .triage-btn-focus {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.space-command-triage-modal .triage-btn-focus:hover {
+  background-color: var(--interactive-accent-hover);
+}
+
+.space-command-triage-modal .triage-btn-snooze {
+  background-color: var(--background-secondary);
+  color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.space-command-triage-modal .triage-btn-snooze:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.space-command-triage-modal .triage-btn-unsnooze {
+  background-color: var(--background-secondary);
+  color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.space-command-triage-modal .triage-btn-unsnooze:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.space-command-triage-modal .triage-btn-close {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.space-command-triage-modal .triage-btn-close:hover {
+  background-color: var(--interactive-accent-hover);
+}
+
+.space-command-triage-modal .triage-done {
+  padding: 20px 0;
+}
+
+.space-command-triage-modal .triage-done-text {
+  font-size: 1.1em;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+

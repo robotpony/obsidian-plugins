@@ -20,6 +20,7 @@ import {
 import {
   SpaceCommandSettings,
   DEFAULT_SETTINGS,
+  TodoItem,
 } from "./src/types";
 import { convertToSlackMarkdown } from "./src/SlackConverter";
 import { showNotice } from "./src/utils";
@@ -173,8 +174,11 @@ export default class SpaceCommandPlugin extends Plugin {
           this.settings.focusListLimit,
           this.settings.focusModeIncludeProjects,
           this.settings.makeLinksClickable,
+          this.settings.triageSnoozedThreshold,
+          this.settings.triageActiveThreshold,
           () => this.showAboutModal(),
-          () => this.showStatsModal()
+          () => this.showStatsModal(),
+          () => this.showTriageModal()
         )
     );
 
@@ -484,6 +488,10 @@ export default class SpaceCommandPlugin extends Plugin {
     new StatsModal(this.app, this.scanner).open();
   }
 
+  showTriageModal() {
+    new TriageModal(this.app, this.scanner, this.processor).open();
+  }
+
   openLLMSettings() {
     // Open Obsidian settings and navigate to Space Command tab
     (this.app as any).setting.open();
@@ -605,6 +613,164 @@ class StatsModal extends Modal {
     const row = container.createEl("div", { cls: "stats-row" });
     row.createEl("span", { cls: "stats-label", text: label });
     row.createEl("span", { cls: "stats-value", text: String(value) });
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+  }
+}
+
+// Triage modal for quickly processing TODOs and Ideas
+class TriageModal extends Modal {
+  private scanner: TodoScanner;
+  private processor: TodoProcessor;
+  private items: TodoItem[] = [];
+  private currentIndex: number = 0;
+
+  constructor(app: App, scanner: TodoScanner, processor: TodoProcessor) {
+    super(app);
+    this.scanner = scanner;
+    this.processor = processor;
+  }
+
+  onOpen(): void {
+    const { contentEl } = this;
+    contentEl.addClass("space-command-triage-modal");
+
+    // Gather items for triage in priority order:
+    // 1. Active TODOs (non-snoozed)
+    // 2. Active Ideas (non-snoozed)
+    // 3. Snoozed items (TODOs then Ideas)
+    const todos = this.scanner.getTodos();
+    const ideas = this.scanner.getIdeas();
+
+    const activeTodos = todos.filter(t =>
+      !t.tags.includes("#future") &&
+      !t.tags.includes("#snooze") &&
+      !t.tags.includes("#snoozed") &&
+      !t.tags.includes("#idea") &&
+      !t.tags.includes("#ideas") &&
+      !t.tags.includes("#ideation") &&
+      !t.tags.includes("#focus") // Skip already focused
+    );
+
+    const activeIdeas = ideas.filter(i =>
+      !i.tags.includes("#future") &&
+      !i.tags.includes("#snooze") &&
+      !i.tags.includes("#snoozed") &&
+      !i.tags.includes("#focus") // Skip already focused
+    );
+
+    const snoozedTodos = todos.filter(t =>
+      (t.tags.includes("#future") ||
+       t.tags.includes("#snooze") ||
+       t.tags.includes("#snoozed")) &&
+      !t.tags.includes("#idea") &&
+      !t.tags.includes("#ideas") &&
+      !t.tags.includes("#ideation")
+    );
+
+    const snoozedIdeas = ideas.filter(i =>
+      i.tags.includes("#future") ||
+      i.tags.includes("#snooze") ||
+      i.tags.includes("#snoozed")
+    );
+
+    // Combine in order: active TODOs, active Ideas, snoozed TODOs, snoozed Ideas
+    this.items = [...activeTodos, ...activeIdeas, ...snoozedTodos, ...snoozedIdeas];
+    this.currentIndex = 0;
+
+    this.renderCurrentItem();
+  }
+
+  private renderCurrentItem(): void {
+    const { contentEl } = this;
+    contentEl.empty();
+
+    // Header
+    const header = contentEl.createEl("div", { cls: "triage-header" });
+    header.createEl("span", { cls: "space-command-logo triage-logo", text: "␣⌘" });
+    header.createEl("h2", { text: "Triage" });
+
+    // Progress indicator
+    const progress = contentEl.createEl("div", { cls: "triage-progress" });
+    progress.appendText(`${this.currentIndex + 1} of ${this.items.length}`);
+
+    if (this.items.length === 0 || this.currentIndex >= this.items.length) {
+      // Done triaging
+      const doneEl = contentEl.createEl("div", { cls: "triage-done" });
+      doneEl.createEl("p", { text: "All items triaged!", cls: "triage-done-text" });
+      const closeBtn = doneEl.createEl("button", { text: "Close", cls: "triage-btn triage-btn-close" });
+      closeBtn.addEventListener("click", () => this.close());
+      return;
+    }
+
+    const item = this.items[this.currentIndex];
+
+    // Item type indicator
+    const typeIndicator = contentEl.createEl("div", { cls: "triage-type" });
+    const isSnoozed = item.tags.includes("#future") || item.tags.includes("#snooze") || item.tags.includes("#snoozed");
+    const isIdea = item.itemType === 'idea' || item.tags.includes("#idea") || item.tags.includes("#ideas");
+    if (isSnoozed) {
+      typeIndicator.appendText(isIdea ? "Snoozed Idea" : "Snoozed TODO");
+    } else {
+      typeIndicator.appendText(isIdea ? "Idea" : "TODO");
+    }
+
+    // Item content
+    const itemContent = contentEl.createEl("div", { cls: "triage-item-content" });
+    // Strip tags and markdown for cleaner display
+    let displayText = item.text
+      .replace(/#\w+\b/g, "") // Remove all tags
+      .replace(/^[-*+]\s*\[.\]\s*/, "") // Remove checkbox
+      .replace(/^[-*+]\s*/, "") // Remove list marker
+      .replace(/^#{1,6}\s+/, "") // Remove heading markers
+      .trim();
+    itemContent.appendText(displayText);
+
+    // Show tags
+    const tagsEl = contentEl.createEl("div", { cls: "triage-tags" });
+    for (const tag of item.tags) {
+      const tagSpan = tagsEl.createEl("span", { cls: "tag triage-tag", text: tag });
+    }
+
+    // Source file
+    const sourceEl = contentEl.createEl("div", { cls: "triage-source" });
+    sourceEl.appendText(item.filePath);
+
+    // Action buttons
+    const actions = contentEl.createEl("div", { cls: "triage-actions" });
+
+    const skipBtn = actions.createEl("button", { text: "Skip", cls: "triage-btn triage-btn-skip" });
+    skipBtn.addEventListener("click", () => this.nextItem());
+
+    const focusBtn = actions.createEl("button", { text: "Focus", cls: "triage-btn triage-btn-focus" });
+    focusBtn.addEventListener("click", async () => {
+      await this.processor.setPriorityTag(item, "#focus");
+      this.nextItem();
+    });
+
+    // Show Unsnooze for snoozed items, Snooze for active items
+    if (isSnoozed) {
+      const unsnoozeBtn = actions.createEl("button", { text: "Unsnooze", cls: "triage-btn triage-btn-unsnooze" });
+      unsnoozeBtn.addEventListener("click", async () => {
+        await this.processor.removeTag(item, "#future");
+        if (item.tags.includes("#snooze")) await this.processor.removeTag(item, "#snooze");
+        if (item.tags.includes("#snoozed")) await this.processor.removeTag(item, "#snoozed");
+        this.nextItem();
+      });
+    } else {
+      const snoozeBtn = actions.createEl("button", { text: "Snooze", cls: "triage-btn triage-btn-snooze" });
+      snoozeBtn.addEventListener("click", async () => {
+        await this.processor.setPriorityTag(item, "#future");
+        this.nextItem();
+      });
+    }
+  }
+
+  private nextItem(): void {
+    this.currentIndex++;
+    this.renderCurrentItem();
   }
 
   onClose(): void {
@@ -857,6 +1023,41 @@ class SpaceCommandSettingTab extends PluginSettingTab {
             const num = parseInt(value);
             if (!isNaN(num) && num > 0) {
               this.plugin.settings.recentTodonesLimit = num;
+              await this.plugin.saveSettings();
+            }
+          })
+      );
+
+    // Triage Settings
+    containerEl.createEl("h3", { text: "Triage" });
+
+    new Setting(containerEl)
+      .setName("Snoozed items threshold")
+      .setDesc("Show triage alert when snoozed items exceed this count")
+      .addText((text) =>
+        text
+          .setPlaceholder("10")
+          .setValue(String(this.plugin.settings.triageSnoozedThreshold))
+          .onChange(async (value) => {
+            const num = parseInt(value);
+            if (!isNaN(num) && num >= 0) {
+              this.plugin.settings.triageSnoozedThreshold = num;
+              await this.plugin.saveSettings();
+            }
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Active items threshold")
+      .setDesc("Show triage alert when active TODOs + Ideas exceed this count")
+      .addText((text) =>
+        text
+          .setPlaceholder("20")
+          .setValue(String(this.plugin.settings.triageActiveThreshold))
+          .onChange(async (value) => {
+            const num = parseInt(value);
+            if (!isNaN(num) && num >= 0) {
+              this.plugin.settings.triageActiveThreshold = num;
               await this.plugin.saveSettings();
             }
           })

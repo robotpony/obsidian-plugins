@@ -71,6 +71,9 @@ export interface SpaceCommandSettings {
   llmRewritePrompt: string;
   llmReviewPrompt: string;
   llmTimeout: number;
+  // Triage settings
+  triageSnoozedThreshold: number;
+  triageActiveThreshold: number;
 }
 
 export const DEFAULT_SETTINGS: SpaceCommandSettings = {
@@ -98,4 +101,7 @@ export const DEFAULT_SETTINGS: SpaceCommandSettings = {
   llmRewritePrompt: "Rewrite the following text to improve clarity, accuracy, and brevity. Keep the same tone and intent. Avoid clichés and filler words. Output only the rewritten text, nothing else:",
   llmReviewPrompt: "Review the following text and provide specific suggestions for improvement. Focus on clarity, accuracy, structure, and style. Be concise and actionable:",
   llmTimeout: 30000,
+  // Triage settings
+  triageSnoozedThreshold: 10,
+  triageActiveThreshold: 20,
 };

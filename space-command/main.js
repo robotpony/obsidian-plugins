@@ -2961,7 +2961,7 @@ var DateSuggest = class extends import_obsidian7.EditorSuggest {
 var import_obsidian8 = require("obsidian");
 var VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 var TodoSidebarView = class extends import_obsidian8.ItemView {
-  constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, recentTodonesLimit, activeTodosLimit, focusListLimit, focusModeIncludeProjects, makeLinksClickable, onShowAbout, onShowStats) {
+  constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, recentTodonesLimit, activeTodosLimit, focusListLimit, focusModeIncludeProjects, makeLinksClickable, triageSnoozedThreshold, triageActiveThreshold, onShowAbout, onShowStats, onShowTriage) {
     super(leaf);
     this.updateListener = null;
     this.activeTab = "todos";
@@ -3002,8 +3002,11 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     this.focusListLimit = focusListLimit;
     this.focusModeIncludeProjects = focusModeIncludeProjects;
     this.makeLinksClickable = makeLinksClickable;
+    this.triageSnoozedThreshold = triageSnoozedThreshold;
+    this.triageActiveThreshold = triageActiveThreshold;
     this.onShowAbout = onShowAbout;
     this.onShowStats = onShowStats;
+    this.onShowTriage = onShowTriage;
     this.contextMenuHandler = new ContextMenuHandler(
       this.app,
       processor,
@@ -3025,6 +3028,25 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
   }
   getIcon() {
     return "square-check-big";
+  }
+  shouldShowTriageAlert() {
+    const allTodos = this.scanner.getTodos();
+    const activeTodos = allTodos.filter(
+      (t) => !t.tags.includes("#future") && !t.tags.includes("#snooze") && !t.tags.includes("#snoozed") && !t.tags.includes("#idea") && !t.tags.includes("#ideas") && !t.tags.includes("#ideation")
+    );
+    const allIdeas = this.scanner.getIdeas();
+    const activeIdeas = allIdeas.filter(
+      (i) => !i.tags.includes("#future") && !i.tags.includes("#snooze") && !i.tags.includes("#snoozed")
+    );
+    const snoozedTodos = allTodos.filter(
+      (t) => t.tags.includes("#future") || t.tags.includes("#snooze") || t.tags.includes("#snoozed")
+    );
+    const snoozedIdeas = allIdeas.filter(
+      (i) => i.tags.includes("#future") || i.tags.includes("#snooze") || i.tags.includes("#snoozed")
+    );
+    const totalSnoozed = snoozedTodos.length + snoozedIdeas.length;
+    const activeCount = activeTodos.length + activeIdeas.length;
+    return totalSnoozed > this.triageSnoozedThreshold || activeCount > this.triageActiveThreshold;
   }
   stripMarkdownSyntax(text5) {
     let cleaned = text5;
@@ -3389,6 +3411,14 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
         break;
     }
     const tabNav = headerDiv.createEl("div", { cls: "sidebar-tab-nav" });
+    if (this.shouldShowTriageAlert()) {
+      const triageBtn = tabNav.createEl("button", {
+        cls: "sidebar-tab-btn triage-alert-btn",
+        attr: { "aria-label": "Triage needed" }
+      });
+      triageBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"/><path d="m5.5 5.5 3 3"/><path d="M2 12h4"/><path d="m5.5 18.5 3-3"/><path d="M12 22v-4"/><path d="m18.5 18.5-3-3"/><path d="M22 12h-4"/><path d="m18.5 5.5-3 3"/><circle cx="12" cy="12" r="4"/></svg>';
+      triageBtn.addEventListener("click", () => this.onShowTriage());
+    }
     const todosTab = tabNav.createEl("button", {
       cls: `sidebar-tab-btn ${this.activeTab === "todos" ? "active" : ""}`,
       attr: { "aria-label": "TODOs" }
@@ -3459,6 +3489,9 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
         });
       });
       menu.addSeparator();
+      menu.addItem((item) => {
+        item.setTitle("Triage").setIcon("siren").onClick(() => this.onShowTriage());
+      });
       menu.addItem((item) => {
         item.setTitle("About").setIcon("info").onClick(() => this.onShowAbout());
       });
@@ -4115,7 +4148,10 @@ var DEFAULT_SETTINGS = {
   llmPrompt: "Explain what this means in plain language, providing context if it's a technical term:",
   llmRewritePrompt: "Rewrite the following text to improve clarity, accuracy, and brevity. Keep the same tone and intent. Avoid clich\xE9s and filler words. Output only the rewritten text, nothing else:",
   llmReviewPrompt: "Review the following text and provide specific suggestions for improvement. Focus on clarity, accuracy, structure, and style. Be concise and actionable:",
-  llmTimeout: 3e4
+  llmTimeout: 3e4,
+  // Triage settings
+  triageSnoozedThreshold: 10,
+  triageActiveThreshold: 20
 };
 
 // node_modules/bail/index.js
@@ -15463,8 +15499,11 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
         this.settings.focusListLimit,
         this.settings.focusModeIncludeProjects,
         this.settings.makeLinksClickable,
+        this.settings.triageSnoozedThreshold,
+        this.settings.triageActiveThreshold,
         () => this.showAboutModal(),
-        () => this.showStatsModal()
+        () => this.showStatsModal(),
+        () => this.showTriageModal()
       )
     );
     if (this.settings.showSidebarByDefault) {
@@ -15696,6 +15735,9 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
   showStatsModal() {
     new StatsModal(this.app, this.scanner).open();
   }
+  showTriageModal() {
+    new TriageModal(this.app, this.scanner, this.processor).open();
+  }
   openLLMSettings() {
     this.app.setting.open();
     this.app.setting.openTabById("space-command");
@@ -15776,6 +15818,104 @@ var StatsModal = class extends import_obsidian11.Modal {
     const row = container.createEl("div", { cls: "stats-row" });
     row.createEl("span", { cls: "stats-label", text: label });
     row.createEl("span", { cls: "stats-value", text: String(value) });
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
+var TriageModal = class extends import_obsidian11.Modal {
+  constructor(app, scanner, processor) {
+    super(app);
+    this.items = [];
+    this.currentIndex = 0;
+    this.scanner = scanner;
+    this.processor = processor;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.addClass("space-command-triage-modal");
+    const todos = this.scanner.getTodos();
+    const ideas = this.scanner.getIdeas();
+    const activeTodos = todos.filter(
+      (t) => !t.tags.includes("#future") && !t.tags.includes("#snooze") && !t.tags.includes("#snoozed") && !t.tags.includes("#idea") && !t.tags.includes("#ideas") && !t.tags.includes("#ideation") && !t.tags.includes("#focus")
+      // Skip already focused
+    );
+    const activeIdeas = ideas.filter(
+      (i) => !i.tags.includes("#future") && !i.tags.includes("#snooze") && !i.tags.includes("#snoozed") && !i.tags.includes("#focus")
+      // Skip already focused
+    );
+    const snoozedTodos = todos.filter(
+      (t) => (t.tags.includes("#future") || t.tags.includes("#snooze") || t.tags.includes("#snoozed")) && !t.tags.includes("#idea") && !t.tags.includes("#ideas") && !t.tags.includes("#ideation")
+    );
+    const snoozedIdeas = ideas.filter(
+      (i) => i.tags.includes("#future") || i.tags.includes("#snooze") || i.tags.includes("#snoozed")
+    );
+    this.items = [...activeTodos, ...activeIdeas, ...snoozedTodos, ...snoozedIdeas];
+    this.currentIndex = 0;
+    this.renderCurrentItem();
+  }
+  renderCurrentItem() {
+    const { contentEl } = this;
+    contentEl.empty();
+    const header = contentEl.createEl("div", { cls: "triage-header" });
+    header.createEl("span", { cls: "space-command-logo triage-logo", text: "\u2423\u2318" });
+    header.createEl("h2", { text: "Triage" });
+    const progress = contentEl.createEl("div", { cls: "triage-progress" });
+    progress.appendText(`${this.currentIndex + 1} of ${this.items.length}`);
+    if (this.items.length === 0 || this.currentIndex >= this.items.length) {
+      const doneEl = contentEl.createEl("div", { cls: "triage-done" });
+      doneEl.createEl("p", { text: "All items triaged!", cls: "triage-done-text" });
+      const closeBtn = doneEl.createEl("button", { text: "Close", cls: "triage-btn triage-btn-close" });
+      closeBtn.addEventListener("click", () => this.close());
+      return;
+    }
+    const item = this.items[this.currentIndex];
+    const typeIndicator = contentEl.createEl("div", { cls: "triage-type" });
+    const isSnoozed = item.tags.includes("#future") || item.tags.includes("#snooze") || item.tags.includes("#snoozed");
+    const isIdea = item.itemType === "idea" || item.tags.includes("#idea") || item.tags.includes("#ideas");
+    if (isSnoozed) {
+      typeIndicator.appendText(isIdea ? "Snoozed Idea" : "Snoozed TODO");
+    } else {
+      typeIndicator.appendText(isIdea ? "Idea" : "TODO");
+    }
+    const itemContent = contentEl.createEl("div", { cls: "triage-item-content" });
+    let displayText = item.text.replace(/#\w+\b/g, "").replace(/^[-*+]\s*\[.\]\s*/, "").replace(/^[-*+]\s*/, "").replace(/^#{1,6}\s+/, "").trim();
+    itemContent.appendText(displayText);
+    const tagsEl = contentEl.createEl("div", { cls: "triage-tags" });
+    for (const tag of item.tags) {
+      const tagSpan = tagsEl.createEl("span", { cls: "tag triage-tag", text: tag });
+    }
+    const sourceEl = contentEl.createEl("div", { cls: "triage-source" });
+    sourceEl.appendText(item.filePath);
+    const actions = contentEl.createEl("div", { cls: "triage-actions" });
+    const skipBtn = actions.createEl("button", { text: "Skip", cls: "triage-btn triage-btn-skip" });
+    skipBtn.addEventListener("click", () => this.nextItem());
+    const focusBtn = actions.createEl("button", { text: "Focus", cls: "triage-btn triage-btn-focus" });
+    focusBtn.addEventListener("click", async () => {
+      await this.processor.setPriorityTag(item, "#focus");
+      this.nextItem();
+    });
+    if (isSnoozed) {
+      const unsnoozeBtn = actions.createEl("button", { text: "Unsnooze", cls: "triage-btn triage-btn-unsnooze" });
+      unsnoozeBtn.addEventListener("click", async () => {
+        await this.processor.removeTag(item, "#future");
+        if (item.tags.includes("#snooze"))
+          await this.processor.removeTag(item, "#snooze");
+        if (item.tags.includes("#snoozed"))
+          await this.processor.removeTag(item, "#snoozed");
+        this.nextItem();
+      });
+    } else {
+      const snoozeBtn = actions.createEl("button", { text: "Snooze", cls: "triage-btn triage-btn-snooze" });
+      snoozeBtn.addEventListener("click", async () => {
+        await this.processor.setPriorityTag(item, "#future");
+        this.nextItem();
+      });
+    }
+  }
+  nextItem() {
+    this.currentIndex++;
+    this.renderCurrentItem();
   }
   onClose() {
     this.contentEl.empty();
@@ -15913,6 +16053,25 @@ var SpaceCommandSettingTab = class extends import_obsidian11.PluginSettingTab {
         const num = parseInt(value);
         if (!isNaN(num) && num > 0) {
           this.plugin.settings.recentTodonesLimit = num;
+          await this.plugin.saveSettings();
+        }
+      })
+    );
+    containerEl.createEl("h3", { text: "Triage" });
+    new import_obsidian11.Setting(containerEl).setName("Snoozed items threshold").setDesc("Show triage alert when snoozed items exceed this count").addText(
+      (text5) => text5.setPlaceholder("10").setValue(String(this.plugin.settings.triageSnoozedThreshold)).onChange(async (value) => {
+        const num = parseInt(value);
+        if (!isNaN(num) && num >= 0) {
+          this.plugin.settings.triageSnoozedThreshold = num;
+          await this.plugin.saveSettings();
+        }
+      })
+    );
+    new import_obsidian11.Setting(containerEl).setName("Active items threshold").setDesc("Show triage alert when active TODOs + Ideas exceed this count").addText(
+      (text5) => text5.setPlaceholder("20").setValue(String(this.plugin.settings.triageActiveThreshold)).onChange(async (value) => {
+        const num = parseInt(value);
+        if (!isNaN(num) && num >= 0) {
+          this.plugin.settings.triageActiveThreshold = num;
           await this.plugin.saveSettings();
         }
       })

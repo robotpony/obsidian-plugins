@@ -2,6 +2,21 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.63] - 2026-01-29
+
+### Added
+
+- **Triage feature**: New modal for quickly processing TODOs and Ideas
+  - Accessible from the kebab menu ("Triage") or via the alert button
+  - Shows items one at a time with Skip, Focus, and Snooze/Unsnooze actions
+  - Items ordered by priority: active TODOs, active Ideas, snoozed TODOs, snoozed Ideas
+  - Already focused items are excluded from triage queue
+- **Triage alert button**: Appears in the sidebar tab nav when thresholds are exceeded
+  - Configurable "Snoozed items threshold" (default: 10)
+  - Configurable "Active items threshold" for TODOs + Ideas (default: 20)
+  - Pulsing animation draws attention when action is needed
+  - Settings available under new "Triage" section
+
 ## [0.9.62] - 2026-01-29
 
 ### Improved

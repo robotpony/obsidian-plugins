@@ -20,6 +20,8 @@ export class TodoSidebarView extends ItemView {
   private focusListLimit: number;
   private focusModeIncludeProjects: boolean;
   private makeLinksClickable: boolean;
+  private triageSnoozedThreshold: number;
+  private triageActiveThreshold: number;
   private activeTab: 'todos' | 'ideas' | 'snoozed' = 'todos';
   private activeTagFilter: string | null = null;
   private focusModeEnabled: boolean = false;
@@ -27,6 +29,7 @@ export class TodoSidebarView extends ItemView {
   private openInfoPopup: HTMLElement | null = null;
   private onShowAbout: () => void;
   private onShowStats: () => void;
+  private onShowTriage: () => void;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -40,8 +43,11 @@ export class TodoSidebarView extends ItemView {
     focusListLimit: number,
     focusModeIncludeProjects: boolean,
     makeLinksClickable: boolean,
+    triageSnoozedThreshold: number,
+    triageActiveThreshold: number,
     onShowAbout: () => void,
-    onShowStats: () => void
+    onShowStats: () => void,
+    onShowTriage: () => void
   ) {
     super(leaf);
     this.scanner = scanner;
@@ -53,8 +59,11 @@ export class TodoSidebarView extends ItemView {
     this.focusListLimit = focusListLimit;
     this.focusModeIncludeProjects = focusModeIncludeProjects;
     this.makeLinksClickable = makeLinksClickable;
+    this.triageSnoozedThreshold = triageSnoozedThreshold;
+    this.triageActiveThreshold = triageActiveThreshold;
     this.onShowAbout = onShowAbout;
     this.onShowStats = onShowStats;
+    this.onShowTriage = onShowTriage;
 
     // Initialize context menu handler
     this.contextMenuHandler = new ContextMenuHandler(
@@ -78,6 +87,44 @@ export class TodoSidebarView extends ItemView {
 
   getIcon(): string {
     return "square-check-big";
+  }
+
+  private shouldShowTriageAlert(): boolean {
+    // Get active (non-snoozed) TODOs
+    const allTodos = this.scanner.getTodos();
+    const activeTodos = allTodos.filter(t =>
+      !t.tags.includes("#future") &&
+      !t.tags.includes("#snooze") &&
+      !t.tags.includes("#snoozed") &&
+      !t.tags.includes("#idea") &&
+      !t.tags.includes("#ideas") &&
+      !t.tags.includes("#ideation")
+    );
+
+    // Get active (non-snoozed) Ideas
+    const allIdeas = this.scanner.getIdeas();
+    const activeIdeas = allIdeas.filter(i =>
+      !i.tags.includes("#future") &&
+      !i.tags.includes("#snooze") &&
+      !i.tags.includes("#snoozed")
+    );
+
+    // Get snoozed items (both TODOs and Ideas)
+    const snoozedTodos = allTodos.filter(t =>
+      t.tags.includes("#future") ||
+      t.tags.includes("#snooze") ||
+      t.tags.includes("#snoozed")
+    );
+    const snoozedIdeas = allIdeas.filter(i =>
+      i.tags.includes("#future") ||
+      i.tags.includes("#snooze") ||
+      i.tags.includes("#snoozed")
+    );
+    const totalSnoozed = snoozedTodos.length + snoozedIdeas.length;
+
+    // Show alert if either threshold is exceeded
+    const activeCount = activeTodos.length + activeIdeas.length;
+    return totalSnoozed > this.triageSnoozedThreshold || activeCount > this.triageActiveThreshold;
   }
 
   private stripMarkdownSyntax(text: string): string {
@@ -611,6 +658,17 @@ export class TodoSidebarView extends ItemView {
     // Tab navigation
     const tabNav = headerDiv.createEl("div", { cls: "sidebar-tab-nav" });
 
+    // Triage alert button (shown when thresholds exceeded)
+    if (this.shouldShowTriageAlert()) {
+      const triageBtn = tabNav.createEl("button", {
+        cls: "sidebar-tab-btn triage-alert-btn",
+        attr: { "aria-label": "Triage needed" },
+      });
+      // Emergency siren/light icon
+      triageBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"/><path d="m5.5 5.5 3 3"/><path d="M2 12h4"/><path d="m5.5 18.5 3-3"/><path d="M12 22v-4"/><path d="m18.5 18.5-3-3"/><path d="M22 12h-4"/><path d="m18.5 5.5-3 3"/><circle cx="12" cy="12" r="4"/></svg>';
+      triageBtn.addEventListener("click", () => this.onShowTriage());
+    }
+
     const todosTab = tabNav.createEl("button", {
       cls: `sidebar-tab-btn ${this.activeTab === 'todos' ? 'active' : ''}`,
       attr: { "aria-label": "TODOs" },
@@ -710,6 +768,14 @@ export class TodoSidebarView extends ItemView {
       });
 
       menu.addSeparator();
+
+      // Triage
+      menu.addItem((item) => {
+        item
+          .setTitle("Triage")
+          .setIcon("siren")
+          .onClick(() => this.onShowTriage());
+      });
 
       // About
       menu.addItem((item) => {
