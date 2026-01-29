@@ -1068,10 +1068,13 @@
   padding: 4px 10px;
   margin: 2px 0 2px 8px;
   border-radius: 12px;
-  font-size: 0.85em;
+  font-size: 0.8em;
   line-height: 1.4;
-  max-width: 300px;
-  vertical-align: middle;
+  max-width: 280px;
+  float: right;
+  clear: right;
+  margin-right: 0;
+  margin-left: 12px;
 }
 
 .hugo-comment-bubble.question {

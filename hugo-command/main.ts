@@ -153,8 +153,64 @@ export default class HugoCommandPlugin extends Plugin {
       })
     );
 
+    // Add sparkles button to markdown view tab header
+    if (this.settings.outline.enabled) {
+      this.registerEvent(
+        this.app.workspace.on("layout-change", () => {
+          this.addSparklesButtonToViews();
+        })
+      );
+      // Also add to any already-open views
+      this.app.workspace.onLayoutReady(() => {
+        this.addSparklesButtonToViews();
+      });
+    }
+
     // Add settings tab
     this.addSettingTab(new HugoCommandSettingTab(this.app, this));
+  }
+
+  /**
+   * Add sparkles button to all open markdown views
+   */
+  private addSparklesButtonToViews(): void {
+    this.app.workspace.iterateAllLeaves((leaf) => {
+      if (leaf.view instanceof MarkdownView) {
+        this.addSparklesButtonToView(leaf.view);
+      }
+    });
+  }
+
+  /**
+   * Add sparkles button to a specific markdown view's title bar
+   */
+  private addSparklesButtonToView(view: MarkdownView): void {
+    // Check if button already exists
+    const existingBtn = view.containerEl.querySelector(".hugo-enhance-action");
+    if (existingBtn) return;
+
+    // Find the view actions container (where other icons like pin, more options live)
+    const viewActions = view.containerEl.querySelector(".view-actions");
+    if (!viewActions) return;
+
+    // Create the sparkles button
+    const btn = document.createElement("a");
+    btn.className = "clickable-icon view-action hugo-enhance-action";
+    btn.setAttribute("aria-label", "Enhance outline");
+    btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>';
+
+    btn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (this.isEnhancingOutline) return;
+
+      btn.addClass("is-loading");
+      await this.enhanceCurrentOutline();
+      btn.removeClass("is-loading");
+    });
+
+    // Insert at the beginning of view-actions (leftmost position)
+    viewActions.insertBefore(btn, viewActions.firstChild);
   }
 
   /**
@@ -315,7 +371,10 @@ export default class HugoCommandPlugin extends Plugin {
           parts.push(content);
         } catch (error) {
           console.error("[Hugo Review] Failed to read style guide file:", error);
+          new Notice(`Could not read style guide: ${this.settings.review.styleGuideFile}`);
         }
+      } else {
+        new Notice(`Style guide file not found: ${this.settings.review.styleGuideFile}`);
       }
     }
 

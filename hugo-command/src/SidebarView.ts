@@ -828,6 +828,18 @@ export class HugoSidebarView extends ItemView {
         // Run review
         const criteria = await this.reviewClient.review(content, styleGuide);
 
+        // Check if criteria were configured
+        if (criteria.length === 0) {
+          reviewContainer.empty();
+          reviewContainer.createEl("div", {
+            cls: "hugo-command-review-error",
+            text: "No review criteria configured. Add criteria in settings.",
+          });
+          runBtn.textContent = "Review post";
+          runBtn.removeClass("loading");
+          return;
+        }
+
         // Cache result
         const result: ReviewResult = {
           filePath: item.filePath,

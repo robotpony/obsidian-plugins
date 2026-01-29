@@ -1181,6 +1181,16 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
         const content = await this.app.vault.read(item.file);
         const styleGuide = await this.getStyleGuide();
         const criteria = await this.reviewClient.review(content, styleGuide);
+        if (criteria.length === 0) {
+          reviewContainer.empty();
+          reviewContainer.createEl("div", {
+            cls: "hugo-command-review-error",
+            text: "No review criteria configured. Add criteria in settings."
+          });
+          runBtn.textContent = "Review post";
+          runBtn.removeClass("loading");
+          return;
+        }
         const result = {
           filePath: item.filePath,
           criteria,
@@ -2470,7 +2480,10 @@ var HugoCommandPlugin = class extends import_obsidian7.Plugin {
           parts.push(content);
         } catch (error) {
           console.error("[Hugo Review] Failed to read style guide file:", error);
+          new import_obsidian7.Notice(`Could not read style guide: ${this.settings.review.styleGuideFile}`);
         }
+      } else {
+        new import_obsidian7.Notice(`Style guide file not found: ${this.settings.review.styleGuideFile}`);
       }
     }
     if (this.settings.review.styleGuideInline) {

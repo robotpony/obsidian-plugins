@@ -2,6 +2,16 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.6.3] - 2026-01-28
+
+### Improved
+
+- **Better error messages**: User-visible notices when things go wrong
+  - Shows notice if style guide file path is configured but file not found
+  - Shows notice if style guide file can't be read
+  - Shows message in review panel if no criteria are configured
+- **Comment bubble positioning**: Suggestions now float to the right margin for cleaner reading
+
 ## [0.6.2] - 2026-01-28
 
 ### Improved
