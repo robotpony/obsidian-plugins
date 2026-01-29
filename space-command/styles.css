@@ -1755,7 +1755,7 @@
 .space-command-triage-modal .triage-separator {
   height: 1px;
   background-color: var(--text-muted);
-  margin: 16px 0 16px 0;
+  margin: 20px 0;
 }
 
 .space-command-triage-modal .triage-actions {

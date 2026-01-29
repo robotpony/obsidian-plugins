@@ -833,7 +833,7 @@ export class EmbedRenderer {
 
   // Render inline markdown without creating block elements
   // Uses DOM methods to avoid XSS vulnerabilities
-  private renderInlineMarkdown(text: string, container: HTMLElement): void {
+  public renderInlineMarkdown(text: string, container: HTMLElement): void {
     // Process markdown inline syntax (bold, italic, links)
     // This avoids the extra <p> tags that MarkdownRenderer adds
 

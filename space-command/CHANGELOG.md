@@ -2,6 +2,14 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.72] - 2026-01-29
+
+### Improved
+
+- **Triage modal enhancements**:
+  - Task text now renders markdown (bold, italic, code, links) instead of plain text
+  - Increased separator line spacing to match modal padding (20px above/below)
+
 ## [0.9.71] - 2026-01-29
 
 ### Improved

@@ -15766,7 +15766,7 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
     new StatsModal(this.app, this.scanner).open();
   }
   showTriageModal() {
-    new TriageModal(this.app, this.scanner, this.processor, this.settings.defaultTodoneFile).open();
+    new TriageModal(this.app, this.scanner, this.processor, this.embedRenderer, this.settings.defaultTodoneFile).open();
   }
   openLLMSettings() {
     this.app.setting.open();
@@ -15854,12 +15854,13 @@ var StatsModal = class extends import_obsidian11.Modal {
   }
 };
 var TriageModal = class extends import_obsidian11.Modal {
-  constructor(app, scanner, processor, defaultTodoneFile) {
+  constructor(app, scanner, processor, embedRenderer, defaultTodoneFile) {
     super(app);
     this.items = [];
     this.currentIndex = 0;
     this.scanner = scanner;
     this.processor = processor;
+    this.embedRenderer = embedRenderer;
     this.defaultTodoneFile = defaultTodoneFile;
   }
   onOpen() {
@@ -15930,7 +15931,7 @@ var TriageModal = class extends import_obsidian11.Modal {
     });
     const textSpan = itemContent.createEl("span", { cls: "triage-item-text" });
     let displayText = item.text.replace(/#\w+\b/g, "").replace(/^[-*+]\s*\[.\]\s*/, "").replace(/^[-*+]\s*/, "").replace(/^#{1,6}\s+/, "").trim();
-    textSpan.appendText(displayText);
+    this.embedRenderer.renderInlineMarkdown(displayText, textSpan);
     const metaRow = contentEl.createEl("div", { cls: "triage-meta-row" });
     const sourceEl = metaRow.createEl("div", { cls: "triage-source" });
     sourceEl.appendText(`(from ${item.filePath})`);

@@ -489,7 +489,7 @@ export default class SpaceCommandPlugin extends Plugin {
   }
 
   showTriageModal() {
-    new TriageModal(this.app, this.scanner, this.processor, this.settings.defaultTodoneFile).open();
+    new TriageModal(this.app, this.scanner, this.processor, this.embedRenderer, this.settings.defaultTodoneFile).open();
   }
 
   openLLMSettings() {
@@ -624,14 +624,16 @@ class StatsModal extends Modal {
 class TriageModal extends Modal {
   private scanner: TodoScanner;
   private processor: TodoProcessor;
+  private embedRenderer: EmbedRenderer;
   private defaultTodoneFile: string;
   private items: TodoItem[] = [];
   private currentIndex: number = 0;
 
-  constructor(app: App, scanner: TodoScanner, processor: TodoProcessor, defaultTodoneFile: string) {
+  constructor(app: App, scanner: TodoScanner, processor: TodoProcessor, embedRenderer: EmbedRenderer, defaultTodoneFile: string) {
     super(app);
     this.scanner = scanner;
     this.processor = processor;
+    this.embedRenderer = embedRenderer;
     this.defaultTodoneFile = defaultTodoneFile;
   }
 
@@ -745,7 +747,7 @@ class TriageModal extends Modal {
       this.nextItem();
     });
 
-    // Strip tags and markdown for cleaner display
+    // Strip tags and list markers, but preserve markdown for rendering
     const textSpan = itemContent.createEl("span", { cls: "triage-item-text" });
     let displayText = item.text
       .replace(/#\w+\b/g, "") // Remove all tags
@@ -753,7 +755,7 @@ class TriageModal extends Modal {
       .replace(/^[-*+]\s*/, "") // Remove list marker
       .replace(/^#{1,6}\s+/, "") // Remove heading markers
       .trim();
-    textSpan.appendText(displayText);
+    this.embedRenderer.renderInlineMarkdown(displayText, textSpan);
 
     // Source file + tags on one line (source left, tags right)
     const metaRow = contentEl.createEl("div", { cls: "triage-meta-row" });
