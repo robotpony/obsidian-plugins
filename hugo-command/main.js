@@ -2036,29 +2036,43 @@ var OutlineLLMClient = class {
     }
   }
   buildPrompt(content, styleGuide) {
+    const hasStyleGuide = styleGuide.trim().length > 0;
     let styleSection = "";
-    if (styleGuide.trim()) {
+    let styleInstructions = "";
+    if (hasStyleGuide) {
       styleSection = `
-## Style Guidelines
+## Style Guide (Reference Only - DO NOT include in output)
+
+The following style guide is for your reference when making suggestions. Do NOT return this section.
 
 ${styleGuide}
 
+--- END OF STYLE GUIDE REFERENCE ---
+
 `;
+      styleInstructions = `When the content doesn't follow a style guide rule, cite the specific rule in your comment (e.g., "<!-- Style: 'Avoid corporate jargon' - consider replacing 'leverage' with 'use' -->").`;
     }
-    const hasStyleGuide = styleGuide.trim().length > 0;
-    const styleInstructions = hasStyleGuide ? `When the content doesn't follow a style guide rule, cite the specific rule in your comment (e.g., "<!-- Style: 'Avoid corporate jargon' - consider replacing 'leverage' with 'use' -->").` : "";
-    return `${this.outlineSettings.prompt}
-${styleSection}
-## Document to Enhance
+    return `# Task: Enhance Document Outline
+
+${this.outlineSettings.prompt}
+
+${styleSection}## Document to Enhance (Return THIS section with annotations)
 
 ${content}
 
+--- END OF DOCUMENT ---
+
 ## Instructions
 
-Return the enhanced document as markdown. Keep all original content intact.
-Add your questions and suggestions as HTML comments (<!-- Q: question here --> for questions, <!-- suggestion here --> for suggestions).
+IMPORTANT: Return ONLY the document content above (between "Document to Enhance" and "END OF DOCUMENT") with your annotations added.
+
+- Keep all original document content intact
+- Add questions as HTML comments: <!-- Q: your question here -->
+- Add suggestions as HTML comments: <!-- your suggestion here -->
 ${styleInstructions}
-Return ONLY the enhanced markdown, no explanations or preamble.`;
+- Do NOT include the style guide in your response
+- Do NOT include any preamble, explanations, or markdown code fences
+- Return the enhanced document directly`;
   }
   async callLLM(prompt) {
     switch (this.reviewSettings.provider) {

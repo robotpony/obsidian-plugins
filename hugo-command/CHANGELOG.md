@@ -2,6 +2,16 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.6.7] - 2026-01-28
+
+### Fixed
+
+- **Outline enhancement returning wrong content**: LLM was sometimes returning the style guide instead of the annotated document
+  - Restructured prompt with clearer section markers
+  - Added explicit "DO NOT include in output" instruction for style guide section
+  - Added document boundary markers ("END OF DOCUMENT", "END OF STYLE GUIDE REFERENCE")
+  - Emphasized returning only the document content with annotations
+
 ## [0.6.6] - 2026-01-28
 
 ### Improved
