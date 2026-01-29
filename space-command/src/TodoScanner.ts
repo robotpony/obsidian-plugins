@@ -103,6 +103,8 @@ export class TodoScanner extends Events {
 
         // Process header with #todo or #todos tag
         if (headerInfo && (tags.includes("#todo") || tags.includes("#todos")) && !tags.includes("#todone") && !tags.includes("#todones")) {
+          // Skip empty headers (just tag, no content)
+          if (!this.hasContent(line)) continue;
           const headerTodo = this.createTodoItem(file, i, line, tags, 'todo');
           headerTodo.isHeader = true;
           headerTodo.headerLevel = headerInfo.level;
@@ -114,6 +116,8 @@ export class TodoScanner extends Events {
 
         // Process header with #todone or #todones tag
         if (headerInfo && (tags.includes("#todone") || tags.includes("#todones"))) {
+          // Skip empty headers (just tag, no content)
+          if (!this.hasContent(line)) continue;
           const headerTodone = this.createTodoItem(file, i, line, tags, 'todone');
           headerTodone.isHeader = true;
           headerTodone.headerLevel = headerInfo.level;
@@ -151,6 +155,9 @@ export class TodoScanner extends Events {
               tags.push("#todone");
             }
 
+            // Skip empty child items
+            if (!this.hasContent(line)) continue;
+
             const childItemType = tags.includes("#todone") ? 'todone' : 'todo';
             const childItem = this.createTodoItem(file, i, line, tags, childItemType);
             childItem.parentLineNumber = currentHeaderTodo.lineNumber;
@@ -174,20 +181,24 @@ export class TodoScanner extends Events {
         const hasTodo = tags.includes("#todo") || tags.includes("#todos");
         const hasTodone = tags.includes("#todone") || tags.includes("#todones");
         const hasIdea = tags.includes("#idea") || tags.includes("#ideas") || tags.includes("#ideation");
+        // Skip empty items (just tags, no content)
+        const lineHasContent = this.hasContent(line);
         if (hasTodone && hasTodo) {
           // Queue this line for cleanup (remove #todo tag)
           linesToCleanup.push(i);
-          // Treat as completed
-          todones.push(this.createTodoItem(file, i, line, tags, 'todone'));
+          // Treat as completed (only if has content)
+          if (lineHasContent) todones.push(this.createTodoItem(file, i, line, tags, 'todone'));
         } else if (hasTodo && !hasIdea) {
-          // Only add to todos if not tagged as idea
-          todos.push(this.createTodoItem(file, i, line, tags, 'todo'));
+          // Only add to todos if not tagged as idea and has content
+          if (lineHasContent) todos.push(this.createTodoItem(file, i, line, tags, 'todo'));
         } else if (hasTodone) {
-          todones.push(this.createTodoItem(file, i, line, tags, 'todone'));
+          if (lineHasContent) todones.push(this.createTodoItem(file, i, line, tags, 'todone'));
         }
 
         // Idea processing - handle headers with children
         if (tags.includes("#idea") || tags.includes("#ideas") || tags.includes("#ideation")) {
+          // Skip empty ideas
+          if (!lineHasContent) continue;
           if (headerInfo) {
             // Header with #idea tag
             const headerIdea = this.createTodoItem(file, i, line, tags, 'idea');
@@ -202,6 +213,8 @@ export class TodoScanner extends Events {
           }
         } else if (currentHeaderIdea && this.isListItem(line) && !tags.includes("#todo") && !tags.includes("#todone")) {
           // Child item under a header idea (only if not already a todo/todone)
+          // Skip empty children
+          if (!this.hasContent(line)) continue;
           const childItem = this.createTodoItem(file, i, line, tags, 'idea');
           childItem.parentLineNumber = currentHeaderIdea.lineNumber;
           currentHeaderIdea.todoItem.childLineNumbers!.push(i);
@@ -210,6 +223,8 @@ export class TodoScanner extends Events {
 
         // Principle processing - handle headers with children
         if (tags.includes("#principle") || tags.includes("#principles")) {
+          // Skip empty principles
+          if (!lineHasContent) continue;
           if (headerInfo) {
             // Header with #principle tag
             const headerPrinciple = this.createTodoItem(file, i, line, tags, 'principle');
@@ -224,6 +239,8 @@ export class TodoScanner extends Events {
           }
         } else if (currentHeaderPrinciple && this.isListItem(line) && !tags.includes("#todo") && !tags.includes("#todone") && !tags.includes("#idea") && !tags.includes("#ideas") && !tags.includes("#ideation")) {
           // Child item under a header principle (only if not already another type)
+          // Skip empty children
+          if (!this.hasContent(line)) continue;
           const childItem = this.createTodoItem(file, i, line, tags, 'principle');
           childItem.parentLineNumber = currentHeaderPrinciple.lineNumber;
           currentHeaderPrinciple.todoItem.childLineNumbers!.push(i);
@@ -353,6 +370,29 @@ export class TodoScanner extends Events {
       itemType,
       inferredFileTag: filenameToTag(file.basename),
     };
+  }
+
+  /**
+   * Check if a line has meaningful content beyond tags and markers.
+   * Returns false for empty items like "- [ ] #todo" or "- #idea  "
+   */
+  private hasContent(text: string): boolean {
+    let content = text.trim();
+    // Remove header markers (e.g., #### )
+    content = content.replace(/^#{1,6}\s*/, '');
+    // Remove list markers (e.g., "- ", "* ", "1. ")
+    content = content.replace(/^[-*]\s*/, '');
+    content = content.replace(/^\d+\.\s*/, '');
+    // Remove checkbox markers (e.g., "[ ] ", "[x] ")
+    content = content.replace(/^\[[ xX]?\]\s*/, '');
+    // Remove all tags (e.g., #todo, #focus, #project-name)
+    content = content.replace(/#[\w-]+/g, '');
+    // Remove dates (e.g., @2026-01-28)
+    content = content.replace(/@\d{4}-\d{2}-\d{2}/g, '');
+    // Remove block link references (e.g., ^block-id)
+    content = content.replace(/\^[\w-]+/g, '');
+    // Check if anything meaningful remains
+    return content.trim().length > 0;
   }
 
   getTodos(): TodoItem[] {

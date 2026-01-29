@@ -425,6 +425,8 @@ var TodoScanner = class extends import_obsidian2.Events {
           }
         }
         if (headerInfo && (tags.includes("#todo") || tags.includes("#todos")) && !tags.includes("#todone") && !tags.includes("#todones")) {
+          if (!this.hasContent(line))
+            continue;
           const headerTodo = this.createTodoItem(file, i, line, tags, "todo");
           headerTodo.isHeader = true;
           headerTodo.headerLevel = headerInfo.level;
@@ -434,6 +436,8 @@ var TodoScanner = class extends import_obsidian2.Events {
           continue;
         }
         if (headerInfo && (tags.includes("#todone") || tags.includes("#todones"))) {
+          if (!this.hasContent(line))
+            continue;
           const headerTodone = this.createTodoItem(file, i, line, tags, "todone");
           headerTodone.isHeader = true;
           headerTodone.headerLevel = headerInfo.level;
@@ -455,6 +459,8 @@ var TodoScanner = class extends import_obsidian2.Events {
               linesToSyncTodone.push(i);
               tags.push("#todone");
             }
+            if (!this.hasContent(line))
+              continue;
             const childItemType = tags.includes("#todone") ? "todone" : "todo";
             const childItem = this.createTodoItem(file, i, line, tags, childItemType);
             childItem.parentLineNumber = currentHeaderTodo.lineNumber;
@@ -470,15 +476,21 @@ var TodoScanner = class extends import_obsidian2.Events {
         const hasTodo = tags.includes("#todo") || tags.includes("#todos");
         const hasTodone = tags.includes("#todone") || tags.includes("#todones");
         const hasIdea = tags.includes("#idea") || tags.includes("#ideas") || tags.includes("#ideation");
+        const lineHasContent = this.hasContent(line);
         if (hasTodone && hasTodo) {
           linesToCleanup.push(i);
-          todones.push(this.createTodoItem(file, i, line, tags, "todone"));
+          if (lineHasContent)
+            todones.push(this.createTodoItem(file, i, line, tags, "todone"));
         } else if (hasTodo && !hasIdea) {
-          todos.push(this.createTodoItem(file, i, line, tags, "todo"));
+          if (lineHasContent)
+            todos.push(this.createTodoItem(file, i, line, tags, "todo"));
         } else if (hasTodone) {
-          todones.push(this.createTodoItem(file, i, line, tags, "todone"));
+          if (lineHasContent)
+            todones.push(this.createTodoItem(file, i, line, tags, "todone"));
         }
         if (tags.includes("#idea") || tags.includes("#ideas") || tags.includes("#ideation")) {
+          if (!lineHasContent)
+            continue;
           if (headerInfo) {
             const headerIdea = this.createTodoItem(file, i, line, tags, "idea");
             headerIdea.isHeader = true;
@@ -490,12 +502,16 @@ var TodoScanner = class extends import_obsidian2.Events {
             ideas.push(this.createTodoItem(file, i, line, tags, "idea"));
           }
         } else if (currentHeaderIdea && this.isListItem(line) && !tags.includes("#todo") && !tags.includes("#todone")) {
+          if (!this.hasContent(line))
+            continue;
           const childItem = this.createTodoItem(file, i, line, tags, "idea");
           childItem.parentLineNumber = currentHeaderIdea.lineNumber;
           currentHeaderIdea.todoItem.childLineNumbers.push(i);
           ideas.push(childItem);
         }
         if (tags.includes("#principle") || tags.includes("#principles")) {
+          if (!lineHasContent)
+            continue;
           if (headerInfo) {
             const headerPrinciple = this.createTodoItem(file, i, line, tags, "principle");
             headerPrinciple.isHeader = true;
@@ -507,6 +523,8 @@ var TodoScanner = class extends import_obsidian2.Events {
             principles.push(this.createTodoItem(file, i, line, tags, "principle"));
           }
         } else if (currentHeaderPrinciple && this.isListItem(line) && !tags.includes("#todo") && !tags.includes("#todone") && !tags.includes("#idea") && !tags.includes("#ideas") && !tags.includes("#ideation")) {
+          if (!this.hasContent(line))
+            continue;
           const childItem = this.createTodoItem(file, i, line, tags, "principle");
           childItem.parentLineNumber = currentHeaderPrinciple.lineNumber;
           currentHeaderPrinciple.todoItem.childLineNumbers.push(i);
@@ -601,6 +619,21 @@ var TodoScanner = class extends import_obsidian2.Events {
       itemType,
       inferredFileTag: filenameToTag(file.basename)
     };
+  }
+  /**
+   * Check if a line has meaningful content beyond tags and markers.
+   * Returns false for empty items like "- [ ] #todo" or "- #idea  "
+   */
+  hasContent(text5) {
+    let content3 = text5.trim();
+    content3 = content3.replace(/^#{1,6}\s*/, "");
+    content3 = content3.replace(/^[-*]\s*/, "");
+    content3 = content3.replace(/^\d+\.\s*/, "");
+    content3 = content3.replace(/^\[[ xX]?\]\s*/, "");
+    content3 = content3.replace(/#[\w-]+/g, "");
+    content3 = content3.replace(/@\d{4}-\d{2}-\d{2}/g, "");
+    content3 = content3.replace(/\^[\w-]+/g, "");
+    return content3.trim().length > 0;
   }
   getTodos() {
     const allTodos = [];

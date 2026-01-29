@@ -2,6 +2,12 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.53] - 2026-01-28
+
+### Improved
+
+- **Skip empty items**: TODOs, ideas, and principles with no meaningful content (just tags, dates, or block references) are now ignored during scanning. This prevents clutter from placeholder items like `- [ ] #todo ^block-id`
+
 ## [0.9.52] - 2026-01-28
 
 ### Improved
