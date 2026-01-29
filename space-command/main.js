@@ -15498,24 +15498,11 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
    */
   applyTagColoursToElement(el) {
     var _a, _b;
-    const tagNodes = el.querySelectorAll(".tag:not([data-sc-tag-type]), a.tag:not([data-sc-tag-type]), span.tag:not([data-sc-tag-type]), .cm-hashtag:not([data-sc-tag-type]), .cm-tag:not([data-sc-tag-type])");
+    const selector = ".tag:not([data-sc-tag-type]), a.tag:not([data-sc-tag-type]), span.tag:not([data-sc-tag-type]), .cm-hashtag:not([data-sc-tag-type]), .cm-tag:not([data-sc-tag-type])";
+    const tagNodes = el.querySelectorAll(selector);
     const tags = Array.from(tagNodes);
-    const allFocusTags = el.querySelectorAll(".cm-tag-focus");
-    if (allFocusTags.length > 0) {
-      const unstyled = Array.from(allFocusTags).filter((t) => !t.hasAttribute("data-sc-tag-type"));
-      if (unstyled.length > 0) {
-        console.log(`[SC Debug] ${unstyled.length}/${allFocusTags.length} focus tags unstyled:`);
-        unstyled.forEach((t, i) => {
-          const isBegin = t.classList.contains("cm-hashtag-begin");
-          const isEnd = t.classList.contains("cm-hashtag-end");
-          const prev = t.previousElementSibling;
-          const next = t.nextElementSibling;
-          console.log(`[SC Debug]   ${i}: ${isBegin ? "BEGIN" : isEnd ? "END" : "OTHER"}`);
-          console.log(`[SC Debug]     prev: ${(prev == null ? void 0 : prev.className) || "null"}, hasAttr: ${prev == null ? void 0 : prev.hasAttribute("data-sc-tag-type")}`);
-          console.log(`[SC Debug]     next: ${(next == null ? void 0 : next.className) || "null"}, hasAttr: ${next == null ? void 0 : next.hasAttribute("data-sc-tag-type")}`);
-          console.log(`[SC Debug]     inQuery: ${tags.includes(t)}`);
-        });
-      }
+    if (el.matches && el.matches(selector)) {
+      tags.unshift(el);
     }
     const projectColourMap = this.getProjectColourMap();
     for (let i = 0; i < tags.length; i++) {
@@ -15541,17 +15528,31 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
         continue;
       } else if (tagEl.classList.contains("cm-hashtag-begin")) {
         const next = tagEl.nextElementSibling;
+        if (tagEl.classList.contains("cm-tag-focus")) {
+          console.log("[SC Debug] Processing focus BEGIN:", {
+            hasEnd: next == null ? void 0 : next.classList.contains("cm-hashtag-end"),
+            nextClass: next == null ? void 0 : next.className,
+            tagText
+          });
+        }
         if (next == null ? void 0 : next.classList.contains("cm-hashtag-end")) {
           tagText = tagText + (((_b = next.textContent) == null ? void 0 : _b.trim()) || "");
           if (!tagText.startsWith("#")) {
             tagText = "#" + tagText;
           }
           const colourInfo2 = getTagColourInfo(tagText, projectColourMap);
+          if (tagEl.classList.contains("cm-tag-focus")) {
+            console.log("[SC Debug] Setting focus BEGIN attr:", colourInfo2);
+          }
           tagEl.dataset.scTagType = colourInfo2.type;
           tagEl.dataset.scPriority = colourInfo2.priority.toString();
           if (!next.hasAttribute("data-sc-tag-type")) {
             next.dataset.scTagType = colourInfo2.type;
             next.dataset.scPriority = colourInfo2.priority.toString();
+          }
+        } else {
+          if (tagEl.classList.contains("cm-tag-focus")) {
+            console.log("[SC Debug] Focus BEGIN has no matching END sibling!");
           }
         }
         continue;

@@ -551,26 +551,14 @@ export default class SpaceCommandPlugin extends Plugin {
   private applyTagColoursToElement(el: HTMLElement): void {
     // Find tags that don't already have colour attributes
     // Include various Obsidian tag selectors: .tag, a.tag, span.tag, .cm-hashtag, .cm-tag
-    const tagNodes = el.querySelectorAll('.tag:not([data-sc-tag-type]), a.tag:not([data-sc-tag-type]), span.tag:not([data-sc-tag-type]), .cm-hashtag:not([data-sc-tag-type]), .cm-tag:not([data-sc-tag-type])');
+    const selector = '.tag:not([data-sc-tag-type]), a.tag:not([data-sc-tag-type]), span.tag:not([data-sc-tag-type]), .cm-hashtag:not([data-sc-tag-type]), .cm-tag:not([data-sc-tag-type])';
+    const tagNodes = el.querySelectorAll(selector);
     const tags = Array.from(tagNodes);
 
-    // Debug: detailed info on unstyled focus tags
-    const allFocusTags = el.querySelectorAll('.cm-tag-focus');
-    if (allFocusTags.length > 0) {
-      const unstyled = Array.from(allFocusTags).filter(t => !t.hasAttribute('data-sc-tag-type'));
-      if (unstyled.length > 0) {
-        console.log(`[SC Debug] ${unstyled.length}/${allFocusTags.length} focus tags unstyled:`);
-        unstyled.forEach((t, i) => {
-          const isBegin = t.classList.contains('cm-hashtag-begin');
-          const isEnd = t.classList.contains('cm-hashtag-end');
-          const prev = t.previousElementSibling;
-          const next = t.nextElementSibling;
-          console.log(`[SC Debug]   ${i}: ${isBegin ? 'BEGIN' : isEnd ? 'END' : 'OTHER'}`);
-          console.log(`[SC Debug]     prev: ${prev?.className || 'null'}, hasAttr: ${prev?.hasAttribute('data-sc-tag-type')}`);
-          console.log(`[SC Debug]     next: ${next?.className || 'null'}, hasAttr: ${next?.hasAttribute('data-sc-tag-type')}`);
-          console.log(`[SC Debug]     inQuery: ${tags.includes(t)}`);
-        });
-      }
+    // Also check if el itself is a tag that needs processing
+    // (mutation observer might pass the tag element itself, not a parent)
+    if (el.matches && el.matches(selector)) {
+      tags.unshift(el);
     }
 
     // Get project colour map for project tag lookups
@@ -608,12 +596,24 @@ export default class SpaceCommandPlugin extends Plugin {
       } else if (tagEl.classList.contains('cm-hashtag-begin')) {
         // For begin elements, find the matching end element by looking at next sibling
         const next = tagEl.nextElementSibling;
+        // Debug: trace focus tag processing
+        if (tagEl.classList.contains('cm-tag-focus')) {
+          console.log('[SC Debug] Processing focus BEGIN:', {
+            hasEnd: next?.classList.contains('cm-hashtag-end'),
+            nextClass: next?.className,
+            tagText: tagText
+          });
+        }
         if (next?.classList.contains('cm-hashtag-end')) {
           tagText = tagText + (next.textContent?.trim() || '');
           if (!tagText.startsWith('#')) {
             tagText = '#' + tagText;
           }
           const colourInfo = getTagColourInfo(tagText, projectColourMap);
+          // Debug
+          if (tagEl.classList.contains('cm-tag-focus')) {
+            console.log('[SC Debug] Setting focus BEGIN attr:', colourInfo);
+          }
           // Always set on begin element
           tagEl.dataset.scTagType = colourInfo.type;
           tagEl.dataset.scPriority = colourInfo.priority.toString();
@@ -621,6 +621,11 @@ export default class SpaceCommandPlugin extends Plugin {
           if (!next.hasAttribute('data-sc-tag-type')) {
             (next as HTMLElement).dataset.scTagType = colourInfo.type;
             (next as HTMLElement).dataset.scPriority = colourInfo.priority.toString();
+          }
+        } else {
+          // Debug: why didn't we find the end?
+          if (tagEl.classList.contains('cm-tag-focus')) {
+            console.log('[SC Debug] Focus BEGIN has no matching END sibling!');
           }
         }
         continue;
