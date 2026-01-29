@@ -577,8 +577,30 @@ export default class SpaceCommandPlugin extends Plugin {
           (prev as HTMLElement).dataset.scPriority = colourInfo.priority.toString();
           continue;
         }
+        // Fallback: if prev sibling isn't the begin element, still try to style this tag
+        // This handles cases where DOM structure is different than expected
+        if (!tagText.startsWith('#')) {
+          tagText = '#' + tagText;
+        }
+        const colourInfo = getTagColourInfo(tagText, projectColourMap);
+        tagEl.dataset.scTagType = colourInfo.type;
+        tagEl.dataset.scPriority = colourInfo.priority.toString();
+        continue;
       } else if (tagEl.classList.contains('cm-hashtag-begin')) {
-        // Skip the begin element, we'll handle it when we see the end
+        // For begin elements, find the matching end element by looking at next sibling
+        // This ensures both get styled even if the end element iteration missed them
+        const next = tagEl.nextElementSibling;
+        if (next?.classList.contains('cm-hashtag-end') && !next.hasAttribute('data-sc-tag-type')) {
+          tagText = tagText + (next.textContent?.trim() || '');
+          if (!tagText.startsWith('#')) {
+            tagText = '#' + tagText;
+          }
+          const colourInfo = getTagColourInfo(tagText, projectColourMap);
+          tagEl.dataset.scTagType = colourInfo.type;
+          tagEl.dataset.scPriority = colourInfo.priority.toString();
+          (next as HTMLElement).dataset.scTagType = colourInfo.type;
+          (next as HTMLElement).dataset.scPriority = colourInfo.priority.toString();
+        }
         continue;
       }
 

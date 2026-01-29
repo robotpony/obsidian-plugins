@@ -2,6 +2,21 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.48] - 2026-01-28
+
+### Fixed
+
+- **Tag colouring consistency**: Fixed tags appearing grey (unstyled) instead of blue (styled)
+  - Some tags like `#focus`, `#p0` were not being coloured due to DOM iteration order issues
+  - Added bidirectional matching: both begin→end and end→begin sibling lookups
+  - Added fallback styling for end elements when begin element isn't found as previous sibling
+
+### Technical
+
+- Tag colouring now handles split `cm-hashtag-begin`/`cm-hashtag-end` elements from both directions
+- When processing `cm-hashtag-begin`, also checks and styles the next sibling if it's `cm-hashtag-end`
+- Ensures all tag pairs get styled regardless of iteration order in the querySelectorAll results
+
 ## [0.9.47] - 2026-01-28
 
 ### Fixed

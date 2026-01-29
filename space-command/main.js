@@ -15497,7 +15497,7 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
    * Targets Obsidian's tag classes in editor (.cm-hashtag) and reading mode (.tag).
    */
   applyTagColoursToElement(el) {
-    var _a;
+    var _a, _b;
     const tagNodes = el.querySelectorAll(".tag:not([data-sc-tag-type]), a.tag:not([data-sc-tag-type]), span.tag:not([data-sc-tag-type]), .cm-hashtag:not([data-sc-tag-type]), .cm-tag:not([data-sc-tag-type])");
     const tags = Array.from(tagNodes);
     const projectColourMap = this.getProjectColourMap();
@@ -15508,14 +15508,33 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
         const prev = tagEl.previousElementSibling;
         if (prev == null ? void 0 : prev.classList.contains("cm-hashtag-begin")) {
           tagText = (prev.textContent || "") + tagText;
-          const colourInfo2 = getTagColourInfo(tagText.startsWith("#") ? tagText : "#" + tagText, projectColourMap);
-          tagEl.dataset.scTagType = colourInfo2.type;
-          tagEl.dataset.scPriority = colourInfo2.priority.toString();
-          prev.dataset.scTagType = colourInfo2.type;
-          prev.dataset.scPriority = colourInfo2.priority.toString();
+          const colourInfo3 = getTagColourInfo(tagText.startsWith("#") ? tagText : "#" + tagText, projectColourMap);
+          tagEl.dataset.scTagType = colourInfo3.type;
+          tagEl.dataset.scPriority = colourInfo3.priority.toString();
+          prev.dataset.scTagType = colourInfo3.type;
+          prev.dataset.scPriority = colourInfo3.priority.toString();
           continue;
         }
+        if (!tagText.startsWith("#")) {
+          tagText = "#" + tagText;
+        }
+        const colourInfo2 = getTagColourInfo(tagText, projectColourMap);
+        tagEl.dataset.scTagType = colourInfo2.type;
+        tagEl.dataset.scPriority = colourInfo2.priority.toString();
+        continue;
       } else if (tagEl.classList.contains("cm-hashtag-begin")) {
+        const next = tagEl.nextElementSibling;
+        if ((next == null ? void 0 : next.classList.contains("cm-hashtag-end")) && !next.hasAttribute("data-sc-tag-type")) {
+          tagText = tagText + (((_b = next.textContent) == null ? void 0 : _b.trim()) || "");
+          if (!tagText.startsWith("#")) {
+            tagText = "#" + tagText;
+          }
+          const colourInfo2 = getTagColourInfo(tagText, projectColourMap);
+          tagEl.dataset.scTagType = colourInfo2.type;
+          tagEl.dataset.scPriority = colourInfo2.priority.toString();
+          next.dataset.scTagType = colourInfo2.type;
+          next.dataset.scPriority = colourInfo2.priority.toString();
+        }
         continue;
       }
       if (!tagText.startsWith("#")) {
