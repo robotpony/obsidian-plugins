@@ -15500,6 +15500,13 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
     var _a, _b;
     const tagNodes = el.querySelectorAll(".tag:not([data-sc-tag-type]), a.tag:not([data-sc-tag-type]), span.tag:not([data-sc-tag-type]), .cm-hashtag:not([data-sc-tag-type]), .cm-tag:not([data-sc-tag-type])");
     const tags = Array.from(tagNodes);
+    const focusTags = tags.filter((t) => {
+      var _a2;
+      return ((_a2 = t.textContent) == null ? void 0 : _a2.includes("focus")) || t.classList.contains("cm-tag-focus");
+    });
+    if (focusTags.length > 0) {
+      console.log("[SC Debug] Found unprocessed focus tags:", focusTags.length, focusTags);
+    }
     const projectColourMap = this.getProjectColourMap();
     for (let i = 0; i < tags.length; i++) {
       const tagEl = tags[i];
