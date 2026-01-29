@@ -1319,6 +1319,10 @@ async function createRichLink(url, config) {
 }
 
 // main.ts
+var LOGO_PREFIX = "L\u2318";
+function showNotice(message, timeout) {
+  return new import_obsidian4.Notice(`${LOGO_PREFIX} ${message}`, timeout);
+}
 var LinkCommandPlugin = class extends import_obsidian4.Plugin {
   constructor() {
     super(...arguments);
@@ -1348,7 +1352,7 @@ var LinkCommandPlugin = class extends import_obsidian4.Plugin {
           () => this.openSettings(),
           async () => {
             await this.unfurlService.clearCache();
-            new import_obsidian4.Notice("Link history cleared");
+            showNotice("Link history cleared");
           }
         );
         return this.sidebarView;
@@ -1371,7 +1375,7 @@ var LinkCommandPlugin = class extends import_obsidian4.Plugin {
         if (url) {
           await this.cycleFormatAtCursor(editor, url);
         } else {
-          new import_obsidian4.Notice("No URL found at cursor");
+          showNotice("No URL found at cursor");
         }
       }
     });
@@ -1381,7 +1385,7 @@ var LinkCommandPlugin = class extends import_obsidian4.Plugin {
       callback: async () => {
         var _a;
         await this.unfurlService.clearCache();
-        new import_obsidian4.Notice("Link cache cleared");
+        showNotice("Link cache cleared");
         (_a = this.sidebarView) == null ? void 0 : _a.render();
       }
     });
@@ -1661,7 +1665,7 @@ var LinkCommandSettingTab = class extends import_obsidian4.PluginSettingTab {
     new import_obsidian4.Setting(containerEl).setName("Cache statistics").setDesc(`Memory: ${stats.memorySize} entries | Persistent: ${stats.persistentSize} entries`).addButton(
       (btn) => btn.setButtonText("Clear cache").onClick(async () => {
         await this.plugin.unfurlService.clearCache();
-        new import_obsidian4.Notice("Link cache cleared");
+        showNotice("Link cache cleared");
         this.display();
       })
     );

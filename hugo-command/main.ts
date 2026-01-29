@@ -7,8 +7,6 @@ import {
   WorkspaceLeaf,
   TFile,
   MarkdownView,
-  Notice,
-  editorViewField,
 } from "obsidian";
 import { HugoScanner } from "./src/HugoScanner";
 import {
@@ -126,7 +124,7 @@ export default class HugoCommandPlugin extends Plugin {
       name: "Enhance Outline with Suggestions",
       editorCallback: async (editor, view) => {
         if (!this.settings.outline.enabled) {
-          new Notice("Outline enhancement is not enabled in settings");
+          showNotice("Outline enhancement is not enabled in settings");
           return;
         }
         await this.enhanceCurrentOutline();
@@ -223,27 +221,27 @@ export default class HugoCommandPlugin extends Plugin {
 
     const activeFile = this.app.workspace.getActiveFile();
     if (!activeFile) {
-      new Notice("No file is currently open");
+      showNotice("No file is currently open");
       return;
     }
 
     if (activeFile.extension !== "md") {
-      new Notice("Outline enhancement only works on markdown files");
+      showNotice("Outline enhancement only works on markdown files");
       return;
     }
 
     this.isEnhancingOutline = true;
-    new Notice("Enhancing outline...");
+    showNotice("Enhancing outline...");
 
     try {
       const content = await this.app.vault.read(activeFile);
       const styleGuide = await this.getStyleGuide();
       const enhanced = await this.outlineClient.enhance(content, styleGuide);
       await this.app.vault.modify(activeFile, enhanced);
-      new Notice("Outline enhanced with suggestions");
+      showNotice("Outline enhanced with suggestions");
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Enhancement failed";
-      new Notice(`Error: ${msg}`);
+      showNotice(`Error: ${msg}`);
       console.error("[Hugo Outline] Enhancement failed:", error);
     } finally {
       this.isEnhancingOutline = false;
@@ -371,10 +369,10 @@ export default class HugoCommandPlugin extends Plugin {
           parts.push(content);
         } catch (error) {
           console.error("[Hugo Review] Failed to read style guide file:", error);
-          new Notice(`Could not read style guide: ${this.settings.review.styleGuideFile}`);
+          showNotice(`Could not read style guide: ${this.settings.review.styleGuideFile}`);
         }
       } else {
-        new Notice(`Style guide file not found: ${this.settings.review.styleGuideFile}`);
+        showNotice(`Style guide file not found: ${this.settings.review.styleGuideFile}`);
       }
     }
 

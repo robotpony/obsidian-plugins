@@ -2,6 +2,23 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.6.5] - 2026-01-28
+
+### Fixed
+
+- **Branded notices**: All status messages now show H⌘ logo prefix for consistency
+  - Outline enhancement messages (start, success, errors)
+  - Style guide file errors
+
+## [0.6.4] - 2026-01-28
+
+### Improved
+
+- **Sparkles button in document tab**: Added enhance outline button to markdown view header
+  - Appears in the view-actions area (left of the close button)
+  - Shows loading animation while processing
+  - Also still available via command palette and file context menu
+
 ## [0.6.3] - 2026-01-28
 
 ### Improved

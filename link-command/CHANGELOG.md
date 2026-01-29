@@ -2,6 +2,12 @@
 
 All notable changes to the Link Command plugin will be documented in this file.
 
+## [0.4.19] - 2026-01-28
+
+### Fixed
+
+- **Branded notices**: All status messages now show L⌘ logo prefix for consistency
+
 ## [0.4.18] - 2026-01-28
 
 ### Added

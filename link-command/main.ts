@@ -19,6 +19,12 @@ import { UrlUnfurlService } from "./src/UrlUnfurlService";
 import { LinkSidebarView, VIEW_TYPE_LINK_SIDEBAR } from "./src/LinkSidebarView";
 import { createFormatToggleExtension, FormatToggleConfig } from "./src/UrlFormatToggle";
 
+const LOGO_PREFIX = "L⌘";
+
+function showNotice(message: string, timeout?: number): Notice {
+  return new Notice(`${LOGO_PREFIX} ${message}`, timeout);
+}
+
 export default class LinkCommandPlugin extends Plugin {
   settings: LinkCommandSettings;
   unfurlService: UrlUnfurlService;
@@ -54,7 +60,7 @@ export default class LinkCommandPlugin extends Plugin {
           () => this.openSettings(),
           async () => {
             await this.unfurlService.clearCache();
-            new Notice("Link history cleared");
+            showNotice("Link history cleared");
           }
         );
         return this.sidebarView;
@@ -85,7 +91,7 @@ export default class LinkCommandPlugin extends Plugin {
         if (url) {
           await this.cycleFormatAtCursor(editor, url);
         } else {
-          new Notice("No URL found at cursor");
+          showNotice("No URL found at cursor");
         }
       },
     });
@@ -95,7 +101,7 @@ export default class LinkCommandPlugin extends Plugin {
       name: "Clear link cache",
       callback: async () => {
         await this.unfurlService.clearCache();
-        new Notice("Link cache cleared");
+        showNotice("Link cache cleared");
         this.sidebarView?.render();
       },
     });
@@ -486,7 +492,7 @@ class LinkCommandSettingTab extends PluginSettingTab {
           .setButtonText("Clear cache")
           .onClick(async () => {
             await this.plugin.unfurlService.clearCache();
-            new Notice("Link cache cleared");
+            showNotice("Link cache cleared");
             this.display(); // Refresh to update stats
           })
       );
