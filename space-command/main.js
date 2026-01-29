@@ -15905,13 +15905,13 @@ var TriageModal = class extends import_obsidian11.Modal {
     const isSnoozed = item.tags.includes("#future") || item.tags.includes("#snooze") || item.tags.includes("#snoozed");
     const isIdea = item.itemType === "idea" || item.tags.includes("#idea") || item.tags.includes("#ideas");
     const typeIndicator = contentEl.createEl("div", { cls: "triage-type" });
-    let typeText = "File this TODO";
+    let typeText = "File this TODO...";
     if (isIdea && isSnoozed) {
-      typeText = "Wake this Idea?";
+      typeText = "Wake this Idea...";
     } else if (isIdea) {
-      typeText = "File this Idea";
+      typeText = "File this Idea...";
     } else if (isSnoozed) {
-      typeText = "Wake this TODO?";
+      typeText = "Wake this TODO...";
     }
     typeIndicator.appendText(typeText);
     const itemContent = contentEl.createEl("div", { cls: "triage-item-content" });
@@ -15940,11 +15940,17 @@ var TriageModal = class extends import_obsidian11.Modal {
     }
     contentEl.createEl("div", { cls: "triage-separator" });
     const actions = contentEl.createEl("div", { cls: "triage-actions" });
-    const skipBtn = actions.createEl("button", { cls: "triage-btn triage-btn-skip" });
-    skipBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg> Skip';
+    const skipBtn = actions.createEl("button", {
+      cls: "triage-btn triage-btn-skip",
+      attr: { title: "Skip this item and move to next" }
+    });
+    skipBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg> Skip';
     skipBtn.addEventListener("click", () => this.nextItem());
     if (isIdea) {
-      const toTodoBtn = actions.createEl("button", { cls: "triage-btn triage-btn-convert" });
+      const toTodoBtn = actions.createEl("button", {
+        cls: "triage-btn triage-btn-convert",
+        attr: { title: "Convert this Idea to a TODO" }
+      });
       toTodoBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.5"/><path d="m9 11 3 3L22 4"/></svg> \u2192 TODO';
       toTodoBtn.addEventListener("click", async () => {
         await this.processor.removeTag(item, "#idea");
@@ -15956,7 +15962,10 @@ var TriageModal = class extends import_obsidian11.Modal {
         this.nextItem();
       });
     } else {
-      const toIdeaBtn = actions.createEl("button", { cls: "triage-btn triage-btn-convert" });
+      const toIdeaBtn = actions.createEl("button", {
+        cls: "triage-btn triage-btn-convert",
+        attr: { title: "Convert this TODO to an Idea" }
+      });
       toIdeaBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"></path><path d="M10 22h4"></path><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"></path></svg> \u2192 Idea';
       toIdeaBtn.addEventListener("click", async () => {
         await this.processor.removeTag(item, "#todo");
@@ -15964,7 +15973,10 @@ var TriageModal = class extends import_obsidian11.Modal {
         this.nextItem();
       });
     }
-    const clearBtn = actions.createEl("button", { cls: "triage-btn triage-btn-clear" });
+    const clearBtn = actions.createEl("button", {
+      cls: "triage-btn triage-btn-clear",
+      attr: { title: "Remove the type tag (item will no longer appear in lists)" }
+    });
     clearBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg> Clear';
     clearBtn.addEventListener("click", async () => {
       if (isIdea) {
@@ -15978,15 +15990,21 @@ var TriageModal = class extends import_obsidian11.Modal {
       }
       this.nextItem();
     });
-    const focusBtn = actions.createEl("button", { cls: "triage-btn triage-btn-focus" });
+    const focusBtn = actions.createEl("button", {
+      cls: "triage-btn triage-btn-focus",
+      attr: { title: "Add #focus tag to prioritize this item" }
+    });
     focusBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg> Focus';
     focusBtn.addEventListener("click", async () => {
       await this.processor.setPriorityTag(item, "#focus");
       this.nextItem();
     });
     if (isSnoozed) {
-      const unsnoozeBtn = actions.createEl("button", { cls: "triage-btn triage-btn-unsnooze" });
-      unsnoozeBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 22h14"/><path d="M5 9h14"/><path d="M7 17h10"/><path d="M12 2v4"/></svg> Wake';
+      const unsnoozeBtn = actions.createEl("button", {
+        cls: "triage-btn triage-btn-unsnooze",
+        attr: { title: "Remove snooze tag and make this item active again" }
+      });
+      unsnoozeBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg> Wake';
       unsnoozeBtn.addEventListener("click", async () => {
         await this.processor.removeTag(item, "#future");
         if (item.tags.includes("#snooze"))
@@ -15996,7 +16014,10 @@ var TriageModal = class extends import_obsidian11.Modal {
         this.nextItem();
       });
     } else {
-      const snoozeBtn = actions.createEl("button", { cls: "triage-btn triage-btn-snooze" });
+      const snoozeBtn = actions.createEl("button", {
+        cls: "triage-btn triage-btn-snooze",
+        attr: { title: "Snooze this item for later" }
+      });
       snoozeBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg> Snooze';
       snoozeBtn.addEventListener("click", async () => {
         await this.processor.setPriorityTag(item, "#future");

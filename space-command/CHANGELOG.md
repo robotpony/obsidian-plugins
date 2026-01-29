@@ -2,6 +2,20 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.68] - 2026-01-29
+
+### Improved
+
+- **Triage modal polish**:
+  - Type prompts now have ellipsis ("File this TODO...")
+  - All action buttons now have tooltips explaining their function
+  - Better Skip icon (skip-forward style ⏭)
+  - Sun icon for Wake button (clearer "unsnooze" metaphor)
+  - Convert button (→ Idea/TODO) now has blue background for visibility
+  - Snooze button now has orange background
+  - Fixed tag top padding
+  - Improved modal padding fix targeting parent containers
+
 ## [0.9.67] - 2026-01-29
 
 ### Fixed
