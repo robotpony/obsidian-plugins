@@ -554,10 +554,18 @@ export default class SpaceCommandPlugin extends Plugin {
     const tagNodes = el.querySelectorAll('.tag:not([data-sc-tag-type]), a.tag:not([data-sc-tag-type]), span.tag:not([data-sc-tag-type]), .cm-hashtag:not([data-sc-tag-type]), .cm-tag:not([data-sc-tag-type])');
     const tags = Array.from(tagNodes);
 
-    // Debug: log unprocessed tags containing "focus"
-    const focusTags = tags.filter(t => t.textContent?.includes('focus') || t.classList.contains('cm-tag-focus'));
-    if (focusTags.length > 0) {
-      console.log('[SC Debug] Found unprocessed focus tags:', focusTags.length, focusTags);
+    // Debug: log tag count periodically
+    if (tags.length > 0) {
+      console.log('[SC Debug] Processing', tags.length, 'tags');
+    }
+
+    // Also check for focus tags specifically with a broader query
+    const allFocusTags = el.querySelectorAll('.cm-tag-focus');
+    if (allFocusTags.length > 0) {
+      console.log('[SC Debug] Found cm-tag-focus elements:', allFocusTags.length);
+      allFocusTags.forEach((t, i) => {
+        console.log(`[SC Debug] Focus tag ${i}:`, t.className, 'has data-sc-tag-type:', t.hasAttribute('data-sc-tag-type'));
+      });
     }
 
     // Get project colour map for project tag lookups
