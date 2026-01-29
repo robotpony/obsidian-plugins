@@ -1305,6 +1305,22 @@
   gap: 6px;
 }
 
+.project-info-principle-items {
+  margin: 0;
+  padding-left: 1.2em;
+  font-size: 0.9em;
+  color: var(--text-normal);
+  line-height: 1.5;
+}
+
+.project-info-principle-item {
+  margin-bottom: 4px;
+}
+
+.project-info-principle-item:last-child {
+  margin-bottom: 0;
+}
+
 .project-info-principle-tag {
   font-size: 0.85em !important;
   font-family: var(--font-monospace) !important;

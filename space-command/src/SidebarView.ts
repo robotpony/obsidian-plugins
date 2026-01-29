@@ -938,16 +938,41 @@ export class TodoSidebarView extends ItemView {
         desc.appendText("No description available.");
       }
 
-      // Principles section
-      if (info.principles.length > 0) {
+      // Principle items - vault-wide items tagged with both #principle and this project's tag
+      const projectPrinciples = this.scanner.getPrinciples().filter(p =>
+        p.tags.includes(project.tag) || p.inferredFileTag === project.tag
+      );
+
+      if (projectPrinciples.length > 0) {
         popup.createEl("div", { cls: "project-info-separator" });
         const principlesHeader = popup.createEl("div", { cls: "project-info-section-header" });
         principlesHeader.appendText("Principles");
 
-        const principlesList = popup.createEl("div", { cls: "project-info-principles" });
+        const principlesList = popup.createEl("ul", { cls: "project-info-principle-items" });
+        for (const principle of projectPrinciples) {
+          const li = principlesList.createEl("li", { cls: "project-info-principle-item" });
+          // Strip #principle tag and project tag from display text
+          let displayText = principle.text
+            .replace(/#principles?\b/gi, "")
+            .replace(new RegExp(project.tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "\\b", "gi"), "")
+            .replace(/\s+/g, " ")
+            .trim();
+          // Remove leading list markers (-, *, +) if present
+          displayText = displayText.replace(/^[-*+]\s*/, "");
+          li.appendText(displayText);
+        }
+      }
+
+      // Principle tags section (from project file)
+      if (info.principles.length > 0) {
+        popup.createEl("div", { cls: "project-info-separator" });
+        const tagsHeader = popup.createEl("div", { cls: "project-info-section-header" });
+        tagsHeader.appendText("Tags");
+
+        const tagsList = popup.createEl("div", { cls: "project-info-principles" });
         for (const principle of info.principles) {
-          const principleItem = principlesList.createEl("span", { cls: "project-info-principle-tag" });
-          principleItem.appendText(principle);
+          const tagItem = tagsList.createEl("span", { cls: "project-info-principle-tag" });
+          tagItem.appendText(principle);
         }
       }
 

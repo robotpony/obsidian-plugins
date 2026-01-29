@@ -3553,14 +3553,29 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
         const desc = popup.createEl("div", { cls: "project-info-description project-info-empty" });
         desc.appendText("No description available.");
       }
-      if (info.principles.length > 0) {
+      const projectPrinciples = this.scanner.getPrinciples().filter(
+        (p) => p.tags.includes(project.tag) || p.inferredFileTag === project.tag
+      );
+      if (projectPrinciples.length > 0) {
         popup.createEl("div", { cls: "project-info-separator" });
         const principlesHeader = popup.createEl("div", { cls: "project-info-section-header" });
         principlesHeader.appendText("Principles");
-        const principlesList = popup.createEl("div", { cls: "project-info-principles" });
+        const principlesList = popup.createEl("ul", { cls: "project-info-principle-items" });
+        for (const principle of projectPrinciples) {
+          const li = principlesList.createEl("li", { cls: "project-info-principle-item" });
+          let displayText = principle.text.replace(/#principles?\b/gi, "").replace(new RegExp(project.tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "gi"), "").replace(/\s+/g, " ").trim();
+          displayText = displayText.replace(/^[-*+]\s*/, "");
+          li.appendText(displayText);
+        }
+      }
+      if (info.principles.length > 0) {
+        popup.createEl("div", { cls: "project-info-separator" });
+        const tagsHeader = popup.createEl("div", { cls: "project-info-section-header" });
+        tagsHeader.appendText("Tags");
+        const tagsList = popup.createEl("div", { cls: "project-info-principles" });
         for (const principle of info.principles) {
-          const principleItem = principlesList.createEl("span", { cls: "project-info-principle-tag" });
-          principleItem.appendText(principle);
+          const tagItem = tagsList.createEl("span", { cls: "project-info-principle-tag" });
+          tagItem.appendText(principle);
         }
       }
       popup.createEl("div", { cls: "project-info-separator" });

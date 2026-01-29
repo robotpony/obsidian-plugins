@@ -2,6 +2,19 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.55] - 2026-01-29
+
+### Added
+
+- **Principle items in project info popup**: The focus list (ⓘ) popup now shows `#principle` tagged items that belong to the project
+  - Displays principle text below the project description
+  - Includes principles tagged with the project tag or in project files
+  - Helps anchor users in what matters for the focused project
+
+### Changed
+
+- **Renamed popup sections**: "Principles" section now shows actual principle items; related tags moved to "Tags" section
+
 ## [0.9.54] - 2026-01-28
 
 ### Added
