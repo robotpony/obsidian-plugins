@@ -199,7 +199,7 @@ function getPriorityValue(tags) {
     return 6;
   if (tags.includes("#p4"))
     return 7;
-  if (tags.includes("#future"))
+  if (tags.includes("#future") || tags.includes("#snooze") || tags.includes("#snoozed"))
     return 8;
   return 5;
 }
@@ -217,6 +217,8 @@ function getTagCount(tags) {
     "#focus",
     "#today",
     "#future",
+    "#snooze",
+    "#snoozed",
     "#p0",
     "#p1",
     "#p2",
@@ -1359,6 +1361,8 @@ var ProjectManager = class {
         "#principle",
         "#principles",
         "#future",
+        "#snooze",
+        "#snoozed",
         "#focus",
         "#today",
         ...this.priorityTags
@@ -3000,7 +3004,14 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     return VIEW_TYPE_TODO_SIDEBAR;
   }
   getDisplayText() {
-    return this.activeTab === "todos" ? "TODOs" : "IDEAs";
+    switch (this.activeTab) {
+      case "todos":
+        return "TODOs";
+      case "ideas":
+        return "IDEAs";
+      case "snoozed":
+        return "Snoozed";
+    }
   }
   getIcon() {
     return "square-check-big";
@@ -3279,6 +3290,33 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
         });
       }
       dropdown.createEl("div", { cls: "tag-dropdown-separator" });
+      if (item) {
+        const isSnoozed = item.tags.includes("#future") || item.tags.includes("#snooze") || item.tags.includes("#snoozed");
+        const snoozeItem = dropdown.createEl("div", {
+          cls: "tag-dropdown-item tag-dropdown-snooze",
+          text: isSnoozed ? "Unsnooze this" : "Snooze this"
+        });
+        snoozeItem.addEventListener("click", async (e2) => {
+          e2.stopPropagation();
+          this.closeDropdown();
+          let success;
+          if (isSnoozed) {
+            success = await this.processor.removeTag(item, "#future");
+            if (item.tags.includes("#snooze")) {
+              await this.processor.removeTag(item, "#snooze");
+            }
+            if (item.tags.includes("#snoozed")) {
+              await this.processor.removeTag(item, "#snoozed");
+            }
+          } else {
+            success = await this.processor.setPriorityTag(item, "#future");
+          }
+          if (success) {
+            this.render();
+          }
+        });
+        dropdown.createEl("div", { cls: "tag-dropdown-separator" });
+      }
       const clearItem = dropdown.createEl("div", {
         cls: `tag-dropdown-clear${this.activeTagFilter ? "" : " disabled"}`,
         text: "Clear filter"
@@ -3329,7 +3367,17 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     const titleEl = headerDiv.createEl("h4", { cls: "sidebar-title" });
     const logoEl = titleEl.createEl("span", { cls: "space-command-logo clickable-logo", text: "\u2423\u2318" });
     logoEl.addEventListener("click", () => this.onShowAbout());
-    titleEl.appendText(this.activeTab === "todos" ? " TODOs" : " IDEAs");
+    switch (this.activeTab) {
+      case "todos":
+        titleEl.appendText(" TODOs");
+        break;
+      case "ideas":
+        titleEl.appendText(" IDEAs");
+        break;
+      case "snoozed":
+        titleEl.appendText(" Snoozed");
+        break;
+    }
     const tabNav = headerDiv.createEl("div", { cls: "sidebar-tab-nav" });
     const todosTab = tabNav.createEl("button", {
       cls: `sidebar-tab-btn ${this.activeTab === "todos" ? "active" : ""}`,
@@ -3347,6 +3395,15 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     ideasTab.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"></path><path d="M10 22h4"></path><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"></path></svg>';
     ideasTab.addEventListener("click", () => {
       this.activeTab = "ideas";
+      this.render();
+    });
+    const snoozedTab = tabNav.createEl("button", {
+      cls: `sidebar-tab-btn ${this.activeTab === "snoozed" ? "active" : ""}`,
+      attr: { "aria-label": "Snoozed" }
+    });
+    snoozedTab.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>';
+    snoozedTab.addEventListener("click", () => {
+      this.activeTab = "snoozed";
       this.render();
     });
     const menuBtn = headerDiv.createEl("button", {
@@ -3407,10 +3464,16 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       menu.showAtMouseEvent(evt);
     });
     const content3 = container.createEl("div", { cls: "sidebar-content" });
-    if (this.activeTab === "todos") {
-      this.renderTodosContent(content3);
-    } else {
-      this.renderIdeasContent(content3);
+    switch (this.activeTab) {
+      case "todos":
+        this.renderTodosContent(content3);
+        break;
+      case "ideas":
+        this.renderIdeasContent(content3);
+        break;
+      case "snoozed":
+        this.renderSnoozedContent(content3);
+        break;
     }
   }
   renderTodosContent(container) {
@@ -3421,6 +3484,71 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
   renderIdeasContent(container) {
     this.renderPrinciples(container);
     this.renderActiveIdeas(container);
+  }
+  renderSnoozedContent(container) {
+    this.renderSnoozedTodos(container);
+    this.renderSnoozedIdeas(container);
+  }
+  renderSnoozedTodos(container) {
+    let todos = this.scanner.getTodos();
+    todos = todos.filter(
+      (todo) => todo.tags.includes("#future") || todo.tags.includes("#snooze") || todo.tags.includes("#snoozed")
+    );
+    todos = todos.filter(
+      (todo) => !todo.tags.includes("#idea") && !todo.tags.includes("#ideas") && !todo.tags.includes("#ideation")
+    );
+    todos = todos.filter((todo) => todo.parentLineNumber === void 0);
+    if (this.activeTagFilter) {
+      todos = todos.filter((todo) => todo.tags.includes(this.activeTagFilter));
+    }
+    todos = this.sortTodosByPriority(todos);
+    const section = container.createEl("div", { cls: "snoozed-todos-section" });
+    const header = section.createEl("div", {
+      cls: "todo-section-header snoozed-todos-header"
+    });
+    const titleSpan = header.createEl("span", { cls: "todo-section-title" });
+    titleSpan.textContent = "Snoozed TODOs";
+    this.renderFilterIndicator(header);
+    if (todos.length === 0) {
+      section.createEl("div", {
+        text: this.activeTagFilter ? `No snoozed TODOs matching ${this.activeTagFilter}` : "No snoozed TODOs",
+        cls: "todo-empty"
+      });
+      return;
+    }
+    const list4 = section.createEl("ul", { cls: "todo-list" });
+    for (const todo of todos) {
+      this.renderListItem(list4, todo, this.todoConfig);
+    }
+  }
+  renderSnoozedIdeas(container) {
+    let ideas = this.scanner.getIdeas();
+    ideas = ideas.filter(
+      (idea) => idea.tags.includes("#future") || idea.tags.includes("#snooze") || idea.tags.includes("#snoozed")
+    );
+    ideas = ideas.filter((idea) => idea.parentLineNumber === void 0);
+    if (this.activeTagFilter) {
+      ideas = ideas.filter((idea) => idea.tags.includes(this.activeTagFilter));
+    }
+    ideas = this.sortTodosByPriority(ideas);
+    const section = container.createEl("div", { cls: "snoozed-ideas-section" });
+    const header = section.createEl("div", {
+      cls: "todo-section-header snoozed-ideas-header"
+    });
+    const titleSpan = header.createEl("span", { cls: "todo-section-title" });
+    titleSpan.textContent = "Snoozed Ideas";
+    this.renderFilterIndicator(header);
+    if (ideas.length === 0) {
+      section.createEl("div", {
+        text: this.activeTagFilter ? `No snoozed ideas matching ${this.activeTagFilter}` : "No snoozed ideas",
+        cls: "todo-empty"
+      });
+      return;
+    }
+    const list4 = section.createEl("ul", { cls: "idea-list" });
+    for (const idea of ideas) {
+      this.renderListItem(list4, idea, this.ideaConfig);
+    }
   }
   sortTodosByPriority(todos) {
     return [...todos].sort(compareTodoItems);
@@ -3654,14 +3782,25 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
   }
   renderActiveTodos(container) {
     let todos = this.scanner.getTodos();
-    todos = todos.filter((todo) => !todo.tags.includes("#future"));
+    todos = todos.filter(
+      (todo) => !todo.tags.includes("#future") && !todo.tags.includes("#snooze") && !todo.tags.includes("#snoozed")
+    );
     todos = todos.filter(
       (todo) => !todo.tags.includes("#idea") && !todo.tags.includes("#ideas") && !todo.tags.includes("#ideation")
     );
     if (this.focusModeEnabled) {
-      todos = todos.filter(
-        (todo) => todo.parentLineNumber === void 0 || todo.tags.includes("#focus")
-      );
+      todos = todos.filter((todo) => {
+        if (todo.parentLineNumber === void 0) {
+          return true;
+        }
+        if (!todo.tags.includes("#focus")) {
+          return false;
+        }
+        const parent = this.scanner.getTodos().find(
+          (t) => t.filePath === todo.filePath && t.lineNumber === todo.parentLineNumber
+        );
+        return !(parent == null ? void 0 : parent.tags.includes("#focus"));
+      });
     } else {
       todos = todos.filter((todo) => todo.parentLineNumber === void 0);
     }
@@ -3848,7 +3987,9 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
   }
   renderActiveIdeas(container) {
     let ideas = this.scanner.getIdeas();
-    ideas = ideas.filter((idea) => !idea.tags.includes("#future"));
+    ideas = ideas.filter(
+      (idea) => !idea.tags.includes("#future") && !idea.tags.includes("#snooze") && !idea.tags.includes("#snoozed")
+    );
     ideas = ideas.filter((idea) => idea.parentLineNumber === void 0);
     if (this.activeTagFilter) {
       ideas = ideas.filter((idea) => idea.tags.includes(this.activeTagFilter));

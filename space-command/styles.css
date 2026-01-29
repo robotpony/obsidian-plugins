@@ -1228,6 +1228,19 @@
   background-color: transparent;
 }
 
+/* Snooze option in tag dropdown */
+.tag-dropdown-snooze {
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 0.9em;
+  color: var(--text-normal);
+  transition: background-color 0.1s;
+}
+
+.tag-dropdown-snooze:hover {
+  background-color: var(--background-modifier-hover);
+}
+
 /* Project info popup styles */
 .project-info-icon {
   cursor: pointer;

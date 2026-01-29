@@ -2,6 +2,27 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.61] - 2026-01-29
+
+### Added
+
+- **Snoozed tab**: New third tab in sidebar (clock icon) shows all snoozed TODOs and Ideas
+  - Separated into "Snoozed TODOs" and "Snoozed Ideas" sections
+  - Snoozed items hidden from TODOs and Ideas tabs
+- **Snooze tag aliases**: `#snooze` and `#snoozed` now work as aliases for `#future`
+  - All three tags are treated equivalently for snoozing
+- **Snooze in tag dropdown**: The `#` menu now includes "Snooze this" / "Unsnooze this" option
+  - Quick access to snooze without right-click context menu
+  - Shows "Unsnooze this" when item is already snoozed
+
+## [0.9.60] - 2026-01-29
+
+### Fixed
+
+- **Duplicate TODOs in focus mode**: Fixed issue where a child TODO with `#focus` would appear twice in the sidebar when its parent header also had `#focus`
+  - Child items now only appear standalone if their parent header does NOT have `#focus`
+  - When parent has `#focus`, child is shown under the parent (not duplicated as standalone)
+
 ## [0.9.59] - 2026-01-29
 
 ### Improved

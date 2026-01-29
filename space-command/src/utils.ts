@@ -86,7 +86,7 @@ export function formatDate(date: Date, format: string): string {
 /**
  * Get the priority value for sorting TODOs.
  * Lower values = higher priority.
- * Priority order: #focus=0, #today=1, #p0=2, #p1=3, #p2=4, no priority=5, #p3=6, #p4=7, #future=8
+ * Priority order: #focus=0, #today=1, #p0=2, #p1=3, #p2=4, no priority=5, #p3=6, #p4=7, snoozed=8
  */
 export function getPriorityValue(tags: string[]): number {
   if (tags.includes("#focus")) return 0;
@@ -96,7 +96,8 @@ export function getPriorityValue(tags: string[]): number {
   if (tags.includes("#p2")) return 4;
   if (tags.includes("#p3")) return 6;
   if (tags.includes("#p4")) return 7;
-  if (tags.includes("#future")) return 8;
+  // Snoozed items (any of the snooze tag variants) get lowest priority
+  if (tags.includes("#future") || tags.includes("#snooze") || tags.includes("#snoozed")) return 8;
   return 5; // No priority = medium (between #p2 and #p3)
 }
 
@@ -109,7 +110,7 @@ export function getTagCount(tags: string[]): number {
     "#todo", "#todos", "#todone", "#todones",
     "#idea", "#ideas", "#ideation",
     "#principle", "#principles",
-    "#focus", "#today", "#future",
+    "#focus", "#today", "#future", "#snooze", "#snoozed",
     "#p0", "#p1", "#p2", "#p3", "#p4"
   ]);
   return tags.filter(tag => !systemTags.has(tag)).length;

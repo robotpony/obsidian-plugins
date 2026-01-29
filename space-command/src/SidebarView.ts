@@ -20,7 +20,7 @@ export class TodoSidebarView extends ItemView {
   private focusListLimit: number;
   private focusModeIncludeProjects: boolean;
   private makeLinksClickable: boolean;
-  private activeTab: 'todos' | 'ideas' = 'todos';
+  private activeTab: 'todos' | 'ideas' | 'snoozed' = 'todos';
   private activeTagFilter: string | null = null;
   private focusModeEnabled: boolean = false;
   private openDropdown: HTMLElement | null = null;
@@ -69,7 +69,11 @@ export class TodoSidebarView extends ItemView {
   }
 
   getDisplayText(): string {
-    return this.activeTab === 'todos' ? "TODOs" : "IDEAs";
+    switch (this.activeTab) {
+      case 'todos': return "TODOs";
+      case 'ideas': return "IDEAs";
+      case 'snoozed': return "Snoozed";
+    }
   }
 
   getIcon(): string {
@@ -494,6 +498,40 @@ export class TodoSidebarView extends ItemView {
       // Add separator
       dropdown.createEl("div", { cls: "tag-dropdown-separator" });
 
+      // Add snooze/unsnooze option (only if item is provided)
+      if (item) {
+        const isSnoozed = item.tags.includes("#future") ||
+                          item.tags.includes("#snooze") ||
+                          item.tags.includes("#snoozed");
+        const snoozeItem = dropdown.createEl("div", {
+          cls: "tag-dropdown-item tag-dropdown-snooze",
+          text: isSnoozed ? "Unsnooze this" : "Snooze this",
+        });
+        snoozeItem.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          this.closeDropdown();
+          let success: boolean;
+          if (isSnoozed) {
+            // Remove all snooze tags
+            success = await this.processor.removeTag(item, "#future");
+            if (item.tags.includes("#snooze")) {
+              await this.processor.removeTag(item, "#snooze");
+            }
+            if (item.tags.includes("#snoozed")) {
+              await this.processor.removeTag(item, "#snoozed");
+            }
+          } else {
+            success = await this.processor.setPriorityTag(item, "#future");
+          }
+          if (success) {
+            this.render();
+          }
+        });
+
+        // Add another separator before clear filter
+        dropdown.createEl("div", { cls: "tag-dropdown-separator" });
+      }
+
       // Add clear filter option
       const clearItem = dropdown.createEl("div", {
         cls: `tag-dropdown-clear${this.activeTagFilter ? "" : " disabled"}`,
@@ -564,7 +602,11 @@ export class TodoSidebarView extends ItemView {
     const titleEl = headerDiv.createEl("h4", { cls: "sidebar-title" });
     const logoEl = titleEl.createEl("span", { cls: "space-command-logo clickable-logo", text: "␣⌘" });
     logoEl.addEventListener("click", () => this.onShowAbout());
-    titleEl.appendText(this.activeTab === 'todos' ? " TODOs" : " IDEAs");
+    switch (this.activeTab) {
+      case 'todos': titleEl.appendText(" TODOs"); break;
+      case 'ideas': titleEl.appendText(" IDEAs"); break;
+      case 'snoozed': titleEl.appendText(" Snoozed"); break;
+    }
 
     // Tab navigation
     const tabNav = headerDiv.createEl("div", { cls: "sidebar-tab-nav" });
@@ -586,6 +628,17 @@ export class TodoSidebarView extends ItemView {
     ideasTab.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"></path><path d="M10 22h4"></path><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"></path></svg>';
     ideasTab.addEventListener("click", () => {
       this.activeTab = 'ideas';
+      this.render();
+    });
+
+    const snoozedTab = tabNav.createEl("button", {
+      cls: `sidebar-tab-btn ${this.activeTab === 'snoozed' ? 'active' : ''}`,
+      attr: { "aria-label": "Snoozed" },
+    });
+    // Clock icon for snoozed
+    snoozedTab.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>';
+    snoozedTab.addEventListener("click", () => {
+      this.activeTab = 'snoozed';
       this.render();
     });
 
@@ -692,10 +745,16 @@ export class TodoSidebarView extends ItemView {
     const content = container.createEl("div", { cls: "sidebar-content" });
 
     // Render content based on active tab
-    if (this.activeTab === 'todos') {
-      this.renderTodosContent(content);
-    } else {
-      this.renderIdeasContent(content);
+    switch (this.activeTab) {
+      case 'todos':
+        this.renderTodosContent(content);
+        break;
+      case 'ideas':
+        this.renderIdeasContent(content);
+        break;
+      case 'snoozed':
+        this.renderSnoozedContent(content);
+        break;
     }
   }
 
@@ -716,6 +775,113 @@ export class TodoSidebarView extends ItemView {
 
     // Active Ideas section
     this.renderActiveIdeas(container);
+  }
+
+  private renderSnoozedContent(container: HTMLElement): void {
+    // Snoozed TODOs section
+    this.renderSnoozedTodos(container);
+
+    // Snoozed Ideas section
+    this.renderSnoozedIdeas(container);
+  }
+
+  private renderSnoozedTodos(container: HTMLElement): void {
+    let todos = this.scanner.getTodos();
+
+    // Keep only snoozed items (#future, #snooze, #snoozed)
+    todos = todos.filter(todo =>
+      todo.tags.includes("#future") ||
+      todo.tags.includes("#snooze") ||
+      todo.tags.includes("#snoozed")
+    );
+
+    // Filter out #idea items
+    todos = todos.filter(todo =>
+      !todo.tags.includes("#idea") &&
+      !todo.tags.includes("#ideas") &&
+      !todo.tags.includes("#ideation")
+    );
+
+    // Filter out child items (they'll be rendered under their parent header)
+    todos = todos.filter(todo => todo.parentLineNumber === undefined);
+
+    // Apply tag filter if active
+    if (this.activeTagFilter) {
+      todos = todos.filter(todo => todo.tags.includes(this.activeTagFilter!));
+    }
+
+    // Sort by priority
+    todos = this.sortTodosByPriority(todos);
+
+    const section = container.createEl("div", { cls: "snoozed-todos-section" });
+
+    const header = section.createEl("div", {
+      cls: "todo-section-header snoozed-todos-header",
+    });
+
+    const titleSpan = header.createEl("span", { cls: "todo-section-title" });
+    titleSpan.textContent = "Snoozed TODOs";
+    this.renderFilterIndicator(header);
+
+    if (todos.length === 0) {
+      section.createEl("div", {
+        text: this.activeTagFilter ? `No snoozed TODOs matching ${this.activeTagFilter}` : "No snoozed TODOs",
+        cls: "todo-empty",
+      });
+      return;
+    }
+
+    const list = section.createEl("ul", { cls: "todo-list" });
+
+    for (const todo of todos) {
+      this.renderListItem(list, todo, this.todoConfig);
+    }
+  }
+
+  private renderSnoozedIdeas(container: HTMLElement): void {
+    let ideas = this.scanner.getIdeas();
+
+    // Keep only snoozed items (#future, #snooze, #snoozed)
+    ideas = ideas.filter(idea =>
+      idea.tags.includes("#future") ||
+      idea.tags.includes("#snooze") ||
+      idea.tags.includes("#snoozed")
+    );
+
+    // Filter out child items
+    ideas = ideas.filter(idea => idea.parentLineNumber === undefined);
+
+    // Apply tag filter if active
+    if (this.activeTagFilter) {
+      ideas = ideas.filter(idea => idea.tags.includes(this.activeTagFilter!));
+    }
+
+    // Sort by priority
+    ideas = this.sortTodosByPriority(ideas);
+
+    const section = container.createEl("div", { cls: "snoozed-ideas-section" });
+
+    const header = section.createEl("div", {
+      cls: "todo-section-header snoozed-ideas-header",
+    });
+
+    const titleSpan = header.createEl("span", { cls: "todo-section-title" });
+    titleSpan.textContent = "Snoozed Ideas";
+    this.renderFilterIndicator(header);
+
+    if (ideas.length === 0) {
+      section.createEl("div", {
+        text: this.activeTagFilter ? `No snoozed ideas matching ${this.activeTagFilter}` : "No snoozed ideas",
+        cls: "todo-empty",
+      });
+      return;
+    }
+
+    const list = section.createEl("ul", { cls: "idea-list" });
+
+    for (const idea of ideas) {
+      this.renderListItem(list, idea, this.ideaConfig);
+    }
   }
 
   private sortTodosByPriority(todos: TodoItem[]): TodoItem[] {
@@ -1039,8 +1205,12 @@ export class TodoSidebarView extends ItemView {
   private renderActiveTodos(container: HTMLElement): void {
     let todos = this.scanner.getTodos();
 
-    // Filter out #future (snoozed) TODOs
-    todos = todos.filter(todo => !todo.tags.includes("#future"));
+    // Filter out snoozed TODOs (#future, #snooze, #snoozed)
+    todos = todos.filter(todo =>
+      !todo.tags.includes("#future") &&
+      !todo.tags.includes("#snooze") &&
+      !todo.tags.includes("#snoozed")
+    );
 
     // Filter out #idea items (they should only appear in Ideas tab)
     todos = todos.filter(todo =>
@@ -1051,10 +1221,22 @@ export class TodoSidebarView extends ItemView {
 
     // Filter out child items (they'll be rendered under their parent header)
     // Exception: In focus mode, keep children with #focus so they appear standalone
+    // BUT only if their parent header doesn't also have #focus (to avoid duplicates)
     if (this.focusModeEnabled) {
-      todos = todos.filter(todo =>
-        todo.parentLineNumber === undefined || todo.tags.includes("#focus")
-      );
+      todos = todos.filter(todo => {
+        if (todo.parentLineNumber === undefined) {
+          return true; // Top-level items always kept
+        }
+        if (!todo.tags.includes("#focus")) {
+          return false; // Child without focus, filter out
+        }
+        // Child with #focus - check if parent also has #focus
+        const parent = this.scanner.getTodos().find(
+          t => t.filePath === todo.filePath && t.lineNumber === todo.parentLineNumber
+        );
+        // If parent has #focus, child will be shown under it, so filter out standalone
+        return !parent?.tags.includes("#focus");
+      });
     } else {
       todos = todos.filter(todo => todo.parentLineNumber === undefined);
     }
@@ -1324,8 +1506,12 @@ export class TodoSidebarView extends ItemView {
   private renderActiveIdeas(container: HTMLElement): void {
     let ideas = this.scanner.getIdeas();
 
-    // Filter out #future (snoozed) ideas
-    ideas = ideas.filter(idea => !idea.tags.includes("#future"));
+    // Filter out snoozed ideas (#future, #snooze, #snoozed)
+    ideas = ideas.filter(idea =>
+      !idea.tags.includes("#future") &&
+      !idea.tags.includes("#snooze") &&
+      !idea.tags.includes("#snoozed")
+    );
 
     // Filter out child items (they'll be rendered under their parent header)
     ideas = ideas.filter(idea => idea.parentLineNumber === undefined);
