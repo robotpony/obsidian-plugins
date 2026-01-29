@@ -2,6 +2,16 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.5.1] - 2026-01-28
+
+### Improved
+
+- **Review UI polish**: Better language and visual feedback
+  - Button text: "Review post" / "Review post again" (was "Run Review" / "Re-run Review")
+  - Loading state: animated spinner with "Reading post..." text
+  - Score display: shows "X/Y passed" with colour-coded background (green/yellow/red)
+  - Wider dropdown: review panel now 280-320px wide for easier reading
+
 ## [0.5.0] - 2026-01-28
 
 ### Added

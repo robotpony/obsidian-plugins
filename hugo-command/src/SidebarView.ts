@@ -816,7 +816,7 @@ export class HugoSidebarView extends ItemView {
     }
 
     // Run/Re-run button
-    const buttonText = cachedReview ? "Re-run Review" : "Run Review";
+    const buttonText = cachedReview ? "Review post again" : "Review post";
     const runBtn = dropdown.createEl("div", {
       cls: "hugo-command-review-btn",
       text: buttonText,
@@ -826,13 +826,14 @@ export class HugoSidebarView extends ItemView {
       e.stopPropagation();
 
       // Show loading state
-      runBtn.textContent = "Reviewing...";
+      runBtn.textContent = "Reading post";
       runBtn.addClass("loading");
       reviewContainer.empty();
-      reviewContainer.createEl("div", {
+      const loadingEl = reviewContainer.createEl("div", {
         cls: "hugo-command-review-loading",
-        text: "Analyzing content...",
       });
+      loadingEl.createEl("span", { cls: "hugo-command-review-spinner" });
+      loadingEl.createSpan({ text: "Reading post..." });
 
       try {
         // Read file content
@@ -855,7 +856,7 @@ export class HugoSidebarView extends ItemView {
         // Update display
         reviewContainer.empty();
         this.renderReviewResults(reviewContainer, result);
-        runBtn.textContent = "Re-run Review";
+        runBtn.textContent = "Review post again";
         runBtn.removeClass("loading");
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : "Review failed";
@@ -872,7 +873,7 @@ export class HugoSidebarView extends ItemView {
           cls: "hugo-command-review-error",
           text: errorMsg,
         });
-        runBtn.textContent = "Retry Review";
+        runBtn.textContent = "Retry";
         runBtn.removeClass("loading");
       }
     });
@@ -882,6 +883,19 @@ export class HugoSidebarView extends ItemView {
    * Render review results checklist
    */
   private renderReviewResults(container: HTMLElement, result: ReviewResult): void {
+    // Calculate score
+    const total = result.criteria.length;
+    const passed = result.criteria.filter(c => c.passed === true).length;
+    const failed = result.criteria.filter(c => c.passed === false).length;
+
+    // Score header
+    if (total > 0) {
+      const scoreEl = container.createEl("div", { cls: "hugo-command-review-score" });
+      const scoreClass = failed === 0 ? "all-passed" : failed <= total / 2 ? "some-failed" : "many-failed";
+      scoreEl.addClass(scoreClass);
+      scoreEl.setText(`${passed}/${total} passed`);
+    }
+
     const list = container.createEl("div", { cls: "hugo-command-review-list" });
 
     for (const criterion of result.criteria) {
