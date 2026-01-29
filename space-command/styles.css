@@ -713,10 +713,31 @@
   background-color: var(--background-primary);
 }
 
+/* Tag styling for editor and reading mode - consistent sizing and alignment */
+/* Reading Mode tags */
+.markdown-preview-view .tag,
+.markdown-rendered .tag {
+  font-family: var(--font-monospace) !important;
+  font-size: 12px !important;
+  vertical-align: middle !important;
+  display: inline-block !important;
+}
+
+/* Editor (Live Preview/Source) tags - CodeMirror elements */
+/* High specificity selectors to override Obsidian defaults */
+.markdown-source-view .cm-hashtag,
+.cm-s-obsidian .cm-hashtag,
+.cm-editor .cm-hashtag,
+.cm-line .cm-hashtag {
+  font-family: var(--font-monospace) !important;
+  font-size: 12px !important;
+  vertical-align: middle !important;
+}
+
 /* Tag styling for sidebar and embed contexts */
 .space-command-sidebar .tag:not(.project-info-principle-tag),
 .space-command-embed .tag {
-  font-size: 9pt !important;
+  font-size: 12px !important;
   font-family: var(--font-monospace) !important;
   opacity: 0.85;
   vertical-align: middle !important;

@@ -2,6 +2,15 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.57] - 2026-01-29
+
+### Improved
+
+- **Consistent tag styling across themes**: Tags in editor and reading mode now use monospace font, fixed 12px size, and vertical middle alignment
+  - Improves readability when tags appear in headings or mixed with other text
+  - Sidebar tags unchanged; embed tags follow the same rules
+  - Works consistently across light and dark themes
+
 ## [0.9.56] - 2026-01-29
 
 ### Improved
