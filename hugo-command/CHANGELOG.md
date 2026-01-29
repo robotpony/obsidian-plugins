@@ -2,6 +2,15 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.6.6] - 2026-01-28
+
+### Improved
+
+- **Comment bubble interactions**:
+  - Added (×) delete button to remove individual suggestions
+  - Re-running enhancement now strips existing comments first (fresh suggestions each time)
+  - Icons aligned to top-left of bubble for better visual hierarchy
+
 ## [0.6.5] - 2026-01-28
 
 ### Fixed

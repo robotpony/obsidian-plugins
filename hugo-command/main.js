@@ -2168,12 +2168,15 @@ Return ONLY the enhanced markdown, no explanations or preamble.`;
 var import_view = require("@codemirror/view");
 var import_state = require("@codemirror/state");
 var CommentBubbleWidget = class extends import_view.WidgetType {
-  constructor(content, commentType) {
+  constructor(content, commentType, from, to, isStandalone) {
     super();
     this.content = content;
     this.commentType = commentType;
+    this.from = from;
+    this.to = to;
+    this.isStandalone = isStandalone;
   }
-  toDOM() {
+  toDOM(view) {
     const bubble = document.createElement("span");
     bubble.className = `hugo-comment-bubble ${this.commentType}`;
     const icon = document.createElement("span");
@@ -2193,13 +2196,36 @@ var CommentBubbleWidget = class extends import_view.WidgetType {
     text.className = "hugo-comment-text";
     text.textContent = this.content;
     bubble.appendChild(text);
+    const deleteBtn = document.createElement("span");
+    deleteBtn.className = "hugo-comment-delete";
+    deleteBtn.textContent = "\xD7";
+    deleteBtn.title = "Remove suggestion";
+    deleteBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.deleteComment(view);
+    });
+    bubble.appendChild(deleteBtn);
     return bubble;
   }
-  eq(other) {
-    return other.content === this.content && other.commentType === this.commentType;
+  deleteComment(view) {
+    let from = this.from;
+    let to = this.to;
+    if (this.isStandalone) {
+      const doc = view.state.doc;
+      const line = doc.lineAt(from);
+      from = line.from;
+      to = line.to < doc.length ? line.to + 1 : line.to;
+    }
+    view.dispatch({
+      changes: { from, to, insert: "" }
+    });
   }
-  ignoreEvent() {
-    return false;
+  eq(other) {
+    return other.content === this.content && other.commentType === this.commentType && other.from === this.from && other.to === this.to;
+  }
+  ignoreEvent(event) {
+    return event.type !== "click";
   }
 };
 var hideDecoration = import_view.Decoration.replace({});
@@ -2230,12 +2256,12 @@ function buildDecorations(view) {
     const isStandalone = !beforeComment && !afterComment;
     if (isStandalone) {
       builder.add(from, to, import_view.Decoration.replace({
-        widget: new CommentBubbleWidget(content, commentType)
+        widget: new CommentBubbleWidget(content, commentType, from, to, true)
       }));
     } else {
       builder.add(from, to, hideDecoration);
       builder.add(to, to, import_view.Decoration.widget({
-        widget: new CommentBubbleWidget(content, commentType),
+        widget: new CommentBubbleWidget(content, commentType, from, to, false),
         side: 1
         // After the position
       }));
@@ -2258,6 +2284,11 @@ var commentBubblesPlugin = import_view.ViewPlugin.fromClass(
     decorations: (v) => v.decorations
   }
 );
+function stripHtmlComments(content) {
+  let result = content.replace(/^[ \t]*<!--[\s\S]*?-->[ \t]*\r?\n/gm, "");
+  result = result.replace(/<!--[\s\S]*?-->/g, "");
+  return result;
+}
 
 // main.ts
 var HugoCommandPlugin = class extends import_obsidian7.Plugin {
@@ -2417,7 +2448,8 @@ var HugoCommandPlugin = class extends import_obsidian7.Plugin {
     this.isEnhancingOutline = true;
     showNotice("Enhancing outline...");
     try {
-      const content = await this.app.vault.read(activeFile);
+      const rawContent = await this.app.vault.read(activeFile);
+      const content = stripHtmlComments(rawContent);
       const styleGuide = await this.getStyleGuide();
       const enhanced = await this.outlineClient.enhance(content, styleGuide);
       await this.app.vault.modify(activeFile, enhanced);

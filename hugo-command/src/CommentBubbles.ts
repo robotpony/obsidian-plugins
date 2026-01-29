@@ -11,14 +11,20 @@ import { RangeSetBuilder } from "@codemirror/state";
 type CommentType = "question" | "style" | "suggestion";
 
 /**
- * Widget that renders a comment bubble
+ * Widget that renders a comment bubble with delete button
  */
 class CommentBubbleWidget extends WidgetType {
-  constructor(readonly content: string, readonly commentType: CommentType) {
+  constructor(
+    readonly content: string,
+    readonly commentType: CommentType,
+    readonly from: number,
+    readonly to: number,
+    readonly isStandalone: boolean
+  ) {
     super();
   }
 
-  toDOM(): HTMLElement {
+  toDOM(view: EditorView): HTMLElement {
     const bubble = document.createElement("span");
     bubble.className = `hugo-comment-bubble ${this.commentType}`;
 
@@ -43,15 +49,51 @@ class CommentBubbleWidget extends WidgetType {
     text.textContent = this.content;
     bubble.appendChild(text);
 
+    // Add delete button
+    const deleteBtn = document.createElement("span");
+    deleteBtn.className = "hugo-comment-delete";
+    deleteBtn.textContent = "×";
+    deleteBtn.title = "Remove suggestion";
+    deleteBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.deleteComment(view);
+    });
+    bubble.appendChild(deleteBtn);
+
     return bubble;
   }
 
-  eq(other: CommentBubbleWidget): boolean {
-    return other.content === this.content && other.commentType === this.commentType;
+  private deleteComment(view: EditorView): void {
+    // For standalone comments, delete the whole line including the newline
+    let from = this.from;
+    let to = this.to;
+
+    if (this.isStandalone) {
+      const doc = view.state.doc;
+      const line = doc.lineAt(from);
+      from = line.from;
+      // Include the newline if not the last line
+      to = line.to < doc.length ? line.to + 1 : line.to;
+    }
+
+    view.dispatch({
+      changes: { from, to, insert: "" },
+    });
   }
 
-  ignoreEvent(): boolean {
-    return false;
+  eq(other: CommentBubbleWidget): boolean {
+    return (
+      other.content === this.content &&
+      other.commentType === this.commentType &&
+      other.from === this.from &&
+      other.to === this.to
+    );
+  }
+
+  ignoreEvent(event: Event): boolean {
+    // Allow click events to pass through for the delete button
+    return event.type !== "click";
   }
 }
 
@@ -103,13 +145,13 @@ function buildDecorations(view: EditorView): DecorationSet {
       // Hide the entire line (including newline) for standalone comments
       // Replace comment with a line widget instead
       builder.add(from, to, Decoration.replace({
-        widget: new CommentBubbleWidget(content, commentType),
+        widget: new CommentBubbleWidget(content, commentType, from, to, true),
       }));
     } else {
       // Inline comment - hide and add widget after
       builder.add(from, to, hideDecoration);
       builder.add(to, to, Decoration.widget({
-        widget: new CommentBubbleWidget(content, commentType),
+        widget: new CommentBubbleWidget(content, commentType, from, to, false),
         side: 1, // After the position
       }));
     }
@@ -139,3 +181,14 @@ export const commentBubblesPlugin = ViewPlugin.fromClass(
     decorations: (v) => v.decorations,
   }
 );
+
+/**
+ * Remove all HTML comments from content
+ */
+export function stripHtmlComments(content: string): string {
+  // Remove standalone comment lines (entire line including newline)
+  let result = content.replace(/^[ \t]*<!--[\s\S]*?-->[ \t]*\r?\n/gm, "");
+  // Remove inline comments
+  result = result.replace(/<!--[\s\S]*?-->/g, "");
+  return result;
+}

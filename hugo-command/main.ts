@@ -26,7 +26,7 @@ import { SiteSettingsModal } from "./src/SiteSettingsModal";
 import { ReviewCache } from "./src/ReviewCache";
 import { ReviewLLMClient } from "./src/ReviewLLMClient";
 import { OutlineLLMClient } from "./src/OutlineLLMClient";
-import { commentBubblesPlugin } from "./src/CommentBubbles";
+import { commentBubblesPlugin, stripHtmlComments } from "./src/CommentBubbles";
 
 export default class HugoCommandPlugin extends Plugin {
   settings: HugoCommandSettings;
@@ -234,7 +234,9 @@ export default class HugoCommandPlugin extends Plugin {
     showNotice("Enhancing outline...");
 
     try {
-      const content = await this.app.vault.read(activeFile);
+      const rawContent = await this.app.vault.read(activeFile);
+      // Strip existing comments before enhancing
+      const content = stripHtmlComments(rawContent);
       const styleGuide = await this.getStyleGuide();
       const enhanced = await this.outlineClient.enhance(content, styleGuide);
       await this.app.vault.modify(activeFile, enhanced);

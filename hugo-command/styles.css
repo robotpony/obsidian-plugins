@@ -1070,7 +1070,7 @@
 /* Comment Bubbles */
 .hugo-comment-bubble {
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   padding: 4px 10px;
   margin: 2px 0 2px 8px;
@@ -1119,4 +1119,19 @@
 .hugo-comment-text {
   word-wrap: break-word;
   overflow-wrap: break-word;
+  flex: 1;
+}
+
+.hugo-comment-delete {
+  cursor: pointer;
+  opacity: 0.5;
+  font-weight: bold;
+  font-size: 1.1em;
+  line-height: 1;
+  padding: 0 2px;
+  transition: opacity 0.15s;
+}
+
+.hugo-comment-delete:hover {
+  opacity: 1;
 }
