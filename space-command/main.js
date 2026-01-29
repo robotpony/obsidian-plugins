@@ -2154,14 +2154,24 @@ var EmbedRenderer = class {
     }
     let topLevelTodos = displayTodos.filter((t) => t.parentLineNumber === void 0);
     const allTodones = this.scanner.getTodones();
+    const allTodosForChildLookup = this.scanner.getTodos();
     topLevelTodos = topLevelTodos.filter((todo) => {
       if (!todo.isHeader || !todo.childLineNumbers || todo.childLineNumbers.length === 0) {
         return true;
       }
-      const allChildrenComplete = todo.childLineNumbers.every(
-        (childLine) => allTodones.some((t) => t.filePath === todo.filePath && t.lineNumber === childLine)
-      );
-      return !allChildrenComplete;
+      const hasActiveChild = todo.childLineNumbers.some((childLine) => {
+        const isComplete = allTodones.some((t) => t.filePath === todo.filePath && t.lineNumber === childLine);
+        if (isComplete)
+          return false;
+        const childItem = allTodosForChildLookup.find((t) => t.filePath === todo.filePath && t.lineNumber === childLine);
+        if (childItem) {
+          const isSnoozed = childItem.tags.includes("#future") || childItem.tags.includes("#snooze") || childItem.tags.includes("#snoozed");
+          if (isSnoozed)
+            return false;
+        }
+        return true;
+      });
+      return hasActiveChild;
     });
     const sortedTodos = this.sortTodos(topLevelTodos);
     const list4 = container.createEl("ul", { cls: "contains-task-list" });
@@ -3805,14 +3815,24 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       todos = todos.filter((todo) => todo.parentLineNumber === void 0);
     }
     const allTodones = this.scanner.getTodones();
+    const allTodosForChildLookup = this.scanner.getTodos();
     todos = todos.filter((todo) => {
       if (!todo.isHeader || !todo.childLineNumbers || todo.childLineNumbers.length === 0) {
         return true;
       }
-      const allChildrenComplete = todo.childLineNumbers.every(
-        (childLine) => allTodones.some((t) => t.filePath === todo.filePath && t.lineNumber === childLine)
-      );
-      return !allChildrenComplete;
+      const hasActiveChild = todo.childLineNumbers.some((childLine) => {
+        const isComplete = allTodones.some((t) => t.filePath === todo.filePath && t.lineNumber === childLine);
+        if (isComplete)
+          return false;
+        const childItem = allTodosForChildLookup.find((t) => t.filePath === todo.filePath && t.lineNumber === childLine);
+        if (childItem) {
+          const isSnoozed = childItem.tags.includes("#future") || childItem.tags.includes("#snooze") || childItem.tags.includes("#snoozed");
+          if (isSnoozed)
+            return false;
+        }
+        return true;
+      });
+      return hasActiveChild;
     });
     if (this.activeTagFilter) {
       todos = todos.filter((todo) => todo.tags.includes(this.activeTagFilter));

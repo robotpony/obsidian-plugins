@@ -2,6 +2,14 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.62] - 2026-01-29
+
+### Improved
+
+- **Header TODOs hide when all children are snoozed**: Header blocks now auto-hide from TODOs tab and embeds when all children are either complete OR snoozed
+  - Previously headers would show with no visible children if all were snoozed
+  - Headers reappear when any child is uncompeted or unsnoozed
+
 ## [0.9.61] - 2026-01-29
 
 ### Added

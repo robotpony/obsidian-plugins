@@ -400,18 +400,30 @@ export class EmbedRenderer {
     // Filter out child items (they'll be rendered under their parent header)
     let topLevelTodos = displayTodos.filter(t => t.parentLineNumber === undefined);
 
-    // Filter out header TODOs where all children are complete
+    // Filter out header TODOs where all children are complete or snoozed
     // This prevents users from having to mark headers done redundantly
     const allTodones = this.scanner.getTodones();
+    const allTodosForChildLookup = this.scanner.getTodos();
     topLevelTodos = topLevelTodos.filter(todo => {
       if (!todo.isHeader || !todo.childLineNumbers || todo.childLineNumbers.length === 0) {
         return true; // Not a header with children, keep it
       }
-      // Check if all children are in todones
-      const allChildrenComplete = todo.childLineNumbers.every(childLine =>
-        allTodones.some(t => t.filePath === todo.filePath && t.lineNumber === childLine)
-      );
-      return !allChildrenComplete; // Keep if NOT all children are complete
+      // Check if there are any active children (not complete and not snoozed)
+      const hasActiveChild = todo.childLineNumbers.some(childLine => {
+        // Check if child is complete
+        const isComplete = allTodones.some(t => t.filePath === todo.filePath && t.lineNumber === childLine);
+        if (isComplete) return false;
+        // Check if child is snoozed
+        const childItem = allTodosForChildLookup.find(t => t.filePath === todo.filePath && t.lineNumber === childLine);
+        if (childItem) {
+          const isSnoozed = childItem.tags.includes("#future") ||
+                            childItem.tags.includes("#snooze") ||
+                            childItem.tags.includes("#snoozed");
+          if (isSnoozed) return false;
+        }
+        return true; // Child is active
+      });
+      return hasActiveChild; // Keep header only if it has at least one active child
     });
 
     // Sort todos: active by priority/project, completed at end
