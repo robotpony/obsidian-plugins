@@ -1639,9 +1639,15 @@
 /* Triage Modal */
 .space-command-triage-modal {
   text-align: center;
-  padding: 20px;
+  padding: 20px !important;
   min-width: 380px;
   max-width: 500px;
+}
+
+/* Remove any extra modal padding that Obsidian may add */
+.modal.mod-community-modal.space-command-triage-modal,
+.modal-content:has(.space-command-triage-modal) {
+  padding-right: 20px !important;
 }
 
 .space-command-triage-modal .triage-header {
@@ -1702,24 +1708,29 @@
 
 /* Source + tags on one row */
 .space-command-triage-modal .triage-meta-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
   gap: 12px;
   margin-bottom: 8px;
+  width: 100%;
 }
 
-.space-command-triage-modal .triage-source {
+.space-command-triage-modal .triage-meta-row .triage-source {
   font-size: 0.8em;
   color: var(--text-faint);
   flex-shrink: 0;
+  order: 1;
 }
 
-.space-command-triage-modal .triage-tags {
+.space-command-triage-modal .triage-meta-row .triage-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   justify-content: flex-end;
+  order: 2;
+  flex-shrink: 1;
 }
 
 /* Use Obsidian's native tag styling */

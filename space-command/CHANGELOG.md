@@ -2,6 +2,14 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.67] - 2026-01-29
+
+### Fixed
+
+- **Triage modal layout fixes**:
+  - Fixed source file and tags not appearing on same line (added !important to override Obsidian styles)
+  - Removed extra right padding on modal
+
 ## [0.9.66] - 2026-01-29
 
 ### Improved
