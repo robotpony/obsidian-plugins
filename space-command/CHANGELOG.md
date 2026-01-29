@@ -2,6 +2,12 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.69] - 2026-01-29
+
+### Fixed
+
+- **Triage modal padding regression**: Restored interior padding that was accidentally removed
+
 ## [0.9.68] - 2026-01-29
 
 ### Improved
@@ -14,7 +20,6 @@ All notable changes to the ␣⌘ Space Command plugin will be documented in thi
   - Convert button (→ Idea/TODO) now has blue background for visibility
   - Snooze button now has orange background
   - Fixed tag top padding
-  - Improved modal padding fix targeting parent containers
 
 ## [0.9.67] - 2026-01-29
 

@@ -1644,18 +1644,9 @@
   max-width: 500px;
 }
 
-/* Remove extra right padding from modal containers */
-.modal:has(.space-command-triage-modal) {
-  padding: 0 !important;
-}
-
+/* Ensure symmetric padding on modal - Obsidian adds extra right padding by default */
 .modal:has(.space-command-triage-modal) .modal-content {
-  padding: 0 !important;
-  margin: 0 !important;
-}
-
-.modal:has(.space-command-triage-modal) .modal-close-button {
-  right: 8px !important;
+  padding-right: 0 !important;
 }
 
 .space-command-triage-modal .triage-header {
