@@ -371,6 +371,49 @@ export class TodoProcessor {
     }
   }
 
+  async addTag(item: TodoItem, tag: string): Promise<boolean> {
+    try {
+      const content = await this.app.vault.read(item.file);
+      const lines = content.split("\n");
+
+      if (item.lineNumber >= lines.length) {
+        throw new Error(
+          `Line number ${item.lineNumber} out of bounds for file ${item.filePath}`
+        );
+      }
+
+      let line = lines[item.lineNumber];
+
+      // Don't add if already present
+      if (line.includes(tag)) {
+        return true;
+      }
+
+      // Add the tag at the end
+      line = line.trimEnd() + ` ${tag}`;
+
+      lines[item.lineNumber] = line;
+      await this.app.vault.modify(item.file, lines.join("\n"));
+
+      // Immediately rescan the file to update cache
+      if (this.scanner) {
+        await this.scanner.scanFile(item.file);
+      }
+
+      // Trigger callback if set
+      if (this.onComplete) {
+        this.onComplete();
+      }
+
+      showNotice(`Added ${tag}`);
+      return true;
+    } catch (error) {
+      console.error("Error adding tag:", error);
+      showNotice("Failed to add tag. See console for details.");
+      return false;
+    }
+  }
+
   async completeIdea(idea: TodoItem): Promise<boolean> {
     try {
       const content = await this.app.vault.read(idea.file);

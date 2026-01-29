@@ -2,6 +2,29 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.65] - 2026-01-29
+
+### Improved
+
+- **Triage modal layout polish**:
+  - Header: Logo and title on same line (matching sidebar style), progress counter at top-right
+  - Helpful type prompts: "File this TODO", "File this Idea", "Wake this TODO?"
+  - Tags now use native Obsidian tag styling
+  - Source file shown as "(from filename.md)"
+  - Separator line between content and action buttons
+  - Left-aligned content for better readability
+
+## [0.9.64] - 2026-01-29
+
+### Improved
+
+- **Enhanced triage modal actions**: More options and clearer UI
+  - Added "→ Idea" button to convert TODOs to Ideas (and vice versa)
+  - Added "Clear" button to remove the item's type tag entirely
+  - All buttons now have icons for faster recognition
+  - Button order: Skip | → Idea/TODO | Clear | Focus | Snooze
+  - "Wake" label for unsnoozed items (clearer than "Unsnooze")
+
 ## [0.9.63] - 2026-01-29
 
 ### Added
