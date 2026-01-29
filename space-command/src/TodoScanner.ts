@@ -132,31 +132,40 @@ export class TodoScanner extends Events {
             continue;
           }
 
-          // Check if checkbox is checked but missing #todone tag - sync the state
-          const isChecked = isCheckboxChecked(line);
-          const hasTodoneTag = tags.includes("#todone");
-
-          if (isChecked && !hasTodoneTag) {
-            // Queue this line to add #todone tag (sync checkbox state)
-            linesToSyncTodone.push(i);
-            // Treat as completed for this scan
-            tags.push("#todone");
-          }
-
-          const childItemType = tags.includes("#todone") ? 'todone' : 'todo';
-          const childItem = this.createTodoItem(file, i, line, tags, childItemType);
-          childItem.parentLineNumber = currentHeaderTodo.lineNumber;
-          // Add this line number to parent's children
-          currentHeaderTodo.todoItem.childLineNumbers!.push(i);
-
-          // Add child to appropriate list based on its own tags
-          if (tags.includes("#todone")) {
-            todones.push(childItem);
+          // Skip items with #principle tags - they should only appear in principles, not todos
+          const hasPrincipleTag = tags.includes("#principle") || tags.includes("#principles");
+          if (hasPrincipleTag) {
+            // Don't add to todo children, let principle processing handle it below
+            // Don't continue - fall through to principle processing
           } else {
-            // Child items don't need explicit #todo tag - they inherit from parent
-            todos.push(childItem);
+            // Regular TODO child processing
+
+            // Check if checkbox is checked but missing #todone tag - sync the state
+            const isChecked = isCheckboxChecked(line);
+            const hasTodoneTag = tags.includes("#todone");
+
+            if (isChecked && !hasTodoneTag) {
+              // Queue this line to add #todone tag (sync checkbox state)
+              linesToSyncTodone.push(i);
+              // Treat as completed for this scan
+              tags.push("#todone");
+            }
+
+            const childItemType = tags.includes("#todone") ? 'todone' : 'todo';
+            const childItem = this.createTodoItem(file, i, line, tags, childItemType);
+            childItem.parentLineNumber = currentHeaderTodo.lineNumber;
+            // Add this line number to parent's children
+            currentHeaderTodo.todoItem.childLineNumbers!.push(i);
+
+            // Add child to appropriate list based on its own tags
+            if (tags.includes("#todone")) {
+              todones.push(childItem);
+            } else {
+              // Child items don't need explicit #todo tag - they inherit from parent
+              todos.push(childItem);
+            }
+            continue;
           }
-          continue;
         }
 
         // Regular TODO/TODONE processing (non-header, non-child items)

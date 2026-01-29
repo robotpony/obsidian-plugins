@@ -442,22 +442,26 @@ var TodoScanner = class extends import_obsidian2.Events {
           if (hasIdeaTag) {
             continue;
           }
-          const isChecked = isCheckboxChecked(line);
-          const hasTodoneTag = tags.includes("#todone");
-          if (isChecked && !hasTodoneTag) {
-            linesToSyncTodone.push(i);
-            tags.push("#todone");
-          }
-          const childItemType = tags.includes("#todone") ? "todone" : "todo";
-          const childItem = this.createTodoItem(file, i, line, tags, childItemType);
-          childItem.parentLineNumber = currentHeaderTodo.lineNumber;
-          currentHeaderTodo.todoItem.childLineNumbers.push(i);
-          if (tags.includes("#todone")) {
-            todones.push(childItem);
+          const hasPrincipleTag = tags.includes("#principle") || tags.includes("#principles");
+          if (hasPrincipleTag) {
           } else {
-            todos.push(childItem);
+            const isChecked = isCheckboxChecked(line);
+            const hasTodoneTag = tags.includes("#todone");
+            if (isChecked && !hasTodoneTag) {
+              linesToSyncTodone.push(i);
+              tags.push("#todone");
+            }
+            const childItemType = tags.includes("#todone") ? "todone" : "todo";
+            const childItem = this.createTodoItem(file, i, line, tags, childItemType);
+            childItem.parentLineNumber = currentHeaderTodo.lineNumber;
+            currentHeaderTodo.todoItem.childLineNumbers.push(i);
+            if (tags.includes("#todone")) {
+              todones.push(childItem);
+            } else {
+              todos.push(childItem);
+            }
+            continue;
           }
-          continue;
         }
         const hasTodo = tags.includes("#todo") || tags.includes("#todos");
         const hasTodone = tags.includes("#todone") || tags.includes("#todones");
@@ -15494,7 +15498,7 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
    */
   applyTagColoursToElement(el) {
     var _a;
-    const tagNodes = el.querySelectorAll(".tag:not([data-sc-tag-type]), a.tag:not([data-sc-tag-type]), .cm-hashtag:not([data-sc-tag-type])");
+    const tagNodes = el.querySelectorAll(".tag:not([data-sc-tag-type]), a.tag:not([data-sc-tag-type]), span.tag:not([data-sc-tag-type]), .cm-hashtag:not([data-sc-tag-type]), .cm-tag:not([data-sc-tag-type])");
     const tags = Array.from(tagNodes);
     const projectColourMap = this.getProjectColourMap();
     for (let i = 0; i < tags.length; i++) {

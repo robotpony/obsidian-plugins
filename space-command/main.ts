@@ -550,7 +550,8 @@ export default class SpaceCommandPlugin extends Plugin {
    */
   private applyTagColoursToElement(el: HTMLElement): void {
     // Find tags that don't already have colour attributes
-    const tagNodes = el.querySelectorAll('.tag:not([data-sc-tag-type]), a.tag:not([data-sc-tag-type]), .cm-hashtag:not([data-sc-tag-type])');
+    // Include various Obsidian tag selectors: .tag, a.tag, span.tag, .cm-hashtag, .cm-tag
+    const tagNodes = el.querySelectorAll('.tag:not([data-sc-tag-type]), a.tag:not([data-sc-tag-type]), span.tag:not([data-sc-tag-type]), .cm-hashtag:not([data-sc-tag-type]), .cm-tag:not([data-sc-tag-type])');
     const tags = Array.from(tagNodes);
 
     // Get project colour map for project tag lookups

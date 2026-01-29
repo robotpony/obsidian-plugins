@@ -2,6 +2,28 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.47] - 2026-01-28
+
+### Fixed
+
+- **Principles under TODO headers now appear in Principles section**: Items with `#principle` tag under a `#todo` header block were incorrectly processed as TODO children instead of principles
+  - The `#principle` tag now takes precedence over parent header context
+  - Similar to how `#idea` tags were already handled correctly
+
+- **Plugin tag text readability**: Changed `#todo`, `#todone`, `#idea`, `#principle` tags to use white text
+  - Previously used dark text on medium-blue background which was hard to read
+  - Now consistent with priority tag text colours
+
+- **Additional tag selectors for colour consistency**: Added `.cm-tag` and `span.tag` selectors
+  - Some tags in Obsidian may use different class names depending on context
+  - Expanded tag colouring to cover more Obsidian tag element types
+
+### Technical
+
+- TodoScanner: Principle-tagged items under TODO headers now skip TODO child processing
+- CSS: Plugin tags `[data-sc-tag-type="plugin"]` now use `color: white` instead of `var(--text-normal)`
+- CSS/main.ts: Added `.cm-tag` selector to tag styling and colouring logic
+
 ## [0.9.46] - 2026-01-28
 
 ### Fixed
