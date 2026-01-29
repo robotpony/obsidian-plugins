@@ -6,7 +6,7 @@ All notable changes to the ␣⌘ Space Command plugin will be documented in thi
 
 ### Improved
 
-- **Consistent sidebar icons**: Both the ribbon icon and sidebar tab now use the same square checkbox icon (`square-check-big`) instead of the inconsistent `checkbox-glyph`
+- **Consistent checkbox icons**: The ribbon icon, sidebar view icon, and TODOs tab button now all use the same square checkbox icon instead of a mix of circle and square variants
 
 ## [0.9.51] - 2026-01-28
 
