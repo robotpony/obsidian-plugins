@@ -2,6 +2,15 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.66] - 2026-01-29
+
+### Improved
+
+- **Triage modal refinements**:
+  - Added checkbox to item content - click to mark as done and advance
+  - Source file and tags now on same line (filename left, tags right)
+  - More compact metadata display
+
 ## [0.9.65] - 2026-01-29
 
 ### Improved

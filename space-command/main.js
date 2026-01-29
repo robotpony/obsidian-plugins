@@ -15766,7 +15766,7 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
     new StatsModal(this.app, this.scanner).open();
   }
   showTriageModal() {
-    new TriageModal(this.app, this.scanner, this.processor).open();
+    new TriageModal(this.app, this.scanner, this.processor, this.settings.defaultTodoneFile).open();
   }
   openLLMSettings() {
     this.app.setting.open();
@@ -15854,12 +15854,13 @@ var StatsModal = class extends import_obsidian11.Modal {
   }
 };
 var TriageModal = class extends import_obsidian11.Modal {
-  constructor(app, scanner, processor) {
+  constructor(app, scanner, processor, defaultTodoneFile) {
     super(app);
     this.items = [];
     this.currentIndex = 0;
     this.scanner = scanner;
     this.processor = processor;
+    this.defaultTodoneFile = defaultTodoneFile;
   }
   onOpen() {
     const { contentEl } = this;
@@ -15914,14 +15915,29 @@ var TriageModal = class extends import_obsidian11.Modal {
     }
     typeIndicator.appendText(typeText);
     const itemContent = contentEl.createEl("div", { cls: "triage-item-content" });
+    const checkbox = itemContent.createEl("input", {
+      type: "checkbox",
+      cls: "triage-checkbox"
+    });
+    checkbox.addEventListener("change", async () => {
+      checkbox.disabled = true;
+      if (isIdea) {
+        await this.processor.completeIdea(item);
+      } else {
+        await this.processor.completeTodo(item, this.defaultTodoneFile);
+      }
+      this.nextItem();
+    });
+    const textSpan = itemContent.createEl("span", { cls: "triage-item-text" });
     let displayText = item.text.replace(/#\w+\b/g, "").replace(/^[-*+]\s*\[.\]\s*/, "").replace(/^[-*+]\s*/, "").replace(/^#{1,6}\s+/, "").trim();
-    itemContent.appendText(displayText);
-    const tagsEl = contentEl.createEl("div", { cls: "triage-tags" });
+    textSpan.appendText(displayText);
+    const metaRow = contentEl.createEl("div", { cls: "triage-meta-row" });
+    const sourceEl = metaRow.createEl("div", { cls: "triage-source" });
+    sourceEl.appendText(`(from ${item.filePath})`);
+    const tagsEl = metaRow.createEl("div", { cls: "triage-tags" });
     for (const tag of item.tags) {
       tagsEl.createEl("a", { cls: "tag", href: tag, text: tag });
     }
-    const sourceEl = contentEl.createEl("div", { cls: "triage-source" });
-    sourceEl.appendText(`(from ${item.filePath})`);
     contentEl.createEl("div", { cls: "triage-separator" });
     const actions = contentEl.createEl("div", { cls: "triage-actions" });
     const skipBtn = actions.createEl("button", { cls: "triage-btn triage-btn-skip" });

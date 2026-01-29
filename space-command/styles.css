@@ -1677,6 +1677,9 @@
 }
 
 .space-command-triage-modal .triage-item-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
   font-size: 1.05em;
   color: var(--text-normal);
   line-height: 1.5;
@@ -1687,12 +1690,36 @@
   text-align: left;
 }
 
+.space-command-triage-modal .triage-checkbox {
+  margin-top: 3px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.space-command-triage-modal .triage-item-text {
+  flex: 1;
+}
+
+/* Source + tags on one row */
+.space-command-triage-modal .triage-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.space-command-triage-modal .triage-source {
+  font-size: 0.8em;
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+
 .space-command-triage-modal .triage-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  justify-content: flex-start;
-  margin-bottom: 8px;
+  justify-content: flex-end;
 }
 
 /* Use Obsidian's native tag styling */
@@ -1709,13 +1736,6 @@
 .space-command-triage-modal .triage-tags .tag:hover {
   color: var(--tag-color-hover) !important;
   background-color: var(--tag-background-hover) !important;
-}
-
-.space-command-triage-modal .triage-source {
-  font-size: 0.8em;
-  color: var(--text-faint);
-  margin-bottom: 16px;
-  text-align: left;
 }
 
 .space-command-triage-modal .triage-separator {

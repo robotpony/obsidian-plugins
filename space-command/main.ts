@@ -489,7 +489,7 @@ export default class SpaceCommandPlugin extends Plugin {
   }
 
   showTriageModal() {
-    new TriageModal(this.app, this.scanner, this.processor).open();
+    new TriageModal(this.app, this.scanner, this.processor, this.settings.defaultTodoneFile).open();
   }
 
   openLLMSettings() {
@@ -624,13 +624,15 @@ class StatsModal extends Modal {
 class TriageModal extends Modal {
   private scanner: TodoScanner;
   private processor: TodoProcessor;
+  private defaultTodoneFile: string;
   private items: TodoItem[] = [];
   private currentIndex: number = 0;
 
-  constructor(app: App, scanner: TodoScanner, processor: TodoProcessor) {
+  constructor(app: App, scanner: TodoScanner, processor: TodoProcessor, defaultTodoneFile: string) {
     super(app);
     this.scanner = scanner;
     this.processor = processor;
+    this.defaultTodoneFile = defaultTodoneFile;
   }
 
   onOpen(): void {
@@ -722,26 +724,40 @@ class TriageModal extends Modal {
     }
     typeIndicator.appendText(typeText);
 
-    // Item content
+    // Item content with checkbox
     const itemContent = contentEl.createEl("div", { cls: "triage-item-content" });
+    const checkbox = itemContent.createEl("input", {
+      type: "checkbox",
+      cls: "triage-checkbox",
+    });
+    checkbox.addEventListener("change", async () => {
+      checkbox.disabled = true;
+      if (isIdea) {
+        await this.processor.completeIdea(item);
+      } else {
+        await this.processor.completeTodo(item, this.defaultTodoneFile);
+      }
+      this.nextItem();
+    });
+
     // Strip tags and markdown for cleaner display
+    const textSpan = itemContent.createEl("span", { cls: "triage-item-text" });
     let displayText = item.text
       .replace(/#\w+\b/g, "") // Remove all tags
       .replace(/^[-*+]\s*\[.\]\s*/, "") // Remove checkbox
       .replace(/^[-*+]\s*/, "") // Remove list marker
       .replace(/^#{1,6}\s+/, "") // Remove heading markers
       .trim();
-    itemContent.appendText(displayText);
+    textSpan.appendText(displayText);
 
-    // Show tags with proper Obsidian styling
-    const tagsEl = contentEl.createEl("div", { cls: "triage-tags" });
+    // Source file + tags on one line (source left, tags right)
+    const metaRow = contentEl.createEl("div", { cls: "triage-meta-row" });
+    const sourceEl = metaRow.createEl("div", { cls: "triage-source" });
+    sourceEl.appendText(`(from ${item.filePath})`);
+    const tagsEl = metaRow.createEl("div", { cls: "triage-tags" });
     for (const tag of item.tags) {
       tagsEl.createEl("a", { cls: "tag", href: tag, text: tag });
     }
-
-    // Source file - format as "(from filename.md)"
-    const sourceEl = contentEl.createEl("div", { cls: "triage-source" });
-    sourceEl.appendText(`(from ${item.filePath})`);
 
     // Separator line before actions
     contentEl.createEl("div", { cls: "triage-separator" });
