@@ -2,6 +2,12 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.73] - 2026-01-29
+
+### Changed
+
+- **Triage button order**: Reordered buttons to Snooze | Clear | → Idea/TODO | Focus | Skip for better workflow
+
 ## [0.9.72] - 2026-01-29
 
 ### Improved
