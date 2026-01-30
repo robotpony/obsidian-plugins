@@ -1640,8 +1640,8 @@
 .space-command-triage-modal {
   text-align: center;
   padding: 20px !important;
-  min-width: 380px;
-  max-width: 500px;
+  min-width: 580px;
+  max-width: 650px;
 }
 
 /* Ensure symmetric padding on modal - Obsidian adds extra right padding by default */
@@ -1677,12 +1677,13 @@
   color: var(--text-muted);
 }
 
-.space-command-triage-modal .triage-type {
+.space-command-triage-modal .triage-context {
   font-size: 0.9em;
   font-weight: 500;
   color: var(--text-muted);
   margin-bottom: 10px;
   text-align: left;
+  min-height: 1.4em;
 }
 
 .space-command-triage-modal .triage-item-content {
@@ -1755,14 +1756,14 @@
 .space-command-triage-modal .triage-separator {
   height: 1px;
   background-color: var(--text-muted);
-  margin: 20px 0;
+  margin: 40px 0;
 }
 
 .space-command-triage-modal .triage-actions {
   display: flex;
   justify-content: center;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .space-command-triage-modal .triage-btn {

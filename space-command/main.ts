@@ -717,19 +717,27 @@ class TriageModal extends Modal {
 
     const item = this.items[this.currentIndex];
 
-    // Item type indicator - more helpful text with ellipsis
+    // Determine item type for button logic
     const isSnoozed = item.tags.includes("#future") || item.tags.includes("#snooze") || item.tags.includes("#snoozed");
     const isIdea = item.itemType === 'idea' || item.tags.includes("#idea") || item.tags.includes("#ideas");
-    const typeIndicator = contentEl.createEl("div", { cls: "triage-type" });
-    let typeText = "File this TODO...";
-    if (isIdea && isSnoozed) {
-      typeText = "Wake this Idea...";
-    } else if (isIdea) {
-      typeText = "File this Idea...";
-    } else if (isSnoozed) {
-      typeText = "Wake this TODO...";
+
+    // Show parent header text if item has one, otherwise leave blank
+    const contextIndicator = contentEl.createEl("div", { cls: "triage-context" });
+    if (item.parentLineNumber !== undefined) {
+      // Look up parent header from scanner
+      const allItems = isIdea ? this.scanner.getIdeas() : this.scanner.getTodos();
+      const parentHeader = allItems.find(
+        t => t.filePath === item.filePath && t.lineNumber === item.parentLineNumber
+      );
+      if (parentHeader) {
+        // Strip tags and heading markers from parent text
+        const parentText = parentHeader.text
+          .replace(/#\w+\b/g, "")
+          .replace(/^#{1,6}\s+/, "")
+          .trim();
+        contextIndicator.appendText(parentText);
+      }
     }
-    typeIndicator.appendText(typeText);
 
     // Item content with checkbox
     const itemContent = contentEl.createEl("div", { cls: "triage-item-content" });

@@ -15905,16 +15905,17 @@ var TriageModal = class extends import_obsidian11.Modal {
     const item = this.items[this.currentIndex];
     const isSnoozed = item.tags.includes("#future") || item.tags.includes("#snooze") || item.tags.includes("#snoozed");
     const isIdea = item.itemType === "idea" || item.tags.includes("#idea") || item.tags.includes("#ideas");
-    const typeIndicator = contentEl.createEl("div", { cls: "triage-type" });
-    let typeText = "File this TODO...";
-    if (isIdea && isSnoozed) {
-      typeText = "Wake this Idea...";
-    } else if (isIdea) {
-      typeText = "File this Idea...";
-    } else if (isSnoozed) {
-      typeText = "Wake this TODO...";
+    const contextIndicator = contentEl.createEl("div", { cls: "triage-context" });
+    if (item.parentLineNumber !== void 0) {
+      const allItems = isIdea ? this.scanner.getIdeas() : this.scanner.getTodos();
+      const parentHeader = allItems.find(
+        (t) => t.filePath === item.filePath && t.lineNumber === item.parentLineNumber
+      );
+      if (parentHeader) {
+        const parentText = parentHeader.text.replace(/#\w+\b/g, "").replace(/^#{1,6}\s+/, "").trim();
+        contextIndicator.appendText(parentText);
+      }
     }
-    typeIndicator.appendText(typeText);
     const itemContent = contentEl.createEl("div", { cls: "triage-item-content" });
     const checkbox = itemContent.createEl("input", {
       type: "checkbox",

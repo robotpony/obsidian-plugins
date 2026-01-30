@@ -2,6 +2,15 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.75] - 2026-01-29
+
+### Improved
+
+- **Triage modal layout**:
+  - Wider modal (580-650px) so all buttons fit on one line
+  - Doubled separator spacing (40px above/below) for better visual separation
+  - Replaced "File this TODO..." text with parent header context (if item has one), otherwise blank
+
 ## [0.9.74] - 2026-01-29
 
 ### Added
