@@ -1639,17 +1639,19 @@
 /* Triage Modal */
 .space-command-triage-modal {
   text-align: center;
-  padding: 20px !important;
+  padding: 24px !important;
 }
 
-/* Let modal auto-size to content with symmetric padding */
+/* Let modal auto-size to content */
 .modal:has(.space-command-triage-modal) {
   width: auto !important;
   max-width: 90vw !important;
+  overflow: hidden !important;
 }
 
 .modal:has(.space-command-triage-modal) .modal-content {
   padding: 0 !important;
+  overflow: hidden !important;
 }
 
 .space-command-triage-modal .triage-header {
@@ -1657,10 +1659,6 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: 16px;
-  /* Align with modal close button (X) by extending into modal padding area */
-  margin-left: -20px;
-  margin-right: -20px;
-  padding: 0 20px;
 }
 
 .space-command-triage-modal .triage-title-group {

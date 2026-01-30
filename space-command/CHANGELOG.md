@@ -2,6 +2,12 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.78] - 2026-01-29
+
+### Fixed
+
+- **Triage modal scrolling**: Removed negative margin trick on header that caused horizontal overflow. Increased padding to 24px for better spacing.
+
 ## [0.9.77] - 2026-01-29
 
 ### Fixed
