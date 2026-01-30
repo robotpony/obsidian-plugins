@@ -2767,9 +2767,30 @@ var SlashCommandSuggest = class extends import_obsidian6.EditorSuggest {
         description: "Insert a TODO list with heading",
         icon: "\u2630",
         action: (editor, start, end) => {
-          const text5 = "## TODOs\n\n- [ ] #todo ";
+          const text5 = "## TODOs #todos\n\n- [ ] ";
           editor.replaceRange(text5, start, end);
-          editor.setCursor({ line: start.line + 2, ch: 12 });
+          editor.setCursor({ line: start.line + 2, ch: 6 });
+        }
+      },
+      {
+        id: "idea",
+        name: "Idea",
+        description: "Insert an idea item",
+        icon: "\u{1F4A1}",
+        action: (editor, start, end) => {
+          editor.replaceRange("- [ ] #idea ", start, end);
+          editor.setCursor({ line: start.line, ch: start.ch + 12 });
+        }
+      },
+      {
+        id: "ideas",
+        name: "Ideas",
+        description: "Insert an Ideas list with heading",
+        icon: "\u{1F4A1}",
+        action: (editor, start, end) => {
+          const text5 = "## Ideas #ideas\n\n- [ ] ";
+          editor.replaceRange(text5, start, end);
+          editor.setCursor({ line: start.line + 2, ch: 6 });
         }
       },
       {
@@ -15434,6 +15455,61 @@ function createHeaderSortPlugin(app, processor, scanner) {
   );
 }
 
+// src/HeaderChecklistExtension.ts
+var import_view2 = require("@codemirror/view");
+var import_state2 = require("@codemirror/state");
+function isTaggedHeader(lineText) {
+  if (!/^#{1,6}\s+/.test(lineText)) {
+    return false;
+  }
+  return /#(?:todos?|ideas?)\b/.test(lineText);
+}
+function isNextLineEmpty(view, currentLineNumber) {
+  const doc = view.state.doc;
+  if (currentLineNumber >= doc.lines) {
+    return true;
+  }
+  const nextLine = doc.line(currentLineNumber + 1);
+  return nextLine.text.trim() === "";
+}
+function handleEnterOnTaggedHeader(view) {
+  const { state } = view;
+  const { selection } = state;
+  if (!selection.main.empty || selection.ranges.length > 1) {
+    return false;
+  }
+  const cursorPos = selection.main.head;
+  const currentLine = state.doc.lineAt(cursorPos);
+  const lineText = currentLine.text;
+  if (!isTaggedHeader(lineText)) {
+    return false;
+  }
+  const textAfterCursor = lineText.slice(cursorPos - currentLine.from);
+  if (textAfterCursor.trim() !== "") {
+    return false;
+  }
+  if (!isNextLineEmpty(view, currentLine.number)) {
+    return false;
+  }
+  const checklistText = "\n\n- [ ] ";
+  const insertPos = currentLine.to;
+  view.dispatch({
+    changes: { from: insertPos, to: insertPos, insert: checklistText },
+    selection: { anchor: insertPos + checklistText.length }
+  });
+  return true;
+}
+function createHeaderChecklistExtension() {
+  return import_state2.Prec.high(
+    import_view2.keymap.of([
+      {
+        key: "Enter",
+        run: handleEnterOnTaggedHeader
+      }
+    ])
+  );
+}
+
 // main.ts
 var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
   async onload() {
@@ -15484,6 +15560,7 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
     this.registerEditorExtension(
       createHeaderSortPlugin(this.app, this.processor, this.scanner)
     );
+    this.registerEditorExtension(createHeaderChecklistExtension());
     this.registerDomEvent(document, "change", async (evt) => {
       const target = evt.target;
       if (!target.matches('input[type="checkbox"].task-list-item-checkbox')) {

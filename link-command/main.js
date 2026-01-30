@@ -1321,7 +1321,13 @@ async function createRichLink(url, config) {
 // main.ts
 var LOGO_PREFIX = "L\u2318";
 function showNotice(message, timeout) {
-  return new import_obsidian4.Notice(`${LOGO_PREFIX} ${message}`, timeout);
+  const fragment = document.createDocumentFragment();
+  const logo = document.createElement("span");
+  logo.className = "link-command-logo";
+  logo.textContent = LOGO_PREFIX;
+  fragment.appendChild(logo);
+  fragment.appendChild(document.createTextNode(" " + message));
+  return new import_obsidian4.Notice(fragment, timeout);
 }
 var LinkCommandPlugin = class extends import_obsidian4.Plugin {
   constructor() {

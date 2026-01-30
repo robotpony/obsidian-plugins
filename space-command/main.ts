@@ -28,6 +28,7 @@ import { LLMClient } from "./src/LLMClient";
 import { DefineTooltip } from "./src/DefineTooltip";
 import { TabLockManager } from "./src/TabLockManager";
 import { createHeaderSortPlugin } from "./src/HeaderSortExtension";
+import { createHeaderChecklistExtension } from "./src/HeaderChecklistExtension";
 
 export default class SpaceCommandPlugin extends Plugin {
   settings: SpaceCommandSettings;
@@ -107,6 +108,9 @@ export default class SpaceCommandPlugin extends Plugin {
     this.registerEditorExtension(
       createHeaderSortPlugin(this.app, this.processor, this.scanner)
     );
+
+    // Register editor extension for auto-inserting checklists after tagged headers
+    this.registerEditorExtension(createHeaderChecklistExtension());
 
     // Watch for native checkbox clicks on #todo lines
     this.registerDomEvent(document, "change", async (evt) => {

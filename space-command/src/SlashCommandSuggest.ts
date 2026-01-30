@@ -69,10 +69,32 @@ export class SlashCommandSuggest extends EditorSuggest<SuggestionItem> {
         description: "Insert a TODO list with heading",
         icon: "☰",
         action: (editor, start, end) => {
-          const text = "## TODOs\n\n- [ ] #todo ";
+          const text = "## TODOs #todos\n\n- [ ] ";
           editor.replaceRange(text, start, end);
-          // Position cursor after #todo on the third line
-          editor.setCursor({ line: start.line + 2, ch: 12 });
+          // Position cursor after "- [ ] " on the third line
+          editor.setCursor({ line: start.line + 2, ch: 6 });
+        },
+      },
+      {
+        id: "idea",
+        name: "Idea",
+        description: "Insert an idea item",
+        icon: "💡",
+        action: (editor, start, end) => {
+          editor.replaceRange("- [ ] #idea ", start, end);
+          editor.setCursor({ line: start.line, ch: start.ch + 12 });
+        },
+      },
+      {
+        id: "ideas",
+        name: "Ideas",
+        description: "Insert an Ideas list with heading",
+        icon: "💡",
+        action: (editor, start, end) => {
+          const text = "## Ideas #ideas\n\n- [ ] ";
+          editor.replaceRange(text, start, end);
+          // Position cursor after "- [ ] " on the third line
+          editor.setCursor({ line: start.line + 2, ch: 6 });
         },
       },
       {

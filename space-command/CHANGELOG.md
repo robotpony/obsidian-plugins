@@ -2,6 +2,19 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.83] - 2026-01-29
+
+### Added
+
+- **Auto-checklist for tagged headers**: When you press Enter at the end of a header line tagged with `#todo(s)` or `#idea(s)`, a blank checklist item (`- [ ] `) is automatically inserted below
+  - Works with all variants: `#todo`, `#todos`, `#idea`, `#ideas`
+  - Only triggers when cursor is at end of line and next line is empty
+  - Positions cursor ready to type the first item
+- **New slash commands**: `/idea` and `/ideas` for quick idea capture
+  - `/idea` inserts `- [ ] #idea ` with cursor positioned to type
+  - `/ideas` inserts a header with checklist: `## Ideas #ideas` followed by `- [ ] `
+- **Improved `/todos` command**: Now inserts `## TODOs #todos` with proper tag (was inserting `## TODOs` without tag)
+
 ## [0.9.82] - 2026-01-29
 
 ### Fixed

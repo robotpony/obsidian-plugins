@@ -2,6 +2,23 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.6.9] - 2026-01-28
+
+### Fixed
+
+- **Outline enhancement now correctly returns annotated document**: Refactored LLM calls to use proper system/user message separation
+  - OpenAI: Uses `system` role for style guide/instructions, `user` role for document
+  - Anthropic: Uses `system` parameter for style guide/instructions
+  - Gemini: Uses `systemInstruction` for style guide/instructions
+  - Ollama: Combines with clear separation (document always last)
+  - This prevents the LLM from confusing the style guide with the document to enhance
+
+## [0.6.8] - 2026-01-28
+
+### Fixed
+
+- **Styled logo in notices**: Notice popups now show the styled H⌘ logo badge instead of plain text
+
 ## [0.6.7] - 2026-01-28
 
 ### Fixed

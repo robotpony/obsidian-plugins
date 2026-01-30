@@ -2,6 +2,12 @@
 
 All notable changes to the Link Command plugin will be documented in this file.
 
+## [0.4.20] - 2026-01-28
+
+### Fixed
+
+- **Styled logo in notices**: Notice popups now show the styled L⌘ logo badge instead of plain text
+
 ## [0.4.19] - 2026-01-28
 
 ### Fixed

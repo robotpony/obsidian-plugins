@@ -22,7 +22,16 @@ import { createFormatToggleExtension, FormatToggleConfig } from "./src/UrlFormat
 const LOGO_PREFIX = "L⌘";
 
 function showNotice(message: string, timeout?: number): Notice {
-  return new Notice(`${LOGO_PREFIX} ${message}`, timeout);
+  const fragment = document.createDocumentFragment();
+
+  const logo = document.createElement("span");
+  logo.className = "link-command-logo";
+  logo.textContent = LOGO_PREFIX;
+  fragment.appendChild(logo);
+
+  fragment.appendChild(document.createTextNode(" " + message));
+
+  return new Notice(fragment, timeout);
 }
 
 export default class LinkCommandPlugin extends Plugin {

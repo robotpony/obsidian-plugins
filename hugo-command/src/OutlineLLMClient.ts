@@ -24,10 +24,11 @@ export class OutlineLLMClient {
    * Returns the modified markdown content.
    */
   async enhance(content: string, styleGuide: string): Promise<string> {
-    const prompt = this.buildPrompt(content, styleGuide);
+    const systemPrompt = this.buildSystemPrompt(styleGuide);
+    const userPrompt = this.buildUserPrompt(content);
 
     try {
-      const response = await this.callLLM(prompt);
+      const response = await this.callLLM(systemPrompt, userPrompt);
       return this.extractMarkdown(response);
     } catch (error) {
       console.error("[Hugo Outline] LLM call failed:", error);
@@ -35,7 +36,7 @@ export class OutlineLLMClient {
     }
   }
 
-  private buildPrompt(content: string, styleGuide: string): string {
+  private buildSystemPrompt(styleGuide: string): string {
     const hasStyleGuide = styleGuide.trim().length > 0;
 
     let styleSection = "";
@@ -43,64 +44,73 @@ export class OutlineLLMClient {
 
     if (hasStyleGuide) {
       styleSection = `
-## Style Guide (Reference Only - DO NOT include in output)
 
-The following style guide is for your reference when making suggestions. Do NOT return this section.
+## Style Guide Reference
+
+Use this style guide when making suggestions. Cite specific rules when the content violates them.
 
 ${styleGuide}
-
---- END OF STYLE GUIDE REFERENCE ---
-
 `;
-      styleInstructions = `When the content doesn't follow a style guide rule, cite the specific rule in your comment (e.g., "<!-- Style: 'Avoid corporate jargon' - consider replacing 'leverage' with 'use' -->").`;
+      styleInstructions = `
+- When content violates a style rule, add a comment like: <!-- Style: 'rule name' - suggestion -->`;
     }
 
-    return `# Task: Enhance Document Outline
+    return `You are a writing assistant that enhances document outlines by adding helpful questions and suggestions as HTML comments.
 
 ${this.outlineSettings.prompt}
+${styleSection}
+## Your Task
 
-${styleSection}## Document to Enhance (Return THIS section with annotations)
+When given a document, return it with your annotations added as HTML comments:
+- Questions: <!-- Q: your question here -->
+- Suggestions: <!-- your suggestion here -->${styleInstructions}
 
-${content}
+## Critical Rules
 
---- END OF DOCUMENT ---
-
-## Instructions
-
-IMPORTANT: Return ONLY the document content above (between "Document to Enhance" and "END OF DOCUMENT") with your annotations added.
-
-- Keep all original document content intact
-- Add questions as HTML comments: <!-- Q: your question here -->
-- Add suggestions as HTML comments: <!-- your suggestion here -->
-${styleInstructions}
-- Do NOT include the style guide in your response
-- Do NOT include any preamble, explanations, or markdown code fences
-- Return the enhanced document directly`;
+1. Return ONLY the document with annotations - nothing else
+2. Keep ALL original content exactly as provided
+3. Do NOT include any preamble, explanation, or markdown code fences
+4. Do NOT summarize or rewrite the content
+5. Start your response directly with the document content`;
   }
 
-  private async callLLM(prompt: string): Promise<string> {
+  private buildUserPrompt(content: string): string {
+    return `Enhance this document with your suggestions:
+
+${content}`;
+  }
+
+  private async callLLM(systemPrompt: string, userPrompt: string): Promise<string> {
     switch (this.reviewSettings.provider) {
       case "ollama":
-        return this.callOllama(prompt);
+        return this.callOllama(systemPrompt, userPrompt);
       case "openai":
-        return this.callOpenAI(prompt);
+        return this.callOpenAI(systemPrompt, userPrompt);
       case "gemini":
-        return this.callGemini(prompt);
+        return this.callGemini(systemPrompt, userPrompt);
       case "anthropic":
-        return this.callAnthropic(prompt);
+        return this.callAnthropic(systemPrompt, userPrompt);
       default:
         throw new Error(`Unknown provider: ${this.reviewSettings.provider}`);
     }
   }
 
-  private async callOllama(prompt: string): Promise<string> {
+  private async callOllama(systemPrompt: string, userPrompt: string): Promise<string> {
+    // Ollama's generate endpoint doesn't support system messages well,
+    // so we combine them but put the document last and clearly marked
+    const combinedPrompt = `${systemPrompt}
+
+---
+
+${userPrompt}`;
+
     const response = await requestUrl({
       url: `${this.reviewSettings.ollamaEndpoint}/api/generate`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         model: this.reviewSettings.ollamaModel,
-        prompt,
+        prompt: combinedPrompt,
         stream: false,
       }),
     });
@@ -112,7 +122,7 @@ ${styleInstructions}
     return response.json.response;
   }
 
-  private async callOpenAI(prompt: string): Promise<string> {
+  private async callOpenAI(systemPrompt: string, userPrompt: string): Promise<string> {
     if (!this.reviewSettings.openaiApiKey) {
       throw new Error("OpenAI API key not configured");
     }
@@ -126,7 +136,10 @@ ${styleInstructions}
       },
       body: JSON.stringify({
         model: this.reviewSettings.openaiModel,
-        messages: [{ role: "user", content: prompt }],
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
       }),
     });
 
@@ -137,17 +150,19 @@ ${styleInstructions}
     return response.json.choices[0].message.content;
   }
 
-  private async callGemini(prompt: string): Promise<string> {
+  private async callGemini(systemPrompt: string, userPrompt: string): Promise<string> {
     if (!this.reviewSettings.geminiApiKey) {
       throw new Error("Gemini API key not configured");
     }
 
+    // Gemini uses systemInstruction for system prompts
     const response = await requestUrl({
       url: `https://generativelanguage.googleapis.com/v1beta/models/${this.reviewSettings.geminiModel}:generateContent?key=${this.reviewSettings.geminiApiKey}`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ parts: [{ text: userPrompt }] }],
       }),
     });
 
@@ -158,7 +173,7 @@ ${styleInstructions}
     return response.json.candidates[0].content.parts[0].text;
   }
 
-  private async callAnthropic(prompt: string): Promise<string> {
+  private async callAnthropic(systemPrompt: string, userPrompt: string): Promise<string> {
     if (!this.reviewSettings.anthropicApiKey) {
       throw new Error("Anthropic API key not configured");
     }
@@ -174,7 +189,8 @@ ${styleInstructions}
       body: JSON.stringify({
         model: this.reviewSettings.anthropicModel,
         max_tokens: 4096,
-        messages: [{ role: "user", content: prompt }],
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
       }),
     });
 

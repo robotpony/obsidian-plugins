@@ -36,7 +36,13 @@ var import_obsidian2 = require("obsidian");
 var import_obsidian = require("obsidian");
 var LOGO_PREFIX = "H\u2318";
 function showNotice(message, timeout) {
-  return new import_obsidian.Notice(`${LOGO_PREFIX} ${message}`, timeout);
+  const fragment = document.createDocumentFragment();
+  const logo = document.createElement("span");
+  logo.className = "hugo-command-logo";
+  logo.textContent = LOGO_PREFIX;
+  fragment.appendChild(logo);
+  fragment.appendChild(document.createTextNode(" " + message));
+  return new import_obsidian.Notice(fragment, timeout);
 }
 function parseFrontmatter(content) {
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
@@ -2026,76 +2032,82 @@ var OutlineLLMClient = class {
    * Returns the modified markdown content.
    */
   async enhance(content, styleGuide) {
-    const prompt = this.buildPrompt(content, styleGuide);
+    const systemPrompt = this.buildSystemPrompt(styleGuide);
+    const userPrompt = this.buildUserPrompt(content);
     try {
-      const response = await this.callLLM(prompt);
+      const response = await this.callLLM(systemPrompt, userPrompt);
       return this.extractMarkdown(response);
     } catch (error) {
       console.error("[Hugo Outline] LLM call failed:", error);
       throw error;
     }
   }
-  buildPrompt(content, styleGuide) {
+  buildSystemPrompt(styleGuide) {
     const hasStyleGuide = styleGuide.trim().length > 0;
     let styleSection = "";
     let styleInstructions = "";
     if (hasStyleGuide) {
       styleSection = `
-## Style Guide (Reference Only - DO NOT include in output)
 
-The following style guide is for your reference when making suggestions. Do NOT return this section.
+## Style Guide Reference
+
+Use this style guide when making suggestions. Cite specific rules when the content violates them.
 
 ${styleGuide}
-
---- END OF STYLE GUIDE REFERENCE ---
-
 `;
-      styleInstructions = `When the content doesn't follow a style guide rule, cite the specific rule in your comment (e.g., "<!-- Style: 'Avoid corporate jargon' - consider replacing 'leverage' with 'use' -->").`;
+      styleInstructions = `
+- When content violates a style rule, add a comment like: <!-- Style: 'rule name' - suggestion -->`;
     }
-    return `# Task: Enhance Document Outline
+    return `You are a writing assistant that enhances document outlines by adding helpful questions and suggestions as HTML comments.
 
 ${this.outlineSettings.prompt}
+${styleSection}
+## Your Task
 
-${styleSection}## Document to Enhance (Return THIS section with annotations)
+When given a document, return it with your annotations added as HTML comments:
+- Questions: <!-- Q: your question here -->
+- Suggestions: <!-- your suggestion here -->${styleInstructions}
 
-${content}
+## Critical Rules
 
---- END OF DOCUMENT ---
-
-## Instructions
-
-IMPORTANT: Return ONLY the document content above (between "Document to Enhance" and "END OF DOCUMENT") with your annotations added.
-
-- Keep all original document content intact
-- Add questions as HTML comments: <!-- Q: your question here -->
-- Add suggestions as HTML comments: <!-- your suggestion here -->
-${styleInstructions}
-- Do NOT include the style guide in your response
-- Do NOT include any preamble, explanations, or markdown code fences
-- Return the enhanced document directly`;
+1. Return ONLY the document with annotations - nothing else
+2. Keep ALL original content exactly as provided
+3. Do NOT include any preamble, explanation, or markdown code fences
+4. Do NOT summarize or rewrite the content
+5. Start your response directly with the document content`;
   }
-  async callLLM(prompt) {
+  buildUserPrompt(content) {
+    return `Enhance this document with your suggestions:
+
+${content}`;
+  }
+  async callLLM(systemPrompt, userPrompt) {
     switch (this.reviewSettings.provider) {
       case "ollama":
-        return this.callOllama(prompt);
+        return this.callOllama(systemPrompt, userPrompt);
       case "openai":
-        return this.callOpenAI(prompt);
+        return this.callOpenAI(systemPrompt, userPrompt);
       case "gemini":
-        return this.callGemini(prompt);
+        return this.callGemini(systemPrompt, userPrompt);
       case "anthropic":
-        return this.callAnthropic(prompt);
+        return this.callAnthropic(systemPrompt, userPrompt);
       default:
         throw new Error(`Unknown provider: ${this.reviewSettings.provider}`);
     }
   }
-  async callOllama(prompt) {
+  async callOllama(systemPrompt, userPrompt) {
+    const combinedPrompt = `${systemPrompt}
+
+---
+
+${userPrompt}`;
     const response = await (0, import_obsidian6.requestUrl)({
       url: `${this.reviewSettings.ollamaEndpoint}/api/generate`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         model: this.reviewSettings.ollamaModel,
-        prompt,
+        prompt: combinedPrompt,
         stream: false
       })
     });
@@ -2104,7 +2116,7 @@ ${styleInstructions}
     }
     return response.json.response;
   }
-  async callOpenAI(prompt) {
+  async callOpenAI(systemPrompt, userPrompt) {
     if (!this.reviewSettings.openaiApiKey) {
       throw new Error("OpenAI API key not configured");
     }
@@ -2117,7 +2129,10 @@ ${styleInstructions}
       },
       body: JSON.stringify({
         model: this.reviewSettings.openaiModel,
-        messages: [{ role: "user", content: prompt }]
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ]
       })
     });
     if (response.status !== 200) {
@@ -2125,7 +2140,7 @@ ${styleInstructions}
     }
     return response.json.choices[0].message.content;
   }
-  async callGemini(prompt) {
+  async callGemini(systemPrompt, userPrompt) {
     if (!this.reviewSettings.geminiApiKey) {
       throw new Error("Gemini API key not configured");
     }
@@ -2134,7 +2149,8 @@ ${styleInstructions}
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }]
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ parts: [{ text: userPrompt }] }]
       })
     });
     if (response.status !== 200) {
@@ -2142,7 +2158,7 @@ ${styleInstructions}
     }
     return response.json.candidates[0].content.parts[0].text;
   }
-  async callAnthropic(prompt) {
+  async callAnthropic(systemPrompt, userPrompt) {
     if (!this.reviewSettings.anthropicApiKey) {
       throw new Error("Anthropic API key not configured");
     }
@@ -2157,7 +2173,8 @@ ${styleInstructions}
       body: JSON.stringify({
         model: this.reviewSettings.anthropicModel,
         max_tokens: 4096,
-        messages: [{ role: "user", content: prompt }]
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }]
       })
     });
     if (response.status !== 200) {

@@ -4,10 +4,19 @@ import { HugoFrontmatter, HugoContentItem, HugoSiteConfig } from "./types";
 export const LOGO_PREFIX = "H\u2318";
 
 /**
- * Show a notice with the Hugo Command logo prefix
+ * Show a notice with the styled Hugo Command logo
  */
 export function showNotice(message: string, timeout?: number): Notice {
-  return new Notice(`${LOGO_PREFIX} ${message}`, timeout);
+  const fragment = document.createDocumentFragment();
+
+  const logo = document.createElement("span");
+  logo.className = "hugo-command-logo";
+  logo.textContent = LOGO_PREFIX;
+  fragment.appendChild(logo);
+
+  fragment.appendChild(document.createTextNode(" " + message));
+
+  return new Notice(fragment, timeout);
 }
 
 /**
