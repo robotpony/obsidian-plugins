@@ -2,6 +2,15 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.6.10] - 2026-01-30
+
+### Improved
+
+- **Standardized kebab menu order**: Sidebar menu now follows consistent order across all Command plugins
+  - Refresh appears first as the most common action
+  - Plugin-specific items (Site Settings) grouped after Refresh
+  - About and Settings always appear last
+
 ## [0.6.9] - 2026-01-28
 
 ### Fixed

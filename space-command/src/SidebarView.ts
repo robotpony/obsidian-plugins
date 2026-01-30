@@ -718,6 +718,20 @@ export class TodoSidebarView extends ItemView {
     menuBtn.addEventListener("click", (evt) => {
       const menu = new Menu();
 
+      // Refresh
+      menu.addItem((item) => {
+        item
+          .setTitle("Refresh")
+          .setIcon("refresh-cw")
+          .onClick(async () => {
+            menuBtn.addClass("rotating");
+            await this.scanner.scanVault();
+            setTimeout(() => menuBtn.removeClass("rotating"), 500);
+          });
+      });
+
+      menu.addSeparator();
+
       // Embed Syntax submenu
       menu.addItem((item) => {
         item
@@ -763,20 +777,6 @@ export class TodoSidebarView extends ItemView {
         });
       });
 
-      // Refresh
-      menu.addItem((item) => {
-        item
-          .setTitle("Refresh")
-          .setIcon("refresh-cw")
-          .onClick(async () => {
-            menuBtn.addClass("rotating");
-            await this.scanner.scanVault();
-            setTimeout(() => menuBtn.removeClass("rotating"), 500);
-          });
-      });
-
-      menu.addSeparator();
-
       // Triage
       menu.addItem((item) => {
         item
@@ -784,6 +784,16 @@ export class TodoSidebarView extends ItemView {
           .setIcon("siren")
           .onClick(() => this.onShowTriage());
       });
+
+      // Stats
+      menu.addItem((item) => {
+        item
+          .setTitle("Stats")
+          .setIcon("bar-chart-2")
+          .onClick(() => this.onShowStats());
+      });
+
+      menu.addSeparator();
 
       // About
       menu.addItem((item) => {
@@ -802,14 +812,6 @@ export class TodoSidebarView extends ItemView {
             (this.app as any).setting.open();
             (this.app as any).setting.openTabById("space-command");
           });
-      });
-
-      // Stats
-      menu.addItem((item) => {
-        item
-          .setTitle("Stats")
-          .setIcon("bar-chart-2")
-          .onClick(() => this.onShowStats());
       });
 
       menu.showAtMouseEvent(evt);

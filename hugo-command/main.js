@@ -695,12 +695,13 @@ var HugoSidebarView = class extends import_obsidian3.ItemView {
     menuBtn.addEventListener("click", (evt) => {
       const menu = new import_obsidian3.Menu();
       menu.addItem((item) => {
-        item.setTitle("Site Settings").setIcon("globe").onClick(() => this.onOpenSiteSettings());
-      });
-      menu.addItem((item) => {
         item.setTitle("Refresh").setIcon("refresh-cw").onClick(async () => {
           await this.scanner.scanVault();
         });
+      });
+      menu.addSeparator();
+      menu.addItem((item) => {
+        item.setTitle("Site Settings").setIcon("globe").onClick(() => this.onOpenSiteSettings());
       });
       menu.addSeparator();
       menu.addItem((item) => {

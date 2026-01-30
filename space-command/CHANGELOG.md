@@ -2,6 +2,15 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.90] - 2026-01-30
+
+### Improved
+
+- **Standardized kebab menu order**: Sidebar menu now follows consistent order across all Command plugins
+  - Refresh appears first as the most common action
+  - Plugin-specific items (Embed Syntax, Triage, Stats) grouped together
+  - About and Settings always appear last
+
 ## [0.9.89] - 2026-01-29
 
 ### Fixed

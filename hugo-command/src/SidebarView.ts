@@ -148,14 +148,6 @@ export class HugoSidebarView extends ItemView {
     menuBtn.addEventListener("click", (evt) => {
       const menu = new Menu();
 
-      // Site Settings
-      menu.addItem((item) => {
-        item
-          .setTitle("Site Settings")
-          .setIcon("globe")
-          .onClick(() => this.onOpenSiteSettings());
-      });
-
       // Refresh
       menu.addItem((item) => {
         item
@@ -164,6 +156,16 @@ export class HugoSidebarView extends ItemView {
           .onClick(async () => {
             await this.scanner.scanVault();
           });
+      });
+
+      menu.addSeparator();
+
+      // Site Settings
+      menu.addItem((item) => {
+        item
+          .setTitle("Site Settings")
+          .setIcon("globe")
+          .onClick(() => this.onOpenSiteSettings());
       });
 
       menu.addSeparator();

@@ -3432,6 +3432,14 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     menuBtn.addEventListener("click", (evt) => {
       const menu = new import_obsidian8.Menu();
       menu.addItem((item) => {
+        item.setTitle("Refresh").setIcon("refresh-cw").onClick(async () => {
+          menuBtn.addClass("rotating");
+          await this.scanner.scanVault();
+          setTimeout(() => menuBtn.removeClass("rotating"), 500);
+        });
+      });
+      menu.addSeparator();
+      menu.addItem((item) => {
         item.setTitle("Embed Syntax").setIcon("copy");
         const submenu = item.setSubmenu();
         submenu.addItem((subItem) => {
@@ -3460,16 +3468,12 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
         });
       });
       menu.addItem((item) => {
-        item.setTitle("Refresh").setIcon("refresh-cw").onClick(async () => {
-          menuBtn.addClass("rotating");
-          await this.scanner.scanVault();
-          setTimeout(() => menuBtn.removeClass("rotating"), 500);
-        });
-      });
-      menu.addSeparator();
-      menu.addItem((item) => {
         item.setTitle("Triage").setIcon("siren").onClick(() => this.onShowTriage());
       });
+      menu.addItem((item) => {
+        item.setTitle("Stats").setIcon("bar-chart-2").onClick(() => this.onShowStats());
+      });
+      menu.addSeparator();
       menu.addItem((item) => {
         item.setTitle("About").setIcon("info").onClick(() => this.onShowAbout());
       });
@@ -3478,9 +3482,6 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
           this.app.setting.open();
           this.app.setting.openTabById("space-command");
         });
-      });
-      menu.addItem((item) => {
-        item.setTitle("Stats").setIcon("bar-chart-2").onClick(() => this.onShowStats());
       });
       menu.showAtMouseEvent(evt);
     });

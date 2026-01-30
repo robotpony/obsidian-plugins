@@ -2,6 +2,15 @@
 
 All notable changes to the Link Command plugin will be documented in this file.
 
+## [0.4.21] - 2026-01-30
+
+### Improved
+
+- **Standardized kebab menu order**: Sidebar menu now follows consistent order across all Command plugins
+  - Refresh appears first as the most common action
+  - About and Settings always appear last
+  - This plugin had no changes needed as it already followed the standard
+
 ## [0.4.20] - 2026-01-28
 
 ### Fixed
