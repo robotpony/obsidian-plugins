@@ -2,6 +2,24 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.89] - 2026-01-29
+
+### Fixed
+
+- **Header TODOs with only empty children now hidden**: Headers where all children have no content (like `- [ ]`) are now filtered out
+  - The scanner skips empty children, leaving `childLineNumbers` empty
+  - Previously, an empty children array was treated as "not a header with children" and kept visible
+  - Now correctly interprets empty children array as "all children were empty" and filters out the header
+
+## [0.9.88] - 2026-01-29
+
+### Fixed
+
+- **Header TODOs hide when children are empty**: Header blocks now correctly hide from sidebar and embeds when all child lines have no content
+  - Previously, empty child lines (like `- [ ]`) counted as "active" and kept the header visible
+  - Now treats non-existent or empty children the same as completed/snoozed children
+  - Header only appears when it has at least one child with actual content
+
 ## [0.9.87] - 2026-01-29
 
 ### Improved

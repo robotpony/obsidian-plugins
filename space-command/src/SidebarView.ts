@@ -1315,27 +1315,37 @@ export class TodoSidebarView extends ItemView {
       todos = todos.filter(todo => todo.parentLineNumber === undefined);
     }
 
-    // Filter out header TODOs where all children are complete or snoozed
+    // Filter out header TODOs where all children are complete, snoozed, or non-existent
     // This prevents users from having to mark headers done redundantly
+    // Also handles case where child lines are empty/filtered out by scanner
     const allTodones = this.scanner.getTodones();
     const allTodosForChildLookup = this.scanner.getTodos();
     todos = todos.filter(todo => {
-      if (!todo.isHeader || !todo.childLineNumbers || todo.childLineNumbers.length === 0) {
-        return true; // Not a header with children, keep it
+      if (!todo.isHeader) {
+        return true; // Not a header, keep it
       }
-      // Check if there are any active children (not complete and not snoozed)
+      if (!todo.childLineNumbers) {
+        return true; // Header without childLineNumbers array (standalone), keep it
+      }
+      if (todo.childLineNumbers.length === 0) {
+        return false; // Header with empty children array - all children were empty/skipped, filter out
+      }
+      // Check if there are any active children (not complete, not snoozed, and exists)
       const hasActiveChild = todo.childLineNumbers.some(childLine => {
         // Check if child is complete
         const isComplete = allTodones.some(t => t.filePath === todo.filePath && t.lineNumber === childLine);
         if (isComplete) return false;
-        // Check if child is snoozed
+        // Check if child exists in todos
         const childItem = allTodosForChildLookup.find(t => t.filePath === todo.filePath && t.lineNumber === childLine);
-        if (childItem) {
-          const isSnoozed = childItem.tags.includes("#future") ||
-                            childItem.tags.includes("#snooze") ||
-                            childItem.tags.includes("#snoozed");
-          if (isSnoozed) return false;
+        if (!childItem) {
+          // Child doesn't exist in cache (empty line, filtered out, etc.) - not active
+          return false;
         }
+        // Check if child is snoozed
+        const isSnoozed = childItem.tags.includes("#future") ||
+                          childItem.tags.includes("#snooze") ||
+                          childItem.tags.includes("#snoozed");
+        if (isSnoozed) return false;
         return true; // Child is active
       });
       return hasActiveChild; // Keep header only if it has at least one active child

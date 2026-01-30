@@ -2082,19 +2082,26 @@ var EmbedRenderer = class {
     const allTodones = this.scanner.getTodones();
     const allTodosForChildLookup = this.scanner.getTodos();
     topLevelTodos = topLevelTodos.filter((todo) => {
-      if (!todo.isHeader || !todo.childLineNumbers || todo.childLineNumbers.length === 0) {
+      if (!todo.isHeader) {
         return true;
+      }
+      if (!todo.childLineNumbers) {
+        return true;
+      }
+      if (todo.childLineNumbers.length === 0) {
+        return false;
       }
       const hasActiveChild = todo.childLineNumbers.some((childLine) => {
         const isComplete = allTodones.some((t) => t.filePath === todo.filePath && t.lineNumber === childLine);
         if (isComplete)
           return false;
         const childItem = allTodosForChildLookup.find((t) => t.filePath === todo.filePath && t.lineNumber === childLine);
-        if (childItem) {
-          const isSnoozed = childItem.tags.includes("#future") || childItem.tags.includes("#snooze") || childItem.tags.includes("#snoozed");
-          if (isSnoozed)
-            return false;
+        if (!childItem) {
+          return false;
         }
+        const isSnoozed = childItem.tags.includes("#future") || childItem.tags.includes("#snooze") || childItem.tags.includes("#snoozed");
+        if (isSnoozed)
+          return false;
         return true;
       });
       return hasActiveChild;
@@ -3821,19 +3828,26 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     const allTodones = this.scanner.getTodones();
     const allTodosForChildLookup = this.scanner.getTodos();
     todos = todos.filter((todo) => {
-      if (!todo.isHeader || !todo.childLineNumbers || todo.childLineNumbers.length === 0) {
+      if (!todo.isHeader) {
         return true;
+      }
+      if (!todo.childLineNumbers) {
+        return true;
+      }
+      if (todo.childLineNumbers.length === 0) {
+        return false;
       }
       const hasActiveChild = todo.childLineNumbers.some((childLine) => {
         const isComplete = allTodones.some((t) => t.filePath === todo.filePath && t.lineNumber === childLine);
         if (isComplete)
           return false;
         const childItem = allTodosForChildLookup.find((t) => t.filePath === todo.filePath && t.lineNumber === childLine);
-        if (childItem) {
-          const isSnoozed = childItem.tags.includes("#future") || childItem.tags.includes("#snooze") || childItem.tags.includes("#snoozed");
-          if (isSnoozed)
-            return false;
+        if (!childItem) {
+          return false;
         }
+        const isSnoozed = childItem.tags.includes("#future") || childItem.tags.includes("#snooze") || childItem.tags.includes("#snoozed");
+        if (isSnoozed)
+          return false;
         return true;
       });
       return hasActiveChild;
