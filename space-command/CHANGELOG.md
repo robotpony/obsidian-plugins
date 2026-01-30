@@ -2,6 +2,12 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.82] - 2026-01-29
+
+### Fixed
+
+- **Triage escaped tags**: Escaped tags (`\#example`) now display correctly in task text as `#example` and are excluded from the tag list. Uses placeholder approach instead of negative lookbehind for better compatibility.
+
 ## [0.9.81] - 2026-01-29
 
 ### Fixed

@@ -15923,7 +15923,7 @@ var TriageModal = class extends import_obsidian11.Modal {
         (t) => t.filePath === item.filePath && t.lineNumber === item.parentLineNumber
       );
       if (parentHeader) {
-        const parentText = parentHeader.text.replace(/(?<!\\)#[\w-]+/g, "").replace(/\\#/g, "#").replace(/^#{1,6}\s+/, "").trim();
+        const parentText = parentHeader.text.replace(/\\#/g, "\0ESCAPED_HASH\0").replace(/#[\w-]+/g, "").replace(/\x00ESCAPED_HASH\x00/g, "#").replace(/^#{1,6}\s+/, "").trim();
         contextIndicator.appendText(parentText);
       }
     }
@@ -15942,14 +15942,22 @@ var TriageModal = class extends import_obsidian11.Modal {
       this.nextItem();
     });
     const textSpan = itemContent.createEl("span", { cls: "triage-item-text" });
-    let displayText = item.text.replace(/(?<!\\)#[\w-]+/g, "").replace(/\\#/g, "#").replace(/^[-*+]\s*\[.\]\s*/, "").replace(/^[-*+]\s*/, "").replace(/^#{1,6}\s+/, "").trim();
+    let displayText = item.text.replace(/\\#/g, "\0ESCAPED_HASH\0").replace(/#[\w-]+/g, "").replace(/\x00ESCAPED_HASH\x00/g, "#").replace(/^[-*+]\s*\[.\]\s*/, "").replace(/^[-*+]\s*/, "").replace(/^#{1,6}\s+/, "").trim();
     this.embedRenderer.renderInlineMarkdown(displayText, textSpan);
     const metaRow = contentEl.createEl("div", { cls: "triage-meta-row" });
     const sourceEl = metaRow.createEl("div", { cls: "triage-source" });
     sourceEl.appendText(`(from ${item.filePath})`);
     const tagsEl = metaRow.createEl("div", { cls: "triage-tags" });
+    const escapedTagPattern = /\\(#[\w-]+)/g;
+    const escapedTags = /* @__PURE__ */ new Set();
+    let match;
+    while ((match = escapedTagPattern.exec(item.text)) !== null) {
+      escapedTags.add(match[1]);
+    }
     for (const tag of item.tags) {
-      tagsEl.createEl("a", { cls: "tag", href: tag, text: tag });
+      if (!escapedTags.has(tag)) {
+        tagsEl.createEl("a", { cls: "tag", href: tag, text: tag });
+      }
     }
     contentEl.createEl("div", { cls: "triage-separator" });
     const actions = contentEl.createEl("div", { cls: "triage-actions" });

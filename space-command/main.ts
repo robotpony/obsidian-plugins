@@ -744,10 +744,11 @@ class TriageModal extends Modal {
         t => t.filePath === item.filePath && t.lineNumber === item.parentLineNumber
       );
       if (parentHeader) {
-        // Strip tags and heading markers from parent text
+        // Strip tags and heading markers from parent text, preserve escaped tags
         const parentText = parentHeader.text
-          .replace(/(?<!\\)#[\w-]+/g, "") // Remove tags including dashes, preserve escaped
-          .replace(/\\#/g, "#") // Convert escaped tags back
+          .replace(/\\#/g, "\x00ESCAPED_HASH\x00") // Protect escaped tags
+          .replace(/#[\w-]+/g, "") // Remove all unescaped tags
+          .replace(/\x00ESCAPED_HASH\x00/g, "#") // Restore escaped tags as normal #
           .replace(/^#{1,6}\s+/, "")
           .trim();
         contextIndicator.appendText(parentText);
@@ -773,8 +774,9 @@ class TriageModal extends Modal {
     // Strip tags and list markers, but preserve markdown for rendering
     const textSpan = itemContent.createEl("span", { cls: "triage-item-text" });
     let displayText = item.text
-      .replace(/(?<!\\)#[\w-]+/g, "") // Remove tags (including dashes), but preserve escaped \#tags
-      .replace(/\\#/g, "#") // Convert escaped tags back to normal
+      .replace(/\\#/g, "\x00ESCAPED_HASH\x00") // Protect escaped tags with placeholder
+      .replace(/#[\w-]+/g, "") // Remove all unescaped tags
+      .replace(/\x00ESCAPED_HASH\x00/g, "#") // Restore escaped tags as normal #
       .replace(/^[-*+]\s*\[.\]\s*/, "") // Remove checkbox
       .replace(/^[-*+]\s*/, "") // Remove list marker
       .replace(/^#{1,6}\s+/, "") // Remove heading markers
@@ -786,8 +788,17 @@ class TriageModal extends Modal {
     const sourceEl = metaRow.createEl("div", { cls: "triage-source" });
     sourceEl.appendText(`(from ${item.filePath})`);
     const tagsEl = metaRow.createEl("div", { cls: "triage-tags" });
+    // Filter out escaped tags (tags that appear as \#tag in original text)
+    const escapedTagPattern = /\\(#[\w-]+)/g;
+    const escapedTags = new Set<string>();
+    let match;
+    while ((match = escapedTagPattern.exec(item.text)) !== null) {
+      escapedTags.add(match[1]); // Add the tag without the backslash
+    }
     for (const tag of item.tags) {
-      tagsEl.createEl("a", { cls: "tag", href: tag, text: tag });
+      if (!escapedTags.has(tag)) {
+        tagsEl.createEl("a", { cls: "tag", href: tag, text: tag });
+      }
     }
 
     // Separator line before actions
