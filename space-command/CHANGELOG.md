@@ -2,6 +2,12 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.76] - 2026-01-29
+
+### Fixed
+
+- **Triage modal width**: Fixed horizontal scrolling by setting width on the parent modal container instead of the content div
+
 ## [0.9.75] - 2026-01-29
 
 ### Improved

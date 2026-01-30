@@ -1640,8 +1640,12 @@
 .space-command-triage-modal {
   text-align: center;
   padding: 20px !important;
-  min-width: 580px;
-  max-width: 650px;
+}
+
+/* Set width on the modal container, not the content */
+.modal:has(.space-command-triage-modal) {
+  width: 600px !important;
+  max-width: 90vw !important;
 }
 
 /* Ensure symmetric padding on modal - Obsidian adds extra right padding by default */
