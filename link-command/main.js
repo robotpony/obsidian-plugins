@@ -863,11 +863,29 @@ var LinkSidebarView = class extends import_obsidian3.ItemView {
   }
   extractLinksFromContent(content) {
     const links = [];
-    const urlRegex = /https?:\/\/[^\s\]\)>"']+/g;
     const lines = content.split("\n");
+    const mdLinkRegex = /\[([^\]]*)\]\((https?:\/\/[^\)]+)\)/g;
+    const urlRegex = /https?:\/\/[^\s\]\)>"']+/g;
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       let match;
+      mdLinkRegex.lastIndex = 0;
+      while ((match = mdLinkRegex.exec(line)) !== null) {
+        const title = match[1];
+        const url = match[2];
+        if (!links.some((l) => l.url === url)) {
+          const cached = this.unfurlService.getCached(url);
+          links.push({
+            url,
+            lineNumber: i,
+            isCached: cached !== null,
+            metadata: cached || void 0,
+            currentTitle: title,
+            isMarkdownLink: true
+          });
+        }
+      }
+      urlRegex.lastIndex = 0;
       while ((match = urlRegex.exec(line)) !== null) {
         const url = match[0].replace(/[.,;:!?)*]+$/, "");
         if (!links.some((l) => l.url === url)) {
@@ -876,7 +894,8 @@ var LinkSidebarView = class extends import_obsidian3.ItemView {
             url,
             lineNumber: i,
             isCached: cached !== null,
-            metadata: cached || void 0
+            metadata: cached || void 0,
+            isMarkdownLink: false
           });
         }
       }
@@ -884,7 +903,7 @@ var LinkSidebarView = class extends import_obsidian3.ItemView {
     return links;
   }
   renderLinkItem(container, link, activeFile) {
-    var _a, _b;
+    var _a, _b, _c;
     const item = container.createEl("div", { cls: "link-sidebar-item" });
     if ((_a = link.metadata) == null ? void 0 : _a.favicon) {
       const favicon = item.createEl("img", {
@@ -908,15 +927,24 @@ var LinkSidebarView = class extends import_obsidian3.ItemView {
       });
     }
     const content = item.createEl("div", { cls: "link-sidebar-item-content" });
-    if ((_b = link.metadata) == null ? void 0 : _b.title) {
-      content.createEl("div", { cls: "link-sidebar-item-title", text: link.metadata.title });
-      if (link.metadata.subreddit) {
-        content.createEl("div", { cls: "link-sidebar-item-subreddit", text: link.metadata.subreddit });
-      }
-      content.createEl("div", { cls: "link-sidebar-item-url", text: this.truncateUrl(link.url) });
-    } else {
-      content.createEl("div", { cls: "link-sidebar-item-title", text: this.truncateUrl(link.url) });
+    const displayTitle = link.currentTitle || ((_b = link.metadata) == null ? void 0 : _b.title) || this.truncateUrl(link.url);
+    const titleRow = content.createEl("div", { cls: "link-sidebar-item-title-row" });
+    const titleEl = titleRow.createEl("span", { cls: "link-sidebar-item-title", text: displayTitle });
+    if (link.isMarkdownLink) {
+      const editBtn = titleRow.createEl("button", {
+        cls: "clickable-icon link-sidebar-edit-btn",
+        attr: { "aria-label": "Edit title" }
+      });
+      editBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>';
+      editBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.startEditingTitle(titleRow, titleEl, link, activeFile);
+      });
     }
+    if ((_c = link.metadata) == null ? void 0 : _c.subreddit) {
+      content.createEl("div", { cls: "link-sidebar-item-subreddit", text: link.metadata.subreddit });
+    }
+    content.createEl("div", { cls: "link-sidebar-item-url", text: this.truncateUrl(link.url) });
     const externalBtn = item.createEl("button", {
       cls: "clickable-icon link-sidebar-external-btn",
       attr: { "aria-label": "Open in browser" }
@@ -933,6 +961,61 @@ var LinkSidebarView = class extends import_obsidian3.ItemView {
       e.preventDefault();
       this.showLinkContextMenu(e, link, activeFile);
     });
+  }
+  startEditingTitle(titleRow, titleEl, link, activeFile) {
+    var _a;
+    const currentTitle = link.currentTitle || ((_a = link.metadata) == null ? void 0 : _a.title) || "";
+    titleEl.style.display = "none";
+    const input = titleRow.createEl("input", {
+      cls: "link-sidebar-title-input",
+      attr: {
+        type: "text",
+        value: currentTitle,
+        placeholder: "Enter title..."
+      }
+    });
+    input.focus();
+    input.select();
+    const saveAndClose = async () => {
+      const newTitle = input.value.trim();
+      if (newTitle && newTitle !== currentTitle) {
+        await this.updateLinkTitle(activeFile, link, newTitle);
+      }
+      input.remove();
+      titleEl.style.display = "";
+      if (newTitle && newTitle !== currentTitle) {
+        titleEl.textContent = newTitle;
+      }
+    };
+    const cancelEdit = () => {
+      input.remove();
+      titleEl.style.display = "";
+    };
+    input.addEventListener("blur", saveAndClose);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        input.blur();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        input.removeEventListener("blur", saveAndClose);
+        cancelEdit();
+      }
+    });
+  }
+  async updateLinkTitle(file, link, newTitle) {
+    const content = await this.app.vault.read(file);
+    const lines = content.split("\n");
+    if (link.lineNumber >= lines.length)
+      return;
+    const line = lines[link.lineNumber];
+    const urlEscaped = link.url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const mdLinkPattern = new RegExp(`\\[([^\\]]*)\\]\\(${urlEscaped}\\)`);
+    const newLine = line.replace(mdLinkPattern, `[${newTitle}](${link.url})`);
+    if (newLine !== line) {
+      lines[link.lineNumber] = newLine;
+      await this.app.vault.modify(file, lines.join("\n"));
+    }
   }
   renderHistoryItem(container, metadata) {
     const item = container.createEl("div", { cls: "link-sidebar-item link-sidebar-history-item" });

@@ -279,10 +279,57 @@
   overflow: hidden;
 }
 
+.link-sidebar-item-title-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .link-sidebar-item-title {
   color: var(--text-normal);
   line-height: 1.4;
   word-wrap: break-word;
+  flex: 1;
+}
+
+/* Edit button (pencil) - appears on hover */
+.link-sidebar-edit-btn {
+  padding: 2px;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s, background-color 0.15s;
+  flex-shrink: 0;
+  border-radius: 4px;
+}
+
+.link-sidebar-item:hover .link-sidebar-edit-btn {
+  opacity: 0.5;
+}
+
+.link-sidebar-edit-btn:hover {
+  opacity: 1 !important;
+  color: var(--text-accent);
+  background-color: var(--background-modifier-hover) !important;
+}
+
+/* Title input field */
+.link-sidebar-title-input {
+  flex: 1;
+  padding: 2px 6px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: inherit;
+  line-height: 1.4;
+  outline: none;
+}
+
+.link-sidebar-title-input:focus {
+  border-color: var(--interactive-accent);
 }
 
 .link-sidebar-item:hover .link-sidebar-item-title {

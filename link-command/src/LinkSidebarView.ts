@@ -9,6 +9,8 @@ interface PageLink {
   lineNumber: number;
   isCached: boolean;
   metadata?: UrlMetadata;
+  currentTitle?: string;  // Title from existing markdown link [title](url)
+  isMarkdownLink: boolean;  // Whether the link is already in markdown format
 }
 
 export class LinkSidebarView extends ItemView {
@@ -225,17 +227,22 @@ export class LinkSidebarView extends ItemView {
 
   private extractLinksFromContent(content: string): PageLink[] {
     const links: PageLink[] = [];
-    const urlRegex = /https?:\/\/[^\s\]\)>"']+/g;
     const lines = content.split("\n");
+
+    // First pass: find markdown links [title](url)
+    const mdLinkRegex = /\[([^\]]*)\]\((https?:\/\/[^\)]+)\)/g;
+    // Second pass: find plain URLs
+    const urlRegex = /https?:\/\/[^\s\]\)>"']+/g;
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       let match;
 
-      while ((match = urlRegex.exec(line)) !== null) {
-        // Clean up URL (remove trailing punctuation that's likely not part of URL)
-        const url = match[0].replace(/[.,;:!?)*]+$/, "");
-        // Avoid duplicates
+      // Find markdown links first
+      mdLinkRegex.lastIndex = 0;
+      while ((match = mdLinkRegex.exec(line)) !== null) {
+        const title = match[1];
+        const url = match[2];
         if (!links.some(l => l.url === url)) {
           const cached = this.unfurlService.getCached(url);
           links.push({
@@ -243,6 +250,24 @@ export class LinkSidebarView extends ItemView {
             lineNumber: i,
             isCached: cached !== null,
             metadata: cached || undefined,
+            currentTitle: title,
+            isMarkdownLink: true,
+          });
+        }
+      }
+
+      // Find plain URLs (not already captured as markdown links)
+      urlRegex.lastIndex = 0;
+      while ((match = urlRegex.exec(line)) !== null) {
+        const url = match[0].replace(/[.,;:!?)*]+$/, "");
+        if (!links.some(l => l.url === url)) {
+          const cached = this.unfurlService.getCached(url);
+          links.push({
+            url,
+            lineNumber: i,
+            isCached: cached !== null,
+            metadata: cached || undefined,
+            isMarkdownLink: false,
           });
         }
       }
@@ -282,17 +307,33 @@ export class LinkSidebarView extends ItemView {
     // Content
     const content = item.createEl("div", { cls: "link-sidebar-item-content" });
 
-    // Title or URL
-    if (link.metadata?.title) {
-      content.createEl("div", { cls: "link-sidebar-item-title", text: link.metadata.title });
-      // Show subreddit if available (Reddit links)
-      if (link.metadata.subreddit) {
-        content.createEl("div", { cls: "link-sidebar-item-subreddit", text: link.metadata.subreddit });
-      }
-      content.createEl("div", { cls: "link-sidebar-item-url", text: this.truncateUrl(link.url) });
-    } else {
-      content.createEl("div", { cls: "link-sidebar-item-title", text: this.truncateUrl(link.url) });
+    // Determine display title: currentTitle (from doc) > metadata.title > truncated URL
+    const displayTitle = link.currentTitle || link.metadata?.title || this.truncateUrl(link.url);
+
+    // Title row with edit button
+    const titleRow = content.createEl("div", { cls: "link-sidebar-item-title-row" });
+    const titleEl = titleRow.createEl("span", { cls: "link-sidebar-item-title", text: displayTitle });
+
+    // Edit button (pencil icon) - only for markdown links
+    if (link.isMarkdownLink) {
+      const editBtn = titleRow.createEl("button", {
+        cls: "clickable-icon link-sidebar-edit-btn",
+        attr: { "aria-label": "Edit title" },
+      });
+      editBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>';
+      editBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.startEditingTitle(titleRow, titleEl, link, activeFile);
+      });
     }
+
+    // Show subreddit if available (Reddit links)
+    if (link.metadata?.subreddit) {
+      content.createEl("div", { cls: "link-sidebar-item-subreddit", text: link.metadata.subreddit });
+    }
+
+    // URL display
+    content.createEl("div", { cls: "link-sidebar-item-url", text: this.truncateUrl(link.url) });
 
     // External link button (arrow)
     const externalBtn = item.createEl("button", {
@@ -315,6 +356,78 @@ export class LinkSidebarView extends ItemView {
       e.preventDefault();
       this.showLinkContextMenu(e, link, activeFile);
     });
+  }
+
+  private startEditingTitle(
+    titleRow: HTMLElement,
+    titleEl: HTMLElement,
+    link: PageLink,
+    activeFile: TFile
+  ): void {
+    const currentTitle = link.currentTitle || link.metadata?.title || "";
+
+    // Hide title, show input
+    titleEl.style.display = "none";
+
+    const input = titleRow.createEl("input", {
+      cls: "link-sidebar-title-input",
+      attr: {
+        type: "text",
+        value: currentTitle,
+        placeholder: "Enter title...",
+      },
+    });
+
+    input.focus();
+    input.select();
+
+    const saveAndClose = async () => {
+      const newTitle = input.value.trim();
+      if (newTitle && newTitle !== currentTitle) {
+        await this.updateLinkTitle(activeFile, link, newTitle);
+      }
+      input.remove();
+      titleEl.style.display = "";
+      if (newTitle && newTitle !== currentTitle) {
+        titleEl.textContent = newTitle;
+      }
+    };
+
+    const cancelEdit = () => {
+      input.remove();
+      titleEl.style.display = "";
+    };
+
+    input.addEventListener("blur", saveAndClose);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        input.blur();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        input.removeEventListener("blur", saveAndClose);
+        cancelEdit();
+      }
+    });
+  }
+
+  private async updateLinkTitle(file: TFile, link: PageLink, newTitle: string): Promise<void> {
+    const content = await this.app.vault.read(file);
+    const lines = content.split("\n");
+
+    if (link.lineNumber >= lines.length) return;
+
+    const line = lines[link.lineNumber];
+    const urlEscaped = link.url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    // Find and replace the markdown link [old title](url) with [new title](url)
+    const mdLinkPattern = new RegExp(`\\[([^\\]]*)\\]\\(${urlEscaped}\\)`);
+    const newLine = line.replace(mdLinkPattern, `[${newTitle}](${link.url})`);
+
+    if (newLine !== line) {
+      lines[link.lineNumber] = newLine;
+      await this.app.vault.modify(file, lines.join("\n"));
+    }
   }
 
   private renderHistoryItem(container: HTMLElement, metadata: UrlMetadata): void {

@@ -2,6 +2,16 @@
 
 All notable changes to the Link Command plugin will be documented in this file.
 
+## [0.4.24] - 2026-01-30
+
+### Added
+
+- **Editable link titles in sidebar**: Edit markdown link titles directly from the Page Links section
+  - Pencil icon appears on hover for links in markdown format `[title](url)`
+  - Click to edit inline; changes are saved to the document
+  - Press Enter to save, Escape to cancel
+  - Plain URLs (not in markdown format) don't show the edit button
+
 ## [0.4.23] - 2026-01-30
 
 ### Changed
