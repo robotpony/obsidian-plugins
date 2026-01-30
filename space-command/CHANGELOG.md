@@ -2,6 +2,17 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.92] - 2026-01-30
+
+### Improved
+
+- **Focus mode in Ideas tab**: Ideas tab now has focus mode filtering like the TODOs tab
+  - Eye icon toggle in Ideas tab header (shared state with TODOs tab)
+  - When enabled, Principles section filters to show only `#focus` principles
+  - When enabled, Ideas section filters to show only `#focus` ideas
+  - Focus mode is now enabled by default for both tabs
+  - Empty states show "No focused principles/ideas" when filtering
+
 ## [0.9.91] - 2026-01-30
 
 ### Fixed

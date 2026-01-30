@@ -2938,7 +2938,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     this.updateListener = null;
     this.activeTab = "todos";
     this.activeTagFilter = null;
-    this.focusModeEnabled = false;
+    this.focusModeEnabled = true;
     this.openDropdown = null;
     this.openInfoPopup = null;
     // Configuration for unified list item rendering
@@ -3504,8 +3504,27 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     this.renderRecentTodones(container);
   }
   renderIdeasContent(container) {
+    this.renderIdeasHeader(container);
     this.renderPrinciples(container);
     this.renderActiveIdeas(container);
+  }
+  renderIdeasHeader(container) {
+    const header = container.createEl("div", {
+      cls: "todo-section-header ideas-tab-header"
+    });
+    const titleSpan = header.createEl("span", { cls: "todo-section-title" });
+    titleSpan.textContent = "Focus";
+    const focusModeBtn = header.createEl("button", {
+      cls: `clickable-icon focus-mode-toggle-btn${this.focusModeEnabled ? " active" : ""}`,
+      attr: { "aria-label": this.focusModeEnabled ? "Show all items" : "Show only focused" }
+    });
+    focusModeBtn.innerHTML = this.focusModeEnabled ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+    focusModeBtn.addEventListener("click", () => {
+      this.focusModeEnabled = !this.focusModeEnabled;
+      showNotice(this.focusModeEnabled ? "Focus mode enabled" : "Focus mode disabled");
+      this.render();
+    });
+    this.renderFilterIndicator(header);
   }
   renderSnoozedContent(container) {
     this.renderSnoozedTodos(container);
@@ -3999,6 +4018,9 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
   renderPrinciples(container) {
     let principles = this.scanner.getPrinciples();
     principles = principles.filter((p) => p.parentLineNumber === void 0);
+    if (this.focusModeEnabled) {
+      principles = principles.filter((p) => p.tags.includes("#focus"));
+    }
     if (this.activeTagFilter) {
       principles = principles.filter((p) => p.tags.includes(this.activeTagFilter));
     }
@@ -4010,8 +4032,9 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     titleSpan.textContent = "Principles";
     this.renderFilterIndicator(header);
     if (principles.length === 0) {
+      const emptyText = this.focusModeEnabled ? "No focused principles" : this.activeTagFilter ? `No principles matching ${this.activeTagFilter}` : "No principles yet";
       section.createEl("div", {
-        text: this.activeTagFilter ? `No principles matching ${this.activeTagFilter}` : "No principles yet",
+        text: emptyText,
         cls: "todo-empty"
       });
       return;
@@ -4030,6 +4053,9 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       (idea) => !idea.tags.includes("#future") && !idea.tags.includes("#snooze") && !idea.tags.includes("#snoozed")
     );
     ideas = ideas.filter((idea) => idea.parentLineNumber === void 0);
+    if (this.focusModeEnabled) {
+      ideas = ideas.filter((idea) => idea.tags.includes("#focus"));
+    }
     if (this.activeTagFilter) {
       ideas = ideas.filter((idea) => idea.tags.includes(this.activeTagFilter));
     }
@@ -4040,8 +4066,9 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     titleSpan.textContent = "Ideas";
     this.renderFilterIndicator(header);
     if (ideas.length === 0) {
+      const emptyText = this.focusModeEnabled ? "No focused ideas" : this.activeTagFilter ? `No ideas matching ${this.activeTagFilter}` : "No ideas yet";
       section.createEl("div", {
-        text: this.activeTagFilter ? `No ideas matching ${this.activeTagFilter}` : "No ideas yet",
+        text: emptyText,
         cls: "todo-empty"
       });
       return;
