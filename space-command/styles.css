@@ -1640,9 +1640,12 @@
 .space-command-triage-modal {
   text-align: center;
   padding: 24px !important;
+  width: 550px;
+  max-width: calc(90vw - 48px);
+  box-sizing: border-box;
 }
 
-/* Let modal auto-size to content */
+/* Fixed width modal for text wrapping */
 .modal:has(.space-command-triage-modal) {
   width: auto !important;
   max-width: 90vw !important;

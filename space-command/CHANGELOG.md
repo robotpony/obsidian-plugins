@@ -2,6 +2,12 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.81] - 2026-01-29
+
+### Fixed
+
+- **Triage text wrapping**: Set fixed 550px width on content to enable text wrapping (previous fix had no width constraint for text to wrap against)
+
 ## [0.9.80] - 2026-01-29
 
 ### Fixed
