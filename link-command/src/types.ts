@@ -85,7 +85,7 @@ export const DEFAULT_SETTINGS: LinkCommandSettings = {
     'confluence.atlassian.com',
   ],
   showSidebarByDefault: true,
-  recentHistoryLimit: 25,
+  recentHistoryLimit: 10,
   redditLinkFormat: 'title_subreddit',
 };
 

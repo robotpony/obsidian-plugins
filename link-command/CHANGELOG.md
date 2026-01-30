@@ -2,6 +2,14 @@
 
 All notable changes to the Link Command plugin will be documented in this file.
 
+## [0.4.23] - 2026-01-30
+
+### Changed
+
+- **Reduced default history limit**: Recent History section now shows 10 items by default (was 25)
+  - Keeps the sidebar more compact and focused
+  - Still configurable via Settings → Recent history limit
+
 ## [0.4.22] - 2026-01-30
 
 ### Improved

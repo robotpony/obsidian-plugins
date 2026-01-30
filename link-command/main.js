@@ -57,7 +57,7 @@ var DEFAULT_SETTINGS = {
     "confluence.atlassian.com"
   ],
   showSidebarByDefault: true,
-  recentHistoryLimit: 25,
+  recentHistoryLimit: 10,
   redditLinkFormat: "title_subreddit"
 };
 
