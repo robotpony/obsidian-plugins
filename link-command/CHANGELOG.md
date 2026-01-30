@@ -2,6 +2,23 @@
 
 All notable changes to the Link Command plugin will be documented in this file.
 
+## [0.4.22] - 2026-01-30
+
+### Improved
+
+- **Toggle button now appears on hover**: The ⌘ format toggle button is now hidden by default and only appears when hovering over the line containing a URL
+  - Reduces visual clutter in the editor
+  - Button smoothly fades in/out on hover
+- **Auto-expand URLs to markdown links**: New URLs are now automatically converted to `[Title](url)` format
+  - Fetches the page title and creates a proper markdown link
+  - Works with pasted and typed URLs
+  - 500ms debounce prevents rapid-fire conversions
+  - New "Auto-expand URLs" setting to enable/disable (enabled by default)
+
+### Settings
+
+- **Auto-expand URLs**: Toggle automatic URL-to-link conversion (default: on)
+
 ## [0.4.21] - 2026-01-30
 
 ### Improved

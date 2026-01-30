@@ -209,6 +209,7 @@ function buildDecorations(state: EditorState, enabled: boolean): DecorationSet {
  */
 export interface FormatToggleConfig {
   enabled: boolean;
+  autoExpand: boolean;
   unfurlService: UrlUnfurlService;
   getSourcePage: () => string | undefined;
   onFormatChange?: () => void;
@@ -277,7 +278,100 @@ export function createFormatToggleExtension(config: FormatToggleConfig) {
     }
   );
 
-  return [configField, decorationField, clickHandler];
+  // Auto-expand handler - watches for new plain URLs and converts them
+  const autoExpandHandler = ViewPlugin.fromClass(
+    class {
+      private pendingUrls: Set<string> = new Set();
+      private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+      constructor(private view: EditorView) {}
+
+      update(update: ViewUpdate) {
+        const currentConfig = update.state.field(configField);
+        if (!currentConfig.autoExpand || !update.docChanged) return;
+
+        // Find all plain URLs added in this transaction
+        update.transactions.forEach((tr) => {
+          if (!tr.docChanged) return;
+
+          tr.changes.iterChanges((fromA, toA, fromB, toB, inserted) => {
+            const insertedText = inserted.toString();
+
+            // Look for URLs in the inserted text
+            const urlRegex = /https?:\/\/[^\s\]\)"`'<>]+/g;
+            let match;
+
+            while ((match = urlRegex.exec(insertedText)) !== null) {
+              const url = match[0].replace(/[.,;:!?)*]+$/, "");
+
+              // Check if this URL is already in markdown link format
+              const pos = fromB + match.index;
+              const format = detectFormat(update.state, url, pos);
+
+              if (format === "url") {
+                this.pendingUrls.add(`${pos}:${url}`);
+              }
+            }
+          });
+        });
+
+        // Debounce the auto-expand to avoid multiple rapid conversions
+        if (this.pendingUrls.size > 0) {
+          if (this.debounceTimer) clearTimeout(this.debounceTimer);
+          this.debounceTimer = setTimeout(() => {
+            this.processUrls(currentConfig);
+          }, 500);
+        }
+      }
+
+      private async processUrls(config: FormatToggleConfig) {
+        const urlsToProcess = Array.from(this.pendingUrls);
+        this.pendingUrls.clear();
+
+        for (const entry of urlsToProcess) {
+          const [posStr, url] = entry.split(":", 2);
+          const pos = parseInt(posStr, 10);
+
+          // Re-check format at current position (document may have changed)
+          const currentFormat = detectFormat(this.view.state, url, pos);
+          if (currentFormat !== "url") continue;
+
+          const range = findFormatRange(this.view.state, url, pos, "url");
+
+          // Verify the URL is still at this position
+          const docText = this.view.state.doc.sliceString(range.from, range.to);
+          if (docText !== url) continue;
+
+          // Auto-expand to markdown link format
+          const sourcePage = config.getSourcePage();
+          const result = await config.unfurlService.unfurl(url, false, sourcePage);
+
+          let title = url;
+          if (result.success && result.metadata?.title) {
+            title = result.metadata.title;
+          }
+
+          const replacement = `[${title}](${url})`;
+
+          const transaction = this.view.state.update({
+            changes: { from: range.from, to: range.to, insert: replacement },
+          });
+
+          this.view.dispatch(transaction);
+
+          if (config.onFormatChange) {
+            config.onFormatChange();
+          }
+        }
+      }
+
+      destroy() {
+        if (this.debounceTimer) clearTimeout(this.debounceTimer);
+      }
+    }
+  );
+
+  return [configField, decorationField, clickHandler, autoExpandHandler];
 }
 
 /**

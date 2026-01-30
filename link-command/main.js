@@ -33,6 +33,8 @@ var import_obsidian4 = require("obsidian");
 var DEFAULT_SETTINGS = {
   unfurlEnabled: true,
   unfurlTimeout: 1e4,
+  autoExpandUrls: true,
+  // Auto-convert new URLs to markdown links
   cacheEnabled: true,
   cacheTTL: 168,
   // 7 days
@@ -1242,7 +1244,79 @@ function createFormatToggleExtension(config) {
       }
     }
   );
-  return [configField, decorationField, clickHandler];
+  const autoExpandHandler = import_view.ViewPlugin.fromClass(
+    class {
+      constructor(view) {
+        this.view = view;
+        this.pendingUrls = /* @__PURE__ */ new Set();
+        this.debounceTimer = null;
+      }
+      update(update) {
+        const currentConfig = update.state.field(configField);
+        if (!currentConfig.autoExpand || !update.docChanged)
+          return;
+        update.transactions.forEach((tr) => {
+          if (!tr.docChanged)
+            return;
+          tr.changes.iterChanges((fromA, toA, fromB, toB, inserted) => {
+            const insertedText = inserted.toString();
+            const urlRegex = /https?:\/\/[^\s\]\)"`'<>]+/g;
+            let match;
+            while ((match = urlRegex.exec(insertedText)) !== null) {
+              const url = match[0].replace(/[.,;:!?)*]+$/, "");
+              const pos = fromB + match.index;
+              const format = detectFormat(update.state, url, pos);
+              if (format === "url") {
+                this.pendingUrls.add(`${pos}:${url}`);
+              }
+            }
+          });
+        });
+        if (this.pendingUrls.size > 0) {
+          if (this.debounceTimer)
+            clearTimeout(this.debounceTimer);
+          this.debounceTimer = setTimeout(() => {
+            this.processUrls(currentConfig);
+          }, 500);
+        }
+      }
+      async processUrls(config2) {
+        var _a;
+        const urlsToProcess = Array.from(this.pendingUrls);
+        this.pendingUrls.clear();
+        for (const entry of urlsToProcess) {
+          const [posStr, url] = entry.split(":", 2);
+          const pos = parseInt(posStr, 10);
+          const currentFormat = detectFormat(this.view.state, url, pos);
+          if (currentFormat !== "url")
+            continue;
+          const range = findFormatRange(this.view.state, url, pos, "url");
+          const docText = this.view.state.doc.sliceString(range.from, range.to);
+          if (docText !== url)
+            continue;
+          const sourcePage = config2.getSourcePage();
+          const result = await config2.unfurlService.unfurl(url, false, sourcePage);
+          let title = url;
+          if (result.success && ((_a = result.metadata) == null ? void 0 : _a.title)) {
+            title = result.metadata.title;
+          }
+          const replacement = `[${title}](${url})`;
+          const transaction = this.view.state.update({
+            changes: { from: range.from, to: range.to, insert: replacement }
+          });
+          this.view.dispatch(transaction);
+          if (config2.onFormatChange) {
+            config2.onFormatChange();
+          }
+        }
+      }
+      destroy() {
+        if (this.debounceTimer)
+          clearTimeout(this.debounceTimer);
+      }
+    }
+  );
+  return [configField, decorationField, clickHandler, autoExpandHandler];
 }
 async function cycleFormat(view, url, from, to, currentFormat, config) {
   const nextFormat = getNextFormat(currentFormat);
@@ -1494,6 +1568,7 @@ var LinkCommandPlugin = class extends import_obsidian4.Plugin {
   registerFormatToggleExtension() {
     const config = {
       enabled: this.settings.unfurlEnabled,
+      autoExpand: this.settings.autoExpandUrls,
       unfurlService: this.unfurlService,
       getSourcePage: () => {
         var _a;
@@ -1630,9 +1705,15 @@ var LinkCommandSettingTab = class extends import_obsidian4.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: "Unfurling" });
-    new import_obsidian4.Setting(containerEl).setName("Enable inline format toggle").setDesc("Show toggle buttons next to URLs to cycle between formats (URL, Link, Rich Link)").addToggle(
+    new import_obsidian4.Setting(containerEl).setName("Enable inline format toggle").setDesc("Show toggle buttons next to URLs to cycle between formats (URL, Link, Rich Link). Button appears on hover.").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.unfurlEnabled).onChange(async (value) => {
         this.plugin.settings.unfurlEnabled = value;
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian4.Setting(containerEl).setName("Auto-expand URLs").setDesc("Automatically convert new URLs to markdown links with fetched titles").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.autoExpandUrls).onChange(async (value) => {
+        this.plugin.settings.autoExpandUrls = value;
         await this.plugin.saveSettings();
       })
     );

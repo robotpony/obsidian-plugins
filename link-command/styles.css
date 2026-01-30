@@ -20,12 +20,19 @@
   background: transparent;
   border: none;
   vertical-align: middle;
-  transition: color 0.15s ease, background-color 0.15s ease;
+  transition: color 0.15s ease, background-color 0.15s ease, opacity 0.15s ease;
+  opacity: 0;
+}
+
+/* Show toggle button when hovering anywhere on the line */
+.cm-line:hover .link-format-toggle {
+  opacity: 1;
 }
 
 .link-format-toggle:hover {
   color: var(--text-accent);
   background-color: var(--background-modifier-hover);
+  opacity: 1;
 }
 
 .link-format-toggle svg {

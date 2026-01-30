@@ -48,6 +48,7 @@ export interface UrlMetadataProvider {
 export interface LinkCommandSettings {
   unfurlEnabled: boolean;
   unfurlTimeout: number;  // ms
+  autoExpandUrls: boolean;  // Auto-convert new URLs to markdown links
   cacheEnabled: boolean;
   cacheTTL: number;  // hours
   // Known domains that require authentication (skip unfurling)
@@ -62,6 +63,7 @@ export interface LinkCommandSettings {
 export const DEFAULT_SETTINGS: LinkCommandSettings = {
   unfurlEnabled: true,
   unfurlTimeout: 10000,
+  autoExpandUrls: true,  // Auto-convert new URLs to markdown links
   cacheEnabled: true,
   cacheTTL: 168,  // 7 days
   authDomains: [
