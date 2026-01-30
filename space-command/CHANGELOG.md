@@ -2,6 +2,12 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.74] - 2026-01-29
+
+### Added
+
+- **Triage back button**: Icon-only back button (⏮) to the left of Skip allows stepping back to review previous items. Disabled when at first item.
+
 ## [0.9.73] - 2026-01-29
 
 ### Changed

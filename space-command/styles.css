@@ -1790,6 +1790,26 @@
   transform: translateY(0);
 }
 
+.space-command-triage-modal .triage-btn-back {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-muted);
+  padding: 8px 10px;
+}
+
+.space-command-triage-modal .triage-btn-back:hover {
+  background-color: var(--background-modifier-border);
+  color: var(--text-normal);
+}
+
+.space-command-triage-modal .triage-btn-disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.space-command-triage-modal .triage-btn-disabled:hover {
+  transform: none;
+}
+
 .space-command-triage-modal .triage-btn-skip {
   background-color: var(--background-modifier-hover);
   color: var(--text-muted);

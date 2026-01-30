@@ -854,6 +854,19 @@ class TriageModal extends Modal {
       this.nextItem();
     });
 
+    // Back button (skip-back icon, no text)
+    const backBtn = actions.createEl("button", {
+      cls: "triage-btn triage-btn-back",
+      attr: { title: "Go back to previous item" }
+    });
+    backBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="5" x2="5" y2="19"/><polygon points="19 4 9 12 19 20 19 4"/></svg>';
+    backBtn.addEventListener("click", () => this.prevItem());
+    // Disable if at first item
+    if (this.currentIndex === 0) {
+      backBtn.disabled = true;
+      backBtn.classList.add("triage-btn-disabled");
+    }
+
     // Skip button (skip-forward icon)
     const skipBtn = actions.createEl("button", {
       cls: "triage-btn triage-btn-skip",
@@ -861,6 +874,13 @@ class TriageModal extends Modal {
     });
     skipBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg> Skip';
     skipBtn.addEventListener("click", () => this.nextItem());
+  }
+
+  private prevItem(): void {
+    if (this.currentIndex > 0) {
+      this.currentIndex--;
+      this.renderCurrentItem();
+    }
   }
 
   private nextItem(): void {
