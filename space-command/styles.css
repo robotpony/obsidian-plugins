@@ -1642,15 +1642,14 @@
   padding: 20px !important;
 }
 
-/* Set width on the modal container, not the content */
+/* Let modal auto-size to content with symmetric padding */
 .modal:has(.space-command-triage-modal) {
-  width: 600px !important;
+  width: auto !important;
   max-width: 90vw !important;
 }
 
-/* Ensure symmetric padding on modal - Obsidian adds extra right padding by default */
 .modal:has(.space-command-triage-modal) .modal-content {
-  padding-right: 0 !important;
+  padding: 0 !important;
 }
 
 .space-command-triage-modal .triage-header {

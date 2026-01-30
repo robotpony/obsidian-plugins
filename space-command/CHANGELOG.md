@@ -2,6 +2,12 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.77] - 2026-01-29
+
+### Fixed
+
+- **Triage modal padding**: Fixed asymmetric left/right padding by letting modal auto-size to button width with symmetric padding
+
 ## [0.9.76] - 2026-01-29
 
 ### Fixed
