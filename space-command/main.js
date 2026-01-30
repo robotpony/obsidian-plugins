@@ -15923,7 +15923,7 @@ var TriageModal = class extends import_obsidian11.Modal {
         (t) => t.filePath === item.filePath && t.lineNumber === item.parentLineNumber
       );
       if (parentHeader) {
-        const parentText = parentHeader.text.replace(/#\w+\b/g, "").replace(/^#{1,6}\s+/, "").trim();
+        const parentText = parentHeader.text.replace(/(?<!\\)#[\w-]+/g, "").replace(/\\#/g, "#").replace(/^#{1,6}\s+/, "").trim();
         contextIndicator.appendText(parentText);
       }
     }
@@ -15942,7 +15942,7 @@ var TriageModal = class extends import_obsidian11.Modal {
       this.nextItem();
     });
     const textSpan = itemContent.createEl("span", { cls: "triage-item-text" });
-    let displayText = item.text.replace(/#\w+\b/g, "").replace(/^[-*+]\s*\[.\]\s*/, "").replace(/^[-*+]\s*/, "").replace(/^#{1,6}\s+/, "").trim();
+    let displayText = item.text.replace(/(?<!\\)#[\w-]+/g, "").replace(/\\#/g, "#").replace(/^[-*+]\s*\[.\]\s*/, "").replace(/^[-*+]\s*/, "").replace(/^#{1,6}\s+/, "").trim();
     this.embedRenderer.renderInlineMarkdown(displayText, textSpan);
     const metaRow = contentEl.createEl("div", { cls: "triage-meta-row" });
     const sourceEl = metaRow.createEl("div", { cls: "triage-source" });

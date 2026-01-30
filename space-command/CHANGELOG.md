@@ -2,6 +2,16 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.80] - 2026-01-29
+
+### Fixed
+
+- **Triage content display**:
+  - Tags with dashes now stripped correctly (e.g., `#cdv-lift` no longer leaves `-lift` behind)
+  - Escaped tags (`\#tag`) are preserved and displayed as `#tag`
+  - Long content now wraps instead of expanding modal width
+  - Added 1em spacing above the context header
+
 ## [0.9.79] - 2026-01-29
 
 ### Improved

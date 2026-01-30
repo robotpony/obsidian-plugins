@@ -746,7 +746,8 @@ class TriageModal extends Modal {
       if (parentHeader) {
         // Strip tags and heading markers from parent text
         const parentText = parentHeader.text
-          .replace(/#\w+\b/g, "")
+          .replace(/(?<!\\)#[\w-]+/g, "") // Remove tags including dashes, preserve escaped
+          .replace(/\\#/g, "#") // Convert escaped tags back
           .replace(/^#{1,6}\s+/, "")
           .trim();
         contextIndicator.appendText(parentText);
@@ -772,7 +773,8 @@ class TriageModal extends Modal {
     // Strip tags and list markers, but preserve markdown for rendering
     const textSpan = itemContent.createEl("span", { cls: "triage-item-text" });
     let displayText = item.text
-      .replace(/#\w+\b/g, "") // Remove all tags
+      .replace(/(?<!\\)#[\w-]+/g, "") // Remove tags (including dashes), but preserve escaped \#tags
+      .replace(/\\#/g, "#") // Convert escaped tags back to normal
       .replace(/^[-*+]\s*\[.\]\s*/, "") // Remove checkbox
       .replace(/^[-*+]\s*/, "") // Remove list marker
       .replace(/^#{1,6}\s+/, "") // Remove heading markers

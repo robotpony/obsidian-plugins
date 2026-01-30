@@ -1682,6 +1682,7 @@
   font-size: 0.9em;
   font-weight: 500;
   color: var(--text-muted);
+  margin-top: 1em;
   margin-bottom: 10px;
   text-align: left;
   min-height: 1.4em;
@@ -1699,16 +1700,22 @@
   border-radius: 8px;
   margin-bottom: 12px;
   text-align: left;
+  max-width: 100%;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.space-command-triage-modal .triage-item-text {
+  flex: 1;
+  min-width: 0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .space-command-triage-modal .triage-checkbox {
   margin-top: 3px;
   cursor: pointer;
   flex-shrink: 0;
-}
-
-.space-command-triage-modal .triage-item-text {
-  flex: 1;
 }
 
 /* Source + tags on one row */
