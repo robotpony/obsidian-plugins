@@ -700,14 +700,17 @@ class TriageModal extends Modal {
     const header = contentEl.createEl("div", { cls: "triage-header" });
     const titleGroup = header.createEl("div", { cls: "triage-title-group" });
     titleGroup.createEl("span", { cls: "space-command-logo", text: "␣⌘" });
-    titleGroup.createEl("span", { cls: "triage-title", text: "Triage your tasks" });
 
     // Progress indicator (top-right)
     const progress = header.createEl("div", { cls: "triage-progress" });
     progress.appendText(`${this.currentIndex + 1} of ${this.items.length}`);
 
     if (this.items.length === 0 || this.currentIndex >= this.items.length) {
-      // Done triaging
+      // Done triaging - show generic title
+      const titleEl = titleGroup.createEl("span", { cls: "triage-title" });
+      titleEl.appendText("Triage your ");
+      titleEl.createEl("em", { text: "tasks" });
+
       const doneEl = contentEl.createEl("div", { cls: "triage-done" });
       doneEl.createEl("p", { text: "All items triaged!", cls: "triage-done-text" });
       const closeBtn = doneEl.createEl("button", { text: "Close", cls: "triage-btn triage-btn-close" });
@@ -717,9 +720,20 @@ class TriageModal extends Modal {
 
     const item = this.items[this.currentIndex];
 
-    // Determine item type for button logic
+    // Determine item type for title and button logic
     const isSnoozed = item.tags.includes("#future") || item.tags.includes("#snooze") || item.tags.includes("#snoozed");
     const isIdea = item.itemType === 'idea' || item.tags.includes("#idea") || item.tags.includes("#ideas");
+
+    // Dynamic title based on item type
+    const titleEl = titleGroup.createEl("span", { cls: "triage-title" });
+    titleEl.appendText("Triage your ");
+    if (isSnoozed) {
+      titleEl.createEl("em", { text: "snoozed items" });
+    } else if (isIdea) {
+      titleEl.createEl("em", { text: "ideas" });
+    } else {
+      titleEl.createEl("em", { text: "tasks" });
+    }
 
     // Show parent header text if item has one, otherwise leave blank
     const contextIndicator = contentEl.createEl("div", { cls: "triage-context" });

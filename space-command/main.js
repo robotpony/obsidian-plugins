@@ -15892,10 +15892,12 @@ var TriageModal = class extends import_obsidian11.Modal {
     const header = contentEl.createEl("div", { cls: "triage-header" });
     const titleGroup = header.createEl("div", { cls: "triage-title-group" });
     titleGroup.createEl("span", { cls: "space-command-logo", text: "\u2423\u2318" });
-    titleGroup.createEl("span", { cls: "triage-title", text: "Triage your tasks" });
     const progress = header.createEl("div", { cls: "triage-progress" });
     progress.appendText(`${this.currentIndex + 1} of ${this.items.length}`);
     if (this.items.length === 0 || this.currentIndex >= this.items.length) {
+      const titleEl2 = titleGroup.createEl("span", { cls: "triage-title" });
+      titleEl2.appendText("Triage your ");
+      titleEl2.createEl("em", { text: "tasks" });
       const doneEl = contentEl.createEl("div", { cls: "triage-done" });
       doneEl.createEl("p", { text: "All items triaged!", cls: "triage-done-text" });
       const closeBtn = doneEl.createEl("button", { text: "Close", cls: "triage-btn triage-btn-close" });
@@ -15905,6 +15907,15 @@ var TriageModal = class extends import_obsidian11.Modal {
     const item = this.items[this.currentIndex];
     const isSnoozed = item.tags.includes("#future") || item.tags.includes("#snooze") || item.tags.includes("#snoozed");
     const isIdea = item.itemType === "idea" || item.tags.includes("#idea") || item.tags.includes("#ideas");
+    const titleEl = titleGroup.createEl("span", { cls: "triage-title" });
+    titleEl.appendText("Triage your ");
+    if (isSnoozed) {
+      titleEl.createEl("em", { text: "snoozed items" });
+    } else if (isIdea) {
+      titleEl.createEl("em", { text: "ideas" });
+    } else {
+      titleEl.createEl("em", { text: "tasks" });
+    }
     const contextIndicator = contentEl.createEl("div", { cls: "triage-context" });
     if (item.parentLineNumber !== void 0) {
       const allItems = isIdea ? this.scanner.getIdeas() : this.scanner.getTodos();

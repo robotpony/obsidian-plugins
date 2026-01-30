@@ -2,6 +2,12 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.79] - 2026-01-29
+
+### Improved
+
+- **Triage dynamic title**: Title now reflects item type - "Triage your *tasks*", "Triage your *ideas*", or "Triage your *snoozed items*" with the type in italics
+
 ## [0.9.78] - 2026-01-29
 
 ### Fixed
