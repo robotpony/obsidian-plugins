@@ -4190,8 +4190,6 @@ function convertInlineFormatting(text) {
   result = result.replace(/\x00BI_START\x00/g, "_*");
   result = result.replace(/\x00BI_END\x00/g, "*_");
   result = result.replace(/~~(.+?)~~/g, "~$1~");
-  result = result.replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1 ($2)");
-  result = result.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, "$1 ($2)");
   result = result.replace(/\x00CODE(\d+)\x00/g, (_, idx) => {
     return `\`${codeSpans[parseInt(idx)]}\``;
   });

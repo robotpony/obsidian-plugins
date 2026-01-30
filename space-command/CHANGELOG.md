@@ -2,6 +2,14 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.91] - 2026-01-30
+
+### Fixed
+
+- **Slack copy preserves markdown links**: Links (`[text](url)`) and images (`![alt](url)`) are now kept as-is when copying as Slack markdown
+  - Slack renders markdown links correctly, so no conversion needed
+  - Previously converted to `text (url)` format which broke clickable links
+
 ## [0.9.90] - 2026-01-30
 
 ### Improved

@@ -99,12 +99,8 @@ function convertInlineFormatting(text: string): string {
   // Convert strikethrough (~~text~~) → ~text~
   result = result.replace(/~~(.+?)~~/g, "~$1~");
 
-  // Convert links [text](url) → text (url)
-  // We output as plain text with URL in parens - Slack auto-links URLs
-  result = result.replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1 ($2)");
-
-  // Convert images ![alt](url) → alt (url)
-  result = result.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, "$1 ($2)");
+  // Links [text](url) and images ![alt](url) are kept as-is
+  // Slack renders markdown links correctly
 
   // Restore inline code
   result = result.replace(/\x00CODE(\d+)\x00/g, (_, idx) => {
