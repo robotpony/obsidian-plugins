@@ -994,30 +994,21 @@
   cursor: not-allowed;
 }
 
-/* Child TODO container */
+/* Child TODO container - base styles */
 .todo-children {
   list-style: none;
-  padding: 0;
   margin: 0;
   font-size: .85em;
 }
 
-/* Embed children flush with header (override Obsidian defaults) */
-.space-command-embed .todo-children,
-.space-command-embed .idea-children,
-.space-command-embed .principle-children {
-  padding-left: 0 !important;
-  margin-left: 0 !important;
-  padding-inline-start: 0 !important;
+/* Sidebar: children flush with parent (compact layout) */
+.space-command-sidebar .todo-children {
+  padding: 0;
 }
 
-/* Override Obsidian's contains-task-list nesting indentation */
-.space-command-embed ul.contains-task-list ul.contains-task-list,
-.space-command-embed .task-list-item ul {
-  padding-left: 0 !important;
-  margin-left: 0 !important;
-  padding-inline-start: 0 !important;
-  margin-inline-start: 0 !important;
+/* Embeds: children indented like editor view */
+.space-command-embed .todo-children {
+  padding-left: 1.5em;
 }
 
 /* Child TODO item styling */
@@ -1053,12 +1044,21 @@
   flex: 1;
 }
 
-/* Child idea container */
+/* Child idea container - base styles */
 .idea-children {
   list-style: none;
-  padding: 0;
   margin: 0;
   font-size: .85em;
+}
+
+/* Sidebar: children flush with parent (compact layout) */
+.space-command-sidebar .idea-children {
+  padding: 0;
+}
+
+/* Embeds: children indented like editor view */
+.space-command-embed .idea-children {
+  padding-left: 1.5em;
 }
 
 /* Child idea item styling */
@@ -1089,17 +1089,36 @@
   flex: 1;
 }
 
-/* Child principle container */
+/* Child principle container - base styles */
 .principle-children {
   list-style: none;
-  padding: 0;
   margin: 0;
   font-size: .85em;
+}
+
+/* Sidebar: children flush with parent (compact layout) */
+.space-command-sidebar .principle-children {
+  padding: 0;
+}
+
+/* Embeds: children indented like editor view */
+.space-command-embed .principle-children {
+  padding-left: 1.5em;
 }
 
 /* Child principle item styling */
 .principle-child {
   opacity: 0.9;
+}
+
+/* Header filename indicator - shown for header blocks with children */
+.header-filename {
+  font-family: var(--font-monospace);
+  font-size: 0.75em;
+  color: var(--text-faint);
+  margin-left: 6px;
+  flex-shrink: 0;
+  align-self: center;
 }
 
 /* Tag dropdown styles - styled to match Obsidian's tag appearance */

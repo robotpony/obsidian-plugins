@@ -379,6 +379,14 @@ export class TodoSidebarView extends ItemView {
       textSpan.appendText(finalText);
     }
 
+    // Show filename for header items with children (before tags and link)
+    if (hasChildren) {
+      rowContainer.createEl("span", {
+        cls: "header-filename",
+        text: item.file.basename,
+      });
+    }
+
     // Get tags (excluding the type tag) and merge with parent header tags for child items
     const itemTags = extractTags(cleanText).filter(tag => !config.tagToStrip.test(tag));
     // Merge parent tags with item tags, avoiding duplicates

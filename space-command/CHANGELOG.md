@@ -2,6 +2,48 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.87] - 2026-01-29
+
+### Improved
+
+- **Header filename positioning**: Filename indicator for header blocks now appears before tags and link arrow for consistent layout
+  - Vertically centred in the row
+  - Order: text → filename → tags (#) → link (→)
+
+## [0.9.86] - 2026-01-29
+
+### Added
+
+- **Filename shown for header blocks**: Header items with children (grouped TODOs, ideas, principles) now display the source filename in a monospace font
+  - Only appears for headers that have nested child items
+  - Shows just the filename (basename), not the full path
+  - Helps identify which file a grouped block belongs to at a glance
+
+## [0.9.85] - 2026-01-29
+
+### Improved
+
+- **Embed list indentation matches editor**: Nested items in embeds now indent like the editor view (1.5em) instead of being flush like the sidebar
+  - Previously, embeds used sidebar styling (compact, no indentation)
+  - Now embeds match Obsidian's native list indentation for consistency
+  - Sidebar retains compact flush styling for space efficiency
+
+## [0.9.84] - 2026-01-29
+
+### Improved
+
+- **Rewritten Slack markdown converter**: Replaced `slackify-markdown` library with custom implementation
+  - Lists now preserve original format (dashes stay as dashes, not converted to bullet points)
+  - Checkboxes (`- [ ]` and `- [x]`) are preserved instead of being stripped
+  - Nested list indentation preserved as-is
+  - Better bold/italic handling without zero-width space artifacts
+  - Smaller bundle size (removed 68 packages)
+
+### Technical
+
+- Removed `slackify-markdown` dependency
+- Custom `SlackConverter.ts` handles: bold, italic, bold+italic, strikethrough, code, links, images, headings, blockquotes
+
 ## [0.9.83] - 2026-01-29
 
 ### Added

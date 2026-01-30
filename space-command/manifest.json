@@ -1,7 +1,7 @@
 {
   "id": "space-command",
   "name": "Space Command",
-  "version": "0.9.83",
+  "version": "0.9.87",
   "minAppVersion": "0.15.0",
   "description": "Tools for managing TODOs, TODONEs, and workflows across your vault with live embeds and interactive sidebar.",
   "author": "Bruce Alderson",

@@ -549,6 +549,14 @@ export class EmbedRenderer {
       });
     }
 
+    // Show filename for header items with children (before link)
+    if (hasChildren) {
+      rowContainer.createEl("span", {
+        cls: "header-filename",
+        text: todo.file.basename,
+      });
+    }
+
     // Add link to source
     const link = rowContainer.createEl("a", {
       text: "→",
@@ -678,6 +686,14 @@ export class EmbedRenderer {
     this.renderInlineMarkdown(displayText, textSpan);
     textSpan.append(" ");
 
+    // Show filename for header items with children (before link)
+    if (hasChildren) {
+      rowContainer.createEl("span", {
+        cls: "header-filename",
+        text: idea.file.basename,
+      });
+    }
+
     // Add link to source
     const link = rowContainer.createEl("a", {
       text: "→",
@@ -802,6 +818,14 @@ export class EmbedRenderer {
 
     this.renderInlineMarkdown(displayText, textSpan);
     textSpan.append(" ");
+
+    // Show filename for header items with children (before link)
+    if (hasChildren) {
+      rowContainer.createEl("span", {
+        cls: "header-filename",
+        text: principle.file.basename,
+      });
+    }
 
     // Add link to source
     const link = rowContainer.createEl("a", {
