@@ -9,6 +9,7 @@ Run the installer from the repo root:
 ./install.sh -a        # Install all plugins (still prompts for vaults)
 ./install.sh -p        # Use previously selected vaults
 ./install.sh -a -p     # Quick reinstall: all plugins to cached vaults
+./install.sh -d 8      # Deep search for nested vaults
 ./install.sh --help    # Show help
 ```
 
@@ -23,6 +24,7 @@ The installer will:
 **Options:**
 - `-a, --all` - Install all plugins (skip plugin prompt)
 - `-p, --previous` - Use previously selected vaults (skip vault prompt)
+- `-d, --depth N` - Override vault search depth (default: 3-5 depending on location)
 - `-h, --help` - Show help
 
 **Prompts:**

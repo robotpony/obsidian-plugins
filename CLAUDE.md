@@ -34,6 +34,7 @@ The root [install.sh](install.sh) script handles building and installing to Obsi
 ./install.sh -a        # Install all plugins (still prompts for vaults)
 ./install.sh -p        # Use previously selected vaults
 ./install.sh -a -p     # Quick reinstall: all plugins to cached vaults
+./install.sh -d 8      # Deep search for nested vaults
 ```
 
 The installer:

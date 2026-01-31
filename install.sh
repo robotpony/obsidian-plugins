@@ -26,6 +26,7 @@ typeset -ga SELECTED_ITEMS
 # Command line options
 USE_ALL_PLUGINS=false
 USE_PREVIOUS_VAULTS=false
+SEARCH_DEPTH=""
 
 show_help() {
     echo "Usage: ./install.sh [options]"
@@ -33,10 +34,13 @@ show_help() {
     echo "Options:"
     echo "  -a, --all        Install all plugins (skip plugin prompt)"
     echo "  -p, --previous   Use previously selected vaults (skip vault prompt)"
+    echo "  -d, --depth N    Override vault search depth (default: 3-5 depending on location)"
     echo "  -h, --help       Show this help message"
     echo ""
     echo "Examples:"
-    echo "  ./install.sh -a -p   Quick reinstall: all plugins to cached vaults"
+    echo "  ./install.sh -a -p      Quick reinstall: all plugins to cached vaults"
+    echo "  ./install.sh -d 2       Shallow search (faster, finds fewer vaults)"
+    echo "  ./install.sh -d 8       Deep search (slower, finds nested vaults)"
     echo ""
     echo "Interactive prompts:"
     echo "  0        Select all items"
@@ -95,6 +99,7 @@ find_vaults() {
     local -a searched_paths
     local frame=0
 
+    # Default depths per location (can be overridden with -d flag)
     local -a search_configs=(
         "$HOME/Documents:4"
         "$HOME/Desktop:3"
@@ -105,6 +110,9 @@ find_vaults() {
     for config in "${search_configs[@]}"; do
         local search_path="${config%:*}"
         local max_depth="${config#*:}"
+
+        # Override with user-specified depth if provided
+        [[ -n "$SEARCH_DEPTH" ]] && max_depth="$SEARCH_DEPTH"
 
         [[ -d "$search_path" ]] || continue
 
@@ -277,6 +285,18 @@ main() {
                 USE_PREVIOUS_VAULTS=true
                 shift
                 ;;
+            -d|--depth)
+                if [[ -z "$2" || "$2" == -* ]]; then
+                    print_error "Option -d requires a numeric argument"
+                    exit 1
+                fi
+                if ! [[ "$2" =~ ^[0-9]+$ ]]; then
+                    print_error "Depth must be a positive integer"
+                    exit 1
+                fi
+                SEARCH_DEPTH="$2"
+                shift 2
+                ;;
             -h|--help)
                 show_help
                 exit 0
@@ -292,7 +312,7 @@ main() {
     echo "${BOLD}${BLUE}Obsidian Plugin Installer${NC}"
 
     # Find plugins
-    print_header "Discovering plugins..."
+    print_header "Searching for plugins..."
     local -a plugin_dirs
     while IFS= read -r line; do
         [[ -n "$line" ]] && plugin_dirs+=("$line")
@@ -363,7 +383,7 @@ main() {
         done
     else
         # Discover and prompt for vaults
-        print_header "Discovering Obsidian vaults..."
+        print_header "Searching for Obsidian vaults..."
         local -a vault_dirs
         while IFS= read -r line; do
             [[ -n "$line" ]] && vault_dirs+=("$line")
@@ -371,7 +391,11 @@ main() {
 
         if [[ ${#vault_dirs[@]} -eq 0 ]]; then
             print_error "No Obsidian vaults found"
-            print_warn "Searched: ~/Documents, ~/Desktop, ~ (depth 5), iCloud"
+            if [[ -n "$SEARCH_DEPTH" ]]; then
+                print_warn "Searched with depth $SEARCH_DEPTH. Try a higher value with -d."
+            else
+                print_warn "Searched: ~/Documents (4), ~/Desktop (3), ~ (5), iCloud (4)"
+            fi
             exit 1
         fi
 
