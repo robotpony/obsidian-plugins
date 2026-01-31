@@ -5,6 +5,6 @@
   "minAppVersion": "0.15.0",
   "description": "Manage and browse your Hugo content with a sidebar showing posts, drafts, and tags.",
   "author": "Bruce Alderson",
-  "authorUrl": "",
+  "authorUrl": "https://github.com/robotpony/obsidian-plugins",
   "isDesktopOnly": false
 }

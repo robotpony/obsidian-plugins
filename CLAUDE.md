@@ -9,7 +9,7 @@ This is a mono-repo containing three Obsidian plugins:
 | Plugin | Description | Has CLAUDE.md |
 |--------|-------------|---------------|
 | [space-command/](space-command/) | TODO/TODONE tracking with sidebar, embeds, slash commands | Yes |
-| [hugo-command/](hugo-command/) | Hugo content browser and management | No |
+| [hugo-command/](hugo-command/) | Hugo content browser and management | Yes |
 | [link-command/](link-command/) | URL unfurling with inline format toggle | Yes |
 
 See plugin-specific CLAUDE.md files for detailed architecture.

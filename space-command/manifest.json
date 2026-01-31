@@ -5,6 +5,6 @@
   "minAppVersion": "0.15.0",
   "description": "Tools for managing TODOs, TODONEs, and workflows across your vault with live embeds and interactive sidebar.",
   "author": "Bruce Alderson",
-  "authorUrl": "",
+  "authorUrl": "https://github.com/robotpony/obsidian-plugins",
   "isDesktopOnly": false
 }

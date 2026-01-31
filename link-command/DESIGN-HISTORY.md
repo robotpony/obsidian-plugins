@@ -1,3 +1,9 @@
+# Link Command Design History
+
+> **Note**: This is the original planning document from before implementation. The actual implementation differs in some areas (e.g., inline format toggle instead of tooltip UI, no code block cards). Kept for historical reference.
+
+---
+
 # Link Command Plugin
 
 ## Summary

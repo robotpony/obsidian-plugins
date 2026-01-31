@@ -42,3 +42,15 @@ Reload Obsidian after installing to activate changes.
 Focus on the right next task. Simple TODOs and tags in your markdown, surfaced when you need them.
 
 Tag lines with `#todo` and view them in a sidebar or embedded lists. Completing a TODO converts it to `#todone @date`. Supports priority tags (`#focus`, `#p0`-`#p4`, `#future`), project grouping, and an Ideas tab for `#idea` and `#principle` tags.
+
+### [Link Command](./link-command)
+
+URL unfurling for Obsidian. Fetch link titles and descriptions, insert as markdown links or rich previews.
+
+Paste a URL and click the inline toggle to cycle formats: plain URL → markdown link → rich link (with bold domain). Includes a sidebar for browsing page links and recent history, smart two-tier caching, and extensible provider architecture for site-specific handling.
+
+### [Hugo Command](./hugo-command)
+
+Manage and browse Hugo content from Obsidian. View posts, drafts, and filter by tags from a convenient sidebar.
+
+Content is grouped by folder with subfolder "folder tags" for filtering. Edit your Hugo site configuration (hugo.toml) directly from the sidebar. Supports both TOML and YAML frontmatter formats.

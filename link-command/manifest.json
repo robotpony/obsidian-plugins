@@ -5,6 +5,6 @@
   "minAppVersion": "0.15.0",
   "description": "URL unfurling for Obsidian. Fetch link titles, descriptions, and images. Insert as markdown links or rich preview cards.",
   "author": "Bruce Alderson",
-  "authorUrl": "",
+  "authorUrl": "https://github.com/robotpony/obsidian-plugins",
   "isDesktopOnly": false
 }
