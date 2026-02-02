@@ -30,6 +30,15 @@ export const PRIORITY_TAG_MAP: Record<string, number> = {
 };
 
 /**
+ * Check if a tags array includes a specific tag (case-insensitive).
+ * This normalizes the check to handle #Focus, #FOCUS, #focus etc.
+ */
+export function hasTag(tags: string[], tag: string): boolean {
+  const lowerTag = tag.toLowerCase();
+  return tags.some(t => t.toLowerCase() === lowerTag);
+}
+
+/**
  * Tag colour info for semantic colouring.
  */
 export interface TagColourInfo {
@@ -89,15 +98,15 @@ export function formatDate(date: Date, format: string): string {
  * Priority order: #focus=0, #today=1, #p0=2, #p1=3, #p2=4, no priority=5, #p3=6, #p4=7, snoozed=8
  */
 export function getPriorityValue(tags: string[]): number {
-  if (tags.includes("#focus")) return 0;
-  if (tags.includes("#today")) return 1;
-  if (tags.includes("#p0")) return 2;
-  if (tags.includes("#p1")) return 3;
-  if (tags.includes("#p2")) return 4;
-  if (tags.includes("#p3")) return 6;
-  if (tags.includes("#p4")) return 7;
+  if (hasTag(tags, "#focus")) return 0;
+  if (hasTag(tags, "#today")) return 1;
+  if (hasTag(tags, "#p0")) return 2;
+  if (hasTag(tags, "#p1")) return 3;
+  if (hasTag(tags, "#p2")) return 4;
+  if (hasTag(tags, "#p3")) return 6;
+  if (hasTag(tags, "#p4")) return 7;
   // Snoozed items (any of the snooze tag variants) get lowest priority
-  if (tags.includes("#future") || tags.includes("#snooze") || tags.includes("#snoozed")) return 8;
+  if (hasTag(tags, "#future") || hasTag(tags, "#snooze") || hasTag(tags, "#snoozed")) return 8;
   return 5; // No priority = medium (between #p2 and #p3)
 }
 
@@ -113,7 +122,8 @@ export function getTagCount(tags: string[]): number {
     "#focus", "#today", "#future", "#snooze", "#snoozed",
     "#p0", "#p1", "#p2", "#p3", "#p4"
   ]);
-  return tags.filter(tag => !systemTags.has(tag)).length;
+  // Case-insensitive check against system tags
+  return tags.filter(tag => !systemTags.has(tag.toLowerCase())).length;
 }
 
 /**
@@ -125,9 +135,9 @@ export function compareTodoItems(
   a: { tags: string[] },
   b: { tags: string[] }
 ): number {
-  // 1. Focus tag first
-  const aHasFocus = a.tags.includes("#focus");
-  const bHasFocus = b.tags.includes("#focus");
+  // 1. Focus tag first (case-insensitive)
+  const aHasFocus = hasTag(a.tags, "#focus");
+  const bHasFocus = hasTag(b.tags, "#focus");
   if (aHasFocus && !bHasFocus) return -1;
   if (!aHasFocus && bHasFocus) return 1;
 

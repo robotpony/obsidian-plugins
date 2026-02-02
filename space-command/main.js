@@ -56,6 +56,10 @@ var PRIORITY_TAG_MAP = {
   "#p4": 6,
   "#future": 7
 };
+function hasTag(tags, tag) {
+  const lowerTag = tag.toLowerCase();
+  return tags.some((t) => t.toLowerCase() === lowerTag);
+}
 function getTagColourInfo(tag, projectColourMap) {
   var _a;
   const normalizedTag = tag.toLowerCase();
@@ -81,21 +85,21 @@ function formatDate(date, format) {
   return (0, import_obsidian.moment)(date).format(format);
 }
 function getPriorityValue(tags) {
-  if (tags.includes("#focus"))
+  if (hasTag(tags, "#focus"))
     return 0;
-  if (tags.includes("#today"))
+  if (hasTag(tags, "#today"))
     return 1;
-  if (tags.includes("#p0"))
+  if (hasTag(tags, "#p0"))
     return 2;
-  if (tags.includes("#p1"))
+  if (hasTag(tags, "#p1"))
     return 3;
-  if (tags.includes("#p2"))
+  if (hasTag(tags, "#p2"))
     return 4;
-  if (tags.includes("#p3"))
+  if (hasTag(tags, "#p3"))
     return 6;
-  if (tags.includes("#p4"))
+  if (hasTag(tags, "#p4"))
     return 7;
-  if (tags.includes("#future") || tags.includes("#snooze") || tags.includes("#snoozed"))
+  if (hasTag(tags, "#future") || hasTag(tags, "#snooze") || hasTag(tags, "#snoozed"))
     return 8;
   return 5;
 }
@@ -121,11 +125,11 @@ function getTagCount(tags) {
     "#p3",
     "#p4"
   ]);
-  return tags.filter((tag) => !systemTags.has(tag)).length;
+  return tags.filter((tag) => !systemTags.has(tag.toLowerCase())).length;
 }
 function compareTodoItems(a, b) {
-  const aHasFocus = a.tags.includes("#focus");
-  const bHasFocus = b.tags.includes("#focus");
+  const aHasFocus = hasTag(a.tags, "#focus");
+  const bHasFocus = hasTag(b.tags, "#focus");
   if (aHasFocus && !bHasFocus)
     return -1;
   if (!aHasFocus && bHasFocus)

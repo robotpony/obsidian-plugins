@@ -2,6 +2,15 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.96] - 2026-02-02
+
+### Fixed
+
+- **Priority tag sorting is now case-insensitive**: Tags like `#P0`, `#Focus`, or `#TODAY` now work the same as their lowercase equivalents
+  - Previously `#P0` (uppercase) would not affect sort order; only `#p0` (lowercase) was recognized
+  - The fix applies to all priority-related tags: `#focus`, `#today`, `#p0`-`#p4`, `#future`, `#snooze`, `#snoozed`
+  - Tag counting for tertiary sort (more project tags = higher priority) is also now case-insensitive
+
 ## [0.9.95] - 2026-01-31
 
 ### Improved
