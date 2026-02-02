@@ -2,6 +2,31 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.95] - 2026-01-31
+
+### Improved
+
+- **Completing ideas now marks checkbox as checked**: When you check off an idea in the sidebar, the checkbox is now marked complete (`- [ ]` → `- [x]`) in addition to removing the `#idea` tag
+  - Completed ideas become regular checked list items
+  - They no longer appear in any sidebar tab
+
+## [0.9.94] - 2026-01-31
+
+### Fixed
+
+- **Ideas tab no longer shows items from done.md**: The TODONE archive file is now excluded from Ideas and Principles lists, not just Recent TODONEs
+  - Previously, any `#idea` or `#principle` tags in done.md would appear in the Ideas tab
+  - The archive file exclusion setting now applies to all sidebar lists
+
+## [0.9.93] - 2026-01-31
+
+### Changed
+
+- **Header TODO scope now ends at any sub-header**: Previously, a `## Header #todo` would capture list items under nested headers like `### Sub-section`. Now the scope ends at the first subsequent header of any level.
+  - Only list items directly following the tagged header become children
+  - More predictable behaviour when headers have internal structure
+  - Example: `## Project #todo` with `- Task A` then `### Details` then `- Task B` — only "Task A" is now a child of the project
+
 ## [0.9.92] - 2026-01-30
 
 ### Improved

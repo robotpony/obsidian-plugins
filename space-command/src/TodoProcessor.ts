@@ -437,6 +437,9 @@ export class TodoProcessor {
       // Remove #idea/#ideas/#ideation tag (idea disappears from sidebar)
       line = removeIdeaTag(line);
 
+      // Mark checkbox as complete if present
+      line = markCheckboxComplete(line);
+
       lines[idea.lineNumber] = line;
       await this.app.vault.modify(idea.file, lines.join("\n"));
 

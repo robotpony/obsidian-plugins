@@ -261,7 +261,7 @@ var TodoScanner = class extends import_obsidian2.Events {
     this.todonesCache = /* @__PURE__ */ new Map();
     this.ideasCache = /* @__PURE__ */ new Map();
     this.principlesCache = /* @__PURE__ */ new Map();
-    this.excludeFromTodones = /* @__PURE__ */ new Set();
+    this.excludeFiles = /* @__PURE__ */ new Set();
     this.app = app;
     this.debouncedScanFile = (0, import_obsidian2.debounce)(
       (file) => this.scanFile(file),
@@ -269,8 +269,8 @@ var TodoScanner = class extends import_obsidian2.Events {
       true
     );
   }
-  setExcludeFromTodones(filePaths) {
-    this.excludeFromTodones = new Set(filePaths);
+  setExcludeFiles(filePaths) {
+    this.excludeFiles = new Set(filePaths);
   }
   async scanVault() {
     this.todosCache.clear();
@@ -312,15 +312,9 @@ var TodoScanner = class extends import_obsidian2.Events {
         const tags = extractTags(line);
         const headerInfo = this.detectHeader(line);
         if (headerInfo) {
-          if (currentHeaderTodo && headerInfo.level <= currentHeaderTodo.level) {
-            currentHeaderTodo = null;
-          }
-          if (currentHeaderIdea && headerInfo.level <= currentHeaderIdea.level) {
-            currentHeaderIdea = null;
-          }
-          if (currentHeaderPrinciple && headerInfo.level <= currentHeaderPrinciple.level) {
-            currentHeaderPrinciple = null;
-          }
+          currentHeaderTodo = null;
+          currentHeaderIdea = null;
+          currentHeaderPrinciple = null;
         }
         if (headerInfo && (tags.includes("#todo") || tags.includes("#todos")) && !tags.includes("#todone") && !tags.includes("#todones")) {
           if (!this.hasContent(line))
@@ -543,7 +537,7 @@ var TodoScanner = class extends import_obsidian2.Events {
   getTodones(limit) {
     const allTodones = [];
     for (const [filePath, todones] of this.todonesCache.entries()) {
-      if (this.excludeFromTodones.has(filePath)) {
+      if (this.excludeFiles.has(filePath)) {
         continue;
       }
       allTodones.push(...todones);
@@ -553,14 +547,20 @@ var TodoScanner = class extends import_obsidian2.Events {
   }
   getIdeas() {
     const allIdeas = [];
-    for (const ideas of this.ideasCache.values()) {
+    for (const [filePath, ideas] of this.ideasCache.entries()) {
+      if (this.excludeFiles.has(filePath)) {
+        continue;
+      }
       allIdeas.push(...ideas);
     }
     return allIdeas.sort((a, b) => a.dateCreated - b.dateCreated);
   }
   getPrinciples() {
     const allPrinciples = [];
-    for (const principles of this.principlesCache.values()) {
+    for (const [filePath, principles] of this.principlesCache.entries()) {
+      if (this.excludeFiles.has(filePath)) {
+        continue;
+      }
       allPrinciples.push(...principles);
     }
     return allPrinciples.sort((a, b) => a.dateCreated - b.dateCreated);
@@ -914,6 +914,7 @@ ${todoneText}` : todoneText;
         );
       }
       line = removeIdeaTag(line);
+      line = markCheckboxComplete(line);
       lines[idea.lineNumber] = line;
       await this.app.vault.modify(idea.file, lines.join("\n"));
       if (this.scanner) {
@@ -5053,7 +5054,7 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
       });
     }
     if (this.settings.excludeTodoneFilesFromRecent) {
-      this.scanner.setExcludeFromTodones([this.settings.defaultTodoneFile]);
+      this.scanner.setExcludeFiles([this.settings.defaultTodoneFile]);
     }
     this.processor.setOnCompleteCallback(() => {
       this.app.workspace.trigger("markdown-changed");

@@ -86,9 +86,9 @@ export default class SpaceCommandPlugin extends Plugin {
       });
     }
 
-    // Configure scanner to exclude TODONE log file from Recent TODONEs
+    // Configure scanner to exclude TODONE archive file from all lists
     if (this.settings.excludeTodoneFilesFromRecent) {
-      this.scanner.setExcludeFromTodones([this.settings.defaultTodoneFile]);
+      this.scanner.setExcludeFiles([this.settings.defaultTodoneFile]);
     }
 
     // Set up processor callback to trigger re-scan after completion

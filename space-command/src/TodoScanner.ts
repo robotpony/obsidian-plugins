@@ -8,7 +8,7 @@ export class TodoScanner extends Events {
   private todonesCache: Map<string, TodoItem[]> = new Map();
   private ideasCache: Map<string, TodoItem[]> = new Map();
   private principlesCache: Map<string, TodoItem[]> = new Map();
-  private excludeFromTodones: Set<string> = new Set();
+  private excludeFiles: Set<string> = new Set();
 
   // Debounced scan function to prevent rapid re-scans on file changes
   private debouncedScanFile: (file: TFile) => void;
@@ -25,8 +25,8 @@ export class TodoScanner extends Events {
     );
   }
 
-  setExcludeFromTodones(filePaths: string[]): void {
-    this.excludeFromTodones = new Set(filePaths);
+  setExcludeFiles(filePaths: string[]): void {
+    this.excludeFiles = new Set(filePaths);
   }
 
   async scanVault(): Promise<void> {
@@ -88,17 +88,12 @@ export class TodoScanner extends Events {
         // Check if this is a header with #todo or #todone
         const headerInfo = this.detectHeader(line);
 
-        // If we encounter any header (with or without tags), check if it ends current header scopes
+        // Any header (with or without tags) ends all current header scopes
+        // This ensures only direct list items (before any sub-header) become children
         if (headerInfo) {
-          if (currentHeaderTodo && headerInfo.level <= currentHeaderTodo.level) {
-            currentHeaderTodo = null;
-          }
-          if (currentHeaderIdea && headerInfo.level <= currentHeaderIdea.level) {
-            currentHeaderIdea = null;
-          }
-          if (currentHeaderPrinciple && headerInfo.level <= currentHeaderPrinciple.level) {
-            currentHeaderPrinciple = null;
-          }
+          currentHeaderTodo = null;
+          currentHeaderIdea = null;
+          currentHeaderPrinciple = null;
         }
 
         // Process header with #todo or #todos tag
@@ -407,8 +402,8 @@ export class TodoScanner extends Events {
   getTodones(limit?: number): TodoItem[] {
     const allTodones: TodoItem[] = [];
     for (const [filePath, todones] of this.todonesCache.entries()) {
-      // Skip files that are in the exclude list
-      if (this.excludeFromTodones.has(filePath)) {
+      // Skip excluded files (e.g., the archive file)
+      if (this.excludeFiles.has(filePath)) {
         continue;
       }
       allTodones.push(...todones);
@@ -420,7 +415,11 @@ export class TodoScanner extends Events {
 
   getIdeas(): TodoItem[] {
     const allIdeas: TodoItem[] = [];
-    for (const ideas of this.ideasCache.values()) {
+    for (const [filePath, ideas] of this.ideasCache.entries()) {
+      // Skip excluded files (e.g., the archive file)
+      if (this.excludeFiles.has(filePath)) {
+        continue;
+      }
       allIdeas.push(...ideas);
     }
     // Sort by date created (oldest first)
@@ -429,7 +428,11 @@ export class TodoScanner extends Events {
 
   getPrinciples(): TodoItem[] {
     const allPrinciples: TodoItem[] = [];
-    for (const principles of this.principlesCache.values()) {
+    for (const [filePath, principles] of this.principlesCache.entries()) {
+      // Skip excluded files (e.g., the archive file)
+      if (this.excludeFiles.has(filePath)) {
+        continue;
+      }
       allPrinciples.push(...principles);
     }
     // Sort by date created (oldest first)
