@@ -2,6 +2,27 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.97] - 2026-02-02
+
+### Changed
+
+- **`#focus` is now a visibility filter, not a priority level**: The `#focus` tag marks items for focus mode filtering, not priority sorting
+  - Previously `#focus` sorted highest (above `#p0`), which mixed "what to see" with "what's important"
+  - Now `#focus` sorts after `#p4` but before unmarked items (priority value 7)
+  - If an item has both `#focus` and a priority tag (e.g., `#focus #p1`), the priority tag determines sort order
+  - Focus mode filtering unchanged: toggle still shows only `#focus` items
+
+- **Header TODOs now sort by average child priority**: Headers with children (e.g., `## Project #todo` with child tasks) sort by the average priority of their active children
+  - Prevents high-priority standalone items from being buried below low-priority header blocks
+  - A header with one `#p0` child and three unmarked children sorts at ~5.5 (between `#p3` and `#p4`)
+  - Headers without children sort by their own priority tags
+
+### Technical
+
+- New `getEffectivePriority()` and `compareWithEffectivePriority()` functions in `utils.ts` for header averaging
+- Added `hasFocusItems` field to `ProjectInfo` for focus mode filtering (separate from `highestPriority`)
+- Updated DESIGN.md with priority system documentation
+
 ## [0.9.96] - 2026-02-02
 
 ### Fixed

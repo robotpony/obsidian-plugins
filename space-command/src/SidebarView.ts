@@ -4,7 +4,7 @@ import { TodoProcessor } from "./TodoProcessor";
 import { ProjectManager } from "./ProjectManager";
 import { TodoItem, ProjectInfo, ItemRenderConfig } from "./types";
 import { ContextMenuHandler } from "./ContextMenuHandler";
-import { getPriorityValue, compareTodoItems, openFileAtLine, extractTags, showNotice, getTagColourInfo } from "./utils";
+import { getPriorityValue, compareTodoItems, compareWithEffectivePriority, hasTag, openFileAtLine, extractTags, showNotice, getTagColourInfo } from "./utils";
 
 export const VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 
@@ -319,7 +319,7 @@ export class TodoSidebarView extends ItemView {
     isChild: boolean = false,
     parentTags: string[] = []
   ): void {
-    const hasFocus = item.tags.includes("#focus");
+    const hasFocus = hasTag(item.tags, "#focus");
     const isHeader = item.isHeader === true;
     const hasChildren = isHeader && item.childLineNumbers && item.childLineNumbers.length > 0;
 
@@ -991,7 +991,8 @@ export class TodoSidebarView extends ItemView {
   }
 
   private sortTodosByPriority(todos: TodoItem[]): TodoItem[] {
-    return [...todos].sort(compareTodoItems);
+    // Use effective priority sorting which considers children for header items
+    return [...todos].sort((a, b) => compareWithEffectivePriority(a, b, todos));
   }
 
   /**
@@ -1047,7 +1048,7 @@ export class TodoSidebarView extends ItemView {
 
     // Apply focus mode filter if enabled
     if (this.focusModeEnabled) {
-      projects = projects.filter(p => p.highestPriority === 0);
+      projects = projects.filter(p => p.hasFocusItems);
     }
 
     if (projects.length === 0) {
@@ -1058,15 +1059,10 @@ export class TodoSidebarView extends ItemView {
       return;
     }
 
-    // Sort projects by: 1) has focus items, 2) priority, 3) tag count (higher = better)
+    // Sort projects by: 1) priority (lowest value = highest priority), 2) tag count (higher = better)
+    // Note: #focus is a visibility filter, not a priority level
     projects.sort((a, b) => {
-      // Focus items first (priority 0 = #focus)
-      const aHasFocus = a.highestPriority === 0;
-      const bHasFocus = b.highestPriority === 0;
-      if (aHasFocus && !bHasFocus) return -1;
-      if (!aHasFocus && bHasFocus) return 1;
-
-      // Then by priority
+      // Sort by priority (lower = higher priority)
       const priorityDiff = a.highestPriority - b.highestPriority;
       if (priorityDiff !== 0) return priorityDiff;
 
@@ -1099,9 +1095,8 @@ export class TodoSidebarView extends ItemView {
   }
 
   private renderProjectItem(list: HTMLElement, project: ProjectInfo): void {
-    // Check if this project has any #focus items (priority 0 = #focus)
-    const hasFocusItems = project.highestPriority === 0;
-    const item = list.createEl("li", { cls: `project-item${hasFocusItems ? ' project-focus' : ''}` });
+    // Check if this project has any #focus items
+    const item = list.createEl("li", { cls: `project-item${project.hasFocusItems ? ' project-focus' : ''}` });
 
     // Add context menu for project operations
     item.addEventListener("contextmenu", (e) => {
@@ -1333,7 +1328,7 @@ export class TodoSidebarView extends ItemView {
         if (todo.parentLineNumber === undefined) {
           return true; // Top-level items always kept
         }
-        if (!todo.tags.includes("#focus")) {
+        if (!hasTag(todo.tags, "#focus")) {
           return false; // Child without focus, filter out
         }
         // Child with #focus - check if parent also has #focus
@@ -1341,7 +1336,7 @@ export class TodoSidebarView extends ItemView {
           t => t.filePath === todo.filePath && t.lineNumber === todo.parentLineNumber
         );
         // If parent has #focus, child will be shown under it, so filter out standalone
-        return !parent?.tags.includes("#focus");
+        return !hasTag(parent?.tags || [], "#focus");
       });
     } else {
       todos = todos.filter(todo => todo.parentLineNumber === undefined);
@@ -1391,18 +1386,18 @@ export class TodoSidebarView extends ItemView {
     // Apply focus mode filter if enabled
     if (this.focusModeEnabled) {
       if (this.focusModeIncludeProjects) {
-        // Get project tags from focused projects
+        // Get project tags from focused projects (those with #focus items)
         const focusedProjects = this.projectManager.getProjects()
-          .filter(p => p.highestPriority === 0)
+          .filter(p => p.hasFocusItems)
           .map(p => p.tag);
         // Show #focus items or items from focused projects
         todos = todos.filter(todo =>
-          todo.tags.includes("#focus") ||
+          hasTag(todo.tags, "#focus") ||
           todo.tags.some(tag => focusedProjects.includes(tag))
         );
       } else {
         // Show only #focus items
-        todos = todos.filter(todo => todo.tags.includes("#focus"));
+        todos = todos.filter(todo => hasTag(todo.tags, "#focus"));
       }
     }
 
@@ -1472,18 +1467,18 @@ export class TodoSidebarView extends ItemView {
 
       // Apply focus/project filter (same logic as Active TODOs)
       if (this.focusModeIncludeProjects) {
-        // Get project tags from focused projects
+        // Get project tags from focused projects (those with #focus items)
         const focusedProjects = this.projectManager.getProjects()
-          .filter(p => p.highestPriority === 0)
+          .filter(p => p.hasFocusItems)
           .map(p => p.tag);
         // Show #focus items or items from focused projects
         allTodones = allTodones.filter(todone =>
-          todone.tags.includes("#focus") ||
+          hasTag(todone.tags, "#focus") ||
           todone.tags.some(tag => focusedProjects.includes(tag))
         );
       } else {
         // Show only #focus items
-        allTodones = allTodones.filter(todone => todone.tags.includes("#focus"));
+        allTodones = allTodones.filter(todone => hasTag(todone.tags, "#focus"));
       }
     }
 
@@ -1599,7 +1594,7 @@ export class TodoSidebarView extends ItemView {
 
     // Apply focus mode filter if enabled
     if (this.focusModeEnabled) {
-      principles = principles.filter(p => p.tags.includes("#focus"));
+      principles = principles.filter(p => hasTag(p.tags, "#focus"));
     }
 
     // Apply tag filter if active
@@ -1654,7 +1649,7 @@ export class TodoSidebarView extends ItemView {
 
     // Apply focus mode filter if enabled
     if (this.focusModeEnabled) {
-      ideas = ideas.filter(idea => idea.tags.includes("#focus"));
+      ideas = ideas.filter(idea => hasTag(idea.tags, "#focus"));
     }
 
     // Apply tag filter if active

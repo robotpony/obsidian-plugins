@@ -1,7 +1,7 @@
 import { App, Modal, TFile } from "obsidian";
 import { TodoScanner } from "./TodoScanner";
 import { ProjectInfo, TodoItem } from "./types";
-import { getPriorityValue } from "./utils";
+import { getPriorityValue, hasTag } from "./utils";
 
 export class ProjectManager {
   private app: App;
@@ -55,6 +55,7 @@ export class ProjectManager {
       }
 
       const todoPriority = getPriorityValue(todo.tags);
+      const todoHasFocus = hasTag(todo.tags, "#focus");
 
       for (const tag of projectTags) {
         if (projectMap.has(tag)) {
@@ -71,12 +72,17 @@ export class ProjectManager {
             project.highestPriority,
             todoPriority
           );
+          // Track if any item has #focus
+          if (todoHasFocus) {
+            project.hasFocusItems = true;
+          }
         } else {
           projectMap.set(tag, {
             tag,
             count: 1,
             lastActivity: todo.dateCreated,
             highestPriority: todoPriority,
+            hasFocusItems: todoHasFocus,
             prioritySum: todoPriority,
             colourIndex: 4, // default, will be calculated below
           });
@@ -85,19 +91,20 @@ export class ProjectManager {
     }
 
     // Calculate colourIndex from weighted average priority for each project
-    // Priority values range from 0 (#focus) to 7 (#future)
+    // Priority values range from 1 (#today) to 9 (#future)
     // Map to colourIndex 0-6 for CSS styling
     const projects: ProjectInfo[] = [];
     for (const [, project] of projectMap) {
       const avgPriority = project.prioritySum / project.count;
-      // Map avgPriority (0-7) to colourIndex (0-6)
+      // Map avgPriority (1-9) to colourIndex (0-6)
       // Use Math.round for reasonable mapping
-      const colourIndex = Math.min(6, Math.round(avgPriority * 6 / 7));
+      const colourIndex = Math.min(6, Math.round((avgPriority - 1) * 6 / 8));
       projects.push({
         tag: project.tag,
         count: project.count,
         lastActivity: project.lastActivity,
         highestPriority: project.highestPriority,
+        hasFocusItems: project.hasFocusItems,
         colourIndex,
       });
     }
@@ -108,15 +115,10 @@ export class ProjectManager {
   getFocusProjects(limit?: number): ProjectInfo[] {
     const projects = this.getProjects();
 
-    // Sort by: 1) has focus items, 2) priority, 3) count (as proxy for tag activity)
+    // Sort by: 1) priority (lowest value = highest priority), 2) count (as proxy for tag activity)
+    // Note: #focus is a visibility filter, not a priority level, so no special handling needed
     projects.sort((a, b) => {
-      // Focus items first (priority 0 = #focus)
-      const aHasFocus = a.highestPriority === 0;
-      const bHasFocus = b.highestPriority === 0;
-      if (aHasFocus && !bHasFocus) return -1;
-      if (!aHasFocus && bHasFocus) return 1;
-
-      // Then by priority
+      // Sort by priority (lower = higher priority)
       const priorityDiff = a.highestPriority - b.highestPriority;
       if (priorityDiff !== 0) return priorityDiff;
 

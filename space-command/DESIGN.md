@@ -151,18 +151,35 @@ interface TodoItem {
 
 ## Priority System
 
-Priority is encoded numerically for sorting (lower = higher priority):
+Priority is encoded numerically for sorting (lower value = higher priority):
 
-| Tag | Value | Description |
-|-----|-------|-------------|
-| #focus | 0 | Highest priority |
-| #p0 | 1 | Critical |
-| #p1 | 2 | High |
-| #p2 | 3 | Medium |
-| #p3 | 4 | Low |
-| #p4 | 5 | Minimal |
-| (none) | 6 | Default |
-| #future | 7 | Snoozed |
+| Tag              | Value | Meaning                              |
+|------------------|-------|--------------------------------------|
+| `#today`         | 1     | Time-sensitive, due today            |
+| `#p0`            | 2     | Highest priority                     |
+| `#p1`            | 3     | High priority                        |
+| `#p2`            | 4     | Medium-high priority                 |
+| `#p3`            | 5     | Medium-low priority                  |
+| `#p4`            | 6     | Low priority                         |
+| `#focus` (alone) | 7     | Focused but no explicit priority     |
+| No priority      | 8     | Unmarked items                       |
+| `#future`/`#snooze` | 9  | Snoozed/deferred items               |
+
+### Key behaviours
+
+**`#focus` is a visibility filter, not a priority level.** The `#focus` tag marks items for focus mode filtering—it shows what you want to work on now, not necessarily what's most important. If an item has both `#focus` and a priority tag (e.g., `#focus #p0`), the priority tag determines sort order.
+
+**Header TODOs sort by average child priority.** A header like `## Project #todo` with children sorts based on the average priority of its active child items, not the tags on the header line. This prevents high-priority standalone items from being buried below low-priority header blocks.
+
+**Unprioritized items sort low.** Items without any priority tag sort after `#p4` but before snoozed items. This encourages explicit prioritization.
+
+### Priority in projects
+
+Projects track two priority-related fields:
+- `highestPriority`: The best (lowest) priority value among all items in the project
+- `hasFocusItems`: Whether any item in the project has the `#focus` tag
+
+In focus mode, projects filter to show only those with `hasFocusItems = true`.
 
 ## Filter Syntax
 

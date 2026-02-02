@@ -5,7 +5,7 @@ import { ProjectManager } from "./ProjectManager";
 import { FilterParser } from "./FilterParser";
 import { ContextMenuHandler } from "./ContextMenuHandler";
 import { TodoItem } from "./types";
-import { compareTodoItems, renderTextWithTags, openFileAtLine, getTagColourInfo, extractTags } from "./utils";
+import { compareTodoItems, compareWithEffectivePriority, renderTextWithTags, openFileAtLine, getTagColourInfo, extractTags } from "./utils";
 
 export class EmbedRenderer {
   private app: App;
@@ -320,8 +320,8 @@ export class EmbedRenderer {
     const activeTodos = todos.filter(t => t.itemType === 'todo');
     const completedTodones = todos.filter(t => t.itemType === 'todone');
 
-    // Sort active TODOs by focus, priority, then tag count
-    activeTodos.sort(compareTodoItems);
+    // Sort active TODOs by effective priority (considers children for headers)
+    activeTodos.sort((a, b) => compareWithEffectivePriority(a, b, activeTodos));
 
     // Append completed TODONEs at the end (unsorted)
     return [...activeTodos, ...completedTodones];

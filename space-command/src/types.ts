@@ -32,6 +32,8 @@ export interface ProjectInfo {
   count: number;
   lastActivity: number;
   highestPriority: number;
+  /** Whether this project has any items with #focus tag */
+  hasFocusItems: boolean;
   /** Colour index 0-6 based on weighted average priority of project's tasks */
   colourIndex: number;
 }

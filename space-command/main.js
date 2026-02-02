@@ -85,8 +85,6 @@ function formatDate(date, format) {
   return (0, import_obsidian.moment)(date).format(format);
 }
 function getPriorityValue(tags) {
-  if (hasTag(tags, "#focus"))
-    return 0;
   if (hasTag(tags, "#today"))
     return 1;
   if (hasTag(tags, "#p0"))
@@ -96,12 +94,14 @@ function getPriorityValue(tags) {
   if (hasTag(tags, "#p2"))
     return 4;
   if (hasTag(tags, "#p3"))
-    return 6;
+    return 5;
   if (hasTag(tags, "#p4"))
-    return 7;
+    return 6;
   if (hasTag(tags, "#future") || hasTag(tags, "#snooze") || hasTag(tags, "#snoozed"))
-    return 8;
-  return 5;
+    return 9;
+  if (hasTag(tags, "#focus"))
+    return 7;
+  return 8;
 }
 function getTagCount(tags) {
   const systemTags = /* @__PURE__ */ new Set([
@@ -127,14 +127,27 @@ function getTagCount(tags) {
   ]);
   return tags.filter((tag) => !systemTags.has(tag.toLowerCase())).length;
 }
-function compareTodoItems(a, b) {
-  const aHasFocus = hasTag(a.tags, "#focus");
-  const bHasFocus = hasTag(b.tags, "#focus");
-  if (aHasFocus && !bHasFocus)
-    return -1;
-  if (!aHasFocus && bHasFocus)
-    return 1;
-  const priorityDiff = getPriorityValue(a.tags) - getPriorityValue(b.tags);
+function getEffectivePriority(item, allItems) {
+  if (!item.isHeader || !item.childLineNumbers || item.childLineNumbers.length === 0) {
+    return getPriorityValue(item.tags);
+  }
+  const childPriorities = [];
+  for (const childLine of item.childLineNumbers) {
+    const child = allItems.find(
+      (t) => t.filePath === item.filePath && t.lineNumber === childLine
+    );
+    if (child) {
+      childPriorities.push(getPriorityValue(child.tags));
+    }
+  }
+  if (childPriorities.length === 0) {
+    return getPriorityValue(item.tags);
+  }
+  const sum = childPriorities.reduce((a, b) => a + b, 0);
+  return sum / childPriorities.length;
+}
+function compareWithEffectivePriority(a, b, allItems) {
+  const priorityDiff = getEffectivePriority(a, allItems) - getEffectivePriority(b, allItems);
   if (priorityDiff !== 0)
     return priorityDiff;
   const tagCountDiff = getTagCount(b.tags) - getTagCount(a.tags);
@@ -1310,6 +1323,7 @@ var ProjectManager = class {
         }
       }
       const todoPriority = getPriorityValue(todo.tags);
+      const todoHasFocus = hasTag(todo.tags, "#focus");
       for (const tag of projectTags) {
         if (projectMap.has(tag)) {
           const project = projectMap.get(tag);
@@ -1323,12 +1337,16 @@ var ProjectManager = class {
             project.highestPriority,
             todoPriority
           );
+          if (todoHasFocus) {
+            project.hasFocusItems = true;
+          }
         } else {
           projectMap.set(tag, {
             tag,
             count: 1,
             lastActivity: todo.dateCreated,
             highestPriority: todoPriority,
+            hasFocusItems: todoHasFocus,
             prioritySum: todoPriority,
             colourIndex: 4
             // default, will be calculated below
@@ -1339,12 +1357,13 @@ var ProjectManager = class {
     const projects = [];
     for (const [, project] of projectMap) {
       const avgPriority = project.prioritySum / project.count;
-      const colourIndex = Math.min(6, Math.round(avgPriority * 6 / 7));
+      const colourIndex = Math.min(6, Math.round((avgPriority - 1) * 6 / 8));
       projects.push({
         tag: project.tag,
         count: project.count,
         lastActivity: project.lastActivity,
         highestPriority: project.highestPriority,
+        hasFocusItems: project.hasFocusItems,
         colourIndex
       });
     }
@@ -1353,12 +1372,6 @@ var ProjectManager = class {
   getFocusProjects(limit) {
     const projects = this.getProjects();
     projects.sort((a, b) => {
-      const aHasFocus = a.highestPriority === 0;
-      const bHasFocus = b.highestPriority === 0;
-      if (aHasFocus && !bHasFocus)
-        return -1;
-      if (!aHasFocus && bHasFocus)
-        return 1;
       const priorityDiff = a.highestPriority - b.highestPriority;
       if (priorityDiff !== 0)
         return priorityDiff;
@@ -2039,7 +2052,7 @@ var EmbedRenderer = class {
   sortTodos(todos) {
     const activeTodos = todos.filter((t) => t.itemType === "todo");
     const completedTodones = todos.filter((t) => t.itemType === "todone");
-    activeTodos.sort(compareTodoItems);
+    activeTodos.sort((a, b) => compareWithEffectivePriority(a, b, activeTodos));
     return [...activeTodos, ...completedTodones];
   }
   extractCompletionDate(text) {
@@ -3131,7 +3144,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
   // Unified list item renderer for todos, ideas, and principles
   // parentTags: optional tags inherited from a parent header block (for child items)
   renderListItem(list, item, config, isChild = false, parentTags = []) {
-    const hasFocus = item.tags.includes("#focus");
+    const hasFocus = hasTag(item.tags, "#focus");
     const isHeader = item.isHeader === true;
     const hasChildren = isHeader && item.childLineNumbers && item.childLineNumbers.length > 0;
     const itemClasses = [
@@ -3597,7 +3610,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     }
   }
   sortTodosByPriority(todos) {
-    return [...todos].sort(compareTodoItems);
+    return [...todos].sort((a, b) => compareWithEffectivePriority(a, b, todos));
   }
   /**
    * Render filter indicator button after section title if a filter is active.
@@ -3638,7 +3651,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     });
     this.renderFilterIndicator(header);
     if (this.focusModeEnabled) {
-      projects = projects.filter((p) => p.highestPriority === 0);
+      projects = projects.filter((p) => p.hasFocusItems);
     }
     if (projects.length === 0) {
       section.createEl("div", {
@@ -3648,12 +3661,6 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       return;
     }
     projects.sort((a, b) => {
-      const aHasFocus = a.highestPriority === 0;
-      const bHasFocus = b.highestPriority === 0;
-      if (aHasFocus && !bHasFocus)
-        return -1;
-      if (!aHasFocus && bHasFocus)
-        return 1;
       const priorityDiff = a.highestPriority - b.highestPriority;
       if (priorityDiff !== 0)
         return priorityDiff;
@@ -3676,8 +3683,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     }
   }
   renderProjectItem(list, project) {
-    const hasFocusItems = project.highestPriority === 0;
-    const item = list.createEl("li", { cls: `project-item${hasFocusItems ? " project-focus" : ""}` });
+    const item = list.createEl("li", { cls: `project-item${project.hasFocusItems ? " project-focus" : ""}` });
     item.addEventListener("contextmenu", (e) => {
       e.preventDefault();
       this.contextMenuHandler.showProjectMenu(
@@ -3839,13 +3845,13 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
         if (todo.parentLineNumber === void 0) {
           return true;
         }
-        if (!todo.tags.includes("#focus")) {
+        if (!hasTag(todo.tags, "#focus")) {
           return false;
         }
         const parent = this.scanner.getTodos().find(
           (t) => t.filePath === todo.filePath && t.lineNumber === todo.parentLineNumber
         );
-        return !(parent == null ? void 0 : parent.tags.includes("#focus"));
+        return !hasTag((parent == null ? void 0 : parent.tags) || [], "#focus");
       });
     } else {
       todos = todos.filter((todo) => todo.parentLineNumber === void 0);
@@ -3882,12 +3888,12 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     }
     if (this.focusModeEnabled) {
       if (this.focusModeIncludeProjects) {
-        const focusedProjects = this.projectManager.getProjects().filter((p) => p.highestPriority === 0).map((p) => p.tag);
+        const focusedProjects = this.projectManager.getProjects().filter((p) => p.hasFocusItems).map((p) => p.tag);
         todos = todos.filter(
-          (todo) => todo.tags.includes("#focus") || todo.tags.some((tag) => focusedProjects.includes(tag))
+          (todo) => hasTag(todo.tags, "#focus") || todo.tags.some((tag) => focusedProjects.includes(tag))
         );
       } else {
-        todos = todos.filter((todo) => todo.tags.includes("#focus"));
+        todos = todos.filter((todo) => hasTag(todo.tags, "#focus"));
       }
     }
     todos = this.sortTodosByPriority(todos);
@@ -3937,12 +3943,12 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
         return completionDate === today;
       });
       if (this.focusModeIncludeProjects) {
-        const focusedProjects = this.projectManager.getProjects().filter((p) => p.highestPriority === 0).map((p) => p.tag);
+        const focusedProjects = this.projectManager.getProjects().filter((p) => p.hasFocusItems).map((p) => p.tag);
         allTodones = allTodones.filter(
-          (todone) => todone.tags.includes("#focus") || todone.tags.some((tag) => focusedProjects.includes(tag))
+          (todone) => hasTag(todone.tags, "#focus") || todone.tags.some((tag) => focusedProjects.includes(tag))
         );
       } else {
-        allTodones = allTodones.filter((todone) => todone.tags.includes("#focus"));
+        allTodones = allTodones.filter((todone) => hasTag(todone.tags, "#focus"));
       }
     }
     const todones = allTodones.slice(0, this.recentTodonesLimit);
@@ -4024,7 +4030,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     let principles = this.scanner.getPrinciples();
     principles = principles.filter((p) => p.parentLineNumber === void 0);
     if (this.focusModeEnabled) {
-      principles = principles.filter((p) => p.tags.includes("#focus"));
+      principles = principles.filter((p) => hasTag(p.tags, "#focus"));
     }
     if (this.activeTagFilter) {
       principles = principles.filter((p) => p.tags.includes(this.activeTagFilter));
@@ -4059,7 +4065,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     );
     ideas = ideas.filter((idea) => idea.parentLineNumber === void 0);
     if (this.focusModeEnabled) {
-      ideas = ideas.filter((idea) => idea.tags.includes("#focus"));
+      ideas = ideas.filter((idea) => hasTag(idea.tags, "#focus"));
     }
     if (this.activeTagFilter) {
       ideas = ideas.filter((idea) => idea.tags.includes(this.activeTagFilter));
