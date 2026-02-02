@@ -314,14 +314,16 @@ export class EmbedRenderer {
     return result;
   }
 
-  private sortTodos(todos: TodoItem[]): TodoItem[] {
+  private sortTodos(todos: TodoItem[], allTodosForChildLookup?: TodoItem[]): TodoItem[] {
     // Separate active TODOs and completed TODONEs
     // Use itemType instead of tag checks to handle both singular (#todo) and plural (#todos) forms
     const activeTodos = todos.filter(t => t.itemType === 'todo');
     const completedTodones = todos.filter(t => t.itemType === 'todone');
 
     // Sort active TODOs by effective priority (considers children for headers)
-    activeTodos.sort((a, b) => compareWithEffectivePriority(a, b, activeTodos));
+    // Pass the full todos list for accurate child priority lookup
+    const lookupList = allTodosForChildLookup || activeTodos;
+    activeTodos.sort((a, b) => compareWithEffectivePriority(a, b, lookupList));
 
     // Append completed TODONEs at the end (unsorted)
     return [...activeTodos, ...completedTodones];
@@ -437,7 +439,8 @@ export class EmbedRenderer {
     });
 
     // Sort todos: active by priority/project, completed at end
-    const sortedTodos = this.sortTodos(topLevelTodos);
+    // Pass full todos list for accurate child priority lookup
+    const sortedTodos = this.sortTodos(topLevelTodos, allTodosForChildLookup);
 
     const list = container.createEl("ul", { cls: "contains-task-list" });
 

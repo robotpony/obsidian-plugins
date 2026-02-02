@@ -990,9 +990,11 @@ export class TodoSidebarView extends ItemView {
     }
   }
 
-  private sortTodosByPriority(todos: TodoItem[]): TodoItem[] {
+  private sortTodosByPriority(todos: TodoItem[], allTodosForChildLookup?: TodoItem[]): TodoItem[] {
     // Use effective priority sorting which considers children for header items
-    return [...todos].sort((a, b) => compareWithEffectivePriority(a, b, todos));
+    // Pass the full todos list (including children) for accurate child priority lookup
+    const lookupList = allTodosForChildLookup || todos;
+    return [...todos].sort((a, b) => compareWithEffectivePriority(a, b, lookupList));
   }
 
   /**
@@ -1402,7 +1404,8 @@ export class TodoSidebarView extends ItemView {
     }
 
     // Sort by focus, priority, then tag count
-    todos = this.sortTodosByPriority(todos);
+    // Pass the full todos list for accurate child priority lookup
+    todos = this.sortTodosByPriority(todos, allTodosForChildLookup);
 
     // Track total count before limiting
     const totalCount = todos.length;
@@ -1644,6 +1647,9 @@ export class TodoSidebarView extends ItemView {
       !idea.tags.includes("#snoozed")
     );
 
+    // Keep reference to full list for child priority lookup
+    const allIdeasForChildLookup = ideas;
+
     // Filter out child items (they'll be rendered under their parent header)
     ideas = ideas.filter(idea => idea.parentLineNumber === undefined);
 
@@ -1658,7 +1664,8 @@ export class TodoSidebarView extends ItemView {
     }
 
     // Sort by priority (focus first)
-    ideas = this.sortTodosByPriority(ideas);
+    // Pass full list for accurate child priority lookup
+    ideas = this.sortTodosByPriority(ideas, allIdeasForChildLookup);
 
     const section = container.createEl("div", { cls: "ideas-section" });
 

@@ -2,6 +2,19 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.98] - 2026-02-02
+
+### Fixed
+
+- **Header TODO priority now excludes snoozed children**: When calculating a header's effective priority (used for sorting), snoozed children (`#future`, `#snooze`, `#snoozed`) are now excluded from the average
+  - Previously, a header with one `#p0` child and three `#future` children would average to ~7.25, sorting below a standalone `#focus` item
+  - Now only active children are considered, so the header sorts at priority 2 (`#p0`)
+  - Prevents headers with deferred work from pushing focused items down the list
+
+- **Sorting now uses full child list for priority lookup**: Fixed issue where header TODO sorting couldn't find children because they were filtered out before sorting
+  - Child items are filtered from display (they render under their parent), but now remain available for priority calculation
+  - Affects both sidebar and embedded TODO lists
+
 ## [0.9.97] - 2026-02-02
 
 ### Changed

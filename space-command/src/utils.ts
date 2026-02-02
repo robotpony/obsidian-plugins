@@ -174,14 +174,22 @@ interface PrioritySortableItem {
 }
 
 /**
+ * Check if an item is snoozed (has #future, #snooze, or #snoozed tag).
+ */
+function isSnoozed(tags: string[]): boolean {
+  return hasTag(tags, "#future") || hasTag(tags, "#snooze") || hasTag(tags, "#snoozed");
+}
+
+/**
  * Get effective priority for an item, considering children for header items.
  *
  * - Standalone items: returns their own priority value
- * - Header items with children: returns average priority of active children
- * - Header items without children: returns their own priority value
+ * - Header items with children: returns average priority of active (non-snoozed) children
+ * - Header items without active children: returns their own priority value
  *
  * This ensures header TODOs sort based on the work they contain, not just
- * the tags on the header line itself.
+ * the tags on the header line itself. Snoozed children are excluded from the
+ * average so they don't drag down the priority of headers with active work.
  */
 export function getEffectivePriority(
   item: PrioritySortableItem,
@@ -192,13 +200,13 @@ export function getEffectivePriority(
     return getPriorityValue(item.tags);
   }
 
-  // Header items: compute average priority of children
+  // Header items: compute average priority of active (non-snoozed) children
   const childPriorities: number[] = [];
   for (const childLine of item.childLineNumbers) {
     const child = allItems.find(
       t => t.filePath === item.filePath && t.lineNumber === childLine
     );
-    if (child) {
+    if (child && !isSnoozed(child.tags)) {
       childPriorities.push(getPriorityValue(child.tags));
     }
   }

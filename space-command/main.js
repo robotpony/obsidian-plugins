@@ -127,6 +127,9 @@ function getTagCount(tags) {
   ]);
   return tags.filter((tag) => !systemTags.has(tag.toLowerCase())).length;
 }
+function isSnoozed(tags) {
+  return hasTag(tags, "#future") || hasTag(tags, "#snooze") || hasTag(tags, "#snoozed");
+}
 function getEffectivePriority(item, allItems) {
   if (!item.isHeader || !item.childLineNumbers || item.childLineNumbers.length === 0) {
     return getPriorityValue(item.tags);
@@ -136,7 +139,7 @@ function getEffectivePriority(item, allItems) {
     const child = allItems.find(
       (t) => t.filePath === item.filePath && t.lineNumber === childLine
     );
-    if (child) {
+    if (child && !isSnoozed(child.tags)) {
       childPriorities.push(getPriorityValue(child.tags));
     }
   }
@@ -2049,10 +2052,11 @@ var EmbedRenderer = class {
     }
     return result;
   }
-  sortTodos(todos) {
+  sortTodos(todos, allTodosForChildLookup) {
     const activeTodos = todos.filter((t) => t.itemType === "todo");
     const completedTodones = todos.filter((t) => t.itemType === "todone");
-    activeTodos.sort((a, b) => compareWithEffectivePriority(a, b, activeTodos));
+    const lookupList = allTodosForChildLookup || activeTodos;
+    activeTodos.sort((a, b) => compareWithEffectivePriority(a, b, lookupList));
     return [...activeTodos, ...completedTodones];
   }
   extractCompletionDate(text) {
@@ -2117,14 +2121,14 @@ var EmbedRenderer = class {
         if (!childItem) {
           return false;
         }
-        const isSnoozed = childItem.tags.includes("#future") || childItem.tags.includes("#snooze") || childItem.tags.includes("#snoozed");
-        if (isSnoozed)
+        const isSnoozed2 = childItem.tags.includes("#future") || childItem.tags.includes("#snooze") || childItem.tags.includes("#snoozed");
+        if (isSnoozed2)
           return false;
         return true;
       });
       return hasActiveChild;
     });
-    const sortedTodos = this.sortTodos(topLevelTodos);
+    const sortedTodos = this.sortTodos(topLevelTodos, allTodosForChildLookup);
     const list = container.createEl("ul", { cls: "contains-task-list" });
     const allTodosForLookup = unfilteredTodos || todos;
     for (const todo of sortedTodos) {
@@ -3319,16 +3323,16 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       }
       dropdown.createEl("div", { cls: "tag-dropdown-separator" });
       if (item) {
-        const isSnoozed = item.tags.includes("#future") || item.tags.includes("#snooze") || item.tags.includes("#snoozed");
+        const isSnoozed2 = item.tags.includes("#future") || item.tags.includes("#snooze") || item.tags.includes("#snoozed");
         const snoozeItem = dropdown.createEl("div", {
           cls: "tag-dropdown-item tag-dropdown-snooze",
-          text: isSnoozed ? "Unsnooze this" : "Snooze this"
+          text: isSnoozed2 ? "Unsnooze this" : "Snooze this"
         });
         snoozeItem.addEventListener("click", async (e2) => {
           e2.stopPropagation();
           this.closeDropdown();
           let success;
-          if (isSnoozed) {
+          if (isSnoozed2) {
             success = await this.processor.removeTag(item, "#future");
             if (item.tags.includes("#snooze")) {
               await this.processor.removeTag(item, "#snooze");
@@ -3609,8 +3613,9 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       this.renderListItem(list, idea, this.ideaConfig);
     }
   }
-  sortTodosByPriority(todos) {
-    return [...todos].sort((a, b) => compareWithEffectivePriority(a, b, todos));
+  sortTodosByPriority(todos, allTodosForChildLookup) {
+    const lookupList = allTodosForChildLookup || todos;
+    return [...todos].sort((a, b) => compareWithEffectivePriority(a, b, lookupList));
   }
   /**
    * Render filter indicator button after section title if a filter is active.
@@ -3876,8 +3881,8 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
         if (!childItem) {
           return false;
         }
-        const isSnoozed = childItem.tags.includes("#future") || childItem.tags.includes("#snooze") || childItem.tags.includes("#snoozed");
-        if (isSnoozed)
+        const isSnoozed2 = childItem.tags.includes("#future") || childItem.tags.includes("#snooze") || childItem.tags.includes("#snoozed");
+        if (isSnoozed2)
           return false;
         return true;
       });
@@ -3896,7 +3901,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
         todos = todos.filter((todo) => hasTag(todo.tags, "#focus"));
       }
     }
-    todos = this.sortTodosByPriority(todos);
+    todos = this.sortTodosByPriority(todos, allTodosForChildLookup);
     const totalCount = todos.length;
     if (this.activeTodosLimit > 0) {
       todos = todos.slice(0, this.activeTodosLimit);
@@ -4063,6 +4068,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     ideas = ideas.filter(
       (idea) => !idea.tags.includes("#future") && !idea.tags.includes("#snooze") && !idea.tags.includes("#snoozed")
     );
+    const allIdeasForChildLookup = ideas;
     ideas = ideas.filter((idea) => idea.parentLineNumber === void 0);
     if (this.focusModeEnabled) {
       ideas = ideas.filter((idea) => hasTag(idea.tags, "#focus"));
@@ -4070,7 +4076,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     if (this.activeTagFilter) {
       ideas = ideas.filter((idea) => idea.tags.includes(this.activeTagFilter));
     }
-    ideas = this.sortTodosByPriority(ideas);
+    ideas = this.sortTodosByPriority(ideas, allIdeasForChildLookup);
     const section = container.createEl("div", { cls: "ideas-section" });
     const header = section.createEl("div", { cls: "todo-section-header" });
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
@@ -5496,11 +5502,11 @@ var TriageModal = class extends import_obsidian11.Modal {
       return;
     }
     const item = this.items[this.currentIndex];
-    const isSnoozed = item.tags.includes("#future") || item.tags.includes("#snooze") || item.tags.includes("#snoozed");
+    const isSnoozed2 = item.tags.includes("#future") || item.tags.includes("#snooze") || item.tags.includes("#snoozed");
     const isIdea = item.itemType === "idea" || item.tags.includes("#idea") || item.tags.includes("#ideas");
     const titleEl = titleGroup.createEl("span", { cls: "triage-title" });
     titleEl.appendText("Triage your ");
-    if (isSnoozed) {
+    if (isSnoozed2) {
       titleEl.createEl("em", { text: "snoozed items" });
     } else if (isIdea) {
       titleEl.createEl("em", { text: "ideas" });
@@ -5552,7 +5558,7 @@ var TriageModal = class extends import_obsidian11.Modal {
     }
     contentEl.createEl("div", { cls: "triage-separator" });
     const actions = contentEl.createEl("div", { cls: "triage-actions" });
-    if (isSnoozed) {
+    if (isSnoozed2) {
       const unsnoozeBtn = actions.createEl("button", {
         cls: "triage-btn triage-btn-unsnooze",
         attr: { title: "Remove snooze tag and make this item active again" }
