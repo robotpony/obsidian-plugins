@@ -24,7 +24,7 @@ export class TodoSidebarView extends ItemView {
   private triageActiveThreshold: number;
   private activeTab: 'todos' | 'ideas' | 'snoozed' = 'todos';
   private activeTagFilter: string | null = null;
-  private focusModeEnabled: boolean = true;
+  private focusModeEnabled: boolean = false;
   private openDropdown: HTMLElement | null = null;
   private openInfoPopup: HTMLElement | null = null;
   private onShowAbout: () => void;

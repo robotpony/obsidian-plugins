@@ -2960,7 +2960,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     this.updateListener = null;
     this.activeTab = "todos";
     this.activeTagFilter = null;
-    this.focusModeEnabled = true;
+    this.focusModeEnabled = false;
     this.openDropdown = null;
     this.openInfoPopup = null;
     // Configuration for unified list item rendering

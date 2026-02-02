@@ -2,6 +2,14 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.99] - 2026-02-02
+
+### Improved
+
+- **Focus mode now starts off by default**: The sidebar now shows all TODOs on plugin load instead of only `#focus` items
+  - Click the eye icon to enable focus mode when you want to narrow down to focused items
+  - More intuitive: see everything first, then filter down as needed
+
 ## [0.9.98] - 2026-02-02
 
 ### Fixed
