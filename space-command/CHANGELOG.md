@@ -2,6 +2,45 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.103] - 2026-02-02
+
+### Fixed
+
+- **Header TODO priority now respects header tags**: Headers with priority tags (like `#focus`) now sort at least as high as their tags indicate, even if children have no priority
+  - Previously, a header with `#focus` but unmarked children sorted at priority 8 (unmarked), appearing below other items
+  - Now uses the better (lower) of header priority or child average
+  - A `## Project #todo #focus` with unmarked children sorts at priority 7 (`#focus`), not 8
+  - Headers with high-priority children still benefit from child priority (e.g., a `#p0` child pulls the header up)
+
+## [0.9.102] - 2026-02-02
+
+### Improved
+
+- **Checkbox sync now works for all TODOs**: Checking a checkbox (`- [x]`) on any `#todo` item now automatically adds `#todone @date`, not just items in the sidebar
+  - Previously, only sidebar interactions triggered the `#todo` → `#todone` conversion
+  - Now, checking a checkbox anywhere in the editor (Live Preview, Reading Mode, or source) syncs the tag state
+  - Works for both standalone TODOs and child items under header TODOs
+
+- **Checkbox sync for ideas**: Checking a checkbox on a `#idea` item removes the tag, turning it into a regular completed list item
+  - Consistent with sidebar behavior where completing an idea removes it from tracking
+
+## [0.9.101] - 2026-02-02
+
+### Fixed
+
+- **Scanner no longer skips lines with mixed backticked/real tags**: Lines containing documentation examples in backticks (like `` `#idea` ``) alongside real tags (like `#p0 #focus`) are now processed correctly
+  - Previously, if ANY plugin tag appeared inside backticks, the entire line was skipped
+  - This caused child TODOs with real priority tags to be missing from parent header calculations
+  - Resulted in incorrect sort order where high-priority items appeared below headers containing only snoozed items
+  - `extractTags()` already correctly ignores backticked content; the redundant `isInInlineCode()` check was removed
+
+## [0.9.100] - 2026-02-02
+
+### Improved
+
+- **Tag dropdown now toggles on click**: Clicking the `#` icon a second time now dismisses the tag menu instead of reopening it
+  - More intuitive interaction matching standard dropdown behavior
+
 ## [0.9.99] - 2026-02-02
 
 ### Improved

@@ -184,20 +184,25 @@ function isSnoozed(tags: string[]): boolean {
  * Get effective priority for an item, considering children for header items.
  *
  * - Standalone items: returns their own priority value
- * - Header items with children: returns average priority of active (non-snoozed) children
+ * - Header items with children: returns the better of header priority or child average
  * - Header items without active children: returns their own priority value
  *
- * This ensures header TODOs sort based on the work they contain, not just
- * the tags on the header line itself. Snoozed children are excluded from the
- * average so they don't drag down the priority of headers with active work.
+ * This ensures header TODOs sort based on the work they contain, while still
+ * respecting priority tags on the header itself. If a header has #focus but
+ * children are unmarked, the header's #focus takes precedence.
+ *
+ * Snoozed children are excluded from the average so they don't drag down
+ * the priority of headers with active work.
  */
 export function getEffectivePriority(
   item: PrioritySortableItem,
   allItems: PrioritySortableItem[]
 ): number {
+  const headerPriority = getPriorityValue(item.tags);
+
   // Non-header items use their own priority
   if (!item.isHeader || !item.childLineNumbers || item.childLineNumbers.length === 0) {
-    return getPriorityValue(item.tags);
+    return headerPriority;
   }
 
   // Header items: compute average priority of active (non-snoozed) children
@@ -212,12 +217,15 @@ export function getEffectivePriority(
   }
 
   if (childPriorities.length === 0) {
-    return getPriorityValue(item.tags);
+    return headerPriority;
   }
 
-  // Return average (rounded to allow comparison)
+  // Return the better (lower) of header priority or child average
+  // This ensures a #focus header sorts at least as high as #focus items,
+  // but can sort higher if children have better priority (e.g., #p0)
   const sum = childPriorities.reduce((a, b) => a + b, 0);
-  return sum / childPriorities.length;
+  const childAverage = sum / childPriorities.length;
+  return Math.min(headerPriority, childAverage);
 }
 
 /**

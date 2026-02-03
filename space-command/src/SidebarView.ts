@@ -26,6 +26,7 @@ export class TodoSidebarView extends ItemView {
   private activeTagFilter: string | null = null;
   private focusModeEnabled: boolean = false;
   private openDropdown: HTMLElement | null = null;
+  private openDropdownTrigger: HTMLElement | null = null;
   private openInfoPopup: HTMLElement | null = null;
   private onShowAbout: () => void;
   private onShowStats: () => void;
@@ -438,6 +439,7 @@ export class TodoSidebarView extends ItemView {
     if (this.openDropdown) {
       this.openDropdown.remove();
       this.openDropdown = null;
+      this.openDropdownTrigger = null;
     }
   }
 
@@ -466,6 +468,12 @@ export class TodoSidebarView extends ItemView {
 
     trigger.addEventListener("click", (e) => {
       e.stopPropagation();
+
+      // If clicking the same trigger that opened the current dropdown, just close it (toggle)
+      if (this.openDropdownTrigger === trigger) {
+        this.closeDropdown();
+        return;
+      }
 
       // Close any existing dropdown or popup
       this.closeDropdown();
@@ -604,6 +612,7 @@ export class TodoSidebarView extends ItemView {
       // Add to document and track
       document.body.appendChild(dropdown);
       this.openDropdown = dropdown;
+      this.openDropdownTrigger = trigger;
 
       // Close on click outside
       const closeHandler = (e: MouseEvent) => {

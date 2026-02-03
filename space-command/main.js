@@ -131,8 +131,9 @@ function isSnoozed(tags) {
   return hasTag(tags, "#future") || hasTag(tags, "#snooze") || hasTag(tags, "#snoozed");
 }
 function getEffectivePriority(item, allItems) {
+  const headerPriority = getPriorityValue(item.tags);
   if (!item.isHeader || !item.childLineNumbers || item.childLineNumbers.length === 0) {
-    return getPriorityValue(item.tags);
+    return headerPriority;
   }
   const childPriorities = [];
   for (const childLine of item.childLineNumbers) {
@@ -144,10 +145,11 @@ function getEffectivePriority(item, allItems) {
     }
   }
   if (childPriorities.length === 0) {
-    return getPriorityValue(item.tags);
+    return headerPriority;
   }
   const sum = childPriorities.reduce((a, b) => a + b, 0);
-  return sum / childPriorities.length;
+  const childAverage = sum / childPriorities.length;
+  return Math.min(headerPriority, childAverage);
 }
 function compareWithEffectivePriority(a, b, allItems) {
   const priorityDiff = getEffectivePriority(a, allItems) - getEffectivePriority(b, allItems);
@@ -313,6 +315,7 @@ var TodoScanner = class extends import_obsidian2.Events {
       const principles = [];
       const linesToCleanup = [];
       const linesToSyncTodone = [];
+      const linesToRemoveIdea = [];
       let inCodeBlock = false;
       let currentHeaderTodo = null;
       let currentHeaderIdea = null;
@@ -324,9 +327,6 @@ var TodoScanner = class extends import_obsidian2.Events {
           continue;
         }
         if (inCodeBlock) {
-          continue;
-        }
-        if (this.isInInlineCode(line)) {
           continue;
         }
         const tags = extractTags(line);
@@ -386,9 +386,14 @@ var TodoScanner = class extends import_obsidian2.Events {
           }
         }
         const hasTodo = tags.includes("#todo") || tags.includes("#todos");
-        const hasTodone = tags.includes("#todone") || tags.includes("#todones");
+        let hasTodone = tags.includes("#todone") || tags.includes("#todones");
         const hasIdea = tags.includes("#idea") || tags.includes("#ideas") || tags.includes("#ideation");
         const lineHasContent = this.hasContent(line);
+        if (hasTodo && !hasTodone && !hasIdea && isCheckboxChecked(line)) {
+          linesToSyncTodone.push(i);
+          tags.push("#todone");
+          hasTodone = true;
+        }
         if (hasTodone && hasTodo) {
           linesToCleanup.push(i);
           if (lineHasContent)
@@ -403,6 +408,10 @@ var TodoScanner = class extends import_obsidian2.Events {
         if (tags.includes("#idea") || tags.includes("#ideas") || tags.includes("#ideation")) {
           if (!lineHasContent)
             continue;
+          if (isCheckboxChecked(line)) {
+            linesToRemoveIdea.push(i);
+            continue;
+          }
           if (headerInfo) {
             const headerIdea = this.createTodoItem(file, i, line, tags, "idea");
             headerIdea.isHeader = true;
@@ -449,6 +458,9 @@ var TodoScanner = class extends import_obsidian2.Events {
       if (linesToSyncTodone.length > 0) {
         this.syncCheckedCheckboxes(file, lines, linesToSyncTodone);
       }
+      if (linesToRemoveIdea.length > 0) {
+        this.removeIdeaTags(file, lines, linesToRemoveIdea);
+      }
       if (todos.length > 0) {
         this.todosCache.set(file.path, todos);
       } else {
@@ -485,37 +497,6 @@ var TodoScanner = class extends import_obsidian2.Events {
   // Check if a line is a list item (bullet or numbered)
   isListItem(line) {
     return /^[\s]*[-*+]\s/.test(line) || /^[\s]*\d+\.\s/.test(line);
-  }
-  isInInlineCode(line) {
-    const todoMatches = [...line.matchAll(/#todos?\b/g)];
-    const todoneMatches = [...line.matchAll(/#todones?\b/g)];
-    const ideaMatches = [...line.matchAll(/#idea(?:s|tion)?\b/g)];
-    const principleMatches = [...line.matchAll(/#principles?\b/g)];
-    const focusMatches = [...line.matchAll(/#focus\b/g)];
-    const allMatches = [...todoMatches, ...todoneMatches, ...ideaMatches, ...principleMatches, ...focusMatches];
-    if (allMatches.length === 0) {
-      return false;
-    }
-    const backticks = [];
-    for (let i = 0; i < line.length; i++) {
-      if (line[i] === "`") {
-        backticks.push(i);
-      }
-    }
-    if (backticks.length % 2 !== 0) {
-      return false;
-    }
-    for (const match of allMatches) {
-      const pos = match.index;
-      for (let i = 0; i < backticks.length; i += 2) {
-        const start = backticks[i];
-        const end = backticks[i + 1];
-        if (pos > start && pos < end) {
-          return true;
-        }
-      }
-    }
-    return false;
   }
   createTodoItem(file, lineNumber, text, tags, itemType) {
     var _a;
@@ -641,6 +622,20 @@ var TodoScanner = class extends import_obsidian2.Events {
     for (const lineNum of lineNumbers) {
       const line = lines[lineNum];
       const newLine = line.trimEnd() + ` #todone @${today}`;
+      if (newLine !== lines[lineNum]) {
+        lines[lineNum] = newLine;
+        modified = true;
+      }
+    }
+    if (modified) {
+      await this.app.vault.modify(file, lines.join("\n"));
+    }
+  }
+  // Remove #idea tag from checked ideas (they become regular checked list items)
+  async removeIdeaTags(file, lines, lineNumbers) {
+    let modified = false;
+    for (const lineNum of lineNumbers) {
+      const newLine = lines[lineNum].replace(/#idea(?:s|tion)?\b\s*/g, "");
       if (newLine !== lines[lineNum]) {
         lines[lineNum] = newLine;
         modified = true;
@@ -2962,6 +2957,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     this.activeTagFilter = null;
     this.focusModeEnabled = false;
     this.openDropdown = null;
+    this.openDropdownTrigger = null;
     this.openInfoPopup = null;
     // Configuration for unified list item rendering
     this.todoConfig = {
@@ -3239,6 +3235,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     if (this.openDropdown) {
       this.openDropdown.remove();
       this.openDropdown = null;
+      this.openDropdownTrigger = null;
     }
   }
   // Get project colour map for tag colouring
@@ -3262,6 +3259,10 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     });
     trigger.addEventListener("click", (e) => {
       e.stopPropagation();
+      if (this.openDropdownTrigger === trigger) {
+        this.closeDropdown();
+        return;
+      }
       this.closeDropdown();
       this.closeInfoPopup();
       const dropdown = document.createElement("div");
@@ -3363,6 +3364,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       }
       document.body.appendChild(dropdown);
       this.openDropdown = dropdown;
+      this.openDropdownTrigger = trigger;
       const closeHandler = (e2) => {
         if (!dropdown.contains(e2.target) && e2.target !== trigger) {
           this.closeDropdown();
@@ -4627,6 +4629,7 @@ var DefineTooltip = class {
 var TabLockManager = class {
   constructor(app) {
     this.enabled = false;
+    this.eventRefs = [];
     this.mutationObserver = null;
     this.updateTimeout = null;
     this.app = app;
@@ -4638,9 +4641,13 @@ var TabLockManager = class {
     if (this.enabled)
       return;
     this.enabled = true;
+    console.log("[TabLockManager] Enabling...");
     this.updateAllTabs();
-    setTimeout(() => this.updateAllTabs(), 200);
+    setTimeout(() => this.updateAllTabs(), 100);
+    setTimeout(() => this.updateAllTabs(), 500);
+    this.registerEvents();
     this.startObserving();
+    console.log("[TabLockManager] Enabled");
   }
   /**
    * Disable the tab lock feature - removes all lock buttons.
@@ -4649,6 +4656,7 @@ var TabLockManager = class {
     if (!this.enabled)
       return;
     this.enabled = false;
+    this.unregisterEvents();
     this.stopObserving();
     this.removeAllButtons();
     if (this.updateTimeout) {
@@ -4663,15 +4671,96 @@ var TabLockManager = class {
     this.disable();
   }
   /**
+   * Register workspace events to detect tab changes.
+   */
+  registerEvents() {
+    const layoutRef = this.app.workspace.on("layout-change", () => {
+      this.scheduleUpdate();
+    });
+    this.eventRefs.push(layoutRef);
+    const activeLeafRef = this.app.workspace.on("active-leaf-change", () => {
+      this.scheduleUpdate();
+    });
+    this.eventRefs.push(activeLeafRef);
+    const fileOpenRef = this.app.workspace.on("file-open", () => {
+      this.scheduleUpdate();
+    });
+    this.eventRefs.push(fileOpenRef);
+  }
+  /**
+   * Unregister all workspace events.
+   */
+  unregisterEvents() {
+    for (const ref of this.eventRefs) {
+      this.app.workspace.offref(ref);
+    }
+    this.eventRefs = [];
+  }
+  /**
+   * Start MutationObserver to catch DOM changes.
+   */
+  startObserving() {
+    if (this.mutationObserver)
+      return;
+    this.mutationObserver = new MutationObserver((mutations) => {
+      var _a, _b, _c, _d;
+      let shouldUpdate = false;
+      for (const mutation of mutations) {
+        if (mutation.type === "childList") {
+          for (const node of Array.from(mutation.addedNodes)) {
+            if (node instanceof HTMLElement) {
+              if (((_a = node.classList) == null ? void 0 : _a.contains("workspace-tab-header")) || ((_b = node.querySelector) == null ? void 0 : _b.call(node, ".workspace-tab-header")) || ((_c = node.classList) == null ? void 0 : _c.contains("workspace-tab-header-inner")) || ((_d = node.closest) == null ? void 0 : _d.call(node, ".workspace-tab-header"))) {
+                shouldUpdate = true;
+                break;
+              }
+            }
+          }
+        }
+        if (shouldUpdate)
+          break;
+      }
+      if (shouldUpdate) {
+        this.scheduleUpdate();
+      }
+    });
+    const workspaceContainer = document.querySelector(".workspace");
+    if (workspaceContainer) {
+      this.mutationObserver.observe(workspaceContainer, {
+        childList: true,
+        subtree: true
+      });
+    }
+  }
+  /**
+   * Stop MutationObserver.
+   */
+  stopObserving() {
+    if (this.mutationObserver) {
+      this.mutationObserver.disconnect();
+      this.mutationObserver = null;
+    }
+  }
+  /**
+   * Schedule a debounced update of all tabs.
+   */
+  scheduleUpdate() {
+    if (this.updateTimeout) {
+      clearTimeout(this.updateTimeout);
+    }
+    this.updateTimeout = setTimeout(() => {
+      this.updateTimeout = null;
+      this.updateAllTabs();
+    }, 50);
+  }
+  /**
    * Update all existing tabs with lock buttons.
    */
   updateAllTabs() {
-    const leaves = this.app.workspace.getLeavesOfType("markdown");
+    if (!this.enabled)
+      return;
+    const leaves = this.getAllLeaves();
+    console.log(`[TabLockManager] updateAllTabs: found ${leaves.length} leaves`);
     for (const leaf of leaves) {
-      this.addButtonToLeaf(leaf);
-    }
-    const allLeaves = this.getAllLeaves();
-    for (const leaf of allLeaves) {
       this.addButtonToLeaf(leaf);
     }
   }
@@ -4687,34 +4776,36 @@ var TabLockManager = class {
   }
   /**
    * Add a lock button to a specific leaf's tab header.
-   * If forceRefresh is true, removes any existing button first.
    */
-  addButtonToLeaf(leaf, forceRefresh = false) {
+  addButtonToLeaf(leaf) {
     if (!this.enabled)
       return;
     const tabHeader = leaf.tabHeaderEl;
-    if (!tabHeader)
+    if (!tabHeader) {
+      console.log(`[TabLockManager] Leaf has no tabHeaderEl`, leaf.getViewState());
       return;
-    if (!tabHeader.classList.contains("workspace-tab-header"))
+    }
+    if (!tabHeader.classList.contains("workspace-tab-header")) {
+      console.log(`[TabLockManager] tabHeader missing workspace-tab-header class`, tabHeader.className);
       return;
+    }
     const dataType = tabHeader.getAttribute("data-type");
-    if (dataType !== "markdown")
+    if (dataType !== "markdown") {
+      console.log(`[TabLockManager] Skipping non-markdown tab: data-type="${dataType}"`);
       return;
+    }
     const existingBtn = tabHeader.querySelector(".space-command-tab-lock-btn");
     if (existingBtn) {
-      if (forceRefresh) {
-        existingBtn.remove();
-        const pinContainer = tabHeader.querySelector("[data-space-command-pin-handler]");
-        if (pinContainer) {
-          pinContainer.removeAttribute("data-space-command-pin-handler");
-        }
-      } else {
-        return;
-      }
+      const isPinned2 = leaf.pinned === true;
+      this.updateButtonState(existingBtn, isPinned2);
+      return;
     }
     const innerContainer = tabHeader.querySelector(".workspace-tab-header-inner");
-    if (!innerContainer)
+    if (!innerContainer) {
+      console.log(`[TabLockManager] No inner container found in tabHeader`);
       return;
+    }
+    console.log(`[TabLockManager] Adding button to leaf`);
     const closeButton = innerContainer.querySelector(".workspace-tab-header-inner-close-button");
     const lockBtn = document.createElement("div");
     lockBtn.className = "space-command-tab-lock-btn workspace-tab-header-status-icon";
@@ -4728,9 +4819,6 @@ var TabLockManager = class {
       const newPinnedState = !currentlyPinned;
       leaf.setPinned(newPinnedState);
       this.updateButtonState(lockBtn, newPinnedState);
-      setTimeout(() => {
-        this.addButtonToLeaf(leaf, true);
-      }, 50);
     });
     if (closeButton) {
       innerContainer.insertBefore(lockBtn, closeButton);
@@ -4741,7 +4829,6 @@ var TabLockManager = class {
   }
   /**
    * Add a click handler to Obsidian's native pin icon for unlocking.
-   * The pin icon appears when the tab is pinned.
    */
   addPinClickHandler(tabHeader, leaf, lockBtn) {
     const pinContainer = tabHeader.querySelector(
@@ -4762,17 +4849,13 @@ var TabLockManager = class {
         e.preventDefault();
         leaf.setPinned(false);
         tabHeader.classList.remove("space-command-tab-locked");
-        setTimeout(() => {
-          this.addButtonToLeaf(leaf, true);
-        }, 50);
+        this.updateButtonState(lockBtn, false);
       },
       { capture: true }
     );
   }
   /**
    * Update the button's visual state based on pinned status.
-   * When locked: hide the lock button and close button, let Obsidian's native pushpin show.
-   * When unlocked: show the lock button (open padlock) and close button.
    */
   updateButtonState(button, isPinned) {
     button.classList.toggle("is-locked", isPinned);
@@ -4784,7 +4867,7 @@ var TabLockManager = class {
     button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>`;
   }
   /**
-   * Remove all lock buttons and cleanup tab header classes.
+   * Remove all lock buttons and cleanup.
    */
   removeAllButtons() {
     const buttons = document.querySelectorAll(".space-command-tab-lock-btn");
@@ -4799,67 +4882,6 @@ var TabLockManager = class {
     pinContainers.forEach(
       (container) => container.removeAttribute("data-space-command-pin-handler")
     );
-  }
-  /**
-   * Schedule a debounced update of all tabs.
-   */
-  scheduleUpdate() {
-    if (this.updateTimeout) {
-      clearTimeout(this.updateTimeout);
-    }
-    this.updateTimeout = setTimeout(() => {
-      this.updateTimeout = null;
-      this.updateAllTabs();
-    }, 50);
-  }
-  /**
-   * Start observing DOM changes to add buttons to new tabs.
-   */
-  startObserving() {
-    if (this.mutationObserver)
-      return;
-    this.mutationObserver = new MutationObserver((mutations) => {
-      var _a, _b, _c, _d;
-      let shouldUpdate = false;
-      for (const mutation of mutations) {
-        if (mutation.type === "childList") {
-          for (const node of Array.from(mutation.addedNodes)) {
-            if (node instanceof HTMLElement) {
-              if (((_a = node.classList) == null ? void 0 : _a.contains("workspace-tab-header")) || ((_b = node.querySelector) == null ? void 0 : _b.call(node, ".workspace-tab-header")) || ((_c = node.classList) == null ? void 0 : _c.contains("workspace-tab-header-inner")) || ((_d = node.closest) == null ? void 0 : _d.call(node, ".workspace-tab-header"))) {
-                shouldUpdate = true;
-                break;
-              }
-            }
-          }
-          if (!shouldUpdate && mutation.target instanceof HTMLElement) {
-            if (mutation.target.closest(".workspace-tab-header") && mutation.removedNodes.length > 0) {
-              shouldUpdate = true;
-            }
-          }
-        }
-        if (shouldUpdate)
-          break;
-      }
-      if (shouldUpdate) {
-        this.scheduleUpdate();
-      }
-    });
-    const workspaceContainer = document.querySelector(".workspace");
-    if (workspaceContainer) {
-      this.mutationObserver.observe(workspaceContainer, {
-        childList: true,
-        subtree: true
-      });
-    }
-  }
-  /**
-   * Stop observing DOM changes.
-   */
-  stopObserving() {
-    if (this.mutationObserver) {
-      this.mutationObserver.disconnect();
-      this.mutationObserver = null;
-    }
   }
 };
 

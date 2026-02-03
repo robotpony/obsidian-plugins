@@ -55,6 +55,7 @@ export class TodoScanner extends Events {
       const principles: TodoItem[] = [];
       const linesToCleanup: number[] = [];
       const linesToSyncTodone: number[] = [];
+      const linesToRemoveIdea: number[] = [];
 
       // Track code block state
       let inCodeBlock = false;
@@ -78,10 +79,8 @@ export class TodoScanner extends Events {
           continue;
         }
 
-        // Skip lines with inline code containing #todo or #todone
-        if (this.isInInlineCode(line)) {
-          continue;
-        }
+        // Note: extractTags() already removes backticked content before extracting tags,
+        // so tags inside inline code (like `#todo`) are correctly ignored.
 
         const tags = extractTags(line);
 
@@ -174,10 +173,18 @@ export class TodoScanner extends Events {
         // If line has both #todo and #todone, #todone wins and we clean up the #todo
         // If line has #idea, it should not appear in todos (idea takes precedence)
         const hasTodo = tags.includes("#todo") || tags.includes("#todos");
-        const hasTodone = tags.includes("#todone") || tags.includes("#todones");
+        let hasTodone = tags.includes("#todone") || tags.includes("#todones");
         const hasIdea = tags.includes("#idea") || tags.includes("#ideas") || tags.includes("#ideation");
         // Skip empty items (just tags, no content)
         const lineHasContent = this.hasContent(line);
+
+        // Sync checked checkboxes: if a #todo item has [x], add #todone @date
+        if (hasTodo && !hasTodone && !hasIdea && isCheckboxChecked(line)) {
+          linesToSyncTodone.push(i);
+          tags.push("#todone");
+          hasTodone = true;
+        }
+
         if (hasTodone && hasTodo) {
           // Queue this line for cleanup (remove #todo tag)
           linesToCleanup.push(i);
@@ -194,6 +201,15 @@ export class TodoScanner extends Events {
         if (tags.includes("#idea") || tags.includes("#ideas") || tags.includes("#ideation")) {
           // Skip empty ideas
           if (!lineHasContent) continue;
+
+          // Sync checked checkboxes: if an #idea item has [x], remove the #idea tag
+          // (completed ideas become regular checked list items, not tracked by Space Command)
+          if (isCheckboxChecked(line)) {
+            linesToRemoveIdea.push(i);
+            // Don't add to ideas list - it's being completed
+            continue;
+          }
+
           if (headerInfo) {
             // Header with #idea tag
             const headerIdea = this.createTodoItem(file, i, line, tags, 'idea');
@@ -253,6 +269,11 @@ export class TodoScanner extends Events {
         this.syncCheckedCheckboxes(file, lines, linesToSyncTodone);
       }
 
+      // Remove #idea tag from checked ideas (they become regular checked list items)
+      if (linesToRemoveIdea.length > 0) {
+        this.removeIdeaTags(file, lines, linesToRemoveIdea);
+      }
+
       if (todos.length > 0) {
         this.todosCache.set(file.path, todos);
       } else {
@@ -297,53 +318,6 @@ export class TodoScanner extends Events {
   private isListItem(line: string): boolean {
     // Match: "- ", "* ", "+ ", "1. ", "  - " (indented), etc.
     return /^[\s]*[-*+]\s/.test(line) || /^[\s]*\d+\.\s/.test(line);
-  }
-
-  private isInInlineCode(line: string): boolean {
-    // Check if #todo, #todone, #idea, #principle, or #focus appears within backticks
-    // This handles inline code like `#todo` or `some code #focus here`
-
-    // Find all tag positions (including plural forms)
-    const todoMatches = [...line.matchAll(/#todos?\b/g)];
-    const todoneMatches = [...line.matchAll(/#todones?\b/g)];
-    const ideaMatches = [...line.matchAll(/#idea(?:s|tion)?\b/g)];
-    const principleMatches = [...line.matchAll(/#principles?\b/g)];
-    const focusMatches = [...line.matchAll(/#focus\b/g)];
-    const allMatches = [...todoMatches, ...todoneMatches, ...ideaMatches, ...principleMatches, ...focusMatches];
-
-    if (allMatches.length === 0) {
-      return false;
-    }
-
-    // Find all backtick pairs
-    const backticks: number[] = [];
-    for (let i = 0; i < line.length; i++) {
-      if (line[i] === '`') {
-        backticks.push(i);
-      }
-    }
-
-    // If odd number of backticks, the line is malformed, treat conservatively
-    if (backticks.length % 2 !== 0) {
-      return false;
-    }
-
-    // Check if any #todo/#todone/#focus is between backtick pairs
-    for (const match of allMatches) {
-      const pos = match.index!;
-
-      // Check all backtick pairs
-      for (let i = 0; i < backticks.length; i += 2) {
-        const start = backticks[i];
-        const end = backticks[i + 1];
-
-        if (pos > start && pos < end) {
-          return true; // Found a tag inside inline code
-        }
-      }
-    }
-
-    return false;
   }
 
   private createTodoItem(
@@ -521,6 +495,28 @@ export class TodoScanner extends Events {
       const line = lines[lineNum];
       // Add #todone @date at end of line (before any trailing whitespace)
       const newLine = line.trimEnd() + ` #todone @${today}`;
+      if (newLine !== lines[lineNum]) {
+        lines[lineNum] = newLine;
+        modified = true;
+      }
+    }
+
+    if (modified) {
+      await this.app.vault.modify(file, lines.join("\n"));
+    }
+  }
+
+  // Remove #idea tag from checked ideas (they become regular checked list items)
+  private async removeIdeaTags(
+    file: TFile,
+    lines: string[],
+    lineNumbers: number[]
+  ): Promise<void> {
+    let modified = false;
+
+    for (const lineNum of lineNumbers) {
+      // Remove #idea, #ideas, or #ideation tag
+      const newLine = lines[lineNum].replace(/#idea(?:s|tion)?\b\s*/g, "");
       if (newLine !== lines[lineNum]) {
         lines[lineNum] = newLine;
         modified = true;
