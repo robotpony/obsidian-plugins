@@ -20,7 +20,6 @@ This is **Link Command** (`link-command`), an Obsidian plugin for URL unfurling.
 
 [main.ts](main.ts) - Plugin entry point extending `Plugin`. Initializes all components and registers:
 - Sidebar view for browsing page links and history
-- Inline format toggle extension (CodeMirror decorations)
 - Commands: "Toggle link format", "Clear link cache", "Toggle link sidebar"
 
 ### Key Components (src/)
@@ -31,12 +30,11 @@ This is **Link Command** (`link-command`), an Obsidian plugin for URL unfurling.
 | [UrlMetadataProvider.ts](src/UrlMetadataProvider.ts) | Provider interface and implementations: `HtmlMetadataProvider` (Open Graph/Twitter Card parser), `AuthDomainProvider` (skips auth-required domains) |
 | [UrlMetadataCache.ts](src/UrlMetadataCache.ts) | Two-tier cache: in-memory for session, persistent via plugin data for offline |
 | [UrlUnfurlService.ts](src/UrlUnfurlService.ts) | Coordinates providers and cache, validates URLs, handles batch unfurling |
-| [UrlFormatToggle.ts](src/UrlFormatToggle.ts) | CodeMirror extension: inline toggle buttons next to URLs to cycle formats |
 | [LinkSidebarView.ts](src/LinkSidebarView.ts) | Sidebar showing page links and recent history |
 
 ### Data Flow
 
-1. **Trigger**: User clicks inline toggle button or runs "Toggle link format" command
+1. **Trigger**: User runs "Toggle link format" command with cursor on a URL
 2. **Service**: `UrlUnfurlService` checks cache, then routes to provider
 3. **Provider**: `HtmlMetadataProvider` fetches HTML via `requestUrl()`, parses Open Graph/meta tags
 4. **Cache**: Successful results stored in memory + persistent cache
@@ -64,7 +62,6 @@ To add a new provider (e.g., for Slack), create a file in `src/providers/` imple
 - **Network requests**: Uses Obsidian's `requestUrl()` API (bypasses CORS)
 - **HTML parsing**: Browser's `DOMParser` extracts Open Graph, Twitter Cards, and standard meta tags
 - **Caching**: Two-tier (memory + persistent) with configurable TTL and source page tracking
-- **Inline toggle**: CodeMirror `StateField` + `WidgetType` + `ViewPlugin` for inline buttons
 - **Sidebar**: Follows space-command's `SidebarView` pattern with sections for page links and history
 
 ### Settings Tab

@@ -17,7 +17,6 @@ import {
 } from "./src/types";
 import { UrlUnfurlService } from "./src/UrlUnfurlService";
 import { LinkSidebarView, VIEW_TYPE_LINK_SIDEBAR } from "./src/LinkSidebarView";
-import { createFormatToggleExtension, FormatToggleConfig } from "./src/UrlFormatToggle";
 
 const LOGO_PREFIX = "L⌘";
 
@@ -87,9 +86,6 @@ export default class LinkCommandPlugin extends Plugin {
         this.activateSidebar();
       });
     }
-
-    // Register inline format toggle extension
-    this.registerFormatToggleExtension();
 
     // Register commands
     this.addCommand({
@@ -220,24 +216,6 @@ export default class LinkCommandPlugin extends Plugin {
     }
 
     return metadata.title;
-  }
-
-  /**
-   * Register the inline format toggle extension
-   */
-  private registerFormatToggleExtension(): void {
-    const config: FormatToggleConfig = {
-      enabled: this.settings.unfurlEnabled,
-      autoExpand: this.settings.autoExpandUrls,
-      unfurlService: this.unfurlService,
-      getSourcePage: () => this.app.workspace.getActiveFile()?.path,
-      onFormatChange: () => {
-        this.sidebarView?.render();
-      },
-    };
-
-    const extension = createFormatToggleExtension(config);
-    this.registerEditorExtension(extension);
   }
 
   /**
@@ -419,30 +397,6 @@ class LinkCommandSettingTab extends PluginSettingTab {
 
     // Unfurling section
     containerEl.createEl("h3", { text: "Unfurling" });
-
-    new Setting(containerEl)
-      .setName("Enable inline format toggle")
-      .setDesc("Show toggle buttons next to URLs to cycle between formats (URL, Link, Rich Link). Button appears on hover.")
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.unfurlEnabled)
-          .onChange(async (value) => {
-            this.plugin.settings.unfurlEnabled = value;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName("Auto-expand URLs")
-      .setDesc("Automatically convert new URLs to markdown links with fetched titles")
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.autoExpandUrls)
-          .onChange(async (value) => {
-            this.plugin.settings.autoExpandUrls = value;
-            await this.plugin.saveSettings();
-          })
-      );
 
     new Setting(containerEl)
       .setName("Request timeout")

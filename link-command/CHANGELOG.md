@@ -2,6 +2,15 @@
 
 All notable changes to the Link Command plugin will be documented in this file.
 
+## [0.5.0] - 2026-02-03
+
+### Removed
+
+- **Inline format toggle**: Removed the ⌘ toggle button that appeared next to URLs
+  - The hidden widget caused spacing issues between links and adjacent text
+  - Use the "Toggle link format" command (via command palette) to cycle formats instead
+  - Removed "Enable inline format toggle" and "Auto-expand URLs" settings
+
 ## [0.4.24] - 2026-01-30
 
 ### Added
