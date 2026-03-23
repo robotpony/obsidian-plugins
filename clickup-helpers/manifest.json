@@ -1,0 +1,10 @@
+{
+  "id": "clickup-helpers",
+  "name": "ClickUp Helpers",
+  "version": "0.1.0",
+  "minAppVersion": "0.15.0",
+  "description": "Connect Obsidian to ClickUp: generate release notes, ticket digests, and create tasks via [[cu:...]] syntax.",
+  "author": "Bruce Alderson",
+  "authorUrl": "https://github.com/robotpony/obsidian-plugins",
+  "isDesktopOnly": false
+}
