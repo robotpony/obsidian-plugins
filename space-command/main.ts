@@ -23,8 +23,6 @@ import {
 } from "./src/types";
 import { convertToSlackMarkdown } from "./src/SlackConverter";
 import { showNotice } from "./src/utils";
-import { LLMClient } from "./src/LLMClient";
-import { DefineTooltip } from "./src/DefineTooltip";
 import { TabLockManager } from "./src/TabLockManager";
 import { createHeaderSortPlugin } from "./src/HeaderSortExtension";
 import { createHeaderChecklistExtension } from "./src/HeaderChecklistExtension";
@@ -36,8 +34,6 @@ export default class SpaceCommandPlugin extends Plugin {
   processor: TodoProcessor;
   projectManager: ProjectManager;
   embedRenderer: EmbedRenderer;
-  llmClient: LLMClient;
-  defineTooltip: DefineTooltip;
   tabLockManager: TabLockManager;
   private sidebarManager: SidebarManager;
 
@@ -68,10 +64,6 @@ export default class SpaceCommandPlugin extends Plugin {
       this.settings.priorityTags,
       this.settings.makeLinksClickable
     );
-
-    // Initialize LLM client for Define/Rewrite/Review features
-    this.llmClient = new LLMClient(this.settings);
-    this.defineTooltip = new DefineTooltip(this.app);
 
     // Initialize tab lock manager
     this.tabLockManager = new TabLockManager(this.app);
@@ -303,103 +295,6 @@ export default class SpaceCommandPlugin extends Plugin {
                 showNotice("Copied as Slack markdown");
               });
           });
-
-          // Define menu item (LLM lookup)
-          if (this.settings.llmEnabled) {
-            menu.addItem((item) => {
-              item
-                .setTitle("Define term...")
-                .setIcon("book-open")
-                .onClick(async () => {
-                  // Show loading tooltip with the selected term
-                  this.defineTooltip.show(editor, "", true, selection, {
-                    loadingText: "Defining...",
-                    commandType: "define",
-                  });
-
-                  // Request definition from LLM
-                  const result = await this.llmClient.define(selection);
-
-                  if (result.success && result.definition) {
-                    this.defineTooltip.updateContent(result.definition);
-                  } else {
-                    this.defineTooltip.showError(
-                      this.llmClient.getModel(),
-                      () => this.openLLMSettings()
-                    );
-                  }
-                });
-            });
-
-            // Review menu item (LLM suggestions)
-            menu.addItem((item) => {
-              item
-                .setTitle("Review...")
-                .setIcon("message-square")
-                .onClick(async () => {
-                  // Show loading tooltip
-                  this.defineTooltip.show(editor, "", true, "", {
-                    loadingText: "Reviewing...",
-                    commandType: "review",
-                    showApply: true,
-                  });
-
-                  // Request review from LLM
-                  const result = await this.llmClient.review(selection);
-
-                  if (result.success && result.result) {
-                    this.defineTooltip.updateContent(result.result, {
-                      showApply: true,
-                    });
-                  } else {
-                    this.defineTooltip.showError(
-                      this.llmClient.getModel(),
-                      () => this.openLLMSettings()
-                    );
-                  }
-                });
-            });
-
-            // Rewrite menu item (LLM rewrite for clarity/brevity)
-            menu.addItem((item) => {
-              item
-                .setTitle("Rewrite...")
-                .setIcon("pencil")
-                .onClick(async () => {
-                  // Store the current selection range for Apply
-                  const from = editor.getCursor("from");
-                  const to = editor.getCursor("to");
-
-                  // Show loading tooltip
-                  this.defineTooltip.show(editor, "", true, "", {
-                    loadingText: "Rewriting...",
-                    commandType: "rewrite",
-                    onApply: (content: string) => {
-                      // Replace the original selection with the rewritten content
-                      editor.replaceRange(content, from, to);
-                      showNotice("Text replaced");
-                    },
-                  });
-
-                  // Request rewrite from LLM
-                  const result = await this.llmClient.rewrite(selection);
-
-                  if (result.success && result.result) {
-                    this.defineTooltip.updateContent(result.result, {
-                      onApply: (content: string) => {
-                        editor.replaceRange(content, from, to);
-                        showNotice("Text replaced");
-                      },
-                    });
-                  } else {
-                    this.defineTooltip.showError(
-                      this.llmClient.getModel(),
-                      () => this.openLLMSettings()
-                    );
-                  }
-                });
-            });
-          }
         }
       })
     );
@@ -416,8 +311,6 @@ export default class SpaceCommandPlugin extends Plugin {
   onunload() {
     // Detach all sidebar views
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_TODO_SIDEBAR);
-    // Clean up define tooltip
-    this.defineTooltip.close();
     // Clean up tab lock manager
     this.tabLockManager.destroy();
   }
@@ -447,11 +340,6 @@ export default class SpaceCommandPlugin extends Plugin {
     new TriageModal(this.app, this.scanner, this.processor, this.embedRenderer, this.settings.defaultTodoneFile).open();
   }
 
-  openLLMSettings() {
-    // Open Obsidian settings and navigate to Space Command tab
-    (this.app as any).setting.open();
-    (this.app as any).setting.openTabById("space-command");
-  }
 }
 
 // About modal for displaying plugin information
@@ -1168,222 +1056,5 @@ class SpaceCommandSettingTab extends PluginSettingTab {
           })
       );
 
-    // LLM/Define/Rewrite/Review Settings
-    containerEl.createEl("h3", { text: "LLM Settings (Define, Rewrite, Review)" });
-
-    new Setting(containerEl)
-      .setName("Enable LLM features")
-      .setDesc("Show Define, Rewrite, and Review options in context menu")
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.llmEnabled)
-          .onChange(async (value) => {
-            this.plugin.settings.llmEnabled = value;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName("LLM Provider")
-      .setDesc("Choose which LLM provider to use")
-      .addDropdown((dropdown) =>
-        dropdown
-          .addOption("ollama", "Ollama (local)")
-          .addOption("openai", "OpenAI")
-          .addOption("gemini", "Google Gemini")
-          .addOption("anthropic", "Anthropic Claude")
-          .setValue(this.plugin.settings.llmProvider)
-          .onChange(async (value: "ollama" | "openai" | "gemini" | "anthropic") => {
-            this.plugin.settings.llmProvider = value;
-            this.plugin.llmClient.updateSettings(this.plugin.settings);
-            await this.plugin.saveSettings();
-            this.display(); // Refresh to show/hide provider-specific settings
-          })
-      );
-
-    // Provider-specific settings
-    const provider = this.plugin.settings.llmProvider;
-
-    if (provider === "ollama") {
-      new Setting(containerEl)
-        .setName("Ollama URL")
-        .setDesc("Ollama server URL (default: http://localhost:11434)")
-        .addText((text) =>
-          text
-            .setPlaceholder("http://localhost:11434")
-            .setValue(this.plugin.settings.llmUrl)
-            .onChange(async (value) => {
-              this.plugin.settings.llmUrl = value;
-              this.plugin.llmClient.updateSettings(this.plugin.settings);
-              await this.plugin.saveSettings();
-            })
-        );
-
-      new Setting(containerEl)
-        .setName("Ollama Model")
-        .setDesc("Model name (e.g., llama3.2, mistral, codellama)")
-        .addText((text) =>
-          text
-            .setPlaceholder("llama3.2")
-            .setValue(this.plugin.settings.llmModel)
-            .onChange(async (value) => {
-              this.plugin.settings.llmModel = value;
-              this.plugin.llmClient.updateSettings(this.plugin.settings);
-              await this.plugin.saveSettings();
-            })
-        );
-    }
-
-    if (provider === "openai") {
-      new Setting(containerEl)
-        .setName("OpenAI API Key")
-        .setDesc("Your OpenAI API key")
-        .addText((text) =>
-          text
-            .setPlaceholder("sk-...")
-            .setValue(this.plugin.settings.llmOpenaiApiKey)
-            .onChange(async (value) => {
-              this.plugin.settings.llmOpenaiApiKey = value;
-              this.plugin.llmClient.updateSettings(this.plugin.settings);
-              await this.plugin.saveSettings();
-            })
-        );
-
-      new Setting(containerEl)
-        .setName("OpenAI Model")
-        .setDesc("Model to use (e.g., gpt-4o-mini, gpt-4o)")
-        .addText((text) =>
-          text
-            .setPlaceholder("gpt-4o-mini")
-            .setValue(this.plugin.settings.llmOpenaiModel)
-            .onChange(async (value) => {
-              this.plugin.settings.llmOpenaiModel = value;
-              this.plugin.llmClient.updateSettings(this.plugin.settings);
-              await this.plugin.saveSettings();
-            })
-        );
-    }
-
-    if (provider === "gemini") {
-      new Setting(containerEl)
-        .setName("Gemini API Key")
-        .setDesc("Your Google AI API key")
-        .addText((text) =>
-          text
-            .setPlaceholder("AI...")
-            .setValue(this.plugin.settings.llmGeminiApiKey)
-            .onChange(async (value) => {
-              this.plugin.settings.llmGeminiApiKey = value;
-              this.plugin.llmClient.updateSettings(this.plugin.settings);
-              await this.plugin.saveSettings();
-            })
-        );
-
-      new Setting(containerEl)
-        .setName("Gemini Model")
-        .setDesc("Model to use (e.g., gemini-1.5-flash, gemini-1.5-pro)")
-        .addText((text) =>
-          text
-            .setPlaceholder("gemini-1.5-flash")
-            .setValue(this.plugin.settings.llmGeminiModel)
-            .onChange(async (value) => {
-              this.plugin.settings.llmGeminiModel = value;
-              this.plugin.llmClient.updateSettings(this.plugin.settings);
-              await this.plugin.saveSettings();
-            })
-        );
-    }
-
-    if (provider === "anthropic") {
-      new Setting(containerEl)
-        .setName("Anthropic API Key")
-        .setDesc("Your Anthropic API key")
-        .addText((text) =>
-          text
-            .setPlaceholder("sk-ant-...")
-            .setValue(this.plugin.settings.llmAnthropicApiKey)
-            .onChange(async (value) => {
-              this.plugin.settings.llmAnthropicApiKey = value;
-              this.plugin.llmClient.updateSettings(this.plugin.settings);
-              await this.plugin.saveSettings();
-            })
-        );
-
-      new Setting(containerEl)
-        .setName("Anthropic Model")
-        .setDesc("Model to use (e.g., claude-3-haiku-20240307, claude-3-sonnet-20240229)")
-        .addText((text) =>
-          text
-            .setPlaceholder("claude-3-haiku-20240307")
-            .setValue(this.plugin.settings.llmAnthropicModel)
-            .onChange(async (value) => {
-              this.plugin.settings.llmAnthropicModel = value;
-              this.plugin.llmClient.updateSettings(this.plugin.settings);
-              await this.plugin.saveSettings();
-            })
-        );
-    }
-
-    // Prompts (always shown)
-    new Setting(containerEl)
-      .setName("Definition prompt")
-      .setDesc("Prompt prepended to the selected text for Define")
-      .addTextArea((text) => {
-        text
-          .setPlaceholder("Explain what this means...")
-          .setValue(this.plugin.settings.llmPrompt)
-          .onChange(async (value) => {
-            this.plugin.settings.llmPrompt = value;
-            await this.plugin.saveSettings();
-          });
-        text.inputEl.rows = 3;
-        text.inputEl.style.width = "100%";
-      });
-
-    new Setting(containerEl)
-      .setName("Rewrite prompt")
-      .setDesc("Prompt prepended to the selected text for Rewrite")
-      .addTextArea((text) => {
-        text
-          .setPlaceholder("Rewrite for clarity and brevity...")
-          .setValue(this.plugin.settings.llmRewritePrompt)
-          .onChange(async (value) => {
-            this.plugin.settings.llmRewritePrompt = value;
-            await this.plugin.saveSettings();
-          });
-        text.inputEl.rows = 3;
-        text.inputEl.style.width = "100%";
-      });
-
-    new Setting(containerEl)
-      .setName("Review prompt")
-      .setDesc("Prompt prepended to the selected text for Review")
-      .addTextArea((text) => {
-        text
-          .setPlaceholder("Review and suggest improvements...")
-          .setValue(this.plugin.settings.llmReviewPrompt)
-          .onChange(async (value) => {
-            this.plugin.settings.llmReviewPrompt = value;
-            await this.plugin.saveSettings();
-          });
-        text.inputEl.rows = 3;
-        text.inputEl.style.width = "100%";
-      });
-
-    new Setting(containerEl)
-      .setName("Timeout (ms)")
-      .setDesc("Maximum time to wait for LLM response")
-      .addText((text) =>
-        text
-          .setPlaceholder("30000")
-          .setValue(String(this.plugin.settings.llmTimeout))
-          .onChange(async (value) => {
-            const num = parseInt(value);
-            if (!isNaN(num) && num > 0) {
-              this.plugin.settings.llmTimeout = num;
-              await this.plugin.saveSettings();
-            }
-          })
-      );
   }
 }

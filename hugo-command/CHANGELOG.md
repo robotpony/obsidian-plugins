@@ -2,6 +2,19 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.6.12] - 2026-03-23
+
+### Removed
+
+- **LLM features removed**: Content Review and Outline Enhancement have been removed. These will return as a dedicated plugin.
+  - Removed "Review post" button and cached review results from the item info dropdown
+  - Removed "Enhance Outline with Suggestions" command
+  - Removed sparkles button from the document tab header
+  - Removed "Enhance outline" file menu item
+  - Removed comment bubble rendering for HTML comments
+  - Removed all review and outline settings (provider, criteria, style guide, prompts)
+  - The shared LLM library remains intact for future use
+
 ## [0.6.11] - 2026-02-05
 
 ### Improved

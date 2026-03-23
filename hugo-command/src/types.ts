@@ -34,91 +34,6 @@ export interface HugoContentItem {
 }
 
 /**
- * LLM provider options
- */
-export type LLMProvider = "ollama" | "openai" | "gemini" | "anthropic";
-
-/**
- * Review criterion result
- */
-export interface ReviewCriterion {
-  text: string;
-  passed: boolean | null;
-  note?: string;
-}
-
-/**
- * Review result for a file
- */
-export interface ReviewResult {
-  filePath: string;
-  criteria: ReviewCriterion[];
-  timestamp: number;
-  error?: string;
-}
-
-/**
- * Review settings
- */
-export interface ReviewSettings {
-  enabled: boolean;
-  provider: LLMProvider;
-  // Ollama settings
-  ollamaEndpoint: string;
-  ollamaModel: string;
-  // OpenAI settings
-  openaiApiKey: string;
-  openaiModel: string;
-  // Gemini settings
-  geminiApiKey: string;
-  geminiModel: string;
-  // Anthropic settings
-  anthropicApiKey: string;
-  anthropicModel: string;
-  // Review criteria (one per line)
-  criteria: string;
-  // Style guide reference
-  styleGuideFile: string;
-  styleGuideInline: string;
-}
-
-/**
- * Outline enhancement settings
- */
-export interface OutlineSettings {
-  enabled: boolean;
-  // Custom prompt/instructions for the LLM
-  prompt: string;
-}
-
-export const DEFAULT_OUTLINE_SETTINGS: OutlineSettings = {
-  enabled: false,
-  prompt: `Analyze this blog post outline/draft and enhance it by:
-1. Adding inline questions as HTML comments (<!-- Q: question here -->) where more detail or examples would help
-2. Suggesting missing sections that would strengthen the piece
-3. Noting any structural improvements
-4. If a style guide is provided, flag specific places where the writing doesn't follow the guidelines, citing the relevant rule
-
-Keep the original content intact. Add your suggestions as HTML comments so they're invisible when rendered.`,
-};
-
-export const DEFAULT_REVIEW_SETTINGS: ReviewSettings = {
-  enabled: false,
-  provider: "ollama",
-  ollamaEndpoint: "http://localhost:11434",
-  ollamaModel: "llama3.2",
-  openaiApiKey: "",
-  openaiModel: "gpt-4o-mini",
-  geminiApiKey: "",
-  geminiModel: "gemini-1.5-flash",
-  anthropicApiKey: "",
-  anthropicModel: "claude-3-haiku-20240307",
-  criteria: "Has a clear, descriptive title\nIncludes an introduction\nHas a conclusion or summary\nUses proper headings structure\nIncludes relevant tags",
-  styleGuideFile: "",
-  styleGuideInline: "",
-};
-
-/**
  * Plugin settings
  */
 export interface HugoCommandSettings {
@@ -128,8 +43,6 @@ export interface HugoCommandSettings {
   showDrafts: boolean;
   defaultSortOrder: "date-desc" | "date-asc" | "title";
   defaultStatusFilter: StatusFilter;
-  review: ReviewSettings;
-  outline: OutlineSettings;
 }
 
 export const DEFAULT_SETTINGS: HugoCommandSettings = {
@@ -139,8 +52,6 @@ export const DEFAULT_SETTINGS: HugoCommandSettings = {
   showDrafts: true,
   defaultSortOrder: "date-desc",
   defaultStatusFilter: "draft",
-  review: DEFAULT_REVIEW_SETTINGS,
-  outline: DEFAULT_OUTLINE_SETTINGS,
 };
 
 export type StatusFilter = "all" | "draft" | "published";

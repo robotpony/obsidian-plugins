@@ -4,8 +4,6 @@ import {
   Plugin,
   PluginSettingTab,
   Setting,
-  TFile,
-  MarkdownView,
 } from "obsidian";
 import { HugoScanner } from "./src/HugoScanner";
 import {
@@ -15,27 +13,15 @@ import {
 import {
   HugoCommandSettings,
   DEFAULT_SETTINGS,
-  DEFAULT_REVIEW_SETTINGS,
-  DEFAULT_OUTLINE_SETTINGS,
-  ReviewResult,
   StatusFilter,
 } from "./src/types";
 import { showNotice, LOGO_PREFIX } from "./src/utils";
 import { SiteSettingsModal } from "./src/SiteSettingsModal";
-import { ReviewCache } from "./src/ReviewCache";
-import { ReviewLLMClient } from "./src/ReviewLLMClient";
-import { OutlineLLMClient } from "./src/OutlineLLMClient";
-import { commentBubblesPlugin, stripHtmlComments } from "./src/CommentBubbles";
 import { SidebarManager } from "../shared";
 
 export default class HugoCommandPlugin extends Plugin {
   settings: HugoCommandSettings;
   scanner: HugoScanner;
-  reviewCache: ReviewCache;
-  reviewClient: ReviewLLMClient;
-  outlineClient: OutlineLLMClient;
-  private reviewCacheData: Record<string, ReviewResult> = {};
-  private isEnhancingOutline: boolean = false;
   private sidebarManager: SidebarManager;
 
   async onload() {
@@ -46,16 +32,6 @@ export default class HugoCommandPlugin extends Plugin {
 
     // Initialize scanner
     this.scanner = new HugoScanner(this.app, this.settings.contentPaths);
-
-    // Initialize review components
-    this.reviewCache = new ReviewCache((data) => {
-      this.reviewCacheData = data;
-      this.saveData({ ...this.settings, _reviewCache: data });
-    });
-    // Load cached review data
-    this.reviewCache.load(this.reviewCacheData);
-    this.reviewClient = new ReviewLLMClient(this.settings.review);
-    this.outlineClient = new OutlineLLMClient(this.settings.review, this.settings.outline);
 
     // Scan vault on load
     await this.scanner.scanVault();
@@ -71,9 +47,6 @@ export default class HugoCommandPlugin extends Plugin {
           leaf,
           this.scanner,
           this.settings,
-          this.reviewCache,
-          this.reviewClient,
-          () => this.getStyleGuide(),
           () => this.showAboutModal(),
           () => this.openSettings(),
           () => this.showSiteSettings()
@@ -117,141 +90,8 @@ export default class HugoCommandPlugin extends Plugin {
       this.sidebarManager.toggle();
     });
 
-    // Register CodeMirror extension for comment bubbles (if outline enabled)
-    if (this.settings.outline.enabled) {
-      this.registerEditorExtension(commentBubblesPlugin);
-    }
-
-    // Add enhance outline command
-    this.addCommand({
-      id: "enhance-outline",
-      name: "Enhance Outline with Suggestions",
-      editorCallback: async (editor, view) => {
-        if (!this.settings.outline.enabled) {
-          showNotice("Outline enhancement is not enabled in settings");
-          return;
-        }
-        await this.enhanceCurrentOutline();
-      },
-    });
-
-    // Register file-menu item for sparkles button
-    this.registerEvent(
-      this.app.workspace.on("file-menu", (menu, file) => {
-        if (!this.settings.outline.enabled) return;
-        if (!(file instanceof TFile) || file.extension !== "md") return;
-
-        menu.addItem((item) => {
-          item
-            .setTitle("Enhance outline")
-            .setIcon("sparkles")
-            .onClick(async () => {
-              // Open the file first if not already open
-              const leaf = this.app.workspace.getLeaf();
-              await leaf.openFile(file);
-              await this.enhanceCurrentOutline();
-            });
-        });
-      })
-    );
-
-    // Add sparkles button to markdown view tab header
-    if (this.settings.outline.enabled) {
-      this.registerEvent(
-        this.app.workspace.on("layout-change", () => {
-          this.addSparklesButtonToViews();
-        })
-      );
-      // Also add to any already-open views
-      this.app.workspace.onLayoutReady(() => {
-        this.addSparklesButtonToViews();
-      });
-    }
-
     // Add settings tab
     this.addSettingTab(new HugoCommandSettingTab(this.app, this));
-  }
-
-  /**
-   * Add sparkles button to all open markdown views
-   */
-  private addSparklesButtonToViews(): void {
-    this.app.workspace.iterateAllLeaves((leaf) => {
-      if (leaf.view instanceof MarkdownView) {
-        this.addSparklesButtonToView(leaf.view);
-      }
-    });
-  }
-
-  /**
-   * Add sparkles button to a specific markdown view's title bar
-   */
-  private addSparklesButtonToView(view: MarkdownView): void {
-    // Check if button already exists
-    const existingBtn = view.containerEl.querySelector(".hugo-enhance-action");
-    if (existingBtn) return;
-
-    // Find the view actions container (where other icons like pin, more options live)
-    const viewActions = view.containerEl.querySelector(".view-actions");
-    if (!viewActions) return;
-
-    // Create the sparkles button
-    const btn = document.createElement("a");
-    btn.className = "clickable-icon view-action hugo-enhance-action";
-    btn.setAttribute("aria-label", "Enhance outline");
-    btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>';
-
-    btn.addEventListener("click", async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (this.isEnhancingOutline) return;
-
-      btn.addClass("is-loading");
-      await this.enhanceCurrentOutline();
-      btn.removeClass("is-loading");
-    });
-
-    // Insert at the beginning of view-actions (leftmost position)
-    viewActions.insertBefore(btn, viewActions.firstChild);
-  }
-
-  /**
-   * Enhance the current document outline using LLM
-   */
-  private async enhanceCurrentOutline(): Promise<void> {
-    if (this.isEnhancingOutline) {
-      return;
-    }
-
-    const activeFile = this.app.workspace.getActiveFile();
-    if (!activeFile) {
-      showNotice("No file is currently open");
-      return;
-    }
-
-    if (activeFile.extension !== "md") {
-      showNotice("Outline enhancement only works on markdown files");
-      return;
-    }
-
-    this.isEnhancingOutline = true;
-    showNotice("Enhancing outline...");
-
-    try {
-      const rawContent = await this.app.vault.read(activeFile);
-      // Strip existing comments before enhancing
-      const content = stripHtmlComments(rawContent);
-      const styleGuide = await this.getStyleGuide();
-      const enhanced = await this.outlineClient.enhance(content, styleGuide);
-      await this.app.vault.modify(activeFile, enhanced);
-      showNotice("Outline enhanced with suggestions");
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : "Enhancement failed";
-      showNotice(`Error: ${msg}`);
-      console.error("[Hugo Outline] Enhancement failed:", error);
-    } finally {
-      this.isEnhancingOutline = false;
-    }
   }
 
   onunload() {
@@ -259,29 +99,13 @@ export default class HugoCommandPlugin extends Plugin {
   }
 
   async loadSettings() {
-    const data = await this.loadData();
-    // Separate review cache from settings
-    const { _reviewCache, ...settingsData } = data || {};
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, settingsData);
-    // Ensure review settings exist
-    if (!this.settings.review) {
-      this.settings.review = DEFAULT_REVIEW_SETTINGS;
-    }
-    // Ensure outline settings exist
-    if (!this.settings.outline) {
-      this.settings.outline = DEFAULT_OUTLINE_SETTINGS;
-    }
-    // Load review cache after reviewCache is initialized
-    this.reviewCacheData = _reviewCache || {};
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
   }
 
   async saveSettings() {
-    await this.saveData({ ...this.settings, _reviewCache: this.reviewCacheData });
+    await this.saveData(this.settings);
     // Update scanner with new content paths
     this.scanner.setContentPaths(this.settings.contentPaths);
-    // Update LLM clients with new settings
-    this.reviewClient.updateSettings(this.settings.review);
-    this.outlineClient.updateSettings(this.settings.review, this.settings.outline);
     // Rescan with new paths
     await this.scanner.scanVault();
     // Update sidebar views
@@ -305,36 +129,6 @@ export default class HugoCommandPlugin extends Plugin {
 
   showSiteSettings() {
     new SiteSettingsModal(this.app).open();
-  }
-
-  /**
-   * Get the combined style guide content from file and inline settings.
-   */
-  async getStyleGuide(): Promise<string> {
-    const parts: string[] = [];
-
-    // Load from file if specified
-    if (this.settings.review.styleGuideFile) {
-      const file = this.app.vault.getAbstractFileByPath(this.settings.review.styleGuideFile);
-      if (file instanceof TFile) {
-        try {
-          const content = await this.app.vault.read(file);
-          parts.push(content);
-        } catch (error) {
-          console.error("[Hugo Review] Failed to read style guide file:", error);
-          showNotice(`Could not read style guide: ${this.settings.review.styleGuideFile}`);
-        }
-      } else {
-        showNotice(`Style guide file not found: ${this.settings.review.styleGuideFile}`);
-      }
-    }
-
-    // Add inline guidelines
-    if (this.settings.review.styleGuideInline) {
-      parts.push(this.settings.review.styleGuideInline);
-    }
-
-    return parts.join("\n\n");
   }
 }
 
@@ -509,233 +303,5 @@ class HugoCommandSettingTab extends PluginSettingTab {
           })
       );
 
-    // Review section
-    containerEl.createEl("h3", { text: "Content Review" });
-
-    new Setting(containerEl)
-      .setName("Enable content review")
-      .setDesc("Use an LLM to review posts against a checklist of criteria")
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.review.enabled)
-          .onChange(async (value) => {
-            this.plugin.settings.review.enabled = value;
-            await this.plugin.saveSettings();
-            this.display(); // Refresh to show/hide provider settings
-          })
-      );
-
-    if (this.plugin.settings.review.enabled) {
-      new Setting(containerEl)
-        .setName("LLM provider")
-        .setDesc("Which LLM service to use for reviews")
-        .addDropdown((dropdown) =>
-          dropdown
-            .addOption("ollama", "Ollama (local)")
-            .addOption("openai", "OpenAI")
-            .addOption("gemini", "Google Gemini")
-            .addOption("anthropic", "Anthropic Claude")
-            .setValue(this.plugin.settings.review.provider)
-            .onChange(async (value) => {
-              this.plugin.settings.review.provider = value as any;
-              await this.plugin.saveSettings();
-              this.display(); // Refresh to show provider-specific settings
-            })
-        );
-
-      // Provider-specific settings
-      const provider = this.plugin.settings.review.provider;
-
-      if (provider === "ollama") {
-        new Setting(containerEl)
-          .setName("Ollama endpoint")
-          .setDesc("URL of your Ollama server")
-          .addText((text) =>
-            text
-              .setPlaceholder("http://localhost:11434")
-              .setValue(this.plugin.settings.review.ollamaEndpoint)
-              .onChange(async (value) => {
-                this.plugin.settings.review.ollamaEndpoint = value.trim() || "http://localhost:11434";
-                await this.plugin.saveSettings();
-              })
-          );
-
-        new Setting(containerEl)
-          .setName("Ollama model")
-          .setDesc("Model to use (e.g., llama3.2, mistral)")
-          .addText((text) =>
-            text
-              .setPlaceholder("llama3.2")
-              .setValue(this.plugin.settings.review.ollamaModel)
-              .onChange(async (value) => {
-                this.plugin.settings.review.ollamaModel = value.trim() || "llama3.2";
-                await this.plugin.saveSettings();
-              })
-          );
-      } else if (provider === "openai") {
-        new Setting(containerEl)
-          .setName("OpenAI API key")
-          .setDesc("Your OpenAI API key")
-          .addText((text) =>
-            text
-              .setPlaceholder("sk-...")
-              .setValue(this.plugin.settings.review.openaiApiKey)
-              .onChange(async (value) => {
-                this.plugin.settings.review.openaiApiKey = value.trim();
-                await this.plugin.saveSettings();
-              })
-          );
-
-        new Setting(containerEl)
-          .setName("OpenAI model")
-          .setDesc("Model to use (e.g., gpt-4o-mini, gpt-4o)")
-          .addText((text) =>
-            text
-              .setPlaceholder("gpt-4o-mini")
-              .setValue(this.plugin.settings.review.openaiModel)
-              .onChange(async (value) => {
-                this.plugin.settings.review.openaiModel = value.trim() || "gpt-4o-mini";
-                await this.plugin.saveSettings();
-              })
-          );
-      } else if (provider === "gemini") {
-        new Setting(containerEl)
-          .setName("Gemini API key")
-          .setDesc("Your Google AI Studio API key")
-          .addText((text) =>
-            text
-              .setPlaceholder("AI...")
-              .setValue(this.plugin.settings.review.geminiApiKey)
-              .onChange(async (value) => {
-                this.plugin.settings.review.geminiApiKey = value.trim();
-                await this.plugin.saveSettings();
-              })
-          );
-
-        new Setting(containerEl)
-          .setName("Gemini model")
-          .setDesc("Model to use (e.g., gemini-1.5-flash, gemini-1.5-pro)")
-          .addText((text) =>
-            text
-              .setPlaceholder("gemini-1.5-flash")
-              .setValue(this.plugin.settings.review.geminiModel)
-              .onChange(async (value) => {
-                this.plugin.settings.review.geminiModel = value.trim() || "gemini-1.5-flash";
-                await this.plugin.saveSettings();
-              })
-          );
-      } else if (provider === "anthropic") {
-        new Setting(containerEl)
-          .setName("Anthropic API key")
-          .setDesc("Your Anthropic API key")
-          .addText((text) =>
-            text
-              .setPlaceholder("sk-ant-...")
-              .setValue(this.plugin.settings.review.anthropicApiKey)
-              .onChange(async (value) => {
-                this.plugin.settings.review.anthropicApiKey = value.trim();
-                await this.plugin.saveSettings();
-              })
-          );
-
-        new Setting(containerEl)
-          .setName("Anthropic model")
-          .setDesc("Model to use (e.g., claude-3-haiku-20240307)")
-          .addText((text) =>
-            text
-              .setPlaceholder("claude-3-haiku-20240307")
-              .setValue(this.plugin.settings.review.anthropicModel)
-              .onChange(async (value) => {
-                this.plugin.settings.review.anthropicModel = value.trim() || "claude-3-haiku-20240307";
-                await this.plugin.saveSettings();
-              })
-          );
-      }
-
-      // Review criteria
-      new Setting(containerEl)
-        .setName("Review criteria")
-        .setDesc("Checklist items to evaluate (one per line)")
-        .addTextArea((text) =>
-          text
-            .setPlaceholder("Has a clear title\nIncludes an introduction\nHas a conclusion")
-            .setValue(this.plugin.settings.review.criteria)
-            .onChange(async (value) => {
-              this.plugin.settings.review.criteria = value;
-              await this.plugin.saveSettings();
-            })
-        );
-
-      // Style guide
-      new Setting(containerEl)
-        .setName("Style guide file")
-        .setDesc("Path to a markdown file containing style guidelines (optional)")
-        .addText((text) =>
-          text
-            .setPlaceholder("Resources/Style Guide.md")
-            .setValue(this.plugin.settings.review.styleGuideFile)
-            .onChange(async (value) => {
-              this.plugin.settings.review.styleGuideFile = value.trim();
-              await this.plugin.saveSettings();
-            })
-        );
-
-      new Setting(containerEl)
-        .setName("Inline style guidelines")
-        .setDesc("Additional style guidelines (combined with file if both specified)")
-        .addTextArea((text) =>
-          text
-            .setPlaceholder("Write in active voice. Keep paragraphs short.")
-            .setValue(this.plugin.settings.review.styleGuideInline)
-            .onChange(async (value) => {
-              this.plugin.settings.review.styleGuideInline = value;
-              await this.plugin.saveSettings();
-            })
-        );
-
-      // Clear cache button
-      new Setting(containerEl)
-        .setName("Clear review cache")
-        .setDesc("Remove all cached review results")
-        .addButton((button) =>
-          button
-            .setButtonText("Clear Cache")
-            .onClick(async () => {
-              this.plugin.reviewCache.clearAll();
-              showNotice("Review cache cleared");
-            })
-        );
-    }
-
-    // Outline Enhancement section
-    containerEl.createEl("h3", { text: "Outline Enhancement" });
-
-    new Setting(containerEl)
-      .setName("Enable outline enhancement")
-      .setDesc("Use an LLM to add questions and suggestions to document outlines (uses same LLM settings as Content Review)")
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.outline.enabled)
-          .onChange(async (value) => {
-            this.plugin.settings.outline.enabled = value;
-            await this.plugin.saveSettings();
-            this.display();
-          })
-      );
-
-    if (this.plugin.settings.outline.enabled) {
-      new Setting(containerEl)
-        .setName("Enhancement prompt")
-        .setDesc("Instructions for the LLM when enhancing outlines")
-        .addTextArea((text) =>
-          text
-            .setPlaceholder("Analyze this outline and add questions...")
-            .setValue(this.plugin.settings.outline.prompt)
-            .onChange(async (value) => {
-              this.plugin.settings.outline.prompt = value;
-              await this.plugin.saveSettings();
-            })
-        );
-    }
   }
 }

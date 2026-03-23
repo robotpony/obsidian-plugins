@@ -2,6 +2,16 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.107] - 2026-03-23
+
+### Removed
+
+- **LLM features removed**: Define, Rewrite, and Review commands have been removed from the context menu. These will return as a dedicated plugin.
+  - Removed "Define term...", "Review...", and "Rewrite..." context menu items
+  - Removed all LLM provider settings (Ollama, OpenAI, Gemini, Anthropic)
+  - Removed prompt configuration settings
+  - The shared LLM library remains intact for future use
+
 ## [0.9.106] - 2026-02-07
 
 ### Improved

@@ -51,22 +51,6 @@ Items sort by: focus → priority → tag count (more tags = more context = high
 
 Right-click any TODO for quick actions: Focus, Later, Snooze, Copy.
 
-## LLM Tools (Define, Rewrite, Review)
-
-Select any text, right-click, and choose from three LLM-powered tools:
-
-| Command     | Purpose                                                    |
-|-------------|------------------------------------------------------------|
-| **Define**  | Get a contextual explanation of the selected text          |
-| **Rewrite** | Improve clarity, accuracy, and brevity (with Apply button) |
-| **Review**  | Get editorial suggestions for improvement                  |
-
-- Results appear in an inline tooltip near your selection
-- Rewrite includes Copy and Apply buttons—Apply replaces your selection
-- Customize prompts in Settings → LLM Settings
-
-**Supported providers**: Ollama (local, default), OpenAI, Google Gemini, Anthropic Claude. Configure in Settings → LLM Settings.
-
 ## Ideas Tab
 
 Capture ideas separately from actionable TODOs. The sidebar has two tabs—TODOs and Ideas.

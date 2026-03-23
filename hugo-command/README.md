@@ -87,40 +87,6 @@ Configure the plugin in Settings > Hugo Command:
 - **Default Sort Order**: How to sort content (date or title)
 - **Trash Folder**: Folder for trashed posts (default: `_trash`)
 
-## LLM Features
-
-Hugo Command includes two LLM-powered features for improving your content. Both require an LLM provider configured in Settings.
-
-### Content Review
-
-Review posts against a configurable checklist. Click the (i) info button on any post, then "Review post".
-
-- **Pass/fail status** for each criterion with explanatory notes
-- **Results cached** per-file (re-run anytime to refresh)
-- **Style guide support** via file path or inline text
-
-### Outline Enhancement
-
-Add questions and suggestions to document outlines. Right-click a file and choose "Enhance Outline with Suggestions", or use the sparkles button in the document header.
-
-- **Inline HTML comments** inserted throughout the document
-- **Comment bubbles** render comments as styled, clickable bubbles
-  - Blue (?) for questions
-  - Yellow (💡) for suggestions
-  - Purple (✎) for style guide violations
-- **Delete individual suggestions** via the (×) button on each bubble
-
-### LLM Providers
-
-Configure in Settings → Hugo Command → LLM Settings:
-
-| Provider | Notes |
-|----------|-------|
-| **Ollama** (default) | Local models (llama3.2, mistral). Requires [Ollama](https://ollama.ai) running. |
-| **OpenAI** | gpt-4o-mini, gpt-4o. Requires API key. |
-| **Google Gemini** | gemini-1.5-flash, gemini-1.5-pro. Requires API key. |
-| **Anthropic Claude** | claude-3-haiku, claude-3-sonnet. Requires API key. |
-
 ## Hugo Frontmatter
 
 The plugin reads standard Hugo frontmatter fields:

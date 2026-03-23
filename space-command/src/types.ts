@@ -1,5 +1,4 @@
 import { TFile } from "obsidian";
-import { LLMProvider } from "../../shared";
 
 export interface TodoItem {
   file: TFile;
@@ -66,26 +65,6 @@ export interface SpaceCommandSettings {
   showTabLockButton: boolean;
   // Link rendering settings
   makeLinksClickable: boolean;
-  // LLM/Define settings
-  llmEnabled: boolean;
-  llmProvider: LLMProvider;
-  // Ollama settings
-  llmUrl: string;
-  llmModel: string;
-  // OpenAI settings
-  llmOpenaiApiKey: string;
-  llmOpenaiModel: string;
-  // Gemini settings
-  llmGeminiApiKey: string;
-  llmGeminiModel: string;
-  // Anthropic settings
-  llmAnthropicApiKey: string;
-  llmAnthropicModel: string;
-  // Prompts
-  llmPrompt: string;
-  llmRewritePrompt: string;
-  llmReviewPrompt: string;
-  llmTimeout: number;
   // Triage settings
   triageSnoozedThreshold: number;
   triageActiveThreshold: number;
@@ -108,26 +87,6 @@ export const DEFAULT_SETTINGS: SpaceCommandSettings = {
   showTabLockButton: false,
   // Link rendering settings
   makeLinksClickable: true,
-  // LLM/Define settings
-  llmEnabled: true,
-  llmProvider: "ollama",
-  // Ollama settings
-  llmUrl: "http://localhost:11434",
-  llmModel: "llama3.2",
-  // OpenAI settings
-  llmOpenaiApiKey: "",
-  llmOpenaiModel: "gpt-4o-mini",
-  // Gemini settings
-  llmGeminiApiKey: "",
-  llmGeminiModel: "gemini-1.5-flash",
-  // Anthropic settings
-  llmAnthropicApiKey: "",
-  llmAnthropicModel: "claude-3-haiku-20240307",
-  // Prompts
-  llmPrompt: "Explain what this means in plain language, providing context if it's a technical term:",
-  llmRewritePrompt: "Rewrite the following text to improve clarity, accuracy, and brevity. Keep the same tone and intent. Avoid clichés and filler words. Output only the rewritten text, nothing else:",
-  llmReviewPrompt: "Review the following text and provide specific suggestions for improvement. Focus on clarity, accuracy, structure, and style. Be concise and actionable:",
-  llmTimeout: 30000,
   // Triage settings
   triageSnoozedThreshold: 10,
   triageActiveThreshold: 20,

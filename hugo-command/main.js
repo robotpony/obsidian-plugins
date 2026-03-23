@@ -27,7 +27,7 @@ __export(main_exports, {
   default: () => HugoCommandPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian9 = require("obsidian");
+var import_obsidian7 = require("obsidian");
 
 // src/HugoScanner.ts
 var import_obsidian4 = require("obsidian");
@@ -690,7 +690,7 @@ var HugoScanner = class extends import_obsidian4.Events {
 var import_obsidian5 = require("obsidian");
 var VIEW_TYPE_HUGO_SIDEBAR = "hugo-command-sidebar";
 var HugoSidebarView = class extends import_obsidian5.ItemView {
-  constructor(leaf, scanner, settings, reviewCache, reviewClient, getStyleGuide, onShowAbout, onOpenSettings, onOpenSiteSettings) {
+  constructor(leaf, scanner, settings, onShowAbout, onOpenSettings, onOpenSiteSettings) {
     super(leaf);
     this.updateListener = null;
     this.activeTagFilter = null;
@@ -701,9 +701,6 @@ var HugoSidebarView = class extends import_obsidian5.ItemView {
     this.openInfoPopup = null;
     this.scanner = scanner;
     this.settings = settings;
-    this.reviewCache = reviewCache;
-    this.reviewClient = reviewClient;
-    this.getStyleGuide = getStyleGuide;
     this.activeStatusFilter = settings.defaultStatusFilter;
     this.onShowAbout = onShowAbout;
     this.onOpenSettings = onOpenSettings;
@@ -1225,9 +1222,6 @@ var HugoSidebarView = class extends import_obsidian5.ItemView {
           });
         }
       }
-      if (this.settings.review.enabled) {
-        this.renderReviewSection(dropdown, item);
-      }
       document.body.appendChild(dropdown);
       this.openDropdown = dropdown;
       this.openDropdownTrigger = trigger;
@@ -1239,144 +1233,6 @@ var HugoSidebarView = class extends import_obsidian5.ItemView {
       };
       setTimeout(() => document.addEventListener("click", closeHandler), 0);
     });
-  }
-  /**
-   * Render review section in item info dropdown
-   */
-  renderReviewSection(dropdown, item) {
-    dropdown.createEl("div", { cls: "hugo-command-tag-separator" });
-    dropdown.createEl("div", {
-      cls: "hugo-command-tag-section-header",
-      text: "Review"
-    });
-    const cachedReview = this.reviewCache.get(item.filePath);
-    const reviewContainer = dropdown.createEl("div", {
-      cls: "hugo-command-review-container"
-    });
-    if (cachedReview && !cachedReview.error) {
-      this.renderReviewResults(reviewContainer, cachedReview);
-    } else if (cachedReview == null ? void 0 : cachedReview.error) {
-      reviewContainer.createEl("div", {
-        cls: "hugo-command-review-error",
-        text: cachedReview.error
-      });
-    }
-    const buttonText = cachedReview ? "Review post again" : "Review post";
-    const runBtn = dropdown.createEl("div", {
-      cls: "hugo-command-review-btn",
-      text: buttonText
-    });
-    runBtn.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      runBtn.textContent = "Reading post";
-      runBtn.addClass("loading");
-      reviewContainer.empty();
-      const loadingEl = reviewContainer.createEl("div", {
-        cls: "hugo-command-review-loading"
-      });
-      loadingEl.createEl("span", { cls: "hugo-command-review-spinner" });
-      loadingEl.createSpan({ text: "Reading post..." });
-      try {
-        const content = await this.app.vault.read(item.file);
-        const styleGuide = await this.getStyleGuide();
-        const criteria = await this.reviewClient.review(content, styleGuide);
-        if (criteria.length === 0) {
-          reviewContainer.empty();
-          reviewContainer.createEl("div", {
-            cls: "hugo-command-review-error",
-            text: "No review criteria configured. Add criteria in settings."
-          });
-          runBtn.textContent = "Review post";
-          runBtn.removeClass("loading");
-          return;
-        }
-        const result = {
-          filePath: item.filePath,
-          criteria,
-          timestamp: Date.now()
-        };
-        this.reviewCache.set(result);
-        reviewContainer.empty();
-        this.renderReviewResults(reviewContainer, result);
-        runBtn.textContent = "Review post again";
-        runBtn.removeClass("loading");
-      } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : "Review failed";
-        const result = {
-          filePath: item.filePath,
-          criteria: [],
-          timestamp: Date.now(),
-          error: errorMsg
-        };
-        this.reviewCache.set(result);
-        reviewContainer.empty();
-        reviewContainer.createEl("div", {
-          cls: "hugo-command-review-error",
-          text: errorMsg
-        });
-        runBtn.textContent = "Retry";
-        runBtn.removeClass("loading");
-      }
-    });
-  }
-  /**
-   * Render review results checklist
-   */
-  renderReviewResults(container, result) {
-    const total = result.criteria.length;
-    const passed = result.criteria.filter((c) => c.passed === true).length;
-    const failed = result.criteria.filter((c) => c.passed === false).length;
-    if (total > 0) {
-      const scoreEl = container.createEl("div", { cls: "hugo-command-review-score" });
-      const scoreClass = failed === 0 ? "all-passed" : failed <= total / 2 ? "some-failed" : "many-failed";
-      scoreEl.addClass(scoreClass);
-      scoreEl.setText(`${passed}/${total} passed`);
-    }
-    const list = container.createEl("div", { cls: "hugo-command-review-list" });
-    for (const criterion of result.criteria) {
-      const item = list.createEl("div", { cls: "hugo-command-review-item" });
-      let statusIcon;
-      let statusClass;
-      if (criterion.passed === true) {
-        statusIcon = "\u2713";
-        statusClass = "passed";
-      } else if (criterion.passed === false) {
-        statusIcon = "\u2717";
-        statusClass = "failed";
-      } else {
-        statusIcon = "\u2014";
-        statusClass = "unknown";
-      }
-      item.createEl("span", {
-        cls: `hugo-command-review-status ${statusClass}`,
-        text: statusIcon
-      });
-      const textEl = item.createEl("span", {
-        cls: "hugo-command-review-text",
-        text: criterion.text
-      });
-      if (criterion.note) {
-        textEl.setAttribute("title", criterion.note);
-      }
-    }
-    const timestamp = new Date(result.timestamp);
-    container.createEl("div", {
-      cls: "hugo-command-review-timestamp",
-      text: `Reviewed ${this.formatTimeAgo(timestamp)}`
-    });
-  }
-  /**
-   * Format a date as relative time (e.g., "2 hours ago")
-   */
-  formatTimeAgo(date) {
-    const seconds = Math.floor((Date.now() - date.getTime()) / 1e3);
-    if (seconds < 60)
-      return "just now";
-    if (seconds < 3600)
-      return `${Math.floor(seconds / 60)}m ago`;
-    if (seconds < 86400)
-      return `${Math.floor(seconds / 3600)}h ago`;
-    return `${Math.floor(seconds / 86400)}d ago`;
   }
   /**
    * Update settings reference (called when settings change)
@@ -1547,40 +1403,13 @@ var TitlePromptModal = class extends import_obsidian5.Modal {
 };
 
 // src/types.ts
-var DEFAULT_OUTLINE_SETTINGS = {
-  enabled: false,
-  prompt: `Analyze this blog post outline/draft and enhance it by:
-1. Adding inline questions as HTML comments (<!-- Q: question here -->) where more detail or examples would help
-2. Suggesting missing sections that would strengthen the piece
-3. Noting any structural improvements
-4. If a style guide is provided, flag specific places where the writing doesn't follow the guidelines, citing the relevant rule
-
-Keep the original content intact. Add your suggestions as HTML comments so they're invisible when rendered.`
-};
-var DEFAULT_REVIEW_SETTINGS = {
-  enabled: false,
-  provider: "ollama",
-  ollamaEndpoint: "http://localhost:11434",
-  ollamaModel: "llama3.2",
-  openaiApiKey: "",
-  openaiModel: "gpt-4o-mini",
-  geminiApiKey: "",
-  geminiModel: "gemini-1.5-flash",
-  anthropicApiKey: "",
-  anthropicModel: "claude-3-haiku-20240307",
-  criteria: "Has a clear, descriptive title\nIncludes an introduction\nHas a conclusion or summary\nUses proper headings structure\nIncludes relevant tags",
-  styleGuideFile: "",
-  styleGuideInline: ""
-};
 var DEFAULT_SETTINGS = {
   contentPaths: ["content"],
   trashFolder: "_trash",
   showSidebarByDefault: true,
   showDrafts: true,
   defaultSortOrder: "date-desc",
-  defaultStatusFilter: "draft",
-  review: DEFAULT_REVIEW_SETTINGS,
-  outline: DEFAULT_OUTLINE_SETTINGS
+  defaultStatusFilter: "draft"
 };
 
 // src/SiteSettingsModal.ts
@@ -1842,596 +1671,12 @@ var SiteSettingsModal = class extends import_obsidian6.Modal {
   }
 };
 
-// src/ReviewCache.ts
-var ReviewCache = class {
-  constructor(onSave) {
-    this.cache = /* @__PURE__ */ new Map();
-    this.onSave = onSave;
-  }
-  /**
-   * Load cache from persisted data.
-   */
-  load(data) {
-    this.cache.clear();
-    if (data) {
-      for (const [key, value] of Object.entries(data)) {
-        this.cache.set(key, value);
-      }
-    }
-  }
-  /**
-   * Get cached review result for a file.
-   */
-  get(filePath) {
-    return this.cache.get(filePath);
-  }
-  /**
-   * Store review result for a file.
-   */
-  set(result) {
-    this.cache.set(result.filePath, result);
-    this.persist();
-  }
-  /**
-   * Clear cached result for a file.
-   */
-  clear(filePath) {
-    this.cache.delete(filePath);
-    this.persist();
-  }
-  /**
-   * Clear all cached results.
-   */
-  clearAll() {
-    this.cache.clear();
-    this.persist();
-  }
-  /**
-   * Get all cached results.
-   */
-  getAll() {
-    return Array.from(this.cache.values());
-  }
-  /**
-   * Persist cache to plugin data.
-   */
-  persist() {
-    const data = {};
-    for (const [key, value] of this.cache.entries()) {
-      data[key] = value;
-    }
-    this.onSave(data);
-  }
-  /**
-   * Export cache data for saving.
-   */
-  export() {
-    const data = {};
-    for (const [key, value] of this.cache.entries()) {
-      data[key] = value;
-    }
-    return data;
-  }
-};
-
-// src/ReviewLLMClient.ts
-var import_obsidian7 = require("obsidian");
-var ReviewLLMClient = class {
-  constructor(settings) {
-    this.settings = settings;
-  }
-  updateSettings(settings) {
-    this.settings = settings;
-  }
-  /**
-   * Run a review of the content against the criteria.
-   * Returns structured results for each criterion.
-   */
-  async review(content, styleGuide) {
-    const criteria = this.parseCriteria();
-    if (criteria.length === 0) {
-      return [];
-    }
-    const prompt = this.buildPrompt(content, styleGuide, criteria);
-    try {
-      const response = await this.callLLM(prompt);
-      return this.parseResponse(response, criteria);
-    } catch (error) {
-      console.error("[Hugo Review] LLM call failed:", error);
-      throw error;
-    }
-  }
-  parseCriteria() {
-    return this.settings.criteria.split("\n").map((line) => line.trim()).filter((line) => line.length > 0);
-  }
-  buildPrompt(content, styleGuide, criteria) {
-    const criteriaList = criteria.map((c, i) => `${i + 1}. ${c}`).join("\n");
-    let styleSection = "";
-    if (styleGuide.trim()) {
-      styleSection = `
-## Style Guidelines
-
-${styleGuide}
-
-`;
-    }
-    return `You are a content reviewer. Review the following blog post against the checklist criteria.
-${styleSection}
-## Review Criteria
-
-${criteriaList}
-
-## Content to Review
-
-${content}
-
-## Instructions
-
-For each criterion, determine if the content passes (true), fails (false), or is not applicable (null).
-Provide a brief note explaining your assessment.
-
-Respond with ONLY a JSON array in this exact format, with one object per criterion in order:
-[
-  {"passed": true, "note": "Brief explanation"},
-  {"passed": false, "note": "Brief explanation"},
-  ...
-]
-
-Do not include any other text, just the JSON array.`;
-  }
-  async callLLM(prompt) {
-    switch (this.settings.provider) {
-      case "ollama":
-        return this.callOllama(prompt);
-      case "openai":
-        return this.callOpenAI(prompt);
-      case "gemini":
-        return this.callGemini(prompt);
-      case "anthropic":
-        return this.callAnthropic(prompt);
-      default:
-        throw new Error(`Unknown provider: ${this.settings.provider}`);
-    }
-  }
-  async callOllama(prompt) {
-    const response = await (0, import_obsidian7.requestUrl)({
-      url: `${this.settings.ollamaEndpoint}/api/generate`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: this.settings.ollamaModel,
-        prompt,
-        stream: false,
-        format: "json"
-      })
-    });
-    if (response.status !== 200) {
-      throw new Error(`Ollama error: ${response.status}`);
-    }
-    return response.json.response;
-  }
-  async callOpenAI(prompt) {
-    if (!this.settings.openaiApiKey) {
-      throw new Error("OpenAI API key not configured");
-    }
-    const response = await (0, import_obsidian7.requestUrl)({
-      url: "https://api.openai.com/v1/chat/completions",
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.settings.openaiApiKey}`
-      },
-      body: JSON.stringify({
-        model: this.settings.openaiModel,
-        messages: [{ role: "user", content: prompt }],
-        response_format: { type: "json_object" }
-      })
-    });
-    if (response.status !== 200) {
-      throw new Error(`OpenAI error: ${response.status}`);
-    }
-    return response.json.choices[0].message.content;
-  }
-  async callGemini(prompt) {
-    if (!this.settings.geminiApiKey) {
-      throw new Error("Gemini API key not configured");
-    }
-    const response = await (0, import_obsidian7.requestUrl)({
-      url: `https://generativelanguage.googleapis.com/v1beta/models/${this.settings.geminiModel}:generateContent?key=${this.settings.geminiApiKey}`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: "application/json"
-        }
-      })
-    });
-    if (response.status !== 200) {
-      throw new Error(`Gemini error: ${response.status}`);
-    }
-    return response.json.candidates[0].content.parts[0].text;
-  }
-  async callAnthropic(prompt) {
-    if (!this.settings.anthropicApiKey) {
-      throw new Error("Anthropic API key not configured");
-    }
-    const response = await (0, import_obsidian7.requestUrl)({
-      url: "https://api.anthropic.com/v1/messages",
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": this.settings.anthropicApiKey,
-        "anthropic-version": "2023-06-01"
-      },
-      body: JSON.stringify({
-        model: this.settings.anthropicModel,
-        max_tokens: 1024,
-        messages: [{ role: "user", content: prompt }]
-      })
-    });
-    if (response.status !== 200) {
-      throw new Error(`Anthropic error: ${response.status}`);
-    }
-    return response.json.content[0].text;
-  }
-  parseResponse(response, criteria) {
-    try {
-      let jsonStr = response.trim();
-      const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-      if (jsonMatch) {
-        jsonStr = jsonMatch[1].trim();
-      }
-      const arrayMatch = jsonStr.match(/\[[\s\S]*\]/);
-      if (arrayMatch) {
-        jsonStr = arrayMatch[0];
-      }
-      const results = JSON.parse(jsonStr);
-      if (!Array.isArray(results)) {
-        throw new Error("Response is not an array");
-      }
-      return criteria.map((text, i) => {
-        const result = results[i] || { passed: null, note: "No response" };
-        return {
-          text,
-          passed: result.passed,
-          note: result.note || ""
-        };
-      });
-    } catch (error) {
-      console.error("[Hugo Review] Failed to parse LLM response:", error);
-      return criteria.map((text) => ({
-        text,
-        passed: null,
-        note: "Failed to parse review response"
-      }));
-    }
-  }
-};
-
-// src/OutlineLLMClient.ts
-var import_obsidian8 = require("obsidian");
-var OutlineLLMClient = class {
-  constructor(reviewSettings, outlineSettings) {
-    this.reviewSettings = reviewSettings;
-    this.outlineSettings = outlineSettings;
-  }
-  updateSettings(reviewSettings, outlineSettings) {
-    this.reviewSettings = reviewSettings;
-    this.outlineSettings = outlineSettings;
-  }
-  /**
-   * Enhance a document outline with questions and suggestions.
-   * Returns the modified markdown content.
-   */
-  async enhance(content, styleGuide) {
-    const systemPrompt = this.buildSystemPrompt(styleGuide);
-    const userPrompt = this.buildUserPrompt(content);
-    try {
-      const response = await this.callLLM(systemPrompt, userPrompt);
-      return this.extractMarkdown(response);
-    } catch (error) {
-      console.error("[Hugo Outline] LLM call failed:", error);
-      throw error;
-    }
-  }
-  buildSystemPrompt(styleGuide) {
-    const hasStyleGuide = styleGuide.trim().length > 0;
-    let styleSection = "";
-    let styleInstructions = "";
-    if (hasStyleGuide) {
-      styleSection = `
-
-## Style Guide Reference
-
-Use this style guide when making suggestions. Cite specific rules when the content violates them.
-
-${styleGuide}
-`;
-      styleInstructions = `
-- When content violates a style rule, add a comment like: <!-- Style: 'rule name' - suggestion -->`;
-    }
-    return `You are a writing assistant that enhances document outlines by adding helpful questions and suggestions as HTML comments.
-
-${this.outlineSettings.prompt}
-${styleSection}
-## Your Task
-
-When given a document, return it with your annotations added as HTML comments:
-- Questions: <!-- Q: your question here -->
-- Suggestions: <!-- your suggestion here -->${styleInstructions}
-
-## Critical Rules
-
-1. Return ONLY the document with annotations - nothing else
-2. Keep ALL original content exactly as provided
-3. Do NOT include any preamble, explanation, or markdown code fences
-4. Do NOT summarize or rewrite the content
-5. Start your response directly with the document content`;
-  }
-  buildUserPrompt(content) {
-    return `Enhance this document with your suggestions:
-
-${content}`;
-  }
-  async callLLM(systemPrompt, userPrompt) {
-    switch (this.reviewSettings.provider) {
-      case "ollama":
-        return this.callOllama(systemPrompt, userPrompt);
-      case "openai":
-        return this.callOpenAI(systemPrompt, userPrompt);
-      case "gemini":
-        return this.callGemini(systemPrompt, userPrompt);
-      case "anthropic":
-        return this.callAnthropic(systemPrompt, userPrompt);
-      default:
-        throw new Error(`Unknown provider: ${this.reviewSettings.provider}`);
-    }
-  }
-  async callOllama(systemPrompt, userPrompt) {
-    const combinedPrompt = `${systemPrompt}
-
----
-
-${userPrompt}`;
-    const response = await (0, import_obsidian8.requestUrl)({
-      url: `${this.reviewSettings.ollamaEndpoint}/api/generate`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: this.reviewSettings.ollamaModel,
-        prompt: combinedPrompt,
-        stream: false
-      })
-    });
-    if (response.status !== 200) {
-      throw new Error(`Ollama error: ${response.status}`);
-    }
-    return response.json.response;
-  }
-  async callOpenAI(systemPrompt, userPrompt) {
-    if (!this.reviewSettings.openaiApiKey) {
-      throw new Error("OpenAI API key not configured");
-    }
-    const response = await (0, import_obsidian8.requestUrl)({
-      url: "https://api.openai.com/v1/chat/completions",
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.reviewSettings.openaiApiKey}`
-      },
-      body: JSON.stringify({
-        model: this.reviewSettings.openaiModel,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ]
-      })
-    });
-    if (response.status !== 200) {
-      throw new Error(`OpenAI error: ${response.status}`);
-    }
-    return response.json.choices[0].message.content;
-  }
-  async callGemini(systemPrompt, userPrompt) {
-    if (!this.reviewSettings.geminiApiKey) {
-      throw new Error("Gemini API key not configured");
-    }
-    const response = await (0, import_obsidian8.requestUrl)({
-      url: `https://generativelanguage.googleapis.com/v1beta/models/${this.reviewSettings.geminiModel}:generateContent?key=${this.reviewSettings.geminiApiKey}`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: systemPrompt }] },
-        contents: [{ parts: [{ text: userPrompt }] }]
-      })
-    });
-    if (response.status !== 200) {
-      throw new Error(`Gemini error: ${response.status}`);
-    }
-    return response.json.candidates[0].content.parts[0].text;
-  }
-  async callAnthropic(systemPrompt, userPrompt) {
-    if (!this.reviewSettings.anthropicApiKey) {
-      throw new Error("Anthropic API key not configured");
-    }
-    const response = await (0, import_obsidian8.requestUrl)({
-      url: "https://api.anthropic.com/v1/messages",
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": this.reviewSettings.anthropicApiKey,
-        "anthropic-version": "2023-06-01"
-      },
-      body: JSON.stringify({
-        model: this.reviewSettings.anthropicModel,
-        max_tokens: 4096,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }]
-      })
-    });
-    if (response.status !== 200) {
-      throw new Error(`Anthropic error: ${response.status}`);
-    }
-    return response.json.content[0].text;
-  }
-  /**
-   * Extract markdown from the response, handling code blocks if present.
-   */
-  extractMarkdown(response) {
-    let content = response.trim();
-    const codeBlockMatch = content.match(/^```(?:markdown|md)?\s*\n([\s\S]*?)\n```$/);
-    if (codeBlockMatch) {
-      content = codeBlockMatch[1];
-    }
-    return content;
-  }
-};
-
-// src/CommentBubbles.ts
-var import_view = require("@codemirror/view");
-var import_state = require("@codemirror/state");
-var CommentBubbleWidget = class extends import_view.WidgetType {
-  constructor(content, commentType, from, to, isStandalone) {
-    super();
-    this.content = content;
-    this.commentType = commentType;
-    this.from = from;
-    this.to = to;
-    this.isStandalone = isStandalone;
-  }
-  toDOM(view) {
-    const bubble = document.createElement("span");
-    bubble.className = `hugo-comment-bubble ${this.commentType}`;
-    const icon = document.createElement("span");
-    icon.className = "hugo-comment-icon";
-    switch (this.commentType) {
-      case "question":
-        icon.textContent = "?";
-        break;
-      case "style":
-        icon.textContent = "\u{1F4DD}";
-        break;
-      default:
-        icon.textContent = "\u{1F4A1}";
-    }
-    bubble.appendChild(icon);
-    const text = document.createElement("span");
-    text.className = "hugo-comment-text";
-    text.textContent = this.content;
-    bubble.appendChild(text);
-    const deleteBtn = document.createElement("span");
-    deleteBtn.className = "hugo-comment-delete";
-    deleteBtn.textContent = "\xD7";
-    deleteBtn.title = "Remove suggestion";
-    deleteBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      this.deleteComment(view);
-    });
-    bubble.appendChild(deleteBtn);
-    return bubble;
-  }
-  deleteComment(view) {
-    let from = this.from;
-    let to = this.to;
-    if (this.isStandalone) {
-      const doc = view.state.doc;
-      const line = doc.lineAt(from);
-      from = line.from;
-      to = line.to < doc.length ? line.to + 1 : line.to;
-    }
-    view.dispatch({
-      changes: { from, to, insert: "" }
-    });
-  }
-  eq(other) {
-    return other.content === this.content && other.commentType === this.commentType && other.from === this.from && other.to === this.to;
-  }
-  ignoreEvent(event) {
-    return event.type !== "click";
-  }
-};
-var hideDecoration = import_view.Decoration.replace({});
-function getCommentType(prefix, content) {
-  if (prefix == null ? void 0 : prefix.startsWith("Q:"))
-    return "question";
-  if ((prefix == null ? void 0 : prefix.startsWith("Style:")) || content.toLowerCase().startsWith("style:"))
-    return "style";
-  return "suggestion";
-}
-function buildDecorations(view) {
-  const builder = new import_state.RangeSetBuilder();
-  const doc = view.state.doc;
-  const text = doc.toString();
-  const commentRegex = /<!--\s*(Q:\s*|Style:\s*)?(.+?)\s*-->/gs;
-  let match;
-  while ((match = commentRegex.exec(text)) !== null) {
-    const prefix = match[1];
-    const content = match[2].trim();
-    const commentType = getCommentType(prefix, content);
-    const from = match.index;
-    const to = match.index + match[0].length;
-    const line = doc.lineAt(from);
-    const lineText = line.text;
-    const commentStartInLine = from - line.from;
-    const beforeComment = lineText.substring(0, commentStartInLine).trim();
-    const afterComment = lineText.substring(commentStartInLine + match[0].length).trim();
-    const isStandalone = !beforeComment && !afterComment;
-    if (isStandalone) {
-      builder.add(from, to, import_view.Decoration.replace({
-        widget: new CommentBubbleWidget(content, commentType, from, to, true)
-      }));
-    } else {
-      builder.add(from, to, hideDecoration);
-      builder.add(to, to, import_view.Decoration.widget({
-        widget: new CommentBubbleWidget(content, commentType, from, to, false),
-        side: 1
-        // After the position
-      }));
-    }
-  }
-  return builder.finish();
-}
-var commentBubblesPlugin = import_view.ViewPlugin.fromClass(
-  class {
-    constructor(view) {
-      this.decorations = buildDecorations(view);
-    }
-    update(update) {
-      if (update.docChanged || update.viewportChanged) {
-        this.decorations = buildDecorations(update.view);
-      }
-    }
-  },
-  {
-    decorations: (v) => v.decorations
-  }
-);
-function stripHtmlComments(content) {
-  let result = content.replace(/^[ \t]*<!--[\s\S]*?-->[ \t]*\r?\n/gm, "");
-  result = result.replace(/<!--[\s\S]*?-->/g, "");
-  return result;
-}
-
 // main.ts
-var HugoCommandPlugin = class extends import_obsidian9.Plugin {
-  constructor() {
-    super(...arguments);
-    this.reviewCacheData = {};
-    this.isEnhancingOutline = false;
-  }
+var HugoCommandPlugin = class extends import_obsidian7.Plugin {
   async onload() {
     await this.loadSettings();
     this.sidebarManager = new SidebarManager(this.app, VIEW_TYPE_HUGO_SIDEBAR);
     this.scanner = new HugoScanner(this.app, this.settings.contentPaths);
-    this.reviewCache = new ReviewCache((data) => {
-      this.reviewCacheData = data;
-      this.saveData({ ...this.settings, _reviewCache: data });
-    });
-    this.reviewCache.load(this.reviewCacheData);
-    this.reviewClient = new ReviewLLMClient(this.settings.review);
-    this.outlineClient = new OutlineLLMClient(this.settings.review, this.settings.outline);
     await this.scanner.scanVault();
     this.scanner.watchFiles();
     this.registerView(
@@ -2440,9 +1685,6 @@ var HugoCommandPlugin = class extends import_obsidian9.Plugin {
         leaf,
         this.scanner,
         this.settings,
-        this.reviewCache,
-        this.reviewClient,
-        () => this.getStyleGuide(),
         () => this.showAboutModal(),
         () => this.openSettings(),
         () => this.showSiteSettings()
@@ -2478,135 +1720,17 @@ var HugoCommandPlugin = class extends import_obsidian9.Plugin {
     this.addRibbonIcon("file-text", "Toggle Hugo Sidebar", () => {
       this.sidebarManager.toggle();
     });
-    if (this.settings.outline.enabled) {
-      this.registerEditorExtension(commentBubblesPlugin);
-    }
-    this.addCommand({
-      id: "enhance-outline",
-      name: "Enhance Outline with Suggestions",
-      editorCallback: async (editor, view) => {
-        if (!this.settings.outline.enabled) {
-          showNotice2("Outline enhancement is not enabled in settings");
-          return;
-        }
-        await this.enhanceCurrentOutline();
-      }
-    });
-    this.registerEvent(
-      this.app.workspace.on("file-menu", (menu, file) => {
-        if (!this.settings.outline.enabled)
-          return;
-        if (!(file instanceof import_obsidian9.TFile) || file.extension !== "md")
-          return;
-        menu.addItem((item) => {
-          item.setTitle("Enhance outline").setIcon("sparkles").onClick(async () => {
-            const leaf = this.app.workspace.getLeaf();
-            await leaf.openFile(file);
-            await this.enhanceCurrentOutline();
-          });
-        });
-      })
-    );
-    if (this.settings.outline.enabled) {
-      this.registerEvent(
-        this.app.workspace.on("layout-change", () => {
-          this.addSparklesButtonToViews();
-        })
-      );
-      this.app.workspace.onLayoutReady(() => {
-        this.addSparklesButtonToViews();
-      });
-    }
     this.addSettingTab(new HugoCommandSettingTab(this.app, this));
-  }
-  /**
-   * Add sparkles button to all open markdown views
-   */
-  addSparklesButtonToViews() {
-    this.app.workspace.iterateAllLeaves((leaf) => {
-      if (leaf.view instanceof import_obsidian9.MarkdownView) {
-        this.addSparklesButtonToView(leaf.view);
-      }
-    });
-  }
-  /**
-   * Add sparkles button to a specific markdown view's title bar
-   */
-  addSparklesButtonToView(view) {
-    const existingBtn = view.containerEl.querySelector(".hugo-enhance-action");
-    if (existingBtn)
-      return;
-    const viewActions = view.containerEl.querySelector(".view-actions");
-    if (!viewActions)
-      return;
-    const btn = document.createElement("a");
-    btn.className = "clickable-icon view-action hugo-enhance-action";
-    btn.setAttribute("aria-label", "Enhance outline");
-    btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>';
-    btn.addEventListener("click", async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (this.isEnhancingOutline)
-        return;
-      btn.addClass("is-loading");
-      await this.enhanceCurrentOutline();
-      btn.removeClass("is-loading");
-    });
-    viewActions.insertBefore(btn, viewActions.firstChild);
-  }
-  /**
-   * Enhance the current document outline using LLM
-   */
-  async enhanceCurrentOutline() {
-    if (this.isEnhancingOutline) {
-      return;
-    }
-    const activeFile = this.app.workspace.getActiveFile();
-    if (!activeFile) {
-      showNotice2("No file is currently open");
-      return;
-    }
-    if (activeFile.extension !== "md") {
-      showNotice2("Outline enhancement only works on markdown files");
-      return;
-    }
-    this.isEnhancingOutline = true;
-    showNotice2("Enhancing outline...");
-    try {
-      const rawContent = await this.app.vault.read(activeFile);
-      const content = stripHtmlComments(rawContent);
-      const styleGuide = await this.getStyleGuide();
-      const enhanced = await this.outlineClient.enhance(content, styleGuide);
-      await this.app.vault.modify(activeFile, enhanced);
-      showNotice2("Outline enhanced with suggestions");
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : "Enhancement failed";
-      showNotice2(`Error: ${msg}`);
-      console.error("[Hugo Outline] Enhancement failed:", error);
-    } finally {
-      this.isEnhancingOutline = false;
-    }
   }
   onunload() {
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_HUGO_SIDEBAR);
   }
   async loadSettings() {
-    const data = await this.loadData();
-    const { _reviewCache, ...settingsData } = data || {};
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, settingsData);
-    if (!this.settings.review) {
-      this.settings.review = DEFAULT_REVIEW_SETTINGS;
-    }
-    if (!this.settings.outline) {
-      this.settings.outline = DEFAULT_OUTLINE_SETTINGS;
-    }
-    this.reviewCacheData = _reviewCache || {};
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
   }
   async saveSettings() {
-    await this.saveData({ ...this.settings, _reviewCache: this.reviewCacheData });
+    await this.saveData(this.settings);
     this.scanner.setContentPaths(this.settings.contentPaths);
-    this.reviewClient.updateSettings(this.settings.review);
-    this.outlineClient.updateSettings(this.settings.review, this.settings.outline);
     await this.scanner.scanVault();
     this.updateSidebarSettings();
   }
@@ -2625,32 +1749,8 @@ var HugoCommandPlugin = class extends import_obsidian9.Plugin {
   showSiteSettings() {
     new SiteSettingsModal(this.app).open();
   }
-  /**
-   * Get the combined style guide content from file and inline settings.
-   */
-  async getStyleGuide() {
-    const parts = [];
-    if (this.settings.review.styleGuideFile) {
-      const file = this.app.vault.getAbstractFileByPath(this.settings.review.styleGuideFile);
-      if (file instanceof import_obsidian9.TFile) {
-        try {
-          const content = await this.app.vault.read(file);
-          parts.push(content);
-        } catch (error) {
-          console.error("[Hugo Review] Failed to read style guide file:", error);
-          showNotice2(`Could not read style guide: ${this.settings.review.styleGuideFile}`);
-        }
-      } else {
-        showNotice2(`Style guide file not found: ${this.settings.review.styleGuideFile}`);
-      }
-    }
-    if (this.settings.review.styleGuideInline) {
-      parts.push(this.settings.review.styleGuideInline);
-    }
-    return parts.join("\n\n");
-  }
 };
-var AboutModal = class extends import_obsidian9.Modal {
+var AboutModal = class extends import_obsidian7.Modal {
   constructor(app, version) {
     super(app);
     this.version = version;
@@ -2681,7 +1781,7 @@ var AboutModal = class extends import_obsidian9.Modal {
     this.contentEl.empty();
   }
 };
-var HugoCommandSettingTab = class extends import_obsidian9.PluginSettingTab {
+var HugoCommandSettingTab = class extends import_obsidian7.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -2707,153 +1807,42 @@ var HugoCommandSettingTab = class extends import_obsidian9.PluginSettingTab {
       href: "https://github.com/robotpony/obsidian-plugins"
     });
     containerEl.createEl("h3", { text: "Sidebar" });
-    new import_obsidian9.Setting(containerEl).setName("Show sidebar by default").setDesc("Show the Hugo sidebar when Obsidian starts").addToggle(
+    new import_obsidian7.Setting(containerEl).setName("Show sidebar by default").setDesc("Show the Hugo sidebar when Obsidian starts").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.showSidebarByDefault).onChange(async (value) => {
         this.plugin.settings.showSidebarByDefault = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian9.Setting(containerEl).setName("Default status filter").setDesc("Which posts to show by default when opening the sidebar").addDropdown(
+    new import_obsidian7.Setting(containerEl).setName("Default status filter").setDesc("Which posts to show by default when opening the sidebar").addDropdown(
       (dropdown) => dropdown.addOption("all", "All").addOption("published", "Published").addOption("draft", "Drafts").setValue(this.plugin.settings.defaultStatusFilter).onChange(async (value) => {
         this.plugin.settings.defaultStatusFilter = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian9.Setting(containerEl).setName("Default sort order").setDesc("How to sort content in the sidebar").addDropdown(
+    new import_obsidian7.Setting(containerEl).setName("Default sort order").setDesc("How to sort content in the sidebar").addDropdown(
       (dropdown) => dropdown.addOption("date-desc", "Date (newest first)").addOption("date-asc", "Date (oldest first)").addOption("title", "Title (A-Z)").setValue(this.plugin.settings.defaultSortOrder).onChange(async (value) => {
         this.plugin.settings.defaultSortOrder = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian9.Setting(containerEl).setName("Show drafts").setDesc("Include draft posts in the content list").addToggle(
+    new import_obsidian7.Setting(containerEl).setName("Show drafts").setDesc("Include draft posts in the content list").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.showDrafts).onChange(async (value) => {
         this.plugin.settings.showDrafts = value;
         await this.plugin.saveSettings();
       })
     );
     containerEl.createEl("h3", { text: "Content" });
-    new import_obsidian9.Setting(containerEl).setName("Content paths").setDesc("Folders to scan for Hugo content (one per line, e.g., content/posts)").addTextArea(
+    new import_obsidian7.Setting(containerEl).setName("Content paths").setDesc("Folders to scan for Hugo content (one per line, e.g., content/posts)").addTextArea(
       (text) => text.setPlaceholder("content\ncontent/posts").setValue(this.plugin.settings.contentPaths.join("\n")).onChange(async (value) => {
         this.plugin.settings.contentPaths = value.split("\n").map((p) => p.trim()).filter((p) => p.length > 0);
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian9.Setting(containerEl).setName("Trash folder").setDesc("Folder for trashed posts (relative to vault root)").addText(
+    new import_obsidian7.Setting(containerEl).setName("Trash folder").setDesc("Folder for trashed posts (relative to vault root)").addText(
       (text) => text.setPlaceholder("_trash").setValue(this.plugin.settings.trashFolder).onChange(async (value) => {
         this.plugin.settings.trashFolder = value.trim() || "_trash";
         await this.plugin.saveSettings();
       })
     );
-    containerEl.createEl("h3", { text: "Content Review" });
-    new import_obsidian9.Setting(containerEl).setName("Enable content review").setDesc("Use an LLM to review posts against a checklist of criteria").addToggle(
-      (toggle) => toggle.setValue(this.plugin.settings.review.enabled).onChange(async (value) => {
-        this.plugin.settings.review.enabled = value;
-        await this.plugin.saveSettings();
-        this.display();
-      })
-    );
-    if (this.plugin.settings.review.enabled) {
-      new import_obsidian9.Setting(containerEl).setName("LLM provider").setDesc("Which LLM service to use for reviews").addDropdown(
-        (dropdown) => dropdown.addOption("ollama", "Ollama (local)").addOption("openai", "OpenAI").addOption("gemini", "Google Gemini").addOption("anthropic", "Anthropic Claude").setValue(this.plugin.settings.review.provider).onChange(async (value) => {
-          this.plugin.settings.review.provider = value;
-          await this.plugin.saveSettings();
-          this.display();
-        })
-      );
-      const provider = this.plugin.settings.review.provider;
-      if (provider === "ollama") {
-        new import_obsidian9.Setting(containerEl).setName("Ollama endpoint").setDesc("URL of your Ollama server").addText(
-          (text) => text.setPlaceholder("http://localhost:11434").setValue(this.plugin.settings.review.ollamaEndpoint).onChange(async (value) => {
-            this.plugin.settings.review.ollamaEndpoint = value.trim() || "http://localhost:11434";
-            await this.plugin.saveSettings();
-          })
-        );
-        new import_obsidian9.Setting(containerEl).setName("Ollama model").setDesc("Model to use (e.g., llama3.2, mistral)").addText(
-          (text) => text.setPlaceholder("llama3.2").setValue(this.plugin.settings.review.ollamaModel).onChange(async (value) => {
-            this.plugin.settings.review.ollamaModel = value.trim() || "llama3.2";
-            await this.plugin.saveSettings();
-          })
-        );
-      } else if (provider === "openai") {
-        new import_obsidian9.Setting(containerEl).setName("OpenAI API key").setDesc("Your OpenAI API key").addText(
-          (text) => text.setPlaceholder("sk-...").setValue(this.plugin.settings.review.openaiApiKey).onChange(async (value) => {
-            this.plugin.settings.review.openaiApiKey = value.trim();
-            await this.plugin.saveSettings();
-          })
-        );
-        new import_obsidian9.Setting(containerEl).setName("OpenAI model").setDesc("Model to use (e.g., gpt-4o-mini, gpt-4o)").addText(
-          (text) => text.setPlaceholder("gpt-4o-mini").setValue(this.plugin.settings.review.openaiModel).onChange(async (value) => {
-            this.plugin.settings.review.openaiModel = value.trim() || "gpt-4o-mini";
-            await this.plugin.saveSettings();
-          })
-        );
-      } else if (provider === "gemini") {
-        new import_obsidian9.Setting(containerEl).setName("Gemini API key").setDesc("Your Google AI Studio API key").addText(
-          (text) => text.setPlaceholder("AI...").setValue(this.plugin.settings.review.geminiApiKey).onChange(async (value) => {
-            this.plugin.settings.review.geminiApiKey = value.trim();
-            await this.plugin.saveSettings();
-          })
-        );
-        new import_obsidian9.Setting(containerEl).setName("Gemini model").setDesc("Model to use (e.g., gemini-1.5-flash, gemini-1.5-pro)").addText(
-          (text) => text.setPlaceholder("gemini-1.5-flash").setValue(this.plugin.settings.review.geminiModel).onChange(async (value) => {
-            this.plugin.settings.review.geminiModel = value.trim() || "gemini-1.5-flash";
-            await this.plugin.saveSettings();
-          })
-        );
-      } else if (provider === "anthropic") {
-        new import_obsidian9.Setting(containerEl).setName("Anthropic API key").setDesc("Your Anthropic API key").addText(
-          (text) => text.setPlaceholder("sk-ant-...").setValue(this.plugin.settings.review.anthropicApiKey).onChange(async (value) => {
-            this.plugin.settings.review.anthropicApiKey = value.trim();
-            await this.plugin.saveSettings();
-          })
-        );
-        new import_obsidian9.Setting(containerEl).setName("Anthropic model").setDesc("Model to use (e.g., claude-3-haiku-20240307)").addText(
-          (text) => text.setPlaceholder("claude-3-haiku-20240307").setValue(this.plugin.settings.review.anthropicModel).onChange(async (value) => {
-            this.plugin.settings.review.anthropicModel = value.trim() || "claude-3-haiku-20240307";
-            await this.plugin.saveSettings();
-          })
-        );
-      }
-      new import_obsidian9.Setting(containerEl).setName("Review criteria").setDesc("Checklist items to evaluate (one per line)").addTextArea(
-        (text) => text.setPlaceholder("Has a clear title\nIncludes an introduction\nHas a conclusion").setValue(this.plugin.settings.review.criteria).onChange(async (value) => {
-          this.plugin.settings.review.criteria = value;
-          await this.plugin.saveSettings();
-        })
-      );
-      new import_obsidian9.Setting(containerEl).setName("Style guide file").setDesc("Path to a markdown file containing style guidelines (optional)").addText(
-        (text) => text.setPlaceholder("Resources/Style Guide.md").setValue(this.plugin.settings.review.styleGuideFile).onChange(async (value) => {
-          this.plugin.settings.review.styleGuideFile = value.trim();
-          await this.plugin.saveSettings();
-        })
-      );
-      new import_obsidian9.Setting(containerEl).setName("Inline style guidelines").setDesc("Additional style guidelines (combined with file if both specified)").addTextArea(
-        (text) => text.setPlaceholder("Write in active voice. Keep paragraphs short.").setValue(this.plugin.settings.review.styleGuideInline).onChange(async (value) => {
-          this.plugin.settings.review.styleGuideInline = value;
-          await this.plugin.saveSettings();
-        })
-      );
-      new import_obsidian9.Setting(containerEl).setName("Clear review cache").setDesc("Remove all cached review results").addButton(
-        (button) => button.setButtonText("Clear Cache").onClick(async () => {
-          this.plugin.reviewCache.clearAll();
-          showNotice2("Review cache cleared");
-        })
-      );
-    }
-    containerEl.createEl("h3", { text: "Outline Enhancement" });
-    new import_obsidian9.Setting(containerEl).setName("Enable outline enhancement").setDesc("Use an LLM to add questions and suggestions to document outlines (uses same LLM settings as Content Review)").addToggle(
-      (toggle) => toggle.setValue(this.plugin.settings.outline.enabled).onChange(async (value) => {
-        this.plugin.settings.outline.enabled = value;
-        await this.plugin.saveSettings();
-        this.display();
-      })
-    );
-    if (this.plugin.settings.outline.enabled) {
-      new import_obsidian9.Setting(containerEl).setName("Enhancement prompt").setDesc("Instructions for the LLM when enhancing outlines").addTextArea(
-        (text) => text.setPlaceholder("Analyze this outline and add questions...").setValue(this.plugin.settings.outline.prompt).onChange(async (value) => {
-          this.plugin.settings.outline.prompt = value;
-          await this.plugin.saveSettings();
-        })
-      );
-    }
   }
 };
