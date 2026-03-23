@@ -4,15 +4,31 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Structure
 
-This is a mono-repo containing three Obsidian plugins:
+This is a mono-repo containing three Obsidian plugins and shared utilities:
 
-| Plugin | Description | Has CLAUDE.md |
-|--------|-------------|---------------|
-| [space-command/](space-command/) | TODO/TODONE tracking with sidebar, embeds, slash commands | Yes |
-| [hugo-command/](hugo-command/) | Hugo content browser and management | Yes |
-| [link-command/](link-command/) | URL unfurling with inline format toggle | Yes |
+| Directory | Description |
+|-----------|-------------|
+| [space-command/](space-command/) | TODO/TODONE tracking with sidebar, embeds, slash commands |
+| [hugo-command/](hugo-command/) | Hugo content browser and management |
+| [link-command/](link-command/) | URL unfurling with format cycling and sidebar |
+| [shared/](shared/) | Common utilities used by all plugins |
 
 See plugin-specific CLAUDE.md files for detailed architecture.
+
+### Shared Module
+
+The `shared/` directory contains utilities used across all plugins:
+
+- **`ui/Notice.ts`**: Styled notice display with plugin branding via `createNoticeFactory()`
+- **`plugin/SidebarManager.ts`**: Manages sidebar lifecycle (activate, toggle, refresh)
+- **`types/Result.ts`**: Standard result type for success/error handling
+- **`llm/LLMClient.ts`**: Multi-provider LLM client (Ollama, OpenAI, Gemini, Anthropic)
+
+Plugins import from shared using relative paths:
+
+```ts
+import { SidebarManager, createNoticeFactory, LLMClient } from "../shared";
+```
 
 ## Build Commands
 

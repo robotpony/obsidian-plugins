@@ -39,6 +39,11 @@ This is **Space Command** (`space-command`), an Obsidian plugin for tracking TOD
 | [SlashCommandSuggest.ts](src/SlashCommandSuggest.ts) | EditorSuggest for `/` commands at column 0: `/todo`, `/callout`, `/today`, `/tomorrow` |
 | [DateSuggest.ts](src/DateSuggest.ts) | EditorSuggest for `@date`, `@today`, `@tomorrow`, `@yesterday` quick insert |
 | [SlackConverter.ts](src/SlackConverter.ts) | Converts markdown to Slack's mrkdwn format for clipboard copy |
+| [LLMClient.ts](src/LLMClient.ts) | Ollama client for Define/Rewrite/Review commands. Sends selected text to local LLM. |
+| [DefineTooltip.ts](src/DefineTooltip.ts) | Renders LLM responses in inline tooltips near selection. Handles Apply/Copy buttons for Rewrite. |
+| [TabLockManager.ts](src/TabLockManager.ts) | Adds lock buttons to tab headers. Locked tabs open links in new tabs instead of replacing content. |
+| [HeaderSortExtension.ts](src/HeaderSortExtension.ts) | CodeMirror extension for sorting header TODO children by priority. |
+| [HeaderChecklistExtension.ts](src/HeaderChecklistExtension.ts) | CodeMirror extension syncing checkbox state with `#todo`/`#todone` tags. |
 | [types.ts](src/types.ts) | TypeScript interfaces: `TodoItem`, `TodoFilters`, `ProjectInfo`, `SpaceCommandSettings` |
 | [utils.ts](src/utils.ts) | Helper functions: date formatting, tag extraction, checkbox/todo text manipulation |
 

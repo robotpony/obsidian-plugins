@@ -120,7 +120,7 @@ export class LinkSidebarView extends ItemView {
     const titleEl = headerDiv.createEl("h4", { cls: "link-sidebar-title" });
     const logoEl = titleEl.createEl("span", { cls: "link-command-logo clickable-logo", text: "L⌘" });
     logoEl.addEventListener("click", () => this.onShowAbout());
-    titleEl.appendText(" Link Command");
+    titleEl.appendText(" Links");
 
     // Kebab menu button (vertical dots)
     const menuBtn = headerDiv.createEl("button", {

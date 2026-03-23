@@ -40,7 +40,7 @@ That's it. Everything else is optional.
 | `#p0` – `#p4` | Priority levels (0 = highest) |
 | `#future` | Snoozed—hidden from active list |
 
-Items sort by: focus → priority → tag count (more tags = more context = higher). Focus projects list shows top 5 by default; TODO list shows all. Configure limits in Settings. Click the eye icon in the Focus header to toggle focus mode—filters projects, TODOs, and recently completed items to show only `#focus` items (or items from focused projects when that setting is enabled). In focus mode, the DONE section shows only today's completions.
+Items sort by: focus → priority → tag count (more tags = more context = higher). Focus projects list shows top 5 by default; TODO list shows all. Configure limits in Settings. Click the eye icon in the Focus header to toggle focus mode—filters projects, TODOs, Ideas, Principles, and recently completed items to show only `#focus` items (or items from focused projects when that setting is enabled). In focus mode, the DONE section shows only today's completions.
 
 **Project tags** group TODOs in the sidebar's Focus section. Any tag that isn't a priority or type tag becomes a project:
 
@@ -61,10 +61,11 @@ Select any text, right-click, and choose from three LLM-powered tools:
 | **Rewrite** | Improve clarity, accuracy, and brevity (with Apply button) |
 | **Review**  | Get editorial suggestions for improvement                  |
 
-- Requires [Ollama](https://ollama.ai) running locally (default: `http://localhost:11434`)
 - Results appear in an inline tooltip near your selection
 - Rewrite includes Copy and Apply buttons—Apply replaces your selection
 - Customize prompts in Settings → LLM Settings
+
+**Supported providers**: Ollama (local, default), OpenAI, Google Gemini, Anthropic Claude. Configure in Settings → LLM Settings.
 
 ## Ideas Tab
 
@@ -143,6 +144,8 @@ Add `#todo` to a heading—all list items below become children:
 
 Completing the header completes all children.
 
+Header TODO sections also show sort buttons inline—click to re-sort children by priority tag.
+
 ## Automatic File Tags
 
 TODOs in your projects folder without explicit project tags are grouped by filename:
@@ -154,6 +157,37 @@ TODOs in your projects folder without explicit project tags are grouped by filen
 ```
 
 Add an explicit project tag to override. Files outside the projects folder don't get inferred tags. Configure excluded folders (like `log`) in Settings.
+
+## Slash Commands
+
+Type `/` at the start of a line to see quick-insert options:
+
+| Command | Inserts |
+|---------|---------|
+| `/todo` | `- [ ] #todo ` (ready to type) |
+| `/callout` | Obsidian callout block |
+| `/today` | Today's date |
+| `/tomorrow` | Tomorrow's date |
+
+## Date Suggestions
+
+Type `@` anywhere to insert dates quickly:
+
+- `@today` → current date
+- `@tomorrow` → next day
+- `@yesterday` → previous day
+
+Dates use your configured format (default: `YYYY-MM-DD`).
+
+## Stats and Triage
+
+**Stats**: Click the chart icon in the sidebar header to see counts of active TODOs, focused items, snoozed items, ideas, and principles.
+
+**Triage**: When you have too many snoozed or active items (configurable thresholds), a triage alert appears. Click it to process items one by one with quick actions: Snooze, Clear, Convert (TODO ↔ Idea), Focus, Skip.
+
+## Copy as Slack
+
+Select text and use `Cmd/Ctrl+Shift+C` or right-click → "Copy as Slack" to copy markdown formatted for Slack (bold, italic, links, lists).
 
 ## Installation
 

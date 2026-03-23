@@ -29,13 +29,24 @@ Open the Hugo sidebar using:
 - Use the command palette: "Toggle Hugo Sidebar"
 - Keyboard shortcut: `Cmd/Ctrl + Shift + H`
 
-### Filtering
+### Search and Filtering
 
+**Search**: Type in the search field to filter by title and description. Active filters appear as chips inside the search field.
+
+**Filters**:
 - **Status Filter**: Use the dropdown to show All, Published only, or Drafts only
 - **Tag Filter**: Click `#tags` to filter by frontmatter tags
 - **Folder Filter**: Click the folder icon to filter by folder path
 - **Stats**: Click the ⓘ icon to see publish/draft counts
 - Active filters display with "Filter:" prefix and × to clear
+
+### New Post
+
+Click the + button in the sidebar header to create a new post:
+
+1. Select a folder from the dropdown (shows your content folder hierarchy)
+2. Enter a title in the prompt
+3. A new file is created with Hugo frontmatter (title, date, draft: true, empty tags)
 
 ### Folder Organization
 
@@ -75,6 +86,40 @@ Configure the plugin in Settings > Hugo Command:
 - **Show Drafts**: Include draft posts in the content list
 - **Default Sort Order**: How to sort content (date or title)
 - **Trash Folder**: Folder for trashed posts (default: `_trash`)
+
+## LLM Features
+
+Hugo Command includes two LLM-powered features for improving your content. Both require an LLM provider configured in Settings.
+
+### Content Review
+
+Review posts against a configurable checklist. Click the (i) info button on any post, then "Review post".
+
+- **Pass/fail status** for each criterion with explanatory notes
+- **Results cached** per-file (re-run anytime to refresh)
+- **Style guide support** via file path or inline text
+
+### Outline Enhancement
+
+Add questions and suggestions to document outlines. Right-click a file and choose "Enhance Outline with Suggestions", or use the sparkles button in the document header.
+
+- **Inline HTML comments** inserted throughout the document
+- **Comment bubbles** render comments as styled, clickable bubbles
+  - Blue (?) for questions
+  - Yellow (💡) for suggestions
+  - Purple (✎) for style guide violations
+- **Delete individual suggestions** via the (×) button on each bubble
+
+### LLM Providers
+
+Configure in Settings → Hugo Command → LLM Settings:
+
+| Provider | Notes |
+|----------|-------|
+| **Ollama** (default) | Local models (llama3.2, mistral). Requires [Ollama](https://ollama.ai) running. |
+| **OpenAI** | gpt-4o-mini, gpt-4o. Requires API key. |
+| **Google Gemini** | gemini-1.5-flash, gemini-1.5-pro. Requires API key. |
+| **Anthropic Claude** | claude-3-haiku, claude-3-sonnet. Requires API key. |
 
 ## Hugo Frontmatter
 

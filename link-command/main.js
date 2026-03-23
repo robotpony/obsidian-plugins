@@ -27,7 +27,7 @@ __export(main_exports, {
   default: () => LinkCommandPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian4 = require("obsidian");
+var import_obsidian6 = require("obsidian");
 
 // src/types.ts
 var DEFAULT_SETTINGS = {
@@ -790,7 +790,7 @@ var LinkSidebarView = class extends import_obsidian3.ItemView {
     const titleEl = headerDiv.createEl("h4", { cls: "link-sidebar-title" });
     const logoEl = titleEl.createEl("span", { cls: "link-command-logo clickable-logo", text: "L\u2318" });
     logoEl.addEventListener("click", () => this.onShowAbout());
-    titleEl.appendText(" Link Command");
+    titleEl.appendText(" Links");
     const menuBtn = headerDiv.createEl("button", {
       cls: "clickable-icon link-sidebar-menu-btn",
       attr: { "aria-label": "Menu" }
@@ -1156,18 +1156,108 @@ var LinkSidebarView = class extends import_obsidian3.ItemView {
   }
 };
 
-// main.ts
-var LOGO_PREFIX = "L\u2318";
-function showNotice(message, timeout) {
+// ../shared/ui/Notice.ts
+var import_obsidian4 = require("obsidian");
+function showNotice(logoPrefix, logoClass, message, timeout) {
   const fragment = document.createDocumentFragment();
   const logo = document.createElement("span");
-  logo.className = "link-command-logo";
-  logo.textContent = LOGO_PREFIX;
+  logo.className = logoClass;
+  logo.textContent = logoPrefix;
   fragment.appendChild(logo);
   fragment.appendChild(document.createTextNode(" " + message));
   return new import_obsidian4.Notice(fragment, timeout);
 }
-var LinkCommandPlugin = class extends import_obsidian4.Plugin {
+function createNoticeFactory(logoPrefix, logoClass) {
+  return (message, timeout) => showNotice(logoPrefix, logoClass, message, timeout);
+}
+
+// ../shared/plugin/SidebarManager.ts
+var SidebarManager = class {
+  constructor(app, viewType) {
+    this.app = app;
+    this.viewType = viewType;
+  }
+  /**
+   * Activate the sidebar view (create if needed, reveal if exists).
+   */
+  async activate() {
+    const { workspace } = this.app;
+    let leaf = null;
+    const leaves = workspace.getLeavesOfType(this.viewType);
+    if (leaves.length > 0) {
+      leaf = leaves[0];
+    } else {
+      const rightLeaf = workspace.getRightLeaf(false);
+      if (rightLeaf) {
+        leaf = rightLeaf;
+        await leaf.setViewState({
+          type: this.viewType,
+          active: true
+        });
+      }
+    }
+    if (leaf) {
+      workspace.revealLeaf(leaf);
+    }
+  }
+  /**
+   * Toggle the sidebar view (close if open, open if closed).
+   */
+  async toggle() {
+    const { workspace } = this.app;
+    const leaves = workspace.getLeavesOfType(this.viewType);
+    if (leaves.length > 0) {
+      leaves.forEach((leaf) => leaf.detach());
+    } else {
+      await this.activate();
+    }
+  }
+  /**
+   * Refresh all instances of the sidebar view.
+   * Calls render() on each view instance.
+   */
+  refresh() {
+    const { workspace } = this.app;
+    const leaves = workspace.getLeavesOfType(this.viewType);
+    for (const leaf of leaves) {
+      const view = leaf.view;
+      if (view && "render" in view && typeof view.render === "function") {
+        view.render();
+      }
+    }
+  }
+  /**
+   * Get the first leaf of this sidebar type, if any.
+   */
+  getLeaf() {
+    const leaves = this.app.workspace.getLeavesOfType(this.viewType);
+    return leaves.length > 0 ? leaves[0] : null;
+  }
+  /**
+   * Get the view instance from the first leaf, if any.
+   */
+  getView() {
+    const leaf = this.getLeaf();
+    return leaf ? leaf.view : null;
+  }
+  /**
+   * Execute a callback on each sidebar view instance.
+   */
+  forEach(callback) {
+    const leaves = this.app.workspace.getLeavesOfType(this.viewType);
+    for (const leaf of leaves) {
+      callback(leaf.view);
+    }
+  }
+};
+
+// ../shared/llm/LLMClient.ts
+var import_obsidian5 = require("obsidian");
+
+// main.ts
+var LOGO_PREFIX = "L\u2318";
+var showNotice2 = createNoticeFactory(LOGO_PREFIX, "link-command-logo");
+var LinkCommandPlugin = class extends import_obsidian6.Plugin {
   constructor() {
     super(...arguments);
     this.cacheData = null;
@@ -1175,6 +1265,7 @@ var LinkCommandPlugin = class extends import_obsidian4.Plugin {
   }
   async onload() {
     await this.loadSettings();
+    this.sidebarManager = new SidebarManager(this.app, VIEW_TYPE_LINK_SIDEBAR);
     this.unfurlService = new UrlUnfurlService(
       this.settings,
       async (data) => {
@@ -1196,18 +1287,18 @@ var LinkCommandPlugin = class extends import_obsidian4.Plugin {
           () => this.openSettings(),
           async () => {
             await this.unfurlService.clearCache();
-            showNotice("Link history cleared");
+            showNotice2("Link history cleared");
           }
         );
         return this.sidebarView;
       }
     );
     this.addRibbonIcon("link", "Link Command", () => {
-      this.toggleSidebar();
+      this.sidebarManager.toggle();
     });
     if (this.settings.showSidebarByDefault) {
       this.app.workspace.onLayoutReady(() => {
-        this.activateSidebar();
+        this.sidebarManager.activate();
       });
     }
     this.addCommand({
@@ -1218,7 +1309,7 @@ var LinkCommandPlugin = class extends import_obsidian4.Plugin {
         if (url) {
           await this.cycleFormatAtCursor(editor, url);
         } else {
-          showNotice("No URL found at cursor");
+          showNotice2("No URL found at cursor");
         }
       }
     });
@@ -1226,51 +1317,23 @@ var LinkCommandPlugin = class extends import_obsidian4.Plugin {
       id: "clear-link-cache",
       name: "Clear link cache",
       callback: async () => {
-        var _a;
         await this.unfurlService.clearCache();
-        showNotice("Link cache cleared");
-        (_a = this.sidebarView) == null ? void 0 : _a.render();
+        showNotice2("Link cache cleared");
+        this.sidebarManager.refresh();
       }
     });
     this.addCommand({
       id: "toggle-link-sidebar",
       name: "Toggle link sidebar",
+      hotkeys: [{ modifiers: ["Mod", "Shift"], key: "l" }],
       callback: () => {
-        this.toggleSidebar();
+        this.sidebarManager.toggle();
       }
     });
     this.addSettingTab(new LinkCommandSettingTab(this.app, this));
   }
   onunload() {
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_LINK_SIDEBAR);
-  }
-  /**
-   * Activate the sidebar view
-   */
-  async activateSidebar() {
-    const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE_LINK_SIDEBAR);
-    if (existing.length > 0) {
-      this.app.workspace.revealLeaf(existing[0]);
-      return;
-    }
-    const rightLeaf = this.app.workspace.getRightLeaf(false);
-    if (rightLeaf) {
-      await rightLeaf.setViewState({
-        type: VIEW_TYPE_LINK_SIDEBAR,
-        active: true
-      });
-    }
-  }
-  /**
-   * Toggle the sidebar view
-   */
-  async toggleSidebar() {
-    const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE_LINK_SIDEBAR);
-    if (existing.length > 0) {
-      existing[0].detach();
-    } else {
-      await this.activateSidebar();
-    }
   }
   /**
    * Navigate to a URL in the active file
@@ -1309,10 +1372,11 @@ var LinkCommandPlugin = class extends import_obsidian4.Plugin {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, data == null ? void 0 : data.settings);
   }
   async saveSettings() {
-    var _a;
     await this.saveData({ settings: this.settings, cache: this.cacheData });
     this.unfurlService.updateSettings(this.settings);
-    (_a = this.sidebarView) == null ? void 0 : _a.updateSettings(this.settings);
+    this.sidebarManager.forEach((view) => {
+      view.updateSettings(this.settings);
+    });
   }
   /**
    * Format metadata title for display, including subreddit if configured
@@ -1350,7 +1414,7 @@ var LinkCommandPlugin = class extends import_obsidian4.Plugin {
    * Cycle through formats at cursor (URL -> Link -> Rich -> URL)
    */
   async cycleFormatAtCursor(editor, url) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c;
     const cursor = editor.getCursor();
     const line = editor.getLine(cursor.line);
     const urlEscaped = url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -1403,10 +1467,10 @@ var LinkCommandPlugin = class extends import_obsidian4.Plugin {
       }
     }
     editor.replaceRange(replacement, from, to);
-    (_d = this.sidebarView) == null ? void 0 : _d.render();
+    this.sidebarManager.refresh();
   }
 };
-var LinkCommandSettingTab = class extends import_obsidian4.PluginSettingTab {
+var LinkCommandSettingTab = class extends import_obsidian6.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -1432,13 +1496,13 @@ var LinkCommandSettingTab = class extends import_obsidian4.PluginSettingTab {
       href: "https://github.com/robotpony/obsidian-plugins"
     });
     containerEl.createEl("h3", { text: "Sidebar" });
-    new import_obsidian4.Setting(containerEl).setName("Show sidebar by default").setDesc("Open the link sidebar when Obsidian starts").addToggle(
+    new import_obsidian6.Setting(containerEl).setName("Show sidebar by default").setDesc("Open the link sidebar when Obsidian starts").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.showSidebarByDefault).onChange(async (value) => {
         this.plugin.settings.showSidebarByDefault = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian4.Setting(containerEl).setName("Recent history limit").setDesc("Number of items to show in the Recent History section").addText(
+    new import_obsidian6.Setting(containerEl).setName("Recent history limit").setDesc("Number of items to show in the Recent History section").addText(
       (text) => text.setPlaceholder("25").setValue(String(this.plugin.settings.recentHistoryLimit)).onChange(async (value) => {
         const num = parseInt(value, 10);
         if (!isNaN(num) && num > 0 && num <= 100) {
@@ -1448,7 +1512,7 @@ var LinkCommandSettingTab = class extends import_obsidian4.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: "Unfurling" });
-    new import_obsidian4.Setting(containerEl).setName("Request timeout").setDesc("Timeout for fetching URL metadata (milliseconds)").addText(
+    new import_obsidian6.Setting(containerEl).setName("Request timeout").setDesc("Timeout for fetching URL metadata (milliseconds)").addText(
       (text) => text.setPlaceholder("10000").setValue(String(this.plugin.settings.unfurlTimeout)).onChange(async (value) => {
         const num = parseInt(value, 10);
         if (!isNaN(num) && num > 0) {
@@ -1457,20 +1521,20 @@ var LinkCommandSettingTab = class extends import_obsidian4.PluginSettingTab {
         }
       })
     );
-    new import_obsidian4.Setting(containerEl).setName("Reddit link format").setDesc("How to format Reddit links when unfurling").addDropdown(
+    new import_obsidian6.Setting(containerEl).setName("Reddit link format").setDesc("How to format Reddit links when unfurling").addDropdown(
       (dropdown) => dropdown.addOption("title", "Title only").addOption("title_subreddit", "Title + subreddit").setValue(this.plugin.settings.redditLinkFormat).onChange(async (value) => {
         this.plugin.settings.redditLinkFormat = value;
         await this.plugin.saveSettings();
       })
     );
     containerEl.createEl("h3", { text: "Cache" });
-    new import_obsidian4.Setting(containerEl).setName("Enable cache").setDesc("Cache fetched metadata for faster access and offline use").addToggle(
+    new import_obsidian6.Setting(containerEl).setName("Enable cache").setDesc("Cache fetched metadata for faster access and offline use").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.cacheEnabled).onChange(async (value) => {
         this.plugin.settings.cacheEnabled = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian4.Setting(containerEl).setName("Cache TTL").setDesc("How long to keep cached metadata (hours)").addText(
+    new import_obsidian6.Setting(containerEl).setName("Cache TTL").setDesc("How long to keep cached metadata (hours)").addText(
       (text) => text.setPlaceholder("168").setValue(String(this.plugin.settings.cacheTTL)).onChange(async (value) => {
         const num = parseInt(value, 10);
         if (!isNaN(num) && num > 0) {
@@ -1480,10 +1544,10 @@ var LinkCommandSettingTab = class extends import_obsidian4.PluginSettingTab {
       })
     );
     const stats = this.plugin.unfurlService.getCacheStats();
-    new import_obsidian4.Setting(containerEl).setName("Cache statistics").setDesc(`Memory: ${stats.memorySize} entries | Persistent: ${stats.persistentSize} entries`).addButton(
+    new import_obsidian6.Setting(containerEl).setName("Cache statistics").setDesc(`Memory: ${stats.memorySize} entries | Persistent: ${stats.persistentSize} entries`).addButton(
       (btn) => btn.setButtonText("Clear cache").onClick(async () => {
         await this.plugin.unfurlService.clearCache();
-        showNotice("Link cache cleared");
+        showNotice2("Link cache cleared");
         this.display();
       })
     );
@@ -1492,7 +1556,7 @@ var LinkCommandSettingTab = class extends import_obsidian4.PluginSettingTab {
       cls: "setting-item-description",
       text: "Domains that require authentication are skipped during unfurling. One domain per line."
     });
-    new import_obsidian4.Setting(containerEl).setName("Auth domains").setDesc("Domains that require login (skipped during unfurling)").addTextArea(
+    new import_obsidian6.Setting(containerEl).setName("Auth domains").setDesc("Domains that require login (skipped during unfurling)").addTextArea(
       (text) => text.setPlaceholder("slack.com\nnotion.so").setValue(this.plugin.settings.authDomains.join("\n")).onChange(async (value) => {
         this.plugin.settings.authDomains = value.split("\n").map((d) => d.trim()).filter((d) => d.length > 0);
         await this.plugin.saveSettings();
@@ -1500,7 +1564,7 @@ var LinkCommandSettingTab = class extends import_obsidian4.PluginSettingTab {
     );
   }
 };
-var AboutModal = class extends import_obsidian4.Modal {
+var AboutModal = class extends import_obsidian6.Modal {
   constructor(app, version, unfurlService) {
     super(app);
     this.version = version;

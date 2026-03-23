@@ -4,7 +4,6 @@ import {
   Plugin,
   PluginSettingTab,
   Setting,
-  WorkspaceLeaf,
 } from "obsidian";
 import { TodoScanner } from "./src/TodoScanner";
 import { TodoProcessor } from "./src/TodoProcessor";
@@ -29,6 +28,7 @@ import { DefineTooltip } from "./src/DefineTooltip";
 import { TabLockManager } from "./src/TabLockManager";
 import { createHeaderSortPlugin } from "./src/HeaderSortExtension";
 import { createHeaderChecklistExtension } from "./src/HeaderChecklistExtension";
+import { SidebarManager } from "../shared";
 
 export default class SpaceCommandPlugin extends Plugin {
   settings: SpaceCommandSettings;
@@ -39,9 +39,13 @@ export default class SpaceCommandPlugin extends Plugin {
   llmClient: LLMClient;
   defineTooltip: DefineTooltip;
   tabLockManager: TabLockManager;
+  private sidebarManager: SidebarManager;
 
   async onload() {
     await this.loadSettings();
+
+    // Initialize sidebar manager
+    this.sidebarManager = new SidebarManager(this.app, VIEW_TYPE_TODO_SIDEBAR);
 
     // Initialize core components
     this.scanner = new TodoScanner(this.app);
@@ -66,14 +70,7 @@ export default class SpaceCommandPlugin extends Plugin {
     );
 
     // Initialize LLM client for Define/Rewrite/Review features
-    this.llmClient = new LLMClient({
-      url: this.settings.llmUrl,
-      model: this.settings.llmModel,
-      prompt: this.settings.llmPrompt,
-      rewritePrompt: this.settings.llmRewritePrompt,
-      reviewPrompt: this.settings.llmReviewPrompt,
-      timeout: this.settings.llmTimeout,
-    });
+    this.llmClient = new LLMClient(this.settings);
     this.defineTooltip = new DefineTooltip(this.app);
 
     // Initialize tab lock manager
@@ -190,7 +187,7 @@ export default class SpaceCommandPlugin extends Plugin {
     // Wait for workspace layout to be ready to avoid null reference errors
     if (this.settings.showSidebarByDefault) {
       this.app.workspace.onLayoutReady(() => {
-        this.activateSidebar();
+        this.sidebarManager.activate();
       });
     }
 
@@ -226,7 +223,7 @@ export default class SpaceCommandPlugin extends Plugin {
       id: "toggle-todo-sidebar",
       name: "Toggle TODO Sidebar",
       callback: () => {
-        this.toggleSidebar();
+        this.sidebarManager.toggle();
       },
       hotkeys: [
         {
@@ -266,7 +263,7 @@ export default class SpaceCommandPlugin extends Plugin {
       name: "Refresh TODOs",
       callback: async () => {
         await this.scanner.scanVault();
-        this.refreshSidebar();
+        this.sidebarManager.refresh();
       },
     });
 
@@ -409,7 +406,7 @@ export default class SpaceCommandPlugin extends Plugin {
 
     // Add ribbon icon
     this.addRibbonIcon("square-check-big", "Toggle TODO Sidebar", () => {
-      this.toggleSidebar();
+      this.sidebarManager.toggle();
     });
 
     // Add settings tab
@@ -433,55 +430,9 @@ export default class SpaceCommandPlugin extends Plugin {
     await this.saveData(this.settings);
   }
 
-  async activateSidebar() {
-    const { workspace } = this.app;
-
-    let leaf: WorkspaceLeaf | null = null;
-    const leaves = workspace.getLeavesOfType(VIEW_TYPE_TODO_SIDEBAR);
-
-    if (leaves.length > 0) {
-      // Sidebar already exists
-      leaf = leaves[0];
-    } else {
-      // Create new sidebar
-      const rightLeaf = workspace.getRightLeaf(false);
-      if (rightLeaf) {
-        leaf = rightLeaf;
-        await leaf.setViewState({
-          type: VIEW_TYPE_TODO_SIDEBAR,
-          active: true,
-        });
-      }
-    }
-
-    if (leaf) {
-      workspace.revealLeaf(leaf);
-    }
-  }
-
-  async toggleSidebar() {
-    const { workspace } = this.app;
-    const leaves = workspace.getLeavesOfType(VIEW_TYPE_TODO_SIDEBAR);
-
-    if (leaves.length > 0) {
-      // Close sidebar
-      leaves.forEach((leaf) => leaf.detach());
-    } else {
-      // Open sidebar
-      await this.activateSidebar();
-    }
-  }
-
+  /** Refresh all sidebar views (delegates to SidebarManager). */
   refreshSidebar() {
-    const { workspace } = this.app;
-    const leaves = workspace.getLeavesOfType(VIEW_TYPE_TODO_SIDEBAR);
-
-    for (const leaf of leaves) {
-      const view = leaf.view;
-      if (view instanceof TodoSidebarView) {
-        view.render();
-      }
-    }
+    this.sidebarManager.refresh();
   }
 
   showAboutModal() {
@@ -1221,8 +1172,8 @@ class SpaceCommandSettingTab extends PluginSettingTab {
     containerEl.createEl("h3", { text: "LLM Settings (Define, Rewrite, Review)" });
 
     new Setting(containerEl)
-      .setName("Enable Define feature")
-      .setDesc("Show 'Define' option in context menu to look up definitions via LLM")
+      .setName("Enable LLM features")
+      .setDesc("Show Define, Rewrite, and Review options in context menu")
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.llmEnabled)
@@ -1233,33 +1184,147 @@ class SpaceCommandSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("LLM URL")
-      .setDesc("Ollama server URL (default: http://localhost:11434)")
-      .addText((text) =>
-        text
-          .setPlaceholder("http://localhost:11434")
-          .setValue(this.plugin.settings.llmUrl)
-          .onChange(async (value) => {
-            this.plugin.settings.llmUrl = value;
-            this.plugin.llmClient.updateConfig({ url: value });
+      .setName("LLM Provider")
+      .setDesc("Choose which LLM provider to use")
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOption("ollama", "Ollama (local)")
+          .addOption("openai", "OpenAI")
+          .addOption("gemini", "Google Gemini")
+          .addOption("anthropic", "Anthropic Claude")
+          .setValue(this.plugin.settings.llmProvider)
+          .onChange(async (value: "ollama" | "openai" | "gemini" | "anthropic") => {
+            this.plugin.settings.llmProvider = value;
+            this.plugin.llmClient.updateSettings(this.plugin.settings);
             await this.plugin.saveSettings();
+            this.display(); // Refresh to show/hide provider-specific settings
           })
       );
 
-    new Setting(containerEl)
-      .setName("LLM Model")
-      .setDesc("Model name to use (e.g., llama3.2, mistral, codellama)")
-      .addText((text) =>
-        text
-          .setPlaceholder("llama3.2")
-          .setValue(this.plugin.settings.llmModel)
-          .onChange(async (value) => {
-            this.plugin.settings.llmModel = value;
-            this.plugin.llmClient.updateConfig({ model: value });
-            await this.plugin.saveSettings();
-          })
-      );
+    // Provider-specific settings
+    const provider = this.plugin.settings.llmProvider;
 
+    if (provider === "ollama") {
+      new Setting(containerEl)
+        .setName("Ollama URL")
+        .setDesc("Ollama server URL (default: http://localhost:11434)")
+        .addText((text) =>
+          text
+            .setPlaceholder("http://localhost:11434")
+            .setValue(this.plugin.settings.llmUrl)
+            .onChange(async (value) => {
+              this.plugin.settings.llmUrl = value;
+              this.plugin.llmClient.updateSettings(this.plugin.settings);
+              await this.plugin.saveSettings();
+            })
+        );
+
+      new Setting(containerEl)
+        .setName("Ollama Model")
+        .setDesc("Model name (e.g., llama3.2, mistral, codellama)")
+        .addText((text) =>
+          text
+            .setPlaceholder("llama3.2")
+            .setValue(this.plugin.settings.llmModel)
+            .onChange(async (value) => {
+              this.plugin.settings.llmModel = value;
+              this.plugin.llmClient.updateSettings(this.plugin.settings);
+              await this.plugin.saveSettings();
+            })
+        );
+    }
+
+    if (provider === "openai") {
+      new Setting(containerEl)
+        .setName("OpenAI API Key")
+        .setDesc("Your OpenAI API key")
+        .addText((text) =>
+          text
+            .setPlaceholder("sk-...")
+            .setValue(this.plugin.settings.llmOpenaiApiKey)
+            .onChange(async (value) => {
+              this.plugin.settings.llmOpenaiApiKey = value;
+              this.plugin.llmClient.updateSettings(this.plugin.settings);
+              await this.plugin.saveSettings();
+            })
+        );
+
+      new Setting(containerEl)
+        .setName("OpenAI Model")
+        .setDesc("Model to use (e.g., gpt-4o-mini, gpt-4o)")
+        .addText((text) =>
+          text
+            .setPlaceholder("gpt-4o-mini")
+            .setValue(this.plugin.settings.llmOpenaiModel)
+            .onChange(async (value) => {
+              this.plugin.settings.llmOpenaiModel = value;
+              this.plugin.llmClient.updateSettings(this.plugin.settings);
+              await this.plugin.saveSettings();
+            })
+        );
+    }
+
+    if (provider === "gemini") {
+      new Setting(containerEl)
+        .setName("Gemini API Key")
+        .setDesc("Your Google AI API key")
+        .addText((text) =>
+          text
+            .setPlaceholder("AI...")
+            .setValue(this.plugin.settings.llmGeminiApiKey)
+            .onChange(async (value) => {
+              this.plugin.settings.llmGeminiApiKey = value;
+              this.plugin.llmClient.updateSettings(this.plugin.settings);
+              await this.plugin.saveSettings();
+            })
+        );
+
+      new Setting(containerEl)
+        .setName("Gemini Model")
+        .setDesc("Model to use (e.g., gemini-1.5-flash, gemini-1.5-pro)")
+        .addText((text) =>
+          text
+            .setPlaceholder("gemini-1.5-flash")
+            .setValue(this.plugin.settings.llmGeminiModel)
+            .onChange(async (value) => {
+              this.plugin.settings.llmGeminiModel = value;
+              this.plugin.llmClient.updateSettings(this.plugin.settings);
+              await this.plugin.saveSettings();
+            })
+        );
+    }
+
+    if (provider === "anthropic") {
+      new Setting(containerEl)
+        .setName("Anthropic API Key")
+        .setDesc("Your Anthropic API key")
+        .addText((text) =>
+          text
+            .setPlaceholder("sk-ant-...")
+            .setValue(this.plugin.settings.llmAnthropicApiKey)
+            .onChange(async (value) => {
+              this.plugin.settings.llmAnthropicApiKey = value;
+              this.plugin.llmClient.updateSettings(this.plugin.settings);
+              await this.plugin.saveSettings();
+            })
+        );
+
+      new Setting(containerEl)
+        .setName("Anthropic Model")
+        .setDesc("Model to use (e.g., claude-3-haiku-20240307, claude-3-sonnet-20240229)")
+        .addText((text) =>
+          text
+            .setPlaceholder("claude-3-haiku-20240307")
+            .setValue(this.plugin.settings.llmAnthropicModel)
+            .onChange(async (value) => {
+              this.plugin.settings.llmAnthropicModel = value;
+              this.plugin.llmClient.updateSettings(this.plugin.settings);
+              await this.plugin.saveSettings();
+            })
+        );
+    }
+
+    // Prompts (always shown)
     new Setting(containerEl)
       .setName("Definition prompt")
       .setDesc("Prompt prepended to the selected text for Define")
@@ -1269,7 +1334,6 @@ class SpaceCommandSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.llmPrompt)
           .onChange(async (value) => {
             this.plugin.settings.llmPrompt = value;
-            this.plugin.llmClient.updateConfig({ prompt: value });
             await this.plugin.saveSettings();
           });
         text.inputEl.rows = 3;
@@ -1285,7 +1349,6 @@ class SpaceCommandSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.llmRewritePrompt)
           .onChange(async (value) => {
             this.plugin.settings.llmRewritePrompt = value;
-            this.plugin.llmClient.updateConfig({ rewritePrompt: value });
             await this.plugin.saveSettings();
           });
         text.inputEl.rows = 3;
@@ -1301,7 +1364,6 @@ class SpaceCommandSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.llmReviewPrompt)
           .onChange(async (value) => {
             this.plugin.settings.llmReviewPrompt = value;
-            this.plugin.llmClient.updateConfig({ reviewPrompt: value });
             await this.plugin.saveSettings();
           });
         text.inputEl.rows = 3;
@@ -1319,7 +1381,6 @@ class SpaceCommandSettingTab extends PluginSettingTab {
             const num = parseInt(value);
             if (!isNaN(num) && num > 0) {
               this.plugin.settings.llmTimeout = num;
-              this.plugin.llmClient.updateConfig({ timeout: num });
               await this.plugin.saveSettings();
             }
           })

@@ -4,7 +4,6 @@ import {
   Plugin,
   PluginSettingTab,
   Setting,
-  WorkspaceLeaf,
   TFile,
   MarkdownView,
 } from "obsidian";
@@ -27,6 +26,7 @@ import { ReviewCache } from "./src/ReviewCache";
 import { ReviewLLMClient } from "./src/ReviewLLMClient";
 import { OutlineLLMClient } from "./src/OutlineLLMClient";
 import { commentBubblesPlugin, stripHtmlComments } from "./src/CommentBubbles";
+import { SidebarManager } from "../shared";
 
 export default class HugoCommandPlugin extends Plugin {
   settings: HugoCommandSettings;
@@ -36,9 +36,13 @@ export default class HugoCommandPlugin extends Plugin {
   outlineClient: OutlineLLMClient;
   private reviewCacheData: Record<string, ReviewResult> = {};
   private isEnhancingOutline: boolean = false;
+  private sidebarManager: SidebarManager;
 
   async onload() {
     await this.loadSettings();
+
+    // Initialize sidebar manager
+    this.sidebarManager = new SidebarManager(this.app, VIEW_TYPE_HUGO_SIDEBAR);
 
     // Initialize scanner
     this.scanner = new HugoScanner(this.app, this.settings.contentPaths);
@@ -79,7 +83,7 @@ export default class HugoCommandPlugin extends Plugin {
     // Show sidebar by default if setting is enabled
     if (this.settings.showSidebarByDefault) {
       this.app.workspace.onLayoutReady(() => {
-        this.activateSidebar();
+        this.sidebarManager.activate();
       });
     }
 
@@ -88,7 +92,7 @@ export default class HugoCommandPlugin extends Plugin {
       id: "toggle-hugo-sidebar",
       name: "Toggle Hugo Sidebar",
       callback: () => {
-        this.toggleSidebar();
+        this.sidebarManager.toggle();
       },
       hotkeys: [
         {
@@ -103,14 +107,14 @@ export default class HugoCommandPlugin extends Plugin {
       name: "Refresh Hugo Content",
       callback: async () => {
         await this.scanner.scanVault();
-        this.refreshSidebar();
+        this.sidebarManager.refresh();
         showNotice("Content refreshed");
       },
     });
 
     // Add ribbon icon
     this.addRibbonIcon("file-text", "Toggle Hugo Sidebar", () => {
-      this.toggleSidebar();
+      this.sidebarManager.toggle();
     });
 
     // Register CodeMirror extension for comment bubbles (if outline enabled)
@@ -284,63 +288,10 @@ export default class HugoCommandPlugin extends Plugin {
     this.updateSidebarSettings();
   }
 
-  async activateSidebar() {
-    const { workspace } = this.app;
-
-    let leaf: WorkspaceLeaf | null = null;
-    const leaves = workspace.getLeavesOfType(VIEW_TYPE_HUGO_SIDEBAR);
-
-    if (leaves.length > 0) {
-      leaf = leaves[0];
-    } else {
-      const rightLeaf = workspace.getRightLeaf(false);
-      if (rightLeaf) {
-        leaf = rightLeaf;
-        await leaf.setViewState({
-          type: VIEW_TYPE_HUGO_SIDEBAR,
-          active: true,
-        });
-      }
-    }
-
-    if (leaf) {
-      workspace.revealLeaf(leaf);
-    }
-  }
-
-  async toggleSidebar() {
-    const { workspace } = this.app;
-    const leaves = workspace.getLeavesOfType(VIEW_TYPE_HUGO_SIDEBAR);
-
-    if (leaves.length > 0) {
-      leaves.forEach((leaf) => leaf.detach());
-    } else {
-      await this.activateSidebar();
-    }
-  }
-
-  refreshSidebar() {
-    const { workspace } = this.app;
-    const leaves = workspace.getLeavesOfType(VIEW_TYPE_HUGO_SIDEBAR);
-
-    for (const leaf of leaves) {
-      const view = leaf.view;
-      if (view instanceof HugoSidebarView) {
-        view.render();
-      }
-    }
-  }
-
   updateSidebarSettings() {
-    const { workspace } = this.app;
-    const leaves = workspace.getLeavesOfType(VIEW_TYPE_HUGO_SIDEBAR);
-
-    for (const leaf of leaves) {
-      const view = leaf.view;
-      if (view instanceof HugoSidebarView) {
-        view.updateSettings(this.settings);
-      }
-    }
+    this.sidebarManager.forEach<HugoSidebarView>((view) => {
+      view.updateSettings(this.settings);
+    });
   }
 
   showAboutModal() {

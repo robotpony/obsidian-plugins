@@ -1,23 +1,14 @@
-import { App, Notice, TFile, parseYaml, stringifyYaml } from "obsidian";
+import { App, TFile, parseYaml, stringifyYaml } from "obsidian";
 import { HugoFrontmatter, HugoContentItem, HugoSiteConfig } from "./types";
+import { createNoticeFactory } from "../../shared";
 
 export const LOGO_PREFIX = "H\u2318";
 
 /**
- * Show a notice with the styled Hugo Command logo
+ * Show a notice with the styled Hugo Command logo.
+ * Uses the shared notice factory pattern.
  */
-export function showNotice(message: string, timeout?: number): Notice {
-  const fragment = document.createDocumentFragment();
-
-  const logo = document.createElement("span");
-  logo.className = "hugo-command-logo";
-  logo.textContent = LOGO_PREFIX;
-  fragment.appendChild(logo);
-
-  fragment.appendChild(document.createTextNode(" " + message));
-
-  return new Notice(fragment, timeout);
-}
+export const showNotice = createNoticeFactory(LOGO_PREFIX, "hugo-command-logo");
 
 /**
  * Parse YAML frontmatter from markdown content

@@ -2,6 +2,29 @@
 
 All notable changes to the Link Command plugin will be documented in this file.
 
+## [0.5.2] - 2026-02-07
+
+### Added
+
+- **Default keyboard shortcut**: Toggle link sidebar now has `Cmd/Ctrl+Shift+L` as default hotkey
+
+### Fixed
+
+- **Sidebar header consistency**: Changed header title from "Link Command" to "Links" to match the view display name
+
+### Improved
+
+- **Documentation**: Updated README with Smart Providers section, context menu details, and title editing feature
+
+## [0.5.1] - 2026-02-05
+
+### Improved
+
+- **Refactored to use shared utilities**: Extracted common patterns to a shared module for consistency across plugins
+  - Notice display now uses shared `createNoticeFactory` pattern
+  - Sidebar management (activate, toggle, refresh) now uses shared `SidebarManager` class
+  - Reduces code duplication across the Obsidian plugins monorepo
+
 ## [0.5.0] - 2026-02-03
 
 ### Removed

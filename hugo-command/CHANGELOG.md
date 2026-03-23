@@ -2,6 +2,15 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.6.11] - 2026-02-05
+
+### Improved
+
+- **Refactored to use shared utilities**: Extracted common patterns to a shared module for consistency across plugins
+  - Notice display now uses shared `createNoticeFactory` pattern
+  - Sidebar management (activate, toggle, refresh) now uses shared `SidebarManager` class
+  - Reduces code duplication across the Obsidian plugins monorepo
+
 ## [0.6.10] - 2026-01-30
 
 ### Improved

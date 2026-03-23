@@ -2,6 +2,40 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.106] - 2026-02-07
+
+### Improved
+
+- **Focus mode now scopes Ideas and Principles to focused projects**: When focus mode is enabled with "Focus mode includes project TODOs" setting, Ideas and Principles from focused projects are now shown (matching how TODOs work)
+  - Previously, Ideas and Principles only showed items with `#focus` tag directly
+  - Now shows items from any project that has at least one `#focus` item
+  - Empty state messages updated to reflect project-scoped filtering
+
+## [0.9.105] - 2026-02-07
+
+### Added
+
+- **Multi-provider LLM support**: Define, Rewrite, and Review now support multiple LLM providers
+  - **Ollama** (local, default)
+  - **OpenAI** (GPT models via API key)
+  - **Google Gemini** (via API key)
+  - **Anthropic Claude** (via API key)
+  - Provider selection and API key configuration in Settings → LLM Settings
+  - Uses shared LLM client module for consistency with Hugo Command
+
+### Improved
+
+- **Documentation**: Added sections for Slash Commands, Date Suggestions, Stats/Triage, and Copy as Slack
+
+## [0.9.104] - 2026-02-05
+
+### Improved
+
+- **Refactored to use shared utilities**: Extracted common patterns to a shared module for consistency across plugins
+  - Notice display now uses shared `createNoticeFactory` pattern
+  - Sidebar management (activate, toggle, refresh) now uses shared `SidebarManager` class
+  - Reduces code duplication across the Obsidian plugins monorepo
+
 ## [0.9.103] - 2026-02-02
 
 ### Fixed

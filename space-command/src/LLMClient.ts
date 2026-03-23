@@ -1,13 +1,5 @@
-import { requestUrl } from "obsidian";
-
-export interface LLMConfig {
-  url: string;
-  model: string;
-  prompt: string;
-  rewritePrompt: string;
-  reviewPrompt: string;
-  timeout: number;
-}
+import { LLMClient as SharedLLMClient, LLMProviderSettings } from "../../shared";
+import { SpaceCommandSettings } from "./types";
 
 export interface LLMResponse {
   success: boolean;
@@ -16,165 +8,80 @@ export interface LLMResponse {
   error?: string;
 }
 
-export class LLMClient {
-  private config: LLMConfig;
+/**
+ * Convert Space Command settings to shared LLM provider settings.
+ */
+function toProviderSettings(settings: SpaceCommandSettings): LLMProviderSettings {
+  return {
+    provider: settings.llmProvider,
+    ollamaEndpoint: settings.llmUrl,
+    ollamaModel: settings.llmModel,
+    openaiApiKey: settings.llmOpenaiApiKey,
+    openaiModel: settings.llmOpenaiModel,
+    geminiApiKey: settings.llmGeminiApiKey,
+    geminiModel: settings.llmGeminiModel,
+    anthropicApiKey: settings.llmAnthropicApiKey,
+    anthropicModel: settings.llmAnthropicModel,
+    timeout: settings.llmTimeout,
+  };
+}
 
-  constructor(config: LLMConfig) {
-    this.config = config;
+/**
+ * LLM client for Define/Rewrite/Review commands.
+ * Wraps the shared multi-provider LLM client.
+ */
+export class LLMClient {
+  private client: SharedLLMClient;
+  private settings: SpaceCommandSettings;
+
+  constructor(settings: SpaceCommandSettings) {
+    this.settings = settings;
+    this.client = new SharedLLMClient(toProviderSettings(settings));
   }
 
-  updateConfig(config: Partial<LLMConfig>): void {
-    this.config = { ...this.config, ...config };
+  updateSettings(settings: SpaceCommandSettings): void {
+    this.settings = settings;
+    this.client.updateSettings(toProviderSettings(settings));
   }
 
   async define(text: string): Promise<LLMResponse> {
-    const fullPrompt = `${this.config.prompt}\n\n"${text}"`;
+    const response = await this.client.request({
+      prompt: `${this.settings.llmPrompt}\n\n"${text}"`,
+    });
 
-    try {
-      const response = await requestUrl({
-        url: `${this.config.url}/api/generate`,
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: this.config.model,
-          prompt: fullPrompt,
-          stream: false,
-        }),
-        throw: false,
-      });
-
-      if (response.status !== 200) {
-        console.error(`[Space Command] Define request failed`, {
-          status: response.status,
-          model: this.config.model,
-          url: this.config.url,
-          response: response.text,
-        });
-        return {
-          success: false,
-          error: "request_failed",
-        };
-      }
-
-      const data = response.json;
-      return {
-        success: true,
-        definition: data.response?.trim() || "No response received",
-      };
-    } catch (error) {
-      console.error(`[Space Command] Define request error`, {
-        model: this.config.model,
-        url: this.config.url,
-        error: error instanceof Error ? error.message : error,
-      });
-      return {
-        success: false,
-        error: "connection_failed",
-      };
+    if (response.success) {
+      return { success: true, definition: response.content };
     }
+    return { success: false, error: response.error };
   }
 
   async rewrite(text: string): Promise<LLMResponse> {
-    const fullPrompt = `${this.config.rewritePrompt}\n\n${text}`;
+    const response = await this.client.request({
+      prompt: `${this.settings.llmRewritePrompt}\n\n${text}`,
+    });
 
-    try {
-      const response = await requestUrl({
-        url: `${this.config.url}/api/generate`,
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: this.config.model,
-          prompt: fullPrompt,
-          stream: false,
-        }),
-        throw: false,
-      });
-
-      if (response.status !== 200) {
-        console.error(`[Space Command] Rewrite request failed`, {
-          status: response.status,
-          model: this.config.model,
-          url: this.config.url,
-          response: response.text,
-        });
-        return {
-          success: false,
-          error: "request_failed",
-        };
-      }
-
-      const data = response.json;
-      return {
-        success: true,
-        result: data.response?.trim() || "No response received",
-      };
-    } catch (error) {
-      console.error(`[Space Command] Rewrite request error`, {
-        model: this.config.model,
-        url: this.config.url,
-        error: error instanceof Error ? error.message : error,
-      });
-      return {
-        success: false,
-        error: "connection_failed",
-      };
+    if (response.success) {
+      return { success: true, result: response.content };
     }
+    return { success: false, error: response.error };
   }
 
   async review(text: string): Promise<LLMResponse> {
-    const fullPrompt = `${this.config.reviewPrompt}\n\n${text}`;
+    const response = await this.client.request({
+      prompt: `${this.settings.llmReviewPrompt}\n\n${text}`,
+    });
 
-    try {
-      const response = await requestUrl({
-        url: `${this.config.url}/api/generate`,
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: this.config.model,
-          prompt: fullPrompt,
-          stream: false,
-        }),
-        throw: false,
-      });
-
-      if (response.status !== 200) {
-        console.error(`[Space Command] Review request failed`, {
-          status: response.status,
-          model: this.config.model,
-          url: this.config.url,
-          response: response.text,
-        });
-        return {
-          success: false,
-          error: "request_failed",
-        };
-      }
-
-      const data = response.json;
-      return {
-        success: true,
-        result: data.response?.trim() || "No response received",
-      };
-    } catch (error) {
-      console.error(`[Space Command] Review request error`, {
-        model: this.config.model,
-        url: this.config.url,
-        error: error instanceof Error ? error.message : error,
-      });
-      return {
-        success: false,
-        error: "connection_failed",
-      };
+    if (response.success) {
+      return { success: true, result: response.content };
     }
+    return { success: false, error: response.error };
   }
 
   getModel(): string {
-    return this.config.model;
+    return this.client.getModel();
+  }
+
+  getProvider(): string {
+    return this.client.getProvider();
   }
 }

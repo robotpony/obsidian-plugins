@@ -1,0 +1,11 @@
+{
+  "name": "@obsidian-plugins/shared",
+  "version": "1.0.0",
+  "description": "Shared utilities for Obsidian plugins monorepo",
+  "private": true,
+  "type": "module",
+  "main": "index.ts",
+  "devDependencies": {
+    "obsidian": "latest"
+  }
+}

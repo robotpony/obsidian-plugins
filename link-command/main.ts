@@ -2,12 +2,10 @@ import {
   App,
   Editor,
   Modal,
-  Notice,
   Plugin,
   PluginSettingTab,
   Setting,
   TFile,
-  WorkspaceLeaf,
 } from "obsidian";
 import {
   LinkCommandSettings,
@@ -17,30 +15,23 @@ import {
 } from "./src/types";
 import { UrlUnfurlService } from "./src/UrlUnfurlService";
 import { LinkSidebarView, VIEW_TYPE_LINK_SIDEBAR } from "./src/LinkSidebarView";
+import { createNoticeFactory, SidebarManager } from "../shared";
 
 const LOGO_PREFIX = "L⌘";
-
-function showNotice(message: string, timeout?: number): Notice {
-  const fragment = document.createDocumentFragment();
-
-  const logo = document.createElement("span");
-  logo.className = "link-command-logo";
-  logo.textContent = LOGO_PREFIX;
-  fragment.appendChild(logo);
-
-  fragment.appendChild(document.createTextNode(" " + message));
-
-  return new Notice(fragment, timeout);
-}
+const showNotice = createNoticeFactory(LOGO_PREFIX, "link-command-logo");
 
 export default class LinkCommandPlugin extends Plugin {
   settings: LinkCommandSettings;
   unfurlService: UrlUnfurlService;
   private cacheData: CacheData | null = null;
   private sidebarView: LinkSidebarView | null = null;
+  private sidebarManager: SidebarManager;
 
   async onload() {
     await this.loadSettings();
+
+    // Initialize sidebar manager
+    this.sidebarManager = new SidebarManager(this.app, VIEW_TYPE_LINK_SIDEBAR);
 
     // Initialize unfurl service
     this.unfurlService = new UrlUnfurlService(
@@ -77,13 +68,13 @@ export default class LinkCommandPlugin extends Plugin {
 
     // Add ribbon icon to toggle sidebar
     this.addRibbonIcon("link", "Link Command", () => {
-      this.toggleSidebar();
+      this.sidebarManager.toggle();
     });
 
     // Show sidebar by default if configured
     if (this.settings.showSidebarByDefault) {
       this.app.workspace.onLayoutReady(() => {
-        this.activateSidebar();
+        this.sidebarManager.activate();
       });
     }
 
@@ -107,15 +98,16 @@ export default class LinkCommandPlugin extends Plugin {
       callback: async () => {
         await this.unfurlService.clearCache();
         showNotice("Link cache cleared");
-        this.sidebarView?.render();
+        this.sidebarManager.refresh();
       },
     });
 
     this.addCommand({
       id: "toggle-link-sidebar",
       name: "Toggle link sidebar",
+      hotkeys: [{ modifiers: ["Mod", "Shift"], key: "l" }],
       callback: () => {
-        this.toggleSidebar();
+        this.sidebarManager.toggle();
       },
     });
 
@@ -125,37 +117,6 @@ export default class LinkCommandPlugin extends Plugin {
 
   onunload() {
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_LINK_SIDEBAR);
-  }
-
-  /**
-   * Activate the sidebar view
-   */
-  async activateSidebar(): Promise<void> {
-    const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE_LINK_SIDEBAR);
-    if (existing.length > 0) {
-      this.app.workspace.revealLeaf(existing[0]);
-      return;
-    }
-
-    const rightLeaf = this.app.workspace.getRightLeaf(false);
-    if (rightLeaf) {
-      await rightLeaf.setViewState({
-        type: VIEW_TYPE_LINK_SIDEBAR,
-        active: true,
-      });
-    }
-  }
-
-  /**
-   * Toggle the sidebar view
-   */
-  async toggleSidebar(): Promise<void> {
-    const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE_LINK_SIDEBAR);
-    if (existing.length > 0) {
-      existing[0].detach();
-    } else {
-      await this.activateSidebar();
-    }
   }
 
   /**
@@ -201,7 +162,9 @@ export default class LinkCommandPlugin extends Plugin {
   async saveSettings() {
     await this.saveData({ settings: this.settings, cache: this.cacheData });
     this.unfurlService.updateSettings(this.settings);
-    this.sidebarView?.updateSettings(this.settings);
+    this.sidebarManager.forEach<LinkSidebarView>((view) => {
+      view.updateSettings(this.settings);
+    });
   }
 
   /**
@@ -322,7 +285,7 @@ export default class LinkCommandPlugin extends Plugin {
     }
 
     editor.replaceRange(replacement, from, to);
-    this.sidebarView?.render();
+    this.sidebarManager.refresh();
   }
 }
 

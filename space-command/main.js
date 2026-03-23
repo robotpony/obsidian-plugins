@@ -7,6 +7,7 @@ var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
@@ -20,6 +21,10 @@ var __copyProps = (to, from, except, desc) => {
   return to;
 };
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+var __publicField = (obj, key, value) => {
+  __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
+  return value;
+};
 
 // main.ts
 var main_exports = {};
@@ -27,14 +32,264 @@ __export(main_exports, {
   default: () => SpaceCommandPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian11 = require("obsidian");
+var import_obsidian12 = require("obsidian");
 
 // src/TodoScanner.ts
-var import_obsidian2 = require("obsidian");
+var import_obsidian4 = require("obsidian");
 
 // src/utils.ts
+var import_obsidian3 = require("obsidian");
+
+// ../shared/ui/Notice.ts
 var import_obsidian = require("obsidian");
+function showNotice(logoPrefix, logoClass, message, timeout) {
+  const fragment = document.createDocumentFragment();
+  const logo = document.createElement("span");
+  logo.className = logoClass;
+  logo.textContent = logoPrefix;
+  fragment.appendChild(logo);
+  fragment.appendChild(document.createTextNode(" " + message));
+  return new import_obsidian.Notice(fragment, timeout);
+}
+function createNoticeFactory(logoPrefix, logoClass) {
+  return (message, timeout) => showNotice(logoPrefix, logoClass, message, timeout);
+}
+
+// ../shared/plugin/SidebarManager.ts
+var SidebarManager = class {
+  constructor(app, viewType) {
+    this.app = app;
+    this.viewType = viewType;
+  }
+  /**
+   * Activate the sidebar view (create if needed, reveal if exists).
+   */
+  async activate() {
+    const { workspace } = this.app;
+    let leaf = null;
+    const leaves = workspace.getLeavesOfType(this.viewType);
+    if (leaves.length > 0) {
+      leaf = leaves[0];
+    } else {
+      const rightLeaf = workspace.getRightLeaf(false);
+      if (rightLeaf) {
+        leaf = rightLeaf;
+        await leaf.setViewState({
+          type: this.viewType,
+          active: true
+        });
+      }
+    }
+    if (leaf) {
+      workspace.revealLeaf(leaf);
+    }
+  }
+  /**
+   * Toggle the sidebar view (close if open, open if closed).
+   */
+  async toggle() {
+    const { workspace } = this.app;
+    const leaves = workspace.getLeavesOfType(this.viewType);
+    if (leaves.length > 0) {
+      leaves.forEach((leaf) => leaf.detach());
+    } else {
+      await this.activate();
+    }
+  }
+  /**
+   * Refresh all instances of the sidebar view.
+   * Calls render() on each view instance.
+   */
+  refresh() {
+    const { workspace } = this.app;
+    const leaves = workspace.getLeavesOfType(this.viewType);
+    for (const leaf of leaves) {
+      const view = leaf.view;
+      if (view && "render" in view && typeof view.render === "function") {
+        view.render();
+      }
+    }
+  }
+  /**
+   * Get the first leaf of this sidebar type, if any.
+   */
+  getLeaf() {
+    const leaves = this.app.workspace.getLeavesOfType(this.viewType);
+    return leaves.length > 0 ? leaves[0] : null;
+  }
+  /**
+   * Get the view instance from the first leaf, if any.
+   */
+  getView() {
+    const leaf = this.getLeaf();
+    return leaf ? leaf.view : null;
+  }
+  /**
+   * Execute a callback on each sidebar view instance.
+   */
+  forEach(callback) {
+    const leaves = this.app.workspace.getLeavesOfType(this.viewType);
+    for (const leaf of leaves) {
+      callback(leaf.view);
+    }
+  }
+};
+
+// ../shared/llm/LLMClient.ts
+var import_obsidian2 = require("obsidian");
+var LLMClient = class {
+  constructor(settings) {
+    __publicField(this, "settings");
+    this.settings = settings;
+  }
+  updateSettings(settings) {
+    this.settings = settings;
+  }
+  getProvider() {
+    return this.settings.provider;
+  }
+  getModel() {
+    switch (this.settings.provider) {
+      case "ollama":
+        return this.settings.ollamaModel;
+      case "openai":
+        return this.settings.openaiModel;
+      case "gemini":
+        return this.settings.geminiModel;
+      case "anthropic":
+        return this.settings.anthropicModel;
+    }
+  }
+  /**
+   * Send a request to the LLM and get a response.
+   */
+  async request(options) {
+    try {
+      const content = await this.callProvider(options);
+      return { success: true, content };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[LLM] Request failed (${this.settings.provider}):`, message);
+      return { success: false, error: message };
+    }
+  }
+  async callProvider(options) {
+    switch (this.settings.provider) {
+      case "ollama":
+        return this.callOllama(options);
+      case "openai":
+        return this.callOpenAI(options);
+      case "gemini":
+        return this.callGemini(options);
+      case "anthropic":
+        return this.callAnthropic(options);
+      default:
+        throw new Error(`Unknown provider: ${this.settings.provider}`);
+    }
+  }
+  async callOllama(options) {
+    var _a;
+    const fullPrompt = options.system ? `${options.system}
+
+${options.prompt}` : options.prompt;
+    const response = await (0, import_obsidian2.requestUrl)({
+      url: `${this.settings.ollamaEndpoint}/api/generate`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: this.settings.ollamaModel,
+        prompt: fullPrompt,
+        stream: false,
+        ...options.jsonResponse ? { format: "json" } : {}
+      }),
+      throw: false
+    });
+    if (response.status !== 200) {
+      throw new Error(`Ollama error: ${response.status} - ${response.text}`);
+    }
+    return ((_a = response.json.response) == null ? void 0 : _a.trim()) || "";
+  }
+  async callOpenAI(options) {
+    var _a;
+    if (!this.settings.openaiApiKey) {
+      throw new Error("OpenAI API key not configured");
+    }
+    const messages = [];
+    if (options.system) {
+      messages.push({ role: "system", content: options.system });
+    }
+    messages.push({ role: "user", content: options.prompt });
+    const response = await (0, import_obsidian2.requestUrl)({
+      url: "https://api.openai.com/v1/chat/completions",
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${this.settings.openaiApiKey}`
+      },
+      body: JSON.stringify({
+        model: this.settings.openaiModel,
+        messages,
+        ...options.jsonResponse ? { response_format: { type: "json_object" } } : {}
+      }),
+      throw: false
+    });
+    if (response.status !== 200) {
+      throw new Error(`OpenAI error: ${response.status} - ${response.text}`);
+    }
+    return ((_a = response.json.choices[0].message.content) == null ? void 0 : _a.trim()) || "";
+  }
+  async callGemini(options) {
+    var _a;
+    if (!this.settings.geminiApiKey) {
+      throw new Error("Gemini API key not configured");
+    }
+    const response = await (0, import_obsidian2.requestUrl)({
+      url: `https://generativelanguage.googleapis.com/v1beta/models/${this.settings.geminiModel}:generateContent?key=${this.settings.geminiApiKey}`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...options.system ? { systemInstruction: { parts: [{ text: options.system }] } } : {},
+        contents: [{ parts: [{ text: options.prompt }] }],
+        generationConfig: options.jsonResponse ? { responseMimeType: "application/json" } : {}
+      }),
+      throw: false
+    });
+    if (response.status !== 200) {
+      throw new Error(`Gemini error: ${response.status} - ${response.text}`);
+    }
+    return ((_a = response.json.candidates[0].content.parts[0].text) == null ? void 0 : _a.trim()) || "";
+  }
+  async callAnthropic(options) {
+    var _a;
+    if (!this.settings.anthropicApiKey) {
+      throw new Error("Anthropic API key not configured");
+    }
+    const response = await (0, import_obsidian2.requestUrl)({
+      url: "https://api.anthropic.com/v1/messages",
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": this.settings.anthropicApiKey,
+        "anthropic-version": "2023-06-01"
+      },
+      body: JSON.stringify({
+        model: this.settings.anthropicModel,
+        max_tokens: 4096,
+        ...options.system ? { system: options.system } : {},
+        messages: [{ role: "user", content: options.prompt }]
+      }),
+      throw: false
+    });
+    if (response.status !== 200) {
+      throw new Error(`Anthropic error: ${response.status} - ${response.text}`);
+    }
+    return ((_a = response.json.content[0].text) == null ? void 0 : _a.trim()) || "";
+  }
+};
+
+// src/utils.ts
 var LOGO_PREFIX = "\u2423\u2318";
+var showNotice2 = createNoticeFactory(LOGO_PREFIX, "space-command-logo");
 var PLUGIN_TAGS = /* @__PURE__ */ new Set([
   "#todo",
   "#todos",
@@ -72,17 +327,8 @@ function getTagColourInfo(tag, projectColourMap) {
   const colourIndex = (_a = projectColourMap == null ? void 0 : projectColourMap.get(normalizedTag)) != null ? _a : 4;
   return { type: "project", priority: colourIndex };
 }
-function showNotice(message, timeout) {
-  const fragment = document.createDocumentFragment();
-  const logo = document.createElement("span");
-  logo.className = "space-command-logo";
-  logo.textContent = LOGO_PREFIX;
-  fragment.appendChild(logo);
-  fragment.appendChild(document.createTextNode(" " + message));
-  return new import_obsidian.Notice(fragment, timeout);
-}
 function formatDate(date, format) {
-  return (0, import_obsidian.moment)(date).format(format);
+  return (0, import_obsidian3.moment)(date).format(format);
 }
 function getPriorityValue(tags) {
   if (hasTag(tags, "#today"))
@@ -265,7 +511,7 @@ function compareByStatusAndDate(a, b) {
 function openFileAtLine(app, file, line) {
   const leaf = app.workspace.getLeaf(false);
   leaf.openFile(file, { active: true }).then(() => {
-    const view = app.workspace.getActiveViewOfType(import_obsidian.MarkdownView);
+    const view = app.workspace.getActiveViewOfType(import_obsidian3.MarkdownView);
     if (view == null ? void 0 : view.editor) {
       const editor = view.editor;
       editor.setCursor({ line, ch: 0 });
@@ -276,7 +522,7 @@ function openFileAtLine(app, file, line) {
 }
 
 // src/TodoScanner.ts
-var TodoScanner = class extends import_obsidian2.Events {
+var TodoScanner = class extends import_obsidian4.Events {
   constructor(app) {
     super();
     this.todosCache = /* @__PURE__ */ new Map();
@@ -285,7 +531,7 @@ var TodoScanner = class extends import_obsidian2.Events {
     this.principlesCache = /* @__PURE__ */ new Map();
     this.excludeFiles = /* @__PURE__ */ new Set();
     this.app = app;
-    this.debouncedScanFile = (0, import_obsidian2.debounce)(
+    this.debouncedScanFile = (0, import_obsidian4.debounce)(
       (file) => this.scanFile(file),
       100,
       true
@@ -568,22 +814,22 @@ var TodoScanner = class extends import_obsidian2.Events {
   }
   watchFiles() {
     this.app.vault.on("modify", (file) => {
-      if (file instanceof import_obsidian2.TFile && file.extension === "md") {
+      if (file instanceof import_obsidian4.TFile && file.extension === "md") {
         this.debouncedScanFile(file);
       }
     });
     this.app.metadataCache.on("changed", (file) => {
-      if (file instanceof import_obsidian2.TFile && file.extension === "md") {
+      if (file instanceof import_obsidian4.TFile && file.extension === "md") {
         this.debouncedScanFile(file);
       }
     });
     this.app.vault.on("create", (file) => {
-      if (file instanceof import_obsidian2.TFile && file.extension === "md") {
+      if (file instanceof import_obsidian4.TFile && file.extension === "md") {
         this.debouncedScanFile(file);
       }
     });
     this.app.vault.on("delete", (file) => {
-      if (file instanceof import_obsidian2.TFile) {
+      if (file instanceof import_obsidian4.TFile) {
         this.todosCache.delete(file.path);
         this.todonesCache.delete(file.path);
         this.ideasCache.delete(file.path);
@@ -592,7 +838,7 @@ var TodoScanner = class extends import_obsidian2.Events {
       }
     });
     this.app.vault.on("rename", (file, oldPath) => {
-      if (file instanceof import_obsidian2.TFile && file.extension === "md") {
+      if (file instanceof import_obsidian4.TFile && file.extension === "md") {
         this.todosCache.delete(oldPath);
         this.todonesCache.delete(oldPath);
         this.ideasCache.delete(oldPath);
@@ -648,7 +894,7 @@ var TodoScanner = class extends import_obsidian2.Events {
 };
 
 // src/TodoProcessor.ts
-var import_obsidian3 = require("obsidian");
+var import_obsidian5 = require("obsidian");
 var TodoProcessor = class {
   constructor(app, dateFormat = "YYYY-MM-DD") {
     this.app = app;
@@ -677,11 +923,11 @@ var TodoProcessor = class {
       }
       const childCount = ((_a = todo.childLineNumbers) == null ? void 0 : _a.length) || 0;
       const message = childCount > 0 ? `TODO marked as complete! (including ${childCount} child item${childCount > 1 ? "s" : ""})` : "TODO marked as complete!";
-      showNotice(message);
+      showNotice2(message);
       return true;
     } catch (error) {
       console.error("Error completing TODO:", error);
-      showNotice("Failed to complete TODO. See console for details.");
+      showNotice2("Failed to complete TODO. See console for details.");
       return false;
     }
   }
@@ -716,11 +962,11 @@ var TodoProcessor = class {
       if (this.onComplete) {
         this.onComplete();
       }
-      showNotice("TODO marked as incomplete!");
+      showNotice2("TODO marked as incomplete!");
       return true;
     } catch (error) {
       console.error("Error uncompleting TODO:", error);
-      showNotice("Failed to uncomplete TODO. See console for details.");
+      showNotice2("Failed to uncomplete TODO. See console for details.");
       return false;
     }
   }
@@ -786,7 +1032,7 @@ var TodoProcessor = class {
       }
       todoneFile = await this.app.vault.create(todoneFilePath, "");
     }
-    if (!(todoneFile instanceof import_obsidian3.TFile)) {
+    if (!(todoneFile instanceof import_obsidian5.TFile)) {
       throw new Error(`${todoneFilePath} is not a file`);
     }
     let todoneText = todo.text;
@@ -846,11 +1092,11 @@ ${todoneText}` : todoneText;
       if (this.onComplete) {
         this.onComplete();
       }
-      showNotice(`Priority set to ${newTag}${addFocus ? " + #focus" : ""}`);
+      showNotice2(`Priority set to ${newTag}${addFocus ? " + #focus" : ""}`);
       return true;
     } catch (error) {
       console.error("Error setting priority:", error);
-      showNotice("Failed to set priority. See console for details.");
+      showNotice2("Failed to set priority. See console for details.");
       return false;
     }
   }
@@ -875,11 +1121,11 @@ ${todoneText}` : todoneText;
       if (this.onComplete) {
         this.onComplete();
       }
-      showNotice(`Removed ${tag}`);
+      showNotice2(`Removed ${tag}`);
       return true;
     } catch (error) {
       console.error("Error removing tag:", error);
-      showNotice("Failed to remove tag. See console for details.");
+      showNotice2("Failed to remove tag. See console for details.");
       return false;
     }
   }
@@ -905,11 +1151,11 @@ ${todoneText}` : todoneText;
       if (this.onComplete) {
         this.onComplete();
       }
-      showNotice(`Added ${tag}`);
+      showNotice2(`Added ${tag}`);
       return true;
     } catch (error) {
       console.error("Error adding tag:", error);
-      showNotice("Failed to add tag. See console for details.");
+      showNotice2("Failed to add tag. See console for details.");
       return false;
     }
   }
@@ -938,11 +1184,11 @@ ${todoneText}` : todoneText;
       if (this.onComplete) {
         this.onComplete();
       }
-      showNotice("Idea completed!");
+      showNotice2("Idea completed!");
       return true;
     } catch (error) {
       console.error("Error completing idea:", error);
-      showNotice("Failed to complete idea. See console for details.");
+      showNotice2("Failed to complete idea. See console for details.");
       return false;
     }
   }
@@ -970,11 +1216,11 @@ ${todoneText}` : todoneText;
       if (this.onComplete) {
         this.onComplete();
       }
-      showNotice("Idea promoted to TODO!");
+      showNotice2("Idea promoted to TODO!");
       return true;
     } catch (error) {
       console.error("Error converting idea to TODO:", error);
-      showNotice("Failed to convert idea. See console for details.");
+      showNotice2("Failed to convert idea. See console for details.");
       return false;
     }
   }
@@ -999,11 +1245,11 @@ ${todoneText}` : todoneText;
       if (this.onComplete) {
         this.onComplete();
       }
-      showNotice("Idea focused!");
+      showNotice2("Idea focused!");
       return true;
     } catch (error) {
       console.error("Error focusing idea:", error);
-      showNotice("Failed to focus idea. See console for details.");
+      showNotice2("Failed to focus idea. See console for details.");
       return false;
     }
   }
@@ -1026,7 +1272,7 @@ ${todoneText}` : todoneText;
         failed++;
     }
     if (success > 0) {
-      showNotice(`Focused ${success} TODO${success > 1 ? "s" : ""}`);
+      showNotice2(`Focused ${success} TODO${success > 1 ? "s" : ""}`);
     }
     return { success, failed };
   }
@@ -1046,7 +1292,7 @@ ${todoneText}` : todoneText;
         failed++;
     }
     if (success > 0) {
-      showNotice(`Unfocused ${success} TODO${success > 1 ? "s" : ""}`);
+      showNotice2(`Unfocused ${success} TODO${success > 1 ? "s" : ""}`);
     }
     return { success, failed };
   }
@@ -1068,7 +1314,7 @@ ${todoneText}` : todoneText;
         failed++;
     }
     if (success > 0) {
-      showNotice(`Set ${success} TODO${success > 1 ? "s" : ""} to later`);
+      showNotice2(`Set ${success} TODO${success > 1 ? "s" : ""} to later`);
     }
     return { success, failed };
   }
@@ -1089,7 +1335,7 @@ ${todoneText}` : todoneText;
         failed++;
     }
     if (success > 0) {
-      showNotice(`Unlatered ${success} TODO${success > 1 ? "s" : ""}`);
+      showNotice2(`Unlatered ${success} TODO${success > 1 ? "s" : ""}`);
     }
     return { success, failed };
   }
@@ -1109,7 +1355,7 @@ ${todoneText}` : todoneText;
         failed++;
     }
     if (success > 0) {
-      showNotice(`Snoozed ${success} TODO${success > 1 ? "s" : ""}`);
+      showNotice2(`Snoozed ${success} TODO${success > 1 ? "s" : ""}`);
     }
     return { success, failed };
   }
@@ -1129,7 +1375,7 @@ ${todoneText}` : todoneText;
         failed++;
     }
     if (success > 0) {
-      showNotice(`Unsnoozed ${success} TODO${success > 1 ? "s" : ""}`);
+      showNotice2(`Unsnoozed ${success} TODO${success > 1 ? "s" : ""}`);
     }
     return { success, failed };
   }
@@ -1238,7 +1484,7 @@ ${todoneText}` : todoneText;
         (child, idx) => child.lineNumber !== childLines[idx].lineNumber
       );
       if (!orderChanged) {
-        showNotice("Items already sorted");
+        showNotice2("Items already sorted");
         return true;
       }
       const sortedLineContents = sortedChildren.map((c) => c.text);
@@ -1253,11 +1499,11 @@ ${todoneText}` : todoneText;
       if (this.onComplete) {
         this.onComplete();
       }
-      showNotice("Sorted items");
+      showNotice2("Sorted items");
       return true;
     } catch (error) {
       console.error("Error sorting header children:", error);
-      showNotice("Failed to sort items");
+      showNotice2("Failed to sort items");
       return false;
     }
   }
@@ -1279,7 +1525,7 @@ ${todoneText}` : todoneText;
 };
 
 // src/ProjectManager.ts
-var import_obsidian4 = require("obsidian");
+var import_obsidian6 = require("obsidian");
 var ProjectManager = class {
   constructor(app, scanner, projectsFolder, priorityTags, excludeFolders = []) {
     this.app = app;
@@ -1388,7 +1634,7 @@ var ProjectManager = class {
     var _a, _b;
     const filepath = this.getProjectFilePath(tag);
     const file = this.app.vault.getAbstractFileByPath(filepath);
-    if (!(file instanceof import_obsidian4.TFile)) {
+    if (!(file instanceof import_obsidian6.TFile)) {
       return null;
     }
     const content = await this.app.vault.read(file);
@@ -1511,7 +1757,7 @@ var ProjectManager = class {
     const filename = tag.replace(/^#/, "") + ".md";
     const filepath = this.projectsFolder + filename;
     const file = this.app.vault.getAbstractFileByPath(filepath);
-    if (file instanceof import_obsidian4.TFile) {
+    if (file instanceof import_obsidian6.TFile) {
       const leaf = this.app.workspace.getLeaf(false);
       await leaf.openFile(file);
     } else {
@@ -1523,7 +1769,7 @@ var ProjectManager = class {
   }
   confirmCreateProjectFile(tag, filepath) {
     return new Promise((resolve) => {
-      const modal = new import_obsidian4.Modal(this.app);
+      const modal = new import_obsidian6.Modal(this.app);
       modal.titleEl.setText("Create Project File?");
       modal.contentEl.createEl("p", {
         text: `Create project file for ${tag} in ${this.projectsFolder}?`
@@ -1626,7 +1872,7 @@ var FilterParser = class {
 };
 
 // src/ContextMenuHandler.ts
-var import_obsidian5 = require("obsidian");
+var import_obsidian7 = require("obsidian");
 var ContextMenuHandler = class {
   constructor(app, processor, priorityTags) {
     this.app = app;
@@ -1637,7 +1883,7 @@ var ContextMenuHandler = class {
    * Show context menu for an active TODO item
    */
   showTodoMenu(evt, todo, onRefresh) {
-    const menu = new import_obsidian5.Menu();
+    const menu = new import_obsidian7.Menu();
     const currentPriority = this.getCurrentPriority(todo);
     const hasFocus = todo.tags.includes("#focus");
     const hasFuture = todo.tags.includes("#future");
@@ -1738,7 +1984,7 @@ var ContextMenuHandler = class {
    * Operations apply to all TODOs matching the project tag
    */
   showProjectMenu(evt, project, scanner, onRefresh, onFilterByTag) {
-    const menu = new import_obsidian5.Menu();
+    const menu = new import_obsidian7.Menu();
     const getTodosForProject = () => {
       return scanner.getTodos().filter((todo) => todo.tags.includes(project.tag));
     };
@@ -1801,7 +2047,7 @@ var ContextMenuHandler = class {
    * Show context menu for an idea item
    */
   showIdeaMenu(evt, idea, onRefresh) {
-    const menu = new import_obsidian5.Menu();
+    const menu = new import_obsidian7.Menu();
     const hasFocus = idea.tags.includes("#focus");
     menu.addItem((item) => {
       item.setTitle("Add to TODOs").setIcon("check-square").onClick(async () => {
@@ -1833,7 +2079,7 @@ var ContextMenuHandler = class {
    * Show context menu for a principle item
    */
   showPrincipleMenu(evt, principle) {
-    const menu = new import_obsidian5.Menu();
+    const menu = new import_obsidian7.Menu();
     menu.addItem((item) => {
       item.setTitle("Copy").setIcon("copy").onClick(async () => {
         await navigator.clipboard.writeText(principle.text);
@@ -2665,7 +2911,7 @@ var CodeBlockProcessor = class {
 };
 
 // src/SlashCommandSuggest.ts
-var import_obsidian6 = require("obsidian");
+var import_obsidian8 = require("obsidian");
 var CALLOUT_TYPES = [
   { id: "info", name: "Info", icon: "\u2139\uFE0F" },
   { id: "tip", name: "Tip", icon: "\u{1F4A1}" },
@@ -2680,7 +2926,7 @@ var CALLOUT_TYPES = [
   { id: "question", name: "Question", icon: "\u2753" },
   { id: "failure", name: "Failure", icon: "\u274C" }
 ];
-var SlashCommandSuggest = class extends import_obsidian6.EditorSuggest {
+var SlashCommandSuggest = class extends import_obsidian8.EditorSuggest {
   constructor(app, settings) {
     super(app);
     this.inCalloutMenu = false;
@@ -2841,8 +3087,8 @@ var SlashCommandSuggest = class extends import_obsidian6.EditorSuggest {
 };
 
 // src/DateSuggest.ts
-var import_obsidian7 = require("obsidian");
-var DateSuggest = class extends import_obsidian7.EditorSuggest {
+var import_obsidian9 = require("obsidian");
+var DateSuggest = class extends import_obsidian9.EditorSuggest {
   constructor(app, settings) {
     super(app);
     this.settings = settings;
@@ -2947,9 +3193,9 @@ var DateSuggest = class extends import_obsidian7.EditorSuggest {
 };
 
 // src/SidebarView.ts
-var import_obsidian8 = require("obsidian");
+var import_obsidian10 = require("obsidian");
 var VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
-var TodoSidebarView = class extends import_obsidian8.ItemView {
+var TodoSidebarView = class extends import_obsidian10.ItemView {
   constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, recentTodonesLimit, activeTodosLimit, focusListLimit, focusModeIncludeProjects, makeLinksClickable, triageSnoozedThreshold, triageActiveThreshold, onShowAbout, onShowStats, onShowTriage) {
     super(leaf);
     this.updateListener = null;
@@ -3241,11 +3487,11 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
   // Get project colour map for tag colouring
   getProjectColourMap() {
     const projects = this.projectManager.getProjects();
-    const map = /* @__PURE__ */ new Map();
+    const map2 = /* @__PURE__ */ new Map();
     for (const project of projects) {
-      map.set(project.tag.toLowerCase(), project.colourIndex);
+      map2.set(project.tag.toLowerCase(), project.colourIndex);
     }
-    return map;
+    return map2;
   }
   // Render collapsed tag indicator with dropdown
   // If item is provided, "Clear tag" option will be available to remove tags from the item
@@ -3454,7 +3700,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     });
     menuBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>';
     menuBtn.addEventListener("click", (evt) => {
-      const menu = new import_obsidian8.Menu();
+      const menu = new import_obsidian10.Menu();
       menu.addItem((item) => {
         item.setTitle("Refresh").setIcon("refresh-cw").onClick(async () => {
           menuBtn.addClass("rotating");
@@ -3469,25 +3715,25 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
         submenu.addItem((subItem) => {
           subItem.setTitle("IDEA code block").setIcon("code").onClick(() => {
             navigator.clipboard.writeText("```focus-ideas\n```");
-            showNotice("Copied IDEA code block syntax");
+            showNotice2("Copied IDEA code block syntax");
           });
         });
         submenu.addItem((subItem) => {
           subItem.setTitle("IDEA inline").setIcon("brackets").onClick(() => {
             navigator.clipboard.writeText("{{focus-ideas}}");
-            showNotice("Copied IDEA inline syntax");
+            showNotice2("Copied IDEA inline syntax");
           });
         });
         submenu.addItem((subItem) => {
           subItem.setTitle("TODO code block").setIcon("code").onClick(() => {
             navigator.clipboard.writeText("```focus-todos\n```");
-            showNotice("Copied TODO code block syntax");
+            showNotice2("Copied TODO code block syntax");
           });
         });
         submenu.addItem((subItem) => {
           subItem.setTitle("TODO inline").setIcon("brackets").onClick(() => {
             navigator.clipboard.writeText("{{focus-todos}}");
-            showNotice("Copied TODO inline syntax");
+            showNotice2("Copied TODO inline syntax");
           });
         });
       });
@@ -3545,7 +3791,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     focusModeBtn.innerHTML = this.focusModeEnabled ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
     focusModeBtn.addEventListener("click", () => {
       this.focusModeEnabled = !this.focusModeEnabled;
-      showNotice(this.focusModeEnabled ? "Focus mode enabled" : "Focus mode disabled");
+      showNotice2(this.focusModeEnabled ? "Focus mode enabled" : "Focus mode disabled");
       this.render();
     });
     this.renderFilterIndicator(header);
@@ -3653,7 +3899,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     focusModeBtn.innerHTML = this.focusModeEnabled ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
     focusModeBtn.addEventListener("click", () => {
       this.focusModeEnabled = !this.focusModeEnabled;
-      showNotice(this.focusModeEnabled ? "Focus mode enabled" : "Focus mode disabled");
+      showNotice2(this.focusModeEnabled ? "Focus mode enabled" : "Focus mode disabled");
       this.render();
     });
     this.renderFilterIndicator(header);
@@ -3761,9 +4007,9 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       title.appendText(project.tag);
       if (info.description) {
         const desc = popup.createEl("div", { cls: "project-info-description" });
-        const component = new import_obsidian8.Component();
+        const component = new import_obsidian10.Component();
         component.load();
-        await import_obsidian8.MarkdownRenderer.render(this.app, info.description, desc, info.filepath, component);
+        await import_obsidian10.MarkdownRenderer.render(this.app, info.description, desc, info.filepath, component);
       } else {
         const desc = popup.createEl("div", { cls: "project-info-description project-info-empty" });
         desc.appendText("No description available.");
@@ -3780,9 +4026,9 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
           const li = principlesList.createEl("li", { cls: "project-info-principle-item" });
           let displayText = principle.text.replace(/#principles?\b/gi, "").replace(new RegExp(project.tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "gi"), "").replace(/\s+/g, " ").trim();
           displayText = displayText.replace(/^[-*+]\s*/, "");
-          const principleComponent = new import_obsidian8.Component();
+          const principleComponent = new import_obsidian10.Component();
           principleComponent.load();
-          await import_obsidian8.MarkdownRenderer.render(this.app, displayText, li, (info == null ? void 0 : info.filepath) || "", principleComponent);
+          await import_obsidian10.MarkdownRenderer.render(this.app, displayText, li, (info == null ? void 0 : info.filepath) || "", principleComponent);
         }
       }
       if (info.principles.length > 0) {
@@ -3807,7 +4053,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
         this.closeInfoPopup();
         const filepath = this.projectManager.getProjectFilePath(project.tag);
         const file = this.app.vault.getAbstractFileByPath(filepath);
-        if (file instanceof import_obsidian8.TFile) {
+        if (file instanceof import_obsidian10.TFile) {
           const leaf = this.app.workspace.getLeaf("tab");
           await leaf.openFile(file);
         }
@@ -3973,7 +4219,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     fileLink.addEventListener("click", async (e) => {
       e.preventDefault();
       const file = this.app.vault.getAbstractFileByPath(this.defaultTodoneFile);
-      if (file instanceof import_obsidian8.TFile) {
+      if (file instanceof import_obsidian10.TFile) {
         await this.app.workspace.getLeaf(false).openFile(file);
       }
     });
@@ -4037,7 +4283,14 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     let principles = this.scanner.getPrinciples();
     principles = principles.filter((p) => p.parentLineNumber === void 0);
     if (this.focusModeEnabled) {
-      principles = principles.filter((p) => hasTag(p.tags, "#focus"));
+      if (this.focusModeIncludeProjects) {
+        const focusedProjects = this.projectManager.getProjects().filter((p) => p.hasFocusItems).map((p) => p.tag);
+        principles = principles.filter(
+          (p) => hasTag(p.tags, "#focus") || p.tags.some((tag) => focusedProjects.includes(tag))
+        );
+      } else {
+        principles = principles.filter((p) => hasTag(p.tags, "#focus"));
+      }
     }
     if (this.activeTagFilter) {
       principles = principles.filter((p) => p.tags.includes(this.activeTagFilter));
@@ -4050,7 +4303,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     titleSpan.textContent = "Principles";
     this.renderFilterIndicator(header);
     if (principles.length === 0) {
-      const emptyText = this.focusModeEnabled ? "No focused principles" : this.activeTagFilter ? `No principles matching ${this.activeTagFilter}` : "No principles yet";
+      const emptyText = this.focusModeEnabled ? this.focusModeIncludeProjects ? "No principles in focused projects" : "No focused principles" : this.activeTagFilter ? `No principles matching ${this.activeTagFilter}` : "No principles yet";
       section.createEl("div", {
         text: emptyText,
         cls: "todo-empty"
@@ -4073,7 +4326,14 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     const allIdeasForChildLookup = ideas;
     ideas = ideas.filter((idea) => idea.parentLineNumber === void 0);
     if (this.focusModeEnabled) {
-      ideas = ideas.filter((idea) => hasTag(idea.tags, "#focus"));
+      if (this.focusModeIncludeProjects) {
+        const focusedProjects = this.projectManager.getProjects().filter((p) => p.hasFocusItems).map((p) => p.tag);
+        ideas = ideas.filter(
+          (idea) => hasTag(idea.tags, "#focus") || idea.tags.some((tag) => focusedProjects.includes(tag))
+        );
+      } else {
+        ideas = ideas.filter((idea) => hasTag(idea.tags, "#focus"));
+      }
     }
     if (this.activeTagFilter) {
       ideas = ideas.filter((idea) => idea.tags.includes(this.activeTagFilter));
@@ -4085,7 +4345,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
     titleSpan.textContent = "Ideas";
     this.renderFilterIndicator(header);
     if (ideas.length === 0) {
-      const emptyText = this.focusModeEnabled ? "No focused ideas" : this.activeTagFilter ? `No ideas matching ${this.activeTagFilter}` : "No ideas yet";
+      const emptyText = this.focusModeEnabled ? this.focusModeIncludeProjects ? "No ideas in focused projects" : "No focused ideas" : this.activeTagFilter ? `No ideas matching ${this.activeTagFilter}` : "No ideas yet";
       section.createEl("div", {
         text: emptyText,
         cls: "todo-empty"
@@ -4102,7 +4362,7 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
   }
   async confirmCompleteProject(project) {
     return new Promise((resolve) => {
-      const modal = new import_obsidian8.Modal(this.app);
+      const modal = new import_obsidian10.Modal(this.app);
       modal.titleEl.setText("Complete All Project TODOs?");
       modal.contentEl.createEl("p", {
         text: `This will mark all ${project.count} TODO(s) for project ${project.tag} as complete. This action cannot be undone.`
@@ -4148,9 +4408,9 @@ var TodoSidebarView = class extends import_obsidian8.ItemView {
       }
     }
     if (failed > 0) {
-      showNotice(`Completed ${completed} TODO(s), ${failed} failed. See console for details.`);
+      showNotice2(`Completed ${completed} TODO(s), ${failed} failed. See console for details.`);
     } else {
-      showNotice(`Completed all ${completed} TODO(s) for ${project.tag}!`);
+      showNotice2(`Completed all ${completed} TODO(s) for ${project.tag}!`);
     }
   }
 };
@@ -4175,8 +4435,20 @@ var DEFAULT_SETTINGS = {
   makeLinksClickable: true,
   // LLM/Define settings
   llmEnabled: true,
+  llmProvider: "ollama",
+  // Ollama settings
   llmUrl: "http://localhost:11434",
   llmModel: "llama3.2",
+  // OpenAI settings
+  llmOpenaiApiKey: "",
+  llmOpenaiModel: "gpt-4o-mini",
+  // Gemini settings
+  llmGeminiApiKey: "",
+  llmGeminiModel: "gemini-1.5-flash",
+  // Anthropic settings
+  llmAnthropicApiKey: "",
+  llmAnthropicModel: "claude-3-haiku-20240307",
+  // Prompts
   llmPrompt: "Explain what this means in plain language, providing context if it's a technical term:",
   llmRewritePrompt: "Rewrite the following text to improve clarity, accuracy, and brevity. Keep the same tone and intent. Avoid clich\xE9s and filler words. Output only the rewritten text, nothing else:",
   llmReviewPrompt: "Review the following text and provide specific suggestions for improvement. Focus on clarity, accuracy, structure, and style. Be concise and actionable:",
@@ -4243,165 +4515,72 @@ function convertInlineFormatting(text) {
 }
 
 // src/LLMClient.ts
-var import_obsidian9 = require("obsidian");
-var LLMClient = class {
-  constructor(config) {
-    this.config = config;
+function toProviderSettings(settings) {
+  return {
+    provider: settings.llmProvider,
+    ollamaEndpoint: settings.llmUrl,
+    ollamaModel: settings.llmModel,
+    openaiApiKey: settings.llmOpenaiApiKey,
+    openaiModel: settings.llmOpenaiModel,
+    geminiApiKey: settings.llmGeminiApiKey,
+    geminiModel: settings.llmGeminiModel,
+    anthropicApiKey: settings.llmAnthropicApiKey,
+    anthropicModel: settings.llmAnthropicModel,
+    timeout: settings.llmTimeout
+  };
+}
+var LLMClient2 = class {
+  constructor(settings) {
+    this.settings = settings;
+    this.client = new LLMClient(toProviderSettings(settings));
   }
-  updateConfig(config) {
-    this.config = { ...this.config, ...config };
+  updateSettings(settings) {
+    this.settings = settings;
+    this.client.updateSettings(toProviderSettings(settings));
   }
   async define(text) {
-    var _a;
-    const fullPrompt = `${this.config.prompt}
+    const response = await this.client.request({
+      prompt: `${this.settings.llmPrompt}
 
-"${text}"`;
-    try {
-      const response = await (0, import_obsidian9.requestUrl)({
-        url: `${this.config.url}/api/generate`,
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: this.config.model,
-          prompt: fullPrompt,
-          stream: false
-        }),
-        throw: false
-      });
-      if (response.status !== 200) {
-        console.error(`[Space Command] Define request failed`, {
-          status: response.status,
-          model: this.config.model,
-          url: this.config.url,
-          response: response.text
-        });
-        return {
-          success: false,
-          error: "request_failed"
-        };
-      }
-      const data = response.json;
-      return {
-        success: true,
-        definition: ((_a = data.response) == null ? void 0 : _a.trim()) || "No response received"
-      };
-    } catch (error) {
-      console.error(`[Space Command] Define request error`, {
-        model: this.config.model,
-        url: this.config.url,
-        error: error instanceof Error ? error.message : error
-      });
-      return {
-        success: false,
-        error: "connection_failed"
-      };
+"${text}"`
+    });
+    if (response.success) {
+      return { success: true, definition: response.content };
     }
+    return { success: false, error: response.error };
   }
   async rewrite(text) {
-    var _a;
-    const fullPrompt = `${this.config.rewritePrompt}
+    const response = await this.client.request({
+      prompt: `${this.settings.llmRewritePrompt}
 
-${text}`;
-    try {
-      const response = await (0, import_obsidian9.requestUrl)({
-        url: `${this.config.url}/api/generate`,
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: this.config.model,
-          prompt: fullPrompt,
-          stream: false
-        }),
-        throw: false
-      });
-      if (response.status !== 200) {
-        console.error(`[Space Command] Rewrite request failed`, {
-          status: response.status,
-          model: this.config.model,
-          url: this.config.url,
-          response: response.text
-        });
-        return {
-          success: false,
-          error: "request_failed"
-        };
-      }
-      const data = response.json;
-      return {
-        success: true,
-        result: ((_a = data.response) == null ? void 0 : _a.trim()) || "No response received"
-      };
-    } catch (error) {
-      console.error(`[Space Command] Rewrite request error`, {
-        model: this.config.model,
-        url: this.config.url,
-        error: error instanceof Error ? error.message : error
-      });
-      return {
-        success: false,
-        error: "connection_failed"
-      };
+${text}`
+    });
+    if (response.success) {
+      return { success: true, result: response.content };
     }
+    return { success: false, error: response.error };
   }
   async review(text) {
-    var _a;
-    const fullPrompt = `${this.config.reviewPrompt}
+    const response = await this.client.request({
+      prompt: `${this.settings.llmReviewPrompt}
 
-${text}`;
-    try {
-      const response = await (0, import_obsidian9.requestUrl)({
-        url: `${this.config.url}/api/generate`,
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: this.config.model,
-          prompt: fullPrompt,
-          stream: false
-        }),
-        throw: false
-      });
-      if (response.status !== 200) {
-        console.error(`[Space Command] Review request failed`, {
-          status: response.status,
-          model: this.config.model,
-          url: this.config.url,
-          response: response.text
-        });
-        return {
-          success: false,
-          error: "request_failed"
-        };
-      }
-      const data = response.json;
-      return {
-        success: true,
-        result: ((_a = data.response) == null ? void 0 : _a.trim()) || "No response received"
-      };
-    } catch (error) {
-      console.error(`[Space Command] Review request error`, {
-        model: this.config.model,
-        url: this.config.url,
-        error: error instanceof Error ? error.message : error
-      });
-      return {
-        success: false,
-        error: "connection_failed"
-      };
+${text}`
+    });
+    if (response.success) {
+      return { success: true, result: response.content };
     }
+    return { success: false, error: response.error };
   }
   getModel() {
-    return this.config.model;
+    return this.client.getModel();
+  }
+  getProvider() {
+    return this.client.getProvider();
   }
 };
 
 // src/DefineTooltip.ts
-var import_obsidian10 = require("obsidian");
+var import_obsidian11 = require("obsidian");
 var DefineTooltip = class {
   constructor(app) {
     this.tooltip = null;
@@ -4473,7 +4652,7 @@ var DefineTooltip = class {
     });
     copyBtn.addEventListener("click", async () => {
       await navigator.clipboard.writeText(this.currentContent);
-      showNotice("Copied to clipboard");
+      showNotice2("Copied to clipboard");
     });
     if (this.options.onApply) {
       const applyBtn = actionsEl.createEl("button", {
@@ -4544,14 +4723,14 @@ var DefineTooltip = class {
     if (this.component) {
       this.component.unload();
     }
-    this.component = new import_obsidian10.Component();
+    this.component = new import_obsidian11.Component();
     this.component.load();
     let processedContent = content;
     if (this.searchTerm && this.searchTerm.trim() !== "") {
       const regex = new RegExp(`(${this.escapeRegex(this.searchTerm)})`, "gi");
       processedContent = content.replace(regex, "==$1==");
     }
-    await import_obsidian10.MarkdownRenderer.render(
+    await import_obsidian11.MarkdownRenderer.render(
       this.app,
       processedContent,
       container,
@@ -5053,9 +5232,10 @@ function createHeaderChecklistExtension() {
 }
 
 // main.ts
-var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
+var SpaceCommandPlugin = class extends import_obsidian12.Plugin {
   async onload() {
     await this.loadSettings();
+    this.sidebarManager = new SidebarManager(this.app, VIEW_TYPE_TODO_SIDEBAR);
     this.scanner = new TodoScanner(this.app);
     this.processor = new TodoProcessor(this.app, this.settings.dateFormat);
     this.processor.setScanner(this.scanner);
@@ -5076,14 +5256,7 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
       this.settings.priorityTags,
       this.settings.makeLinksClickable
     );
-    this.llmClient = new LLMClient({
-      url: this.settings.llmUrl,
-      model: this.settings.llmModel,
-      prompt: this.settings.llmPrompt,
-      rewritePrompt: this.settings.llmRewritePrompt,
-      reviewPrompt: this.settings.llmReviewPrompt,
-      timeout: this.settings.llmTimeout
-    });
+    this.llmClient = new LLMClient2(this.settings);
     this.defineTooltip = new DefineTooltip(this.app);
     this.tabLockManager = new TabLockManager(this.app);
     if (this.settings.showTabLockButton) {
@@ -5157,7 +5330,7 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
     );
     if (this.settings.showSidebarByDefault) {
       this.app.workspace.onLayoutReady(() => {
-        this.activateSidebar();
+        this.sidebarManager.activate();
       });
     }
     this.registerMarkdownPostProcessor((el, ctx) => {
@@ -5184,7 +5357,7 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
       id: "toggle-todo-sidebar",
       name: "Toggle TODO Sidebar",
       callback: () => {
-        this.toggleSidebar();
+        this.sidebarManager.toggle();
       },
       hotkeys: [
         {
@@ -5219,7 +5392,7 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
       name: "Refresh TODOs",
       callback: async () => {
         await this.scanner.scanVault();
-        this.refreshSidebar();
+        this.sidebarManager.refresh();
       }
     });
     this.addCommand({
@@ -5228,12 +5401,12 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
       editorCallback: async (editor) => {
         const selection = editor.getSelection();
         if (!selection) {
-          showNotice("No text selected");
+          showNotice2("No text selected");
           return;
         }
         const slackMd = convertToSlackMarkdown(selection);
         await navigator.clipboard.writeText(slackMd);
-        showNotice("Copied as Slack markdown");
+        showNotice2("Copied as Slack markdown");
       },
       hotkeys: [
         {
@@ -5250,7 +5423,7 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
             item.setTitle("Copy as Slack").setIcon("clipboard-copy").onClick(async () => {
               const slackMd = convertToSlackMarkdown(selection);
               await navigator.clipboard.writeText(slackMd);
-              showNotice("Copied as Slack markdown");
+              showNotice2("Copied as Slack markdown");
             });
           });
           if (this.settings.llmEnabled) {
@@ -5300,7 +5473,7 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
                   commandType: "rewrite",
                   onApply: (content) => {
                     editor.replaceRange(content, from, to);
-                    showNotice("Text replaced");
+                    showNotice2("Text replaced");
                   }
                 });
                 const result = await this.llmClient.rewrite(selection);
@@ -5308,7 +5481,7 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
                   this.defineTooltip.updateContent(result.result, {
                     onApply: (content) => {
                       editor.replaceRange(content, from, to);
-                      showNotice("Text replaced");
+                      showNotice2("Text replaced");
                     }
                   });
                 } else {
@@ -5324,7 +5497,7 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
       })
     );
     this.addRibbonIcon("square-check-big", "Toggle TODO Sidebar", () => {
-      this.toggleSidebar();
+      this.sidebarManager.toggle();
     });
     this.addSettingTab(new SpaceCommandSettingTab(this.app, this));
   }
@@ -5339,44 +5512,9 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
   async saveSettings() {
     await this.saveData(this.settings);
   }
-  async activateSidebar() {
-    const { workspace } = this.app;
-    let leaf = null;
-    const leaves = workspace.getLeavesOfType(VIEW_TYPE_TODO_SIDEBAR);
-    if (leaves.length > 0) {
-      leaf = leaves[0];
-    } else {
-      const rightLeaf = workspace.getRightLeaf(false);
-      if (rightLeaf) {
-        leaf = rightLeaf;
-        await leaf.setViewState({
-          type: VIEW_TYPE_TODO_SIDEBAR,
-          active: true
-        });
-      }
-    }
-    if (leaf) {
-      workspace.revealLeaf(leaf);
-    }
-  }
-  async toggleSidebar() {
-    const { workspace } = this.app;
-    const leaves = workspace.getLeavesOfType(VIEW_TYPE_TODO_SIDEBAR);
-    if (leaves.length > 0) {
-      leaves.forEach((leaf) => leaf.detach());
-    } else {
-      await this.activateSidebar();
-    }
-  }
+  /** Refresh all sidebar views (delegates to SidebarManager). */
   refreshSidebar() {
-    const { workspace } = this.app;
-    const leaves = workspace.getLeavesOfType(VIEW_TYPE_TODO_SIDEBAR);
-    for (const leaf of leaves) {
-      const view = leaf.view;
-      if (view instanceof TodoSidebarView) {
-        view.render();
-      }
-    }
+    this.sidebarManager.refresh();
   }
   showAboutModal() {
     new AboutModal(this.app, this.manifest.version).open();
@@ -5392,7 +5530,7 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
     this.app.setting.openTabById("space-command");
   }
 };
-var AboutModal = class extends import_obsidian11.Modal {
+var AboutModal = class extends import_obsidian12.Modal {
   constructor(app, version) {
     super(app);
     this.version = version;
@@ -5423,7 +5561,7 @@ var AboutModal = class extends import_obsidian11.Modal {
     this.contentEl.empty();
   }
 };
-var StatsModal = class extends import_obsidian11.Modal {
+var StatsModal = class extends import_obsidian12.Modal {
   constructor(app, scanner) {
     super(app);
     this.scanner = scanner;
@@ -5472,7 +5610,7 @@ var StatsModal = class extends import_obsidian11.Modal {
     this.contentEl.empty();
   }
 };
-var TriageModal = class extends import_obsidian11.Modal {
+var TriageModal = class extends import_obsidian12.Modal {
   constructor(app, scanner, processor, embedRenderer, defaultTodoneFile) {
     super(app);
     this.items = [];
@@ -5689,7 +5827,7 @@ var TriageModal = class extends import_obsidian11.Modal {
     this.contentEl.empty();
   }
 };
-var SpaceCommandSettingTab = class extends import_obsidian11.PluginSettingTab {
+var SpaceCommandSettingTab = class extends import_obsidian12.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -5715,13 +5853,13 @@ var SpaceCommandSettingTab = class extends import_obsidian11.PluginSettingTab {
       href: "https://github.com/robotpony/obsidian-plugins"
     });
     containerEl.createEl("h3", { text: "Sidebar" });
-    new import_obsidian11.Setting(containerEl).setName("Show sidebar by default").setDesc("Show the TODO sidebar when Obsidian starts").addToggle(
+    new import_obsidian12.Setting(containerEl).setName("Show sidebar by default").setDesc("Show the TODO sidebar when Obsidian starts").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.showSidebarByDefault).onChange(async (value) => {
         this.plugin.settings.showSidebarByDefault = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian11.Setting(containerEl).setName("Show tab lock buttons").setDesc("Add lock buttons to tab headers. Locked tabs force links to open in new tabs.").addToggle(
+    new import_obsidian12.Setting(containerEl).setName("Show tab lock buttons").setDesc("Add lock buttons to tab headers. Locked tabs force links to open in new tabs.").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.showTabLockButton).onChange(async (value) => {
         this.plugin.settings.showTabLockButton = value;
         if (value) {
@@ -5732,7 +5870,7 @@ var SpaceCommandSettingTab = class extends import_obsidian11.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian11.Setting(containerEl).setName("Make links clickable in lists").setDesc("Render wiki links and markdown links as clickable in sidebar and embeds. When disabled, links display as plain text without markdown syntax.").addToggle(
+    new import_obsidian12.Setting(containerEl).setName("Make links clickable in lists").setDesc("Render wiki links and markdown links as clickable in sidebar and embeds. When disabled, links display as plain text without markdown syntax.").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.makeLinksClickable).onChange(async (value) => {
         this.plugin.settings.makeLinksClickable = value;
         await this.plugin.saveSettings();
@@ -5740,13 +5878,13 @@ var SpaceCommandSettingTab = class extends import_obsidian11.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: "TODOs" });
-    new import_obsidian11.Setting(containerEl).setName("Default TODONE file").setDesc("Default file path for logging completed TODOs").addText(
+    new import_obsidian12.Setting(containerEl).setName("Default TODONE file").setDesc("Default file path for logging completed TODOs").addText(
       (text) => text.setPlaceholder("todos/done.md").setValue(this.plugin.settings.defaultTodoneFile).onChange(async (value) => {
         this.plugin.settings.defaultTodoneFile = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian11.Setting(containerEl).setName("Date format").setDesc("Format for completion dates (using moment.js format)").addText(
+    new import_obsidian12.Setting(containerEl).setName("Date format").setDesc("Format for completion dates (using moment.js format)").addText(
       (text) => text.setPlaceholder("YYYY-MM-DD").setValue(this.plugin.settings.dateFormat).onChange(async (value) => {
         this.plugin.settings.dateFormat = value;
         this.plugin.processor = new TodoProcessor(
@@ -5757,13 +5895,13 @@ var SpaceCommandSettingTab = class extends import_obsidian11.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: "Projects" });
-    new import_obsidian11.Setting(containerEl).setName("Default projects folder").setDesc("Folder where project files are created (e.g., projects/)").addText(
+    new import_obsidian12.Setting(containerEl).setName("Default projects folder").setDesc("Folder where project files are created (e.g., projects/)").addText(
       (text) => text.setPlaceholder("projects/").setValue(this.plugin.settings.defaultProjectsFolder).onChange(async (value) => {
         this.plugin.settings.defaultProjectsFolder = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian11.Setting(containerEl).setName("Focus list limit").setDesc("Maximum number of projects to show in sidebar and {{focus-list}}").addText(
+    new import_obsidian12.Setting(containerEl).setName("Focus list limit").setDesc("Maximum number of projects to show in sidebar and {{focus-list}}").addText(
       (text) => text.setPlaceholder("5").setValue(String(this.plugin.settings.focusListLimit)).onChange(async (value) => {
         const num = parseInt(value);
         if (!isNaN(num) && num > 0) {
@@ -5772,7 +5910,7 @@ var SpaceCommandSettingTab = class extends import_obsidian11.PluginSettingTab {
         }
       })
     );
-    new import_obsidian11.Setting(containerEl).setName("Active TODOs limit").setDesc("Maximum number of TODOs to show in sidebar (0 for unlimited)").addText(
+    new import_obsidian12.Setting(containerEl).setName("Active TODOs limit").setDesc("Maximum number of TODOs to show in sidebar (0 for unlimited)").addText(
       (text) => text.setPlaceholder("5").setValue(String(this.plugin.settings.activeTodosLimit)).onChange(async (value) => {
         const num = parseInt(value);
         if (!isNaN(num) && num >= 0) {
@@ -5781,13 +5919,13 @@ var SpaceCommandSettingTab = class extends import_obsidian11.PluginSettingTab {
         }
       })
     );
-    new import_obsidian11.Setting(containerEl).setName("Focus mode includes project TODOs").setDesc("When enabled, focus mode shows all TODOs from focused projects (not just #focus items)").addToggle(
+    new import_obsidian12.Setting(containerEl).setName("Focus mode includes project TODOs").setDesc("When enabled, focus mode shows all TODOs from focused projects (not just #focus items)").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.focusModeIncludeProjects).onChange(async (value) => {
         this.plugin.settings.focusModeIncludeProjects = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian11.Setting(containerEl).setName("Exclude folders from projects").setDesc("Comma-separated folders to exclude from inferred project tags (e.g., log, archive)").addText(
+    new import_obsidian12.Setting(containerEl).setName("Exclude folders from projects").setDesc("Comma-separated folders to exclude from inferred project tags (e.g., log, archive)").addText(
       (text) => text.setPlaceholder("log").setValue(this.plugin.settings.excludeFoldersFromProjects.join(", ")).onChange(async (value) => {
         const folders = value.split(",").map((f) => f.trim()).filter((f) => f.length > 0);
         this.plugin.settings.excludeFoldersFromProjects = folders;
@@ -5802,7 +5940,7 @@ var SpaceCommandSettingTab = class extends import_obsidian11.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: "Priority Settings" });
-    new import_obsidian11.Setting(containerEl).setName("Priority tags").setDesc("Comma-separated list of priority tags (e.g., #p0, #p1, #p2, #p3, #p4). These tags won't appear in the Projects list.").addText(
+    new import_obsidian12.Setting(containerEl).setName("Priority tags").setDesc("Comma-separated list of priority tags (e.g., #p0, #p1, #p2, #p3, #p4). These tags won't appear in the Projects list.").addText(
       (text) => text.setPlaceholder("#p0, #p1, #p2, #p3, #p4").setValue(this.plugin.settings.priorityTags.join(", ")).onChange(async (value) => {
         const tags = value.split(",").map((tag) => tag.trim()).filter((tag) => tag.length > 0).map((tag) => tag.startsWith("#") ? tag : `#${tag}`);
         this.plugin.settings.priorityTags = tags;
@@ -5816,7 +5954,7 @@ var SpaceCommandSettingTab = class extends import_obsidian11.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian11.Setting(containerEl).setName("Recent TODONEs limit").setDesc("Maximum number of recent TODONEs to show in sidebar").addText(
+    new import_obsidian12.Setting(containerEl).setName("Recent TODONEs limit").setDesc("Maximum number of recent TODONEs to show in sidebar").addText(
       (text) => text.setPlaceholder("5").setValue(String(this.plugin.settings.recentTodonesLimit)).onChange(async (value) => {
         const num = parseInt(value);
         if (!isNaN(num) && num > 0) {
@@ -5826,7 +5964,7 @@ var SpaceCommandSettingTab = class extends import_obsidian11.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: "Triage" });
-    new import_obsidian11.Setting(containerEl).setName("Snoozed items threshold").setDesc("Show triage alert when snoozed items exceed this count").addText(
+    new import_obsidian12.Setting(containerEl).setName("Snoozed items threshold").setDesc("Show triage alert when snoozed items exceed this count").addText(
       (text) => text.setPlaceholder("10").setValue(String(this.plugin.settings.triageSnoozedThreshold)).onChange(async (value) => {
         const num = parseInt(value);
         if (!isNaN(num) && num >= 0) {
@@ -5835,7 +5973,7 @@ var SpaceCommandSettingTab = class extends import_obsidian11.PluginSettingTab {
         }
       })
     );
-    new import_obsidian11.Setting(containerEl).setName("Active items threshold").setDesc("Show triage alert when active TODOs + Ideas exceed this count").addText(
+    new import_obsidian12.Setting(containerEl).setName("Active items threshold").setDesc("Show triage alert when active TODOs + Ideas exceed this count").addText(
       (text) => text.setPlaceholder("20").setValue(String(this.plugin.settings.triageActiveThreshold)).onChange(async (value) => {
         const num = parseInt(value);
         if (!isNaN(num) && num >= 0) {
@@ -5845,59 +5983,114 @@ var SpaceCommandSettingTab = class extends import_obsidian11.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: "LLM Settings (Define, Rewrite, Review)" });
-    new import_obsidian11.Setting(containerEl).setName("Enable Define feature").setDesc("Show 'Define' option in context menu to look up definitions via LLM").addToggle(
+    new import_obsidian12.Setting(containerEl).setName("Enable LLM features").setDesc("Show Define, Rewrite, and Review options in context menu").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.llmEnabled).onChange(async (value) => {
         this.plugin.settings.llmEnabled = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian11.Setting(containerEl).setName("LLM URL").setDesc("Ollama server URL (default: http://localhost:11434)").addText(
-      (text) => text.setPlaceholder("http://localhost:11434").setValue(this.plugin.settings.llmUrl).onChange(async (value) => {
-        this.plugin.settings.llmUrl = value;
-        this.plugin.llmClient.updateConfig({ url: value });
+    new import_obsidian12.Setting(containerEl).setName("LLM Provider").setDesc("Choose which LLM provider to use").addDropdown(
+      (dropdown) => dropdown.addOption("ollama", "Ollama (local)").addOption("openai", "OpenAI").addOption("gemini", "Google Gemini").addOption("anthropic", "Anthropic Claude").setValue(this.plugin.settings.llmProvider).onChange(async (value) => {
+        this.plugin.settings.llmProvider = value;
+        this.plugin.llmClient.updateSettings(this.plugin.settings);
         await this.plugin.saveSettings();
+        this.display();
       })
     );
-    new import_obsidian11.Setting(containerEl).setName("LLM Model").setDesc("Model name to use (e.g., llama3.2, mistral, codellama)").addText(
-      (text) => text.setPlaceholder("llama3.2").setValue(this.plugin.settings.llmModel).onChange(async (value) => {
-        this.plugin.settings.llmModel = value;
-        this.plugin.llmClient.updateConfig({ model: value });
-        await this.plugin.saveSettings();
-      })
-    );
-    new import_obsidian11.Setting(containerEl).setName("Definition prompt").setDesc("Prompt prepended to the selected text for Define").addTextArea((text) => {
+    const provider = this.plugin.settings.llmProvider;
+    if (provider === "ollama") {
+      new import_obsidian12.Setting(containerEl).setName("Ollama URL").setDesc("Ollama server URL (default: http://localhost:11434)").addText(
+        (text) => text.setPlaceholder("http://localhost:11434").setValue(this.plugin.settings.llmUrl).onChange(async (value) => {
+          this.plugin.settings.llmUrl = value;
+          this.plugin.llmClient.updateSettings(this.plugin.settings);
+          await this.plugin.saveSettings();
+        })
+      );
+      new import_obsidian12.Setting(containerEl).setName("Ollama Model").setDesc("Model name (e.g., llama3.2, mistral, codellama)").addText(
+        (text) => text.setPlaceholder("llama3.2").setValue(this.plugin.settings.llmModel).onChange(async (value) => {
+          this.plugin.settings.llmModel = value;
+          this.plugin.llmClient.updateSettings(this.plugin.settings);
+          await this.plugin.saveSettings();
+        })
+      );
+    }
+    if (provider === "openai") {
+      new import_obsidian12.Setting(containerEl).setName("OpenAI API Key").setDesc("Your OpenAI API key").addText(
+        (text) => text.setPlaceholder("sk-...").setValue(this.plugin.settings.llmOpenaiApiKey).onChange(async (value) => {
+          this.plugin.settings.llmOpenaiApiKey = value;
+          this.plugin.llmClient.updateSettings(this.plugin.settings);
+          await this.plugin.saveSettings();
+        })
+      );
+      new import_obsidian12.Setting(containerEl).setName("OpenAI Model").setDesc("Model to use (e.g., gpt-4o-mini, gpt-4o)").addText(
+        (text) => text.setPlaceholder("gpt-4o-mini").setValue(this.plugin.settings.llmOpenaiModel).onChange(async (value) => {
+          this.plugin.settings.llmOpenaiModel = value;
+          this.plugin.llmClient.updateSettings(this.plugin.settings);
+          await this.plugin.saveSettings();
+        })
+      );
+    }
+    if (provider === "gemini") {
+      new import_obsidian12.Setting(containerEl).setName("Gemini API Key").setDesc("Your Google AI API key").addText(
+        (text) => text.setPlaceholder("AI...").setValue(this.plugin.settings.llmGeminiApiKey).onChange(async (value) => {
+          this.plugin.settings.llmGeminiApiKey = value;
+          this.plugin.llmClient.updateSettings(this.plugin.settings);
+          await this.plugin.saveSettings();
+        })
+      );
+      new import_obsidian12.Setting(containerEl).setName("Gemini Model").setDesc("Model to use (e.g., gemini-1.5-flash, gemini-1.5-pro)").addText(
+        (text) => text.setPlaceholder("gemini-1.5-flash").setValue(this.plugin.settings.llmGeminiModel).onChange(async (value) => {
+          this.plugin.settings.llmGeminiModel = value;
+          this.plugin.llmClient.updateSettings(this.plugin.settings);
+          await this.plugin.saveSettings();
+        })
+      );
+    }
+    if (provider === "anthropic") {
+      new import_obsidian12.Setting(containerEl).setName("Anthropic API Key").setDesc("Your Anthropic API key").addText(
+        (text) => text.setPlaceholder("sk-ant-...").setValue(this.plugin.settings.llmAnthropicApiKey).onChange(async (value) => {
+          this.plugin.settings.llmAnthropicApiKey = value;
+          this.plugin.llmClient.updateSettings(this.plugin.settings);
+          await this.plugin.saveSettings();
+        })
+      );
+      new import_obsidian12.Setting(containerEl).setName("Anthropic Model").setDesc("Model to use (e.g., claude-3-haiku-20240307, claude-3-sonnet-20240229)").addText(
+        (text) => text.setPlaceholder("claude-3-haiku-20240307").setValue(this.plugin.settings.llmAnthropicModel).onChange(async (value) => {
+          this.plugin.settings.llmAnthropicModel = value;
+          this.plugin.llmClient.updateSettings(this.plugin.settings);
+          await this.plugin.saveSettings();
+        })
+      );
+    }
+    new import_obsidian12.Setting(containerEl).setName("Definition prompt").setDesc("Prompt prepended to the selected text for Define").addTextArea((text) => {
       text.setPlaceholder("Explain what this means...").setValue(this.plugin.settings.llmPrompt).onChange(async (value) => {
         this.plugin.settings.llmPrompt = value;
-        this.plugin.llmClient.updateConfig({ prompt: value });
         await this.plugin.saveSettings();
       });
       text.inputEl.rows = 3;
       text.inputEl.style.width = "100%";
     });
-    new import_obsidian11.Setting(containerEl).setName("Rewrite prompt").setDesc("Prompt prepended to the selected text for Rewrite").addTextArea((text) => {
+    new import_obsidian12.Setting(containerEl).setName("Rewrite prompt").setDesc("Prompt prepended to the selected text for Rewrite").addTextArea((text) => {
       text.setPlaceholder("Rewrite for clarity and brevity...").setValue(this.plugin.settings.llmRewritePrompt).onChange(async (value) => {
         this.plugin.settings.llmRewritePrompt = value;
-        this.plugin.llmClient.updateConfig({ rewritePrompt: value });
         await this.plugin.saveSettings();
       });
       text.inputEl.rows = 3;
       text.inputEl.style.width = "100%";
     });
-    new import_obsidian11.Setting(containerEl).setName("Review prompt").setDesc("Prompt prepended to the selected text for Review").addTextArea((text) => {
+    new import_obsidian12.Setting(containerEl).setName("Review prompt").setDesc("Prompt prepended to the selected text for Review").addTextArea((text) => {
       text.setPlaceholder("Review and suggest improvements...").setValue(this.plugin.settings.llmReviewPrompt).onChange(async (value) => {
         this.plugin.settings.llmReviewPrompt = value;
-        this.plugin.llmClient.updateConfig({ reviewPrompt: value });
         await this.plugin.saveSettings();
       });
       text.inputEl.rows = 3;
       text.inputEl.style.width = "100%";
     });
-    new import_obsidian11.Setting(containerEl).setName("Timeout (ms)").setDesc("Maximum time to wait for LLM response").addText(
+    new import_obsidian12.Setting(containerEl).setName("Timeout (ms)").setDesc("Maximum time to wait for LLM response").addText(
       (text) => text.setPlaceholder("30000").setValue(String(this.plugin.settings.llmTimeout)).onChange(async (value) => {
         const num = parseInt(value);
         if (!isNaN(num) && num > 0) {
           this.plugin.settings.llmTimeout = num;
-          this.plugin.llmClient.updateConfig({ timeout: num });
           await this.plugin.saveSettings();
         }
       })

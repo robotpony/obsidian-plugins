@@ -47,10 +47,12 @@ Tag lines with `#todo` and view them in a sidebar or embedded lists. Completing 
 
 URL unfurling for Obsidian. Fetch link titles and descriptions, insert as markdown links or rich previews.
 
-Paste a URL and click the inline toggle to cycle formats: plain URL → markdown link → rich link (with bold domain). Includes a sidebar for browsing page links and recent history, smart two-tier caching, and extensible provider architecture for site-specific handling.
+Paste a URL and use the "Toggle link format" command to cycle formats: plain URL → markdown link → rich link (with bold domain). Includes a sidebar for browsing page links and recent history, smart two-tier caching, and extensible provider architecture for site-specific handling.
 
 ### [Hugo Command](./hugo-command)
 
 Manage and browse Hugo content from Obsidian. View posts, drafts, and filter by tags from a convenient sidebar.
 
 Content is grouped by folder with subfolder "folder tags" for filtering. Edit your Hugo site configuration (hugo.toml) directly from the sidebar. Supports both TOML and YAML frontmatter formats.
+
+LLM features (requires Ollama, OpenAI, Gemini, or Anthropic): **Content Review** evaluates posts against a checklist; **Outline Enhancement** adds questions and suggestions as inline comment bubbles.

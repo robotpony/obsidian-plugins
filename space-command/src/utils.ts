@@ -1,7 +1,14 @@
-import { App, MarkdownView, TFile, WorkspaceLeaf, moment, Notice } from "obsidian";
+import { App, MarkdownView, TFile, WorkspaceLeaf, moment } from "obsidian";
+import { createNoticeFactory } from "../../shared";
 
 /** Logo prefix for Notice messages */
 export const LOGO_PREFIX = "␣⌘";
+
+/**
+ * Show a notice with the styled Space Command logo badge.
+ * Uses the shared notice factory pattern.
+ */
+export const showNotice = createNoticeFactory(LOGO_PREFIX, "space-command-logo");
 
 /**
  * Plugin tags - system tags that get base logo colour styling.
@@ -69,23 +76,6 @@ export function getTagColourInfo(
   // It's a project tag - look up its colour index or use default
   const colourIndex = projectColourMap?.get(normalizedTag) ?? 4; // default mid-priority
   return { type: 'project', priority: colourIndex };
-}
-
-/**
- * Show a notice with the styled Space Command logo badge.
- * Uses a DocumentFragment to render the logo with CSS styling.
- */
-export function showNotice(message: string, timeout?: number): Notice {
-  const fragment = document.createDocumentFragment();
-
-  const logo = document.createElement("span");
-  logo.className = "space-command-logo";
-  logo.textContent = LOGO_PREFIX;
-  fragment.appendChild(logo);
-
-  fragment.appendChild(document.createTextNode(" " + message));
-
-  return new Notice(fragment, timeout);
 }
 
 export function formatDate(date: Date, format: string): string {

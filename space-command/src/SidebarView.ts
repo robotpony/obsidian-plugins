@@ -1606,7 +1606,20 @@ export class TodoSidebarView extends ItemView {
 
     // Apply focus mode filter if enabled
     if (this.focusModeEnabled) {
-      principles = principles.filter(p => hasTag(p.tags, "#focus"));
+      if (this.focusModeIncludeProjects) {
+        // Get project tags from focused projects (those with #focus items)
+        const focusedProjects = this.projectManager.getProjects()
+          .filter(p => p.hasFocusItems)
+          .map(p => p.tag);
+        // Show #focus items or items from focused projects
+        principles = principles.filter(p =>
+          hasTag(p.tags, "#focus") ||
+          p.tags.some(tag => focusedProjects.includes(tag))
+        );
+      } else {
+        // Show only #focus items
+        principles = principles.filter(p => hasTag(p.tags, "#focus"));
+      }
     }
 
     // Apply tag filter if active
@@ -1626,7 +1639,7 @@ export class TodoSidebarView extends ItemView {
 
     if (principles.length === 0) {
       const emptyText = this.focusModeEnabled
-        ? "No focused principles"
+        ? (this.focusModeIncludeProjects ? "No principles in focused projects" : "No focused principles")
         : (this.activeTagFilter ? `No principles matching ${this.activeTagFilter}` : "No principles yet");
       section.createEl("div", {
         text: emptyText,
@@ -1664,7 +1677,20 @@ export class TodoSidebarView extends ItemView {
 
     // Apply focus mode filter if enabled
     if (this.focusModeEnabled) {
-      ideas = ideas.filter(idea => hasTag(idea.tags, "#focus"));
+      if (this.focusModeIncludeProjects) {
+        // Get project tags from focused projects (those with #focus items)
+        const focusedProjects = this.projectManager.getProjects()
+          .filter(p => p.hasFocusItems)
+          .map(p => p.tag);
+        // Show #focus items or items from focused projects
+        ideas = ideas.filter(idea =>
+          hasTag(idea.tags, "#focus") ||
+          idea.tags.some(tag => focusedProjects.includes(tag))
+        );
+      } else {
+        // Show only #focus items
+        ideas = ideas.filter(idea => hasTag(idea.tags, "#focus"));
+      }
     }
 
     // Apply tag filter if active
@@ -1685,7 +1711,7 @@ export class TodoSidebarView extends ItemView {
 
     if (ideas.length === 0) {
       const emptyText = this.focusModeEnabled
-        ? "No focused ideas"
+        ? (this.focusModeIncludeProjects ? "No ideas in focused projects" : "No focused ideas")
         : (this.activeTagFilter ? `No ideas matching ${this.activeTagFilter}` : "No ideas yet");
       section.createEl("div", {
         text: emptyText,
