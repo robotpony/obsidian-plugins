@@ -229,13 +229,11 @@ build_plugin() {
         return 1
     fi
 
-    if [[ ! -d "$plugin_dir/node_modules" ]]; then
-        output=$( (cd "$plugin_dir" && npm install 2>&1) ) || {
-            print_error "npm install failed"
-            show_error_block "npm install" "$output"
-            return 1
-        }
-    fi
+    output=$( (cd "$plugin_dir" && npm install 2>&1) ) || {
+        print_error "npm install failed"
+        show_error_block "npm install" "$output"
+        return 1
+    }
 
     output=$( (cd "$plugin_dir" && npm run build 2>&1) ) || {
         print_error "Build failed"
