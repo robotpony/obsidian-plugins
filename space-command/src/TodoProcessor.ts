@@ -147,7 +147,8 @@ export class TodoProcessor {
           return `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todone tag. File may have been modified.`;
         }
         return null;
-      }
+      },
+      todo.fingerprint
     );
   }
 
@@ -177,7 +178,8 @@ export class TodoProcessor {
           return `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todo tag. File may have been modified.`;
         }
         return null;
-      }
+      },
+      todo.fingerprint
     );
   }
 
@@ -260,7 +262,8 @@ export class TodoProcessor {
             return `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todo tag. File may have been modified.`;
           }
           return null;
-        }
+        },
+        todo.fingerprint
       );
 
       if (this.scanner) await this.scanner.scanFile(todo.file);
@@ -283,7 +286,9 @@ export class TodoProcessor {
         (line) => {
           const tagPattern = new RegExp(`${tag}\\b\\s*`, "g");
           return line.replace(tagPattern, "").replace(/\s+/g, " ").trim();
-        }
+        },
+        undefined,
+        todo.fingerprint
       );
 
       if (this.scanner) await this.scanner.scanFile(todo.file);
@@ -308,7 +313,8 @@ export class TodoProcessor {
           // Word-boundary check to avoid matching #todo inside #todone etc.
           const tagPattern = new RegExp(`${tag}\\b`);
           return tagPattern.test(line) ? `Tag ${tag} already present` : null;
-        }
+        },
+        item.fingerprint
       );
 
       if (this.scanner) await this.scanner.scanFile(item.file);
@@ -334,7 +340,8 @@ export class TodoProcessor {
         (line) => markCheckboxComplete(removeIdeaTag(line)),
         (line) => !/#idea(?:s|tion)?\b/.test(line)
           ? `Line ${idea.lineNumber} in ${idea.filePath} no longer contains #idea/#ideas/#ideation tag. File may have been modified.`
-          : null
+          : null,
+        idea.fingerprint
       );
 
       if (this.scanner) await this.scanner.scanFile(idea.file);
@@ -357,7 +364,8 @@ export class TodoProcessor {
         (line) => replaceIdeaWithTodo(line),
         (line) => !/#idea(?:s|tion)?\b/.test(line)
           ? `Line ${idea.lineNumber} in ${idea.filePath} no longer contains #idea/#ideas/#ideation tag. File may have been modified.`
-          : null
+          : null,
+        idea.fingerprint
       );
 
       if (this.scanner) await this.scanner.scanFile(idea.file);
@@ -377,7 +385,9 @@ export class TodoProcessor {
         this.app.vault,
         idea.file,
         idea.lineNumber,
-        (line) => line.includes("#focus") ? line : line.trimEnd() + " #focus"
+        (line) => line.includes("#focus") ? line : line.trimEnd() + " #focus",
+        undefined,
+        idea.fingerprint
       );
 
       if (this.scanner) await this.scanner.scanFile(idea.file);
@@ -577,7 +587,8 @@ export class TodoProcessor {
           if (line.includes("#todone")) return "already completed";
           if (!line.includes("#todo") && !isChildItem) return "not a todo";
           return null;
-        }
+        },
+        todo.fingerprint
       );
       if (this.scanner) await this.scanner.scanFile(todo.file);
       return true;
@@ -598,7 +609,9 @@ export class TodoProcessor {
         (line) => {
           const tagPattern = new RegExp(`${tag}\\b\\s*`, "g");
           return line.replace(tagPattern, "").replace(/\s+/g, " ").trim();
-        }
+        },
+        undefined,
+        todo.fingerprint
       );
       if (this.scanner) await this.scanner.scanFile(todo.file);
       return true;

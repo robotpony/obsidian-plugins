@@ -78,6 +78,19 @@ export function getTagColourInfo(
   return { type: 'project', priority: colourIndex };
 }
 
+/**
+ * Return true if the given metadataCache tag list contains at least one tag
+ * that Space Command tracks (`PLUGIN_TAGS`). Used by TodoScanner to skip files
+ * before reading them, avoiding unnecessary vault I/O.
+ *
+ * Accepts the `tags` field from `CachedMetadata` directly (or undefined when
+ * the file has no tags or hasn't been indexed yet).
+ */
+export function hasCachedRelevantTags(tags: { tag: string }[] | undefined): boolean {
+  if (!tags || tags.length === 0) return false;
+  return tags.some(t => PLUGIN_TAGS.has(t.tag.toLowerCase()));
+}
+
 export function formatDate(date: Date, format: string): string {
   return (moment as any)(date).format(format);
 }
@@ -431,34 +444,94 @@ export function compareByStatusAndDate(
 }
 
 /**
+ * Produce a stable fingerprint for a markdown line by stripping all variable content:
+ * tags, dates, block references, and markdown structure markers. What remains is the
+ * human-readable text of the item, which should be stable across tag changes and completion.
+ *
+ * An empty string is returned when the line has no human content (e.g., "- [ ] #todo").
+ */
+export function createFingerprint(text: string): string {
+  let content = text.trim();
+  content = content.replace(/`[^`]*`/g, "");            // strip inline code spans
+  content = content.replace(/^#{1,6}\s+/,"");             // strip header markers (require space — avoids matching #tags)
+  content = content.replace(/^[-*+]\s*/,"");             // strip list markers (-, *, +)
+  content = content.replace(/^\d+\.\s*/,"");             // strip numbered list markers
+  content = content.replace(/^\[[ xX]?\]\s*/,"");        // strip checkboxes
+  content = content.replace(/#[\w-]+/g, "");             // strip all tags
+  content = content.replace(/@\d{4}-\d{2}-\d{2}/g, ""); // strip @date annotations
+  content = content.replace(/\^[\w-]+/g, "");            // strip block reference IDs
+  return content.trim();
+}
+
+/**
+ * Resolve the actual line number to modify, using the stored line number as a fast-path
+ * hint and falling back to nearby-line and full-file search when the file has shifted.
+ *
+ * Returns -1 if no matching line is found.
+ * An empty fingerprint skips content matching and always returns the hint unchanged.
+ */
+export function resolveLineNumber(lines: string[], hint: number, fingerprint: string): number {
+  // Empty fingerprint means the item had no human text — use hint as-is
+  if (!fingerprint) return hint;
+
+  // Fast path: hint line still matches
+  if (hint >= 0 && hint < lines.length && createFingerprint(lines[hint]) === fingerprint) {
+    return hint;
+  }
+
+  // Nearby search: check up to 15 lines in each direction
+  const NEARBY = 15;
+  for (let delta = 1; delta <= NEARBY; delta++) {
+    const before = hint - delta;
+    const after  = hint + delta;
+    if (before >= 0 && before < lines.length && createFingerprint(lines[before]) === fingerprint) return before;
+    if (after < lines.length && createFingerprint(lines[after]) === fingerprint) return after;
+  }
+
+  // Full-file scan as last resort
+  return lines.findIndex(l => createFingerprint(l) === fingerprint);
+}
+
+/**
  * Read a file, apply a transform to a single line, and write back in one vault.modify() call.
  *
- * Throws if `lineNumber` is out of bounds or if `validate` returns a non-null error string.
- * `validate` receives the current line text before the transform and can return an error
- * message to abort (e.g. checking that the expected tag is still present).
+ * When `fingerprint` is supplied and non-empty, the actual line to modify is resolved via
+ * `resolveLineNumber()` first, recovering gracefully when external edits have shifted lines.
+ * `lineNumber` is used as a fast-path hint; the search expands to ±15 lines then the full file.
+ *
+ * Throws if the resolved line is out of bounds or if `validate` returns a non-null error string.
+ * `validate` receives the current line text before the transform.
  */
 export async function modifyFileLine(
   vault: Vault,
   file: TFile,
   lineNumber: number,
   transform: (line: string) => string,
-  validate?: (line: string) => string | null
+  validate?: (line: string) => string | null,
+  fingerprint?: string
 ): Promise<void> {
   const content = await vault.read(file);
   const lines = content.split("\n");
 
-  if (lineNumber >= lines.length) {
-    throw new Error(`Line ${lineNumber} out of bounds for ${file.path} (${lines.length} lines)`);
+  const resolved = (fingerprint)
+    ? resolveLineNumber(lines, lineNumber, fingerprint)
+    : lineNumber;
+
+  if (resolved < 0 || resolved >= lines.length) {
+    throw new Error(
+      `Cannot locate line ${lineNumber} in ${file.path}` +
+      (fingerprint ? ` (fingerprint: "${fingerprint}")` : "")
+    );
   }
 
-  const currentLine = lines[lineNumber];
+  const currentLine = lines[resolved];
 
   if (validate) {
     const error = validate(currentLine);
     if (error) throw new Error(error);
   }
 
-  lines[lineNumber] = transform(currentLine);
+  lines[resolved] = transform(currentLine);
   await vault.modify(file, lines.join("\n"));
 }
 

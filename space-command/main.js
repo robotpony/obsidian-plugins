@@ -173,6 +173,11 @@ function getTagColourInfo(tag, projectColourMap) {
   const colourIndex = (_a = projectColourMap == null ? void 0 : projectColourMap.get(normalizedTag)) != null ? _a : 4;
   return { type: "project", priority: colourIndex };
 }
+function hasCachedRelevantTags(tags) {
+  if (!tags || tags.length === 0)
+    return false;
+  return tags.some((t) => PLUGIN_TAGS.has(t.tag.toLowerCase()));
+}
 function formatDate(date, format) {
   return (0, import_obsidian3.moment)(date).format(format);
 }
@@ -354,19 +359,51 @@ function compareByStatusAndDate(a, b) {
   }
   return 0;
 }
-async function modifyFileLine(vault, file, lineNumber, transform, validate) {
+function createFingerprint(text) {
+  let content = text.trim();
+  content = content.replace(/`[^`]*`/g, "");
+  content = content.replace(/^#{1,6}\s+/, "");
+  content = content.replace(/^[-*+]\s*/, "");
+  content = content.replace(/^\d+\.\s*/, "");
+  content = content.replace(/^\[[ xX]?\]\s*/, "");
+  content = content.replace(/#[\w-]+/g, "");
+  content = content.replace(/@\d{4}-\d{2}-\d{2}/g, "");
+  content = content.replace(/\^[\w-]+/g, "");
+  return content.trim();
+}
+function resolveLineNumber(lines, hint, fingerprint) {
+  if (!fingerprint)
+    return hint;
+  if (hint >= 0 && hint < lines.length && createFingerprint(lines[hint]) === fingerprint) {
+    return hint;
+  }
+  const NEARBY = 15;
+  for (let delta = 1; delta <= NEARBY; delta++) {
+    const before = hint - delta;
+    const after = hint + delta;
+    if (before >= 0 && before < lines.length && createFingerprint(lines[before]) === fingerprint)
+      return before;
+    if (after < lines.length && createFingerprint(lines[after]) === fingerprint)
+      return after;
+  }
+  return lines.findIndex((l) => createFingerprint(l) === fingerprint);
+}
+async function modifyFileLine(vault, file, lineNumber, transform, validate, fingerprint) {
   const content = await vault.read(file);
   const lines = content.split("\n");
-  if (lineNumber >= lines.length) {
-    throw new Error(`Line ${lineNumber} out of bounds for ${file.path} (${lines.length} lines)`);
+  const resolved = fingerprint ? resolveLineNumber(lines, lineNumber, fingerprint) : lineNumber;
+  if (resolved < 0 || resolved >= lines.length) {
+    throw new Error(
+      `Cannot locate line ${lineNumber} in ${file.path}` + (fingerprint ? ` (fingerprint: "${fingerprint}")` : "")
+    );
   }
-  const currentLine = lines[lineNumber];
+  const currentLine = lines[resolved];
   if (validate) {
     const error = validate(currentLine);
     if (error)
       throw new Error(error);
   }
-  lines[lineNumber] = transform(currentLine);
+  lines[resolved] = transform(currentLine);
   await vault.modify(file, lines.join("\n"));
 }
 function openFileAtLine(app, file, line) {
@@ -401,6 +438,19 @@ var TodoScanner = class extends import_obsidian4.Events {
   setExcludeFiles(filePaths) {
     this.excludeFiles = new Set(filePaths);
   }
+  // Remove all cached items for a given file path across all four caches.
+  evictFile(filePath) {
+    this.todosCache.delete(filePath);
+    this.todonesCache.delete(filePath);
+    this.ideasCache.delete(filePath);
+    this.principlesCache.delete(filePath);
+  }
+  // Return true if the metadataCache shows this file contains at least one
+  // plugin-relevant tag. Files without relevant tags are skipped before reading.
+  fileHasRelevantTags(file) {
+    const cache = this.app.metadataCache.getFileCache(file);
+    return hasCachedRelevantTags(cache == null ? void 0 : cache.tags);
+  }
   async scanVault() {
     this.todosCache.clear();
     this.todonesCache.clear();
@@ -408,11 +458,18 @@ var TodoScanner = class extends import_obsidian4.Events {
     this.principlesCache.clear();
     const files = this.app.vault.getMarkdownFiles();
     for (const file of files) {
-      await this.scanFile(file);
+      if (this.fileHasRelevantTags(file)) {
+        await this.scanFile(file);
+      }
     }
     this.trigger("todos-updated");
   }
   async scanFile(file) {
+    if (!this.fileHasRelevantTags(file)) {
+      this.evictFile(file.path);
+      this.trigger("todos-updated");
+      return;
+    }
     try {
       const content = await this.app.vault.read(file);
       const lines = content.split("\n");
@@ -604,6 +661,7 @@ var TodoScanner = class extends import_obsidian4.Events {
       filePath: file.path,
       folder: ((_a = file.parent) == null ? void 0 : _a.path) || "",
       lineNumber,
+      fingerprint: createFingerprint(text),
       text: text.trim(),
       hasCheckbox: hasCheckboxFormat(text),
       tags,
@@ -668,11 +726,6 @@ var TodoScanner = class extends import_obsidian4.Events {
     return allPrinciples.sort((a, b) => a.dateCreated - b.dateCreated);
   }
   watchFiles() {
-    this.app.vault.on("modify", (file) => {
-      if (file instanceof import_obsidian4.TFile && file.extension === "md") {
-        this.debouncedScanFile(file);
-      }
-    });
     this.app.metadataCache.on("changed", (file) => {
       if (file instanceof import_obsidian4.TFile && file.extension === "md") {
         this.debouncedScanFile(file);
@@ -685,19 +738,13 @@ var TodoScanner = class extends import_obsidian4.Events {
     });
     this.app.vault.on("delete", (file) => {
       if (file instanceof import_obsidian4.TFile) {
-        this.todosCache.delete(file.path);
-        this.todonesCache.delete(file.path);
-        this.ideasCache.delete(file.path);
-        this.principlesCache.delete(file.path);
+        this.evictFile(file.path);
         this.trigger("todos-updated");
       }
     });
     this.app.vault.on("rename", (file, oldPath) => {
       if (file instanceof import_obsidian4.TFile && file.extension === "md") {
-        this.todosCache.delete(oldPath);
-        this.todonesCache.delete(oldPath);
-        this.ideasCache.delete(oldPath);
-        this.principlesCache.delete(oldPath);
+        this.evictFile(oldPath);
         this.debouncedScanFile(file);
       }
     });
@@ -830,7 +877,8 @@ var TodoProcessor = class {
           return `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todone tag. File may have been modified.`;
         }
         return null;
-      }
+      },
+      todo.fingerprint
     );
   }
   async updateSourceFile(todo, date) {
@@ -858,7 +906,8 @@ var TodoProcessor = class {
           return `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todo tag. File may have been modified.`;
         }
         return null;
-      }
+      },
+      todo.fingerprint
     );
   }
   async appendToTodoneFile(todo, todoneFilePath, date) {
@@ -918,7 +967,8 @@ ${todoneText}` : todoneText;
             return `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todo tag. File may have been modified.`;
           }
           return null;
-        }
+        },
+        todo.fingerprint
       );
       if (this.scanner)
         await this.scanner.scanFile(todo.file);
@@ -941,7 +991,9 @@ ${todoneText}` : todoneText;
         (line) => {
           const tagPattern = new RegExp(`${tag}\\b\\s*`, "g");
           return line.replace(tagPattern, "").replace(/\s+/g, " ").trim();
-        }
+        },
+        void 0,
+        todo.fingerprint
       );
       if (this.scanner)
         await this.scanner.scanFile(todo.file);
@@ -965,7 +1017,8 @@ ${todoneText}` : todoneText;
         (line) => {
           const tagPattern = new RegExp(`${tag}\\b`);
           return tagPattern.test(line) ? `Tag ${tag} already present` : null;
-        }
+        },
+        item.fingerprint
       );
       if (this.scanner)
         await this.scanner.scanFile(item.file);
@@ -989,7 +1042,8 @@ ${todoneText}` : todoneText;
         idea.file,
         idea.lineNumber,
         (line) => markCheckboxComplete(removeIdeaTag(line)),
-        (line) => !/#idea(?:s|tion)?\b/.test(line) ? `Line ${idea.lineNumber} in ${idea.filePath} no longer contains #idea/#ideas/#ideation tag. File may have been modified.` : null
+        (line) => !/#idea(?:s|tion)?\b/.test(line) ? `Line ${idea.lineNumber} in ${idea.filePath} no longer contains #idea/#ideas/#ideation tag. File may have been modified.` : null,
+        idea.fingerprint
       );
       if (this.scanner)
         await this.scanner.scanFile(idea.file);
@@ -1010,7 +1064,8 @@ ${todoneText}` : todoneText;
         idea.file,
         idea.lineNumber,
         (line) => replaceIdeaWithTodo(line),
-        (line) => !/#idea(?:s|tion)?\b/.test(line) ? `Line ${idea.lineNumber} in ${idea.filePath} no longer contains #idea/#ideas/#ideation tag. File may have been modified.` : null
+        (line) => !/#idea(?:s|tion)?\b/.test(line) ? `Line ${idea.lineNumber} in ${idea.filePath} no longer contains #idea/#ideas/#ideation tag. File may have been modified.` : null,
+        idea.fingerprint
       );
       if (this.scanner)
         await this.scanner.scanFile(idea.file);
@@ -1030,7 +1085,9 @@ ${todoneText}` : todoneText;
         this.app.vault,
         idea.file,
         idea.lineNumber,
-        (line) => line.includes("#focus") ? line : line.trimEnd() + " #focus"
+        (line) => line.includes("#focus") ? line : line.trimEnd() + " #focus",
+        void 0,
+        idea.fingerprint
       );
       if (this.scanner)
         await this.scanner.scanFile(idea.file);
@@ -1224,7 +1281,8 @@ ${todoneText}` : todoneText;
           if (!line.includes("#todo") && !isChildItem)
             return "not a todo";
           return null;
-        }
+        },
+        todo.fingerprint
       );
       if (this.scanner)
         await this.scanner.scanFile(todo.file);
@@ -1245,7 +1303,9 @@ ${todoneText}` : todoneText;
         (line) => {
           const tagPattern = new RegExp(`${tag}\\b\\s*`, "g");
           return line.replace(tagPattern, "").replace(/\s+/g, " ").trim();
-        }
+        },
+        void 0,
+        todo.fingerprint
       );
       if (this.scanner)
         await this.scanner.scanFile(todo.file);
@@ -4754,8 +4814,13 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
     this.processor.setOnCompleteCallback(() => {
       this.app.workspace.trigger("markdown-changed");
     });
-    await this.scanner.scanVault();
     this.scanner.watchFiles();
+    this.app.workspace.onLayoutReady(async () => {
+      await this.scanner.scanVault();
+      if (this.settings.showSidebarByDefault) {
+        this.sidebarManager.activate();
+      }
+    });
     this.registerEditorExtension(
       createHeaderSortPlugin(this.app, this.processor, this.scanner)
     );
@@ -4812,11 +4877,6 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
         () => this.showTriageModal()
       )
     );
-    if (this.settings.showSidebarByDefault) {
-      this.app.workspace.onLayoutReady(() => {
-        this.sidebarManager.activate();
-      });
-    }
     this.registerMarkdownPostProcessor((el, ctx) => {
       const codeBlocks = el.findAll("p, div");
       for (const block of codeBlocks) {
