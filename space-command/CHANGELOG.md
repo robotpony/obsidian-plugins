@@ -2,6 +2,12 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.111] - 2026-03-26
+
+### Fixed
+
+- **`#focus` highlight no longer shifts item spacing**: Removed `padding` and `margin` from the focus highlight rules for todos, projects, ideas, and principles. The highlight now applies only `background-color` and `border-radius` to the `<li>` element, which already carries the standard `padding: 4px 0` from the base item style. For header items with children, the `<li>` covers the full block (header row plus child list) naturally via `display: block`, so the highlight is visually complete without layout side-effects.
+
 ## [0.9.110] - 2026-03-26
 
 ### Improved

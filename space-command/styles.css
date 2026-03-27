@@ -752,8 +752,6 @@
 .space-command-sidebar .principle-focus {
   background-color: color-mix(in srgb, var(--interactive-accent) 15%, transparent);
   border-radius: 4px;
-  padding: 4px 6px;
-  margin: 2px -6px;
 }
 
 .space-command-sidebar .idea-focus:hover,
@@ -868,8 +866,6 @@
 .space-command-sidebar .project-focus {
   background-color: color-mix(in srgb, var(--interactive-accent) 15%, transparent);
   border-radius: 4px;
-  padding: 4px 6px;
-  margin: 2px -6px;
 }
 
 .space-command-sidebar .todo-focus:hover,
