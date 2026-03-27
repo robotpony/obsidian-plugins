@@ -259,20 +259,8 @@ export class TodoScanner extends Events {
         }
       }
 
-      // Clean up lines that have both #todo and #todone
-      if (linesToCleanup.length > 0) {
-        this.cleanupDuplicateTags(file, lines, linesToCleanup);
-      }
-
-      // Sync checked checkboxes by adding #todone tag
-      if (linesToSyncTodone.length > 0) {
-        this.syncCheckedCheckboxes(file, lines, linesToSyncTodone);
-      }
-
-      // Remove #idea tag from checked ideas (they become regular checked list items)
-      if (linesToRemoveIdea.length > 0) {
-        this.removeIdeaTags(file, lines, linesToRemoveIdea);
-      }
+      // Apply all queued line mutations in one write to avoid concurrent vault.modify() calls
+      await this.applyLineMutations(file, lines, linesToCleanup, linesToSyncTodone, linesToRemoveIdea);
 
       if (todos.length > 0) {
         this.todosCache.set(file.path, todos);
@@ -349,8 +337,8 @@ export class TodoScanner extends Events {
     let content = text.trim();
     // Remove header markers (e.g., #### )
     content = content.replace(/^#{1,6}\s*/, '');
-    // Remove list markers (e.g., "- ", "* ", "1. ")
-    content = content.replace(/^[-*]\s*/, '');
+    // Remove list markers (e.g., "- ", "* ", "+ ", "1. ")
+    content = content.replace(/^[-*+]\s*/, '');
     content = content.replace(/^\d+\.\s*/, '');
     // Remove checkbox markers (e.g., "[ ] ", "[x] ")
     content = content.replace(/^\[[ xX]?\]\s*/, '');
@@ -366,7 +354,8 @@ export class TodoScanner extends Events {
 
   getTodos(): TodoItem[] {
     const allTodos: TodoItem[] = [];
-    for (const todos of this.todosCache.values()) {
+    for (const [filePath, todos] of this.todosCache.entries()) {
+      if (this.excludeFiles.has(filePath)) continue;
       allTodos.push(...todos);
     }
     // Sort by date created (oldest first)
@@ -459,68 +448,35 @@ export class TodoScanner extends Events {
     });
   }
 
-  // Clean up lines that have both #todo/#todos and #todone/#todones (remove #todo/#todos)
-  private async cleanupDuplicateTags(
+  // Apply all queued line mutations in a single vault.modify() call.
+  // Processes cleanup, checkbox sync, and idea tag removal together so only one write occurs.
+  private async applyLineMutations(
     file: TFile,
     lines: string[],
-    lineNumbers: number[]
+    linesToCleanup: number[],
+    linesToSyncTodone: number[],
+    linesToRemoveIdea: number[]
   ): Promise<void> {
-    let modified = false;
-
-    for (const lineNum of lineNumbers) {
-      // Remove #todo or #todos tag from lines that also have #todone/#todones
-      // Use #todos? to match both singular and plural forms
-      const newLine = lines[lineNum].replace(/#todos?\b\s*/g, "");
-      if (newLine !== lines[lineNum]) {
-        lines[lineNum] = newLine;
-        modified = true;
-      }
+    if (linesToCleanup.length === 0 && linesToSyncTodone.length === 0 && linesToRemoveIdea.length === 0) {
+      return;
     }
 
-    if (modified) {
-      await this.app.vault.modify(file, lines.join("\n"));
-    }
-  }
-
-  // Sync checked checkboxes (- [x]) by adding #todone tag with date
-  private async syncCheckedCheckboxes(
-    file: TFile,
-    lines: string[],
-    lineNumbers: number[]
-  ): Promise<void> {
-    let modified = false;
     const today = new Date().toISOString().split("T")[0];
-
-    for (const lineNum of lineNumbers) {
-      const line = lines[lineNum];
-      // Add #todone @date at end of line (before any trailing whitespace)
-      const newLine = line.trimEnd() + ` #todone @${today}`;
-      if (newLine !== lines[lineNum]) {
-        lines[lineNum] = newLine;
-        modified = true;
-      }
-    }
-
-    if (modified) {
-      await this.app.vault.modify(file, lines.join("\n"));
-    }
-  }
-
-  // Remove #idea tag from checked ideas (they become regular checked list items)
-  private async removeIdeaTags(
-    file: TFile,
-    lines: string[],
-    lineNumbers: number[]
-  ): Promise<void> {
     let modified = false;
 
-    for (const lineNum of lineNumbers) {
-      // Remove #idea, #ideas, or #ideation tag
+    for (const lineNum of linesToCleanup) {
+      const newLine = lines[lineNum].replace(/#todos?\b\s*/g, "");
+      if (newLine !== lines[lineNum]) { lines[lineNum] = newLine; modified = true; }
+    }
+
+    for (const lineNum of linesToSyncTodone) {
+      const newLine = lines[lineNum].trimEnd() + ` #todone @${today}`;
+      if (newLine !== lines[lineNum]) { lines[lineNum] = newLine; modified = true; }
+    }
+
+    for (const lineNum of linesToRemoveIdea) {
       const newLine = lines[lineNum].replace(/#idea(?:s|tion)?\b\s*/g, "");
-      if (newLine !== lines[lineNum]) {
-        lines[lineNum] = newLine;
-        modified = true;
-      }
+      if (newLine !== lines[lineNum]) { lines[lineNum] = newLine; modified = true; }
     }
 
     if (modified) {

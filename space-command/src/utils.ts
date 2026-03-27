@@ -1,4 +1,4 @@
-import { App, MarkdownView, TFile, WorkspaceLeaf, moment } from "obsidian";
+import { App, MarkdownView, TFile, Vault, WorkspaceLeaf, moment } from "obsidian";
 import { createNoticeFactory } from "../../shared";
 
 /** Logo prefix for Notice messages */
@@ -428,6 +428,38 @@ export function compareByStatusAndDate(
 
   // Both undated - maintain original order
   return 0;
+}
+
+/**
+ * Read a file, apply a transform to a single line, and write back in one vault.modify() call.
+ *
+ * Throws if `lineNumber` is out of bounds or if `validate` returns a non-null error string.
+ * `validate` receives the current line text before the transform and can return an error
+ * message to abort (e.g. checking that the expected tag is still present).
+ */
+export async function modifyFileLine(
+  vault: Vault,
+  file: TFile,
+  lineNumber: number,
+  transform: (line: string) => string,
+  validate?: (line: string) => string | null
+): Promise<void> {
+  const content = await vault.read(file);
+  const lines = content.split("\n");
+
+  if (lineNumber >= lines.length) {
+    throw new Error(`Line ${lineNumber} out of bounds for ${file.path} (${lines.length} lines)`);
+  }
+
+  const currentLine = lines[lineNumber];
+
+  if (validate) {
+    const error = validate(currentLine);
+    if (error) throw new Error(error);
+  }
+
+  lines[lineNumber] = transform(currentLine);
+  await vault.modify(file, lines.join("\n"));
 }
 
 export function openFileAtLine(

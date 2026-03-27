@@ -2,6 +2,7 @@ import { App, TFile } from "obsidian";
 import { TodoItem } from "./types";
 import {
   formatDate,
+  modifyFileLine,
   replaceTodoWithTodone,
   markCheckboxComplete,
   replaceTodoneWithTodo,
@@ -132,77 +133,52 @@ export class TodoProcessor {
   }
 
   private async revertSourceFile(todo: TodoItem): Promise<void> {
-    const content = await this.app.vault.read(todo.file);
-    const lines = content.split("\n");
-
-    if (todo.lineNumber >= lines.length) {
-      throw new Error(
-        `Line number ${todo.lineNumber} out of bounds for file ${todo.filePath}`
-      );
-    }
-
-    let updatedLine = lines[todo.lineNumber];
-
-    // Validate line content hasn't changed since scan (prevents modifying wrong line)
-    if (!updatedLine.includes("#todone")) {
-      throw new Error(
-        `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todone tag. File may have been modified.`
-      );
-    }
-
-    // Replace #todone (with optional @date) with #todo
-    updatedLine = replaceTodoneWithTodo(updatedLine);
-
-    // If it has a completed checkbox [x], mark it incomplete [ ]
-    if (todo.hasCheckbox) {
-      updatedLine = markCheckboxIncomplete(updatedLine);
-    }
-
-    lines[todo.lineNumber] = updatedLine;
-    await this.app.vault.modify(todo.file, lines.join("\n"));
+    await modifyFileLine(
+      this.app.vault,
+      todo.file,
+      todo.lineNumber,
+      (line) => {
+        let updated = replaceTodoneWithTodo(line);
+        if (todo.hasCheckbox) updated = markCheckboxIncomplete(updated);
+        return updated;
+      },
+      (line) => {
+        if (!line.includes("#todone")) {
+          return `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todone tag. File may have been modified.`;
+        }
+        return null;
+      }
+    );
   }
 
   private async updateSourceFile(todo: TodoItem, date: string): Promise<void> {
-    const content = await this.app.vault.read(todo.file);
-    const lines = content.split("\n");
-
-    if (todo.lineNumber >= lines.length) {
-      throw new Error(
-        `Line number ${todo.lineNumber} out of bounds for file ${todo.filePath}`
-      );
-    }
-
-    let updatedLine = lines[todo.lineNumber];
-
-    // Check if already completed
-    if (updatedLine.includes("#todone")) {
-      throw new Error(
-        `Line ${todo.lineNumber} in ${todo.filePath} already contains #todone tag. File may have been modified.`
-      );
-    }
-
-    // Handle child items that inherit from parent header (no explicit #todo tag)
     const isChildItem = todo.parentLineNumber !== undefined;
 
-    if (updatedLine.includes("#todo")) {
-      // Regular TODO with explicit tag - replace #todo with #todone @date
-      updatedLine = replaceTodoWithTodone(updatedLine, date);
-    } else if (isChildItem) {
-      // Child item without explicit #todo tag - add #todone @date
-      updatedLine = updatedLine.trimEnd() + ` #todone @${date}`;
-    } else {
-      throw new Error(
-        `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todo tag. File may have been modified.`
-      );
-    }
-
-    // If it has a checkbox, mark it complete
-    if (todo.hasCheckbox) {
-      updatedLine = markCheckboxComplete(updatedLine);
-    }
-
-    lines[todo.lineNumber] = updatedLine;
-    await this.app.vault.modify(todo.file, lines.join("\n"));
+    await modifyFileLine(
+      this.app.vault,
+      todo.file,
+      todo.lineNumber,
+      (line) => {
+        let updated: string;
+        if (line.includes("#todo")) {
+          updated = replaceTodoWithTodone(line, date);
+        } else {
+          // Child item without explicit #todo tag
+          updated = line.trimEnd() + ` #todone @${date}`;
+        }
+        if (todo.hasCheckbox) updated = markCheckboxComplete(updated);
+        return updated;
+      },
+      (line) => {
+        if (line.includes("#todone")) {
+          return `Line ${todo.lineNumber} in ${todo.filePath} already contains #todone tag. File may have been modified.`;
+        }
+        if (!line.includes("#todo") && !isChildItem) {
+          return `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todo tag. File may have been modified.`;
+        }
+        return null;
+      }
+    );
   }
 
   private async appendToTodoneFile(
@@ -264,62 +240,31 @@ export class TodoProcessor {
   }
 
   async setPriorityTag(todo: TodoItem, newTag: string, addFocus: boolean = false): Promise<boolean> {
+    const isChildItem = todo.parentLineNumber !== undefined;
     try {
-      const content = await this.app.vault.read(todo.file);
-      const lines = content.split("\n");
+      await modifyFileLine(
+        this.app.vault,
+        todo.file,
+        todo.lineNumber,
+        (line) => {
+          line = line.replace(/#p[0-4]\b/g, "").replace(/#future\b/g, "").replace(/#today\b/g, "");
+          line = line.replace(/\s+/g, " ").trim() + ` ${newTag}`;
+          if (addFocus && !line.includes("#focus")) line = line + " #focus";
+          return line;
+        },
+        (line) => {
+          if (line.includes("#todone")) {
+            return `Line ${todo.lineNumber} in ${todo.filePath} contains #todone tag. Item is already completed.`;
+          }
+          if (!line.includes("#todo") && !isChildItem) {
+            return `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todo tag. File may have been modified.`;
+          }
+          return null;
+        }
+      );
 
-      if (todo.lineNumber >= lines.length) {
-        throw new Error(
-          `Line number ${todo.lineNumber} out of bounds for file ${todo.filePath}`
-        );
-      }
-
-      let line = lines[todo.lineNumber];
-
-      // Handle child items that inherit from parent header (no explicit #todo tag)
-      const isChildItem = todo.parentLineNumber !== undefined;
-
-      // Validate line still contains #todo (prevents modifying wrong line)
-      // Child items don't need explicit #todo tag - they inherit from parent
-      if (line.includes("#todone")) {
-        throw new Error(
-          `Line ${todo.lineNumber} in ${todo.filePath} contains #todone tag. Item is already completed.`
-        );
-      }
-      if (!line.includes("#todo") && !isChildItem) {
-        throw new Error(
-          `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todo tag. File may have been modified.`
-        );
-      }
-
-      // Remove existing priority tags (#p0-#p4, #future)
-      line = line.replace(/#p[0-4]\b/g, "");
-      line = line.replace(/#future\b/g, "");
-
-      // Clean up extra whitespace
-      line = line.replace(/\s+/g, " ").trim();
-
-      // Add new priority tag at end
-      line = line + ` ${newTag}`;
-
-      // Add #focus tag if requested (and not already present)
-      if (addFocus && !line.includes("#focus")) {
-        line = line + " #focus";
-      }
-
-      lines[todo.lineNumber] = line;
-      await this.app.vault.modify(todo.file, lines.join("\n"));
-
-      // Immediately rescan the file to update cache
-      if (this.scanner) {
-        await this.scanner.scanFile(todo.file);
-      }
-
-      // Trigger callback if set
-      if (this.onComplete) {
-        this.onComplete();
-      }
-
+      if (this.scanner) await this.scanner.scanFile(todo.file);
+      if (this.onComplete) this.onComplete();
       showNotice(`Priority set to ${newTag}${addFocus ? " + #focus" : ""}`);
       return true;
     } catch (error) {
@@ -331,37 +276,18 @@ export class TodoProcessor {
 
   async removeTag(todo: TodoItem, tag: string): Promise<boolean> {
     try {
-      const content = await this.app.vault.read(todo.file);
-      const lines = content.split("\n");
+      await modifyFileLine(
+        this.app.vault,
+        todo.file,
+        todo.lineNumber,
+        (line) => {
+          const tagPattern = new RegExp(`${tag}\\b\\s*`, "g");
+          return line.replace(tagPattern, "").replace(/\s+/g, " ").trim();
+        }
+      );
 
-      if (todo.lineNumber >= lines.length) {
-        throw new Error(
-          `Line number ${todo.lineNumber} out of bounds for file ${todo.filePath}`
-        );
-      }
-
-      let line = lines[todo.lineNumber];
-
-      // Remove the specified tag
-      const tagPattern = new RegExp(`${tag}\\b\\s*`, "g");
-      line = line.replace(tagPattern, "");
-
-      // Clean up extra whitespace
-      line = line.replace(/\s+/g, " ").trim();
-
-      lines[todo.lineNumber] = line;
-      await this.app.vault.modify(todo.file, lines.join("\n"));
-
-      // Immediately rescan the file to update cache
-      if (this.scanner) {
-        await this.scanner.scanFile(todo.file);
-      }
-
-      // Trigger callback if set
-      if (this.onComplete) {
-        this.onComplete();
-      }
-
+      if (this.scanner) await this.scanner.scanFile(todo.file);
+      if (this.onComplete) this.onComplete();
       showNotice(`Removed ${tag}`);
       return true;
     } catch (error) {
@@ -373,41 +299,26 @@ export class TodoProcessor {
 
   async addTag(item: TodoItem, tag: string): Promise<boolean> {
     try {
-      const content = await this.app.vault.read(item.file);
-      const lines = content.split("\n");
+      await modifyFileLine(
+        this.app.vault,
+        item.file,
+        item.lineNumber,
+        (line) => line.trimEnd() + ` ${tag}`,
+        (line) => {
+          // Word-boundary check to avoid matching #todo inside #todone etc.
+          const tagPattern = new RegExp(`${tag}\\b`);
+          return tagPattern.test(line) ? `Tag ${tag} already present` : null;
+        }
+      );
 
-      if (item.lineNumber >= lines.length) {
-        throw new Error(
-          `Line number ${item.lineNumber} out of bounds for file ${item.filePath}`
-        );
-      }
-
-      let line = lines[item.lineNumber];
-
-      // Don't add if already present
-      if (line.includes(tag)) {
-        return true;
-      }
-
-      // Add the tag at the end
-      line = line.trimEnd() + ` ${tag}`;
-
-      lines[item.lineNumber] = line;
-      await this.app.vault.modify(item.file, lines.join("\n"));
-
-      // Immediately rescan the file to update cache
-      if (this.scanner) {
-        await this.scanner.scanFile(item.file);
-      }
-
-      // Trigger callback if set
-      if (this.onComplete) {
-        this.onComplete();
-      }
-
+      if (this.scanner) await this.scanner.scanFile(item.file);
+      if (this.onComplete) this.onComplete();
       showNotice(`Added ${tag}`);
       return true;
     } catch (error) {
+      // "already present" is not a failure worth surfacing
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes("already present")) return true;
       console.error("Error adding tag:", error);
       showNotice("Failed to add tag. See console for details.");
       return false;
@@ -416,43 +327,18 @@ export class TodoProcessor {
 
   async completeIdea(idea: TodoItem): Promise<boolean> {
     try {
-      const content = await this.app.vault.read(idea.file);
-      const lines = content.split("\n");
+      await modifyFileLine(
+        this.app.vault,
+        idea.file,
+        idea.lineNumber,
+        (line) => markCheckboxComplete(removeIdeaTag(line)),
+        (line) => !/#idea(?:s|tion)?\b/.test(line)
+          ? `Line ${idea.lineNumber} in ${idea.filePath} no longer contains #idea/#ideas/#ideation tag. File may have been modified.`
+          : null
+      );
 
-      if (idea.lineNumber >= lines.length) {
-        throw new Error(
-          `Line number ${idea.lineNumber} out of bounds for file ${idea.filePath}`
-        );
-      }
-
-      let line = lines[idea.lineNumber];
-
-      // Validate line still contains #idea, #ideas, or #ideation
-      if (!/#idea(?:s|tion)?\b/.test(line)) {
-        throw new Error(
-          `Line ${idea.lineNumber} in ${idea.filePath} no longer contains #idea/#ideas/#ideation tag. File may have been modified.`
-        );
-      }
-
-      // Remove #idea/#ideas/#ideation tag (idea disappears from sidebar)
-      line = removeIdeaTag(line);
-
-      // Mark checkbox as complete if present
-      line = markCheckboxComplete(line);
-
-      lines[idea.lineNumber] = line;
-      await this.app.vault.modify(idea.file, lines.join("\n"));
-
-      // Immediately rescan the file to update cache
-      if (this.scanner) {
-        await this.scanner.scanFile(idea.file);
-      }
-
-      // Trigger callback if set
-      if (this.onComplete) {
-        this.onComplete();
-      }
-
+      if (this.scanner) await this.scanner.scanFile(idea.file);
+      if (this.onComplete) this.onComplete();
       showNotice("Idea completed!");
       return true;
     } catch (error) {
@@ -464,40 +350,18 @@ export class TodoProcessor {
 
   async convertIdeaToTodo(idea: TodoItem): Promise<boolean> {
     try {
-      const content = await this.app.vault.read(idea.file);
-      const lines = content.split("\n");
+      await modifyFileLine(
+        this.app.vault,
+        idea.file,
+        idea.lineNumber,
+        (line) => replaceIdeaWithTodo(line),
+        (line) => !/#idea(?:s|tion)?\b/.test(line)
+          ? `Line ${idea.lineNumber} in ${idea.filePath} no longer contains #idea/#ideas/#ideation tag. File may have been modified.`
+          : null
+      );
 
-      if (idea.lineNumber >= lines.length) {
-        throw new Error(
-          `Line number ${idea.lineNumber} out of bounds for file ${idea.filePath}`
-        );
-      }
-
-      let line = lines[idea.lineNumber];
-
-      // Validate line still contains #idea, #ideas, or #ideation
-      if (!/#idea(?:s|tion)?\b/.test(line)) {
-        throw new Error(
-          `Line ${idea.lineNumber} in ${idea.filePath} no longer contains #idea/#ideas/#ideation tag. File may have been modified.`
-        );
-      }
-
-      // Replace #idea/#ideas/#ideation with #todo
-      line = replaceIdeaWithTodo(line);
-
-      lines[idea.lineNumber] = line;
-      await this.app.vault.modify(idea.file, lines.join("\n"));
-
-      // Immediately rescan the file to update cache
-      if (this.scanner) {
-        await this.scanner.scanFile(idea.file);
-      }
-
-      // Trigger callback if set
-      if (this.onComplete) {
-        this.onComplete();
-      }
-
+      if (this.scanner) await this.scanner.scanFile(idea.file);
+      if (this.onComplete) this.onComplete();
       showNotice("Idea promoted to TODO!");
       return true;
     } catch (error) {
@@ -509,35 +373,15 @@ export class TodoProcessor {
 
   async addFocusToIdea(idea: TodoItem): Promise<boolean> {
     try {
-      const content = await this.app.vault.read(idea.file);
-      const lines = content.split("\n");
+      await modifyFileLine(
+        this.app.vault,
+        idea.file,
+        idea.lineNumber,
+        (line) => line.includes("#focus") ? line : line.trimEnd() + " #focus"
+      );
 
-      if (idea.lineNumber >= lines.length) {
-        throw new Error(
-          `Line number ${idea.lineNumber} out of bounds for file ${idea.filePath}`
-        );
-      }
-
-      let line = lines[idea.lineNumber];
-
-      // Add #focus tag if not already present
-      if (!line.includes("#focus")) {
-        line = line.trimEnd() + " #focus";
-      }
-
-      lines[idea.lineNumber] = line;
-      await this.app.vault.modify(idea.file, lines.join("\n"));
-
-      // Immediately rescan the file to update cache
-      if (this.scanner) {
-        await this.scanner.scanFile(idea.file);
-      }
-
-      // Trigger callback if set
-      if (this.onComplete) {
-        this.onComplete();
-      }
-
+      if (this.scanner) await this.scanner.scanFile(idea.file);
+      if (this.onComplete) this.onComplete();
       showNotice("Idea focused!");
       return true;
     } catch (error) {
@@ -713,71 +557,52 @@ export class TodoProcessor {
   }
 
   /**
-   * Set priority tag without showing notice (for batch operations)
+   * Set priority tag without showing notice (for batch operations).
+   * Handles child items that inherit todo status from a parent header.
    */
   private async setPriorityTagSilent(todo: TodoItem, newTag: string, addFocus: boolean): Promise<boolean> {
+    const isChildItem = todo.parentLineNumber !== undefined;
     try {
-      const content = await this.app.vault.read(todo.file);
-      const lines = content.split("\n");
-
-      if (todo.lineNumber >= lines.length) return false;
-
-      let line = lines[todo.lineNumber];
-      if (!line.includes("#todo") || line.includes("#todone")) return false;
-
-      // Remove existing priority tags
-      line = line.replace(/#p[0-4]\b/g, "");
-      line = line.replace(/#future\b/g, "");
-      line = line.replace(/\s+/g, " ").trim();
-
-      // Add new priority tag
-      line = line + ` ${newTag}`;
-
-      // Add #focus if requested
-      if (addFocus && !line.includes("#focus")) {
-        line = line + " #focus";
-      }
-
-      lines[todo.lineNumber] = line;
-      await this.app.vault.modify(todo.file, lines.join("\n"));
-
-      if (this.scanner) {
-        await this.scanner.scanFile(todo.file);
-      }
-
+      await modifyFileLine(
+        this.app.vault,
+        todo.file,
+        todo.lineNumber,
+        (line) => {
+          line = line.replace(/#p[0-4]\b/g, "").replace(/#future\b/g, "").replace(/#today\b/g, "");
+          line = line.replace(/\s+/g, " ").trim() + ` ${newTag}`;
+          if (addFocus && !line.includes("#focus")) line = line + " #focus";
+          return line;
+        },
+        (line) => {
+          if (line.includes("#todone")) return "already completed";
+          if (!line.includes("#todo") && !isChildItem) return "not a todo";
+          return null;
+        }
+      );
+      if (this.scanner) await this.scanner.scanFile(todo.file);
       return true;
-    } catch (error) {
-      console.error("Error setting priority:", error);
+    } catch {
       return false;
     }
   }
 
   /**
-   * Remove tag without showing notice (for batch operations)
+   * Remove tag without showing notice (for batch operations).
    */
   private async removeTagSilent(todo: TodoItem, tag: string): Promise<boolean> {
     try {
-      const content = await this.app.vault.read(todo.file);
-      const lines = content.split("\n");
-
-      if (todo.lineNumber >= lines.length) return false;
-
-      let line = lines[todo.lineNumber];
-
-      const tagPattern = new RegExp(`${tag}\\b\\s*`, "g");
-      line = line.replace(tagPattern, "");
-      line = line.replace(/\s+/g, " ").trim();
-
-      lines[todo.lineNumber] = line;
-      await this.app.vault.modify(todo.file, lines.join("\n"));
-
-      if (this.scanner) {
-        await this.scanner.scanFile(todo.file);
-      }
-
+      await modifyFileLine(
+        this.app.vault,
+        todo.file,
+        todo.lineNumber,
+        (line) => {
+          const tagPattern = new RegExp(`${tag}\\b\\s*`, "g");
+          return line.replace(tagPattern, "").replace(/\s+/g, " ").trim();
+        }
+      );
+      if (this.scanner) await this.scanner.scanFile(todo.file);
       return true;
-    } catch (error) {
-      console.error("Error removing tag:", error);
+    } catch {
       return false;
     }
   }

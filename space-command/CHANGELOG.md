@@ -2,6 +2,22 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.108] - 2026-03-26
+
+### Fixed
+
+- **Concurrent write race condition**: `scanFile()` was firing three separate `vault.modify()` calls without `await`, causing concurrent writes that could overwrite each other and emitting `todos-updated` before any write completed. All scan-time line mutations (duplicate tag cleanup, checkbox sync, idea tag removal) are now batched into a single awaited write.
+- **`addTag()` false deduplication**: Using `line.includes(tag)` meant adding `#todo` to a line containing `#todone` was incorrectly skipped. Now uses a word-boundary regex check.
+- **`getTodos()` ignored excluded files**: The archive file exclusion applied to `getTodones()`, `getIdeas()`, and `getPrinciples()` but not `getTodos()`, causing archive items to appear in the active todo list.
+- **`todone:show|hide` filter not applied**: The filter was parsed correctly but never used in `FilterParser.applyFilters()`. It now hides or shows only todone items as specified.
+- **`setPriorityTagSilent()` silently failed for child items**: Batch focus/snooze operations skipped child items that inherit todo status from a parent header. Now mirrors the child item logic from the public `setPriorityTag()`.
+- **`#today` tag not removed when changing priority**: Setting a new priority via the context menu now removes `#today` along with `#p0`–`#p4` and `#future`.
+- **`hasContent()` missed `+` list marker**: Lines like `+ #todo` were incorrectly treated as having content. Added `+` to the list marker strip.
+
+### Improved
+
+- Extracted `modifyFileLine()` helper into `utils.ts`, replacing ~10 duplicated read-split-modify-join-write patterns across `TodoProcessor`. All file modifications now go through a single validated, bounds-checked path.
+
 ## [0.9.107] - 2026-03-23
 
 ### Removed

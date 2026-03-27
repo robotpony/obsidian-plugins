@@ -72,6 +72,14 @@ export class FilterParser {
       });
     }
 
+    // Apply todone visibility filter
+    if (filters.todone === 'hide') {
+      filtered = filtered.filter((todo) => todo.itemType !== 'todone');
+    } else if (filters.todone === 'show') {
+      // 'show' means include only todone items (useful for review blocks)
+      filtered = filtered.filter((todo) => todo.itemType === 'todone');
+    }
+
     // Apply limit
     if (filters.limit) {
       filtered = filtered.slice(0, filters.limit);
