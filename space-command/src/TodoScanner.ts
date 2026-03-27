@@ -1,6 +1,6 @@
 import { App, TFile, Vault, Events, debounce } from "obsidian";
 import { TodoItem } from "./types";
-import { extractTags, filenameToTag, hasCheckboxFormat, isCheckboxChecked } from "./utils";
+import { createFingerprint, extractTags, filenameToTag, hasCheckboxFormat, isCheckboxChecked } from "./utils";
 
 export class TodoScanner extends Events {
   private app: App;
@@ -320,6 +320,7 @@ export class TodoScanner extends Events {
       filePath: file.path,
       folder: file.parent?.path || "",
       lineNumber,
+      fingerprint: createFingerprint(text),
       text: text.trim(),
       hasCheckbox: hasCheckboxFormat(text),
       tags,

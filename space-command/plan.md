@@ -50,7 +50,7 @@ When setting a new priority, `#today` is not removed along with `#p0-#p4` and `#
 
 ---
 
-## Phase 2: Content fingerprinting (future)
+## Phase 2: Content fingerprinting ✓ done
 
 Add a `fingerprint` field to `TodoItem` (trimmed text minus dates and priority tags). Use line number as a fast-path hint at write time; fall back to nearby-line and full-file search if the hint is stale. Makes the plugin resilient to external file edits shifting line numbers.
 

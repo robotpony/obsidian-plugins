@@ -354,19 +354,51 @@ function compareByStatusAndDate(a, b) {
   }
   return 0;
 }
-async function modifyFileLine(vault, file, lineNumber, transform, validate) {
+function createFingerprint(text) {
+  let content = text.trim();
+  content = content.replace(/`[^`]*`/g, "");
+  content = content.replace(/^#{1,6}\s+/, "");
+  content = content.replace(/^[-*+]\s*/, "");
+  content = content.replace(/^\d+\.\s*/, "");
+  content = content.replace(/^\[[ xX]?\]\s*/, "");
+  content = content.replace(/#[\w-]+/g, "");
+  content = content.replace(/@\d{4}-\d{2}-\d{2}/g, "");
+  content = content.replace(/\^[\w-]+/g, "");
+  return content.trim();
+}
+function resolveLineNumber(lines, hint, fingerprint) {
+  if (!fingerprint)
+    return hint;
+  if (hint >= 0 && hint < lines.length && createFingerprint(lines[hint]) === fingerprint) {
+    return hint;
+  }
+  const NEARBY = 15;
+  for (let delta = 1; delta <= NEARBY; delta++) {
+    const before = hint - delta;
+    const after = hint + delta;
+    if (before >= 0 && before < lines.length && createFingerprint(lines[before]) === fingerprint)
+      return before;
+    if (after < lines.length && createFingerprint(lines[after]) === fingerprint)
+      return after;
+  }
+  return lines.findIndex((l) => createFingerprint(l) === fingerprint);
+}
+async function modifyFileLine(vault, file, lineNumber, transform, validate, fingerprint) {
   const content = await vault.read(file);
   const lines = content.split("\n");
-  if (lineNumber >= lines.length) {
-    throw new Error(`Line ${lineNumber} out of bounds for ${file.path} (${lines.length} lines)`);
+  const resolved = fingerprint ? resolveLineNumber(lines, lineNumber, fingerprint) : lineNumber;
+  if (resolved < 0 || resolved >= lines.length) {
+    throw new Error(
+      `Cannot locate line ${lineNumber} in ${file.path}` + (fingerprint ? ` (fingerprint: "${fingerprint}")` : "")
+    );
   }
-  const currentLine = lines[lineNumber];
+  const currentLine = lines[resolved];
   if (validate) {
     const error = validate(currentLine);
     if (error)
       throw new Error(error);
   }
-  lines[lineNumber] = transform(currentLine);
+  lines[resolved] = transform(currentLine);
   await vault.modify(file, lines.join("\n"));
 }
 function openFileAtLine(app, file, line) {
@@ -604,6 +636,7 @@ var TodoScanner = class extends import_obsidian4.Events {
       filePath: file.path,
       folder: ((_a = file.parent) == null ? void 0 : _a.path) || "",
       lineNumber,
+      fingerprint: createFingerprint(text),
       text: text.trim(),
       hasCheckbox: hasCheckboxFormat(text),
       tags,
@@ -830,7 +863,8 @@ var TodoProcessor = class {
           return `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todone tag. File may have been modified.`;
         }
         return null;
-      }
+      },
+      todo.fingerprint
     );
   }
   async updateSourceFile(todo, date) {
@@ -858,7 +892,8 @@ var TodoProcessor = class {
           return `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todo tag. File may have been modified.`;
         }
         return null;
-      }
+      },
+      todo.fingerprint
     );
   }
   async appendToTodoneFile(todo, todoneFilePath, date) {
@@ -918,7 +953,8 @@ ${todoneText}` : todoneText;
             return `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todo tag. File may have been modified.`;
           }
           return null;
-        }
+        },
+        todo.fingerprint
       );
       if (this.scanner)
         await this.scanner.scanFile(todo.file);
@@ -941,7 +977,9 @@ ${todoneText}` : todoneText;
         (line) => {
           const tagPattern = new RegExp(`${tag}\\b\\s*`, "g");
           return line.replace(tagPattern, "").replace(/\s+/g, " ").trim();
-        }
+        },
+        void 0,
+        todo.fingerprint
       );
       if (this.scanner)
         await this.scanner.scanFile(todo.file);
@@ -965,7 +1003,8 @@ ${todoneText}` : todoneText;
         (line) => {
           const tagPattern = new RegExp(`${tag}\\b`);
           return tagPattern.test(line) ? `Tag ${tag} already present` : null;
-        }
+        },
+        item.fingerprint
       );
       if (this.scanner)
         await this.scanner.scanFile(item.file);
@@ -989,7 +1028,8 @@ ${todoneText}` : todoneText;
         idea.file,
         idea.lineNumber,
         (line) => markCheckboxComplete(removeIdeaTag(line)),
-        (line) => !/#idea(?:s|tion)?\b/.test(line) ? `Line ${idea.lineNumber} in ${idea.filePath} no longer contains #idea/#ideas/#ideation tag. File may have been modified.` : null
+        (line) => !/#idea(?:s|tion)?\b/.test(line) ? `Line ${idea.lineNumber} in ${idea.filePath} no longer contains #idea/#ideas/#ideation tag. File may have been modified.` : null,
+        idea.fingerprint
       );
       if (this.scanner)
         await this.scanner.scanFile(idea.file);
@@ -1010,7 +1050,8 @@ ${todoneText}` : todoneText;
         idea.file,
         idea.lineNumber,
         (line) => replaceIdeaWithTodo(line),
-        (line) => !/#idea(?:s|tion)?\b/.test(line) ? `Line ${idea.lineNumber} in ${idea.filePath} no longer contains #idea/#ideas/#ideation tag. File may have been modified.` : null
+        (line) => !/#idea(?:s|tion)?\b/.test(line) ? `Line ${idea.lineNumber} in ${idea.filePath} no longer contains #idea/#ideas/#ideation tag. File may have been modified.` : null,
+        idea.fingerprint
       );
       if (this.scanner)
         await this.scanner.scanFile(idea.file);
@@ -1030,7 +1071,9 @@ ${todoneText}` : todoneText;
         this.app.vault,
         idea.file,
         idea.lineNumber,
-        (line) => line.includes("#focus") ? line : line.trimEnd() + " #focus"
+        (line) => line.includes("#focus") ? line : line.trimEnd() + " #focus",
+        void 0,
+        idea.fingerprint
       );
       if (this.scanner)
         await this.scanner.scanFile(idea.file);
@@ -1224,7 +1267,8 @@ ${todoneText}` : todoneText;
           if (!line.includes("#todo") && !isChildItem)
             return "not a todo";
           return null;
-        }
+        },
+        todo.fingerprint
       );
       if (this.scanner)
         await this.scanner.scanFile(todo.file);
@@ -1245,7 +1289,9 @@ ${todoneText}` : todoneText;
         (line) => {
           const tagPattern = new RegExp(`${tag}\\b\\s*`, "g");
           return line.replace(tagPattern, "").replace(/\s+/g, " ").trim();
-        }
+        },
+        void 0,
+        todo.fingerprint
       );
       if (this.scanner)
         await this.scanner.scanFile(todo.file);

@@ -2,6 +2,16 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.109] - 2026-03-26
+
+### Improved
+
+- **Resilient write-back via content fingerprinting**: All item modification operations now recover gracefully when external edits (sync services, other editors, git operations) have shifted line numbers since the last scan. Each `TodoItem` carries a `fingerprint` — the human text of the line stripped of tags, dates, and markdown markers — which stays stable across tag changes and completion. At write time, the stored line number is checked first; if the fingerprint doesn't match, the plugin searches ±15 lines and then the full file before giving up. This eliminates the most common cause of "file may have been modified" errors.
+
+### Added
+
+- Unit test suite via Vitest covering `createFingerprint` (18 cases) and `resolveLineNumber` (11 cases), including fast-path, nearby, full-scan, empty fingerprint, and duplicate-line disambiguation scenarios.
+
 ## [0.9.108] - 2026-03-26
 
 ### Fixed

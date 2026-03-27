@@ -5,6 +5,7 @@ export interface TodoItem {
   filePath: string;
   folder: string;
   lineNumber: number;
+  fingerprint: string;  // human text stripped of tags, dates, and markdown markers — used for stale line-number recovery
   text: string;
   hasCheckbox: boolean;
   tags: string[];
