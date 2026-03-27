@@ -78,6 +78,19 @@ export function getTagColourInfo(
   return { type: 'project', priority: colourIndex };
 }
 
+/**
+ * Return true if the given metadataCache tag list contains at least one tag
+ * that Space Command tracks (`PLUGIN_TAGS`). Used by TodoScanner to skip files
+ * before reading them, avoiding unnecessary vault I/O.
+ *
+ * Accepts the `tags` field from `CachedMetadata` directly (or undefined when
+ * the file has no tags or hasn't been indexed yet).
+ */
+export function hasCachedRelevantTags(tags: { tag: string }[] | undefined): boolean {
+  if (!tags || tags.length === 0) return false;
+  return tags.some(t => PLUGIN_TAGS.has(t.tag.toLowerCase()));
+}
+
 export function formatDate(date: Date, format: string): string {
   return (moment as any)(date).format(format);
 }

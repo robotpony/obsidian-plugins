@@ -173,6 +173,11 @@ function getTagColourInfo(tag, projectColourMap) {
   const colourIndex = (_a = projectColourMap == null ? void 0 : projectColourMap.get(normalizedTag)) != null ? _a : 4;
   return { type: "project", priority: colourIndex };
 }
+function hasCachedRelevantTags(tags) {
+  if (!tags || tags.length === 0)
+    return false;
+  return tags.some((t) => PLUGIN_TAGS.has(t.tag.toLowerCase()));
+}
 function formatDate(date, format) {
   return (0, import_obsidian3.moment)(date).format(format);
 }
@@ -433,6 +438,19 @@ var TodoScanner = class extends import_obsidian4.Events {
   setExcludeFiles(filePaths) {
     this.excludeFiles = new Set(filePaths);
   }
+  // Remove all cached items for a given file path across all four caches.
+  evictFile(filePath) {
+    this.todosCache.delete(filePath);
+    this.todonesCache.delete(filePath);
+    this.ideasCache.delete(filePath);
+    this.principlesCache.delete(filePath);
+  }
+  // Return true if the metadataCache shows this file contains at least one
+  // plugin-relevant tag. Files without relevant tags are skipped before reading.
+  fileHasRelevantTags(file) {
+    const cache = this.app.metadataCache.getFileCache(file);
+    return hasCachedRelevantTags(cache == null ? void 0 : cache.tags);
+  }
   async scanVault() {
     this.todosCache.clear();
     this.todonesCache.clear();
@@ -440,11 +458,18 @@ var TodoScanner = class extends import_obsidian4.Events {
     this.principlesCache.clear();
     const files = this.app.vault.getMarkdownFiles();
     for (const file of files) {
-      await this.scanFile(file);
+      if (this.fileHasRelevantTags(file)) {
+        await this.scanFile(file);
+      }
     }
     this.trigger("todos-updated");
   }
   async scanFile(file) {
+    if (!this.fileHasRelevantTags(file)) {
+      this.evictFile(file.path);
+      this.trigger("todos-updated");
+      return;
+    }
     try {
       const content = await this.app.vault.read(file);
       const lines = content.split("\n");
@@ -701,11 +726,6 @@ var TodoScanner = class extends import_obsidian4.Events {
     return allPrinciples.sort((a, b) => a.dateCreated - b.dateCreated);
   }
   watchFiles() {
-    this.app.vault.on("modify", (file) => {
-      if (file instanceof import_obsidian4.TFile && file.extension === "md") {
-        this.debouncedScanFile(file);
-      }
-    });
     this.app.metadataCache.on("changed", (file) => {
       if (file instanceof import_obsidian4.TFile && file.extension === "md") {
         this.debouncedScanFile(file);
@@ -718,19 +738,13 @@ var TodoScanner = class extends import_obsidian4.Events {
     });
     this.app.vault.on("delete", (file) => {
       if (file instanceof import_obsidian4.TFile) {
-        this.todosCache.delete(file.path);
-        this.todonesCache.delete(file.path);
-        this.ideasCache.delete(file.path);
-        this.principlesCache.delete(file.path);
+        this.evictFile(file.path);
         this.trigger("todos-updated");
       }
     });
     this.app.vault.on("rename", (file, oldPath) => {
       if (file instanceof import_obsidian4.TFile && file.extension === "md") {
-        this.todosCache.delete(oldPath);
-        this.todonesCache.delete(oldPath);
-        this.ideasCache.delete(oldPath);
-        this.principlesCache.delete(oldPath);
+        this.evictFile(oldPath);
         this.debouncedScanFile(file);
       }
     });
@@ -4800,8 +4814,13 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
     this.processor.setOnCompleteCallback(() => {
       this.app.workspace.trigger("markdown-changed");
     });
-    await this.scanner.scanVault();
     this.scanner.watchFiles();
+    this.app.workspace.onLayoutReady(async () => {
+      await this.scanner.scanVault();
+      if (this.settings.showSidebarByDefault) {
+        this.sidebarManager.activate();
+      }
+    });
     this.registerEditorExtension(
       createHeaderSortPlugin(this.app, this.processor, this.scanner)
     );
@@ -4858,11 +4877,6 @@ var SpaceCommandPlugin = class extends import_obsidian11.Plugin {
         () => this.showTriageModal()
       )
     );
-    if (this.settings.showSidebarByDefault) {
-      this.app.workspace.onLayoutReady(() => {
-        this.sidebarManager.activate();
-      });
-    }
     this.registerMarkdownPostProcessor((el, ctx) => {
       const codeBlocks = el.findAll("p, div");
       for (const block of codeBlocks) {

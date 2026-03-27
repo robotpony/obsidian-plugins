@@ -2,6 +2,19 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.110] - 2026-03-26
+
+### Improved
+
+- **Faster vault scan on startup**: `scanVault()` now checks `metadataCache.getFileCache()` before reading each file. Files with no plugin-relevant tags (`#todo`, `#todone`, `#idea`, `#principle`, and their variants) are skipped entirely, eliminating unnecessary I/O. For vaults where tagged files are a small fraction of the total, startup scan time drops proportionally.
+- **Eliminated redundant scans on every edit**: `vault.on("modify")` has been removed as a scan trigger. It fired before Obsidian finished parsing the file, causing a wasted scan against stale cache state immediately followed by the correct scan from `metadataCache.on("changed")`. Incremental updates now use only the `metadataCache.on("changed")` event, which fires exactly once per change after parsing is complete.
+- **Sidebar populates with data on first render**: The initial vault scan is now deferred to `workspace.onLayoutReady`, which fires after Obsidian's metadata cache has completed its initial indexing pass. Previously, the scan ran in `onload()` and could race the cache; the sidebar now activates after the scan finishes rather than before.
+- **Removed redundant cache-delete patterns**: Extracted `evictFile(path)` helper in `TodoScanner`, replacing four repetitions of the four-cache delete pattern in the delete and rename watchers.
+
+### Added
+
+- Unit tests for `hasCachedRelevantTags()` (17 cases) covering undefined, empty, non-relevant tags, all nine plugin tag variants, case-insensitivity, mixed arrays, priority-tag exclusion, and no-substring-match behaviour.
+
 ## [0.9.109] - 2026-03-26
 
 ### Improved

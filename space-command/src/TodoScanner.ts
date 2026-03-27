@@ -1,6 +1,6 @@
 import { App, TFile, Vault, Events, debounce } from "obsidian";
 import { TodoItem } from "./types";
-import { createFingerprint, extractTags, filenameToTag, hasCheckboxFormat, isCheckboxChecked } from "./utils";
+import { createFingerprint, extractTags, filenameToTag, hasCachedRelevantTags, hasCheckboxFormat, isCheckboxChecked } from "./utils";
 
 export class TodoScanner extends Events {
   private app: App;
@@ -29,6 +29,21 @@ export class TodoScanner extends Events {
     this.excludeFiles = new Set(filePaths);
   }
 
+  // Remove all cached items for a given file path across all four caches.
+  private evictFile(filePath: string): void {
+    this.todosCache.delete(filePath);
+    this.todonesCache.delete(filePath);
+    this.ideasCache.delete(filePath);
+    this.principlesCache.delete(filePath);
+  }
+
+  // Return true if the metadataCache shows this file contains at least one
+  // plugin-relevant tag. Files without relevant tags are skipped before reading.
+  private fileHasRelevantTags(file: TFile): boolean {
+    const cache = this.app.metadataCache.getFileCache(file);
+    return hasCachedRelevantTags(cache?.tags);
+  }
+
   async scanVault(): Promise<void> {
     this.todosCache.clear();
     this.todonesCache.clear();
@@ -37,7 +52,9 @@ export class TodoScanner extends Events {
 
     const files = this.app.vault.getMarkdownFiles();
     for (const file of files) {
-      await this.scanFile(file);
+      if (this.fileHasRelevantTags(file)) {
+        await this.scanFile(file);
+      }
     }
 
     // Emit final event after full scan completes, ensuring any listeners
@@ -46,6 +63,15 @@ export class TodoScanner extends Events {
   }
 
   async scanFile(file: TFile): Promise<void> {
+    // If all plugin tags were removed from this file, evict it from cache and skip the read.
+    // fileHasRelevantTags() uses metadataCache which already reflects the current file state
+    // (it fires only after Obsidian's parser has finished via metadataCache.on("changed")).
+    if (!this.fileHasRelevantTags(file)) {
+      this.evictFile(file.path);
+      this.trigger("todos-updated");
+      return;
+    }
+
     try {
       const content = await this.app.vault.read(file);
       const lines = content.split("\n");
@@ -404,15 +430,10 @@ export class TodoScanner extends Events {
   }
 
   watchFiles(): void {
-    // Watch for file modifications (debounced to prevent rapid re-scans)
-    this.app.vault.on("modify", (file) => {
-      if (file instanceof TFile && file.extension === "md") {
-        this.debouncedScanFile(file);
-      }
-    });
-
-    // Watch for metadata cache changes - fires more reliably for external file changes
-    // (e.g., when files are modified by another editor, git operations, or sync services)
+    // Sole incremental update trigger. Fires after Obsidian finishes parsing the file,
+    // so the metadataCache reflects the new content when our scanFile() runs.
+    // vault.on("modify") is intentionally omitted: it fires before parsing is complete,
+    // producing a redundant scan against stale cache state.
     this.app.metadataCache.on("changed", (file) => {
       if (file instanceof TFile && file.extension === "md") {
         this.debouncedScanFile(file);
@@ -429,10 +450,7 @@ export class TodoScanner extends Events {
     // Watch for file deletion (immediate - no debounce needed)
     this.app.vault.on("delete", (file) => {
       if (file instanceof TFile) {
-        this.todosCache.delete(file.path);
-        this.todonesCache.delete(file.path);
-        this.ideasCache.delete(file.path);
-        this.principlesCache.delete(file.path);
+        this.evictFile(file.path);
         this.trigger("todos-updated");
       }
     });
@@ -440,10 +458,7 @@ export class TodoScanner extends Events {
     // Watch for file rename (debounced scan for new path)
     this.app.vault.on("rename", (file, oldPath) => {
       if (file instanceof TFile && file.extension === "md") {
-        this.todosCache.delete(oldPath);
-        this.todonesCache.delete(oldPath);
-        this.ideasCache.delete(oldPath);
-        this.principlesCache.delete(oldPath);
+        this.evictFile(oldPath);
         this.debouncedScanFile(file);
       }
     });

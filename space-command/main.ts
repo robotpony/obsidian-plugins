@@ -87,11 +87,24 @@ export default class SpaceCommandPlugin extends Plugin {
       this.app.workspace.trigger("markdown-changed");
     });
 
-    // Scan vault on load
-    await this.scanner.scanVault();
-
-    // Watch for file changes
+    // Set up file watchers immediately so changes during startup are not missed.
+    // The metadataCache.on("changed") watcher (the primary trigger) is safe to
+    // register before the cache is resolved — it simply won't fire until files
+    // are indexed.
     this.scanner.watchFiles();
+
+    // Defer the initial vault scan until the workspace layout is ready.
+    // onLayoutReady fires after Obsidian's metadata cache has finished its
+    // initial indexing pass, ensuring getFileCache() returns accurate results
+    // for the pre-filter check introduced in phase 3.
+    this.app.workspace.onLayoutReady(async () => {
+      await this.scanner.scanVault();
+
+      // Activate the sidebar after the scan so it has data to show on first render.
+      if (this.settings.showSidebarByDefault) {
+        this.sidebarManager.activate();
+      }
+    });
 
     // Register editor extension for header sort buttons
     this.registerEditorExtension(
@@ -175,13 +188,7 @@ export default class SpaceCommandPlugin extends Plugin {
         )
     );
 
-    // Show sidebar by default if setting is enabled
-    // Wait for workspace layout to be ready to avoid null reference errors
-    if (this.settings.showSidebarByDefault) {
-      this.app.workspace.onLayoutReady(() => {
-        this.sidebarManager.activate();
-      });
-    }
+    // Sidebar is activated inside onLayoutReady above (after scanVault completes).
 
     // Register markdown post processor for {{focus-todos}}, {{focus-ideas}}, and {{focus-list}} syntax
     this.registerMarkdownPostProcessor((el, ctx) => {
