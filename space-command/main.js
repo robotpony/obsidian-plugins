@@ -3276,7 +3276,7 @@ var DateSuggest = class extends import_obsidian10.EditorSuggest {
 var import_obsidian11 = require("obsidian");
 var VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 var TodoSidebarView = class extends import_obsidian11.ItemView {
-  constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, recentTodonesLimit, activeTodosLimit, focusListLimit, focusModeIncludeProjects, makeLinksClickable, triageSnoozedThreshold, triageActiveThreshold, onShowAbout, onShowStats, onShowTriage, getMoveHistory = () => []) {
+  constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, activeTodosLimit, focusListLimit, focusModeIncludeProjects, makeLinksClickable, triageSnoozedThreshold, triageActiveThreshold, onShowAbout, onShowStats, onShowTriage, getMoveHistory = () => []) {
     super(leaf);
     this.updateListener = null;
     this.activeTab = "todos";
@@ -3313,7 +3313,6 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
     this.processor = processor;
     this.projectManager = projectManager;
     this.defaultTodoneFile = defaultTodoneFile;
-    this.recentTodonesLimit = recentTodonesLimit;
     this.activeTodosLimit = activeTodosLimit;
     this.focusListLimit = focusListLimit;
     this.focusModeIncludeProjects = focusModeIncludeProjects;
@@ -3382,11 +3381,6 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
     });
     cleaned = cleaned.replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1");
     return cleaned;
-  }
-  // Extract completion date from text (@YYYY-MM-DD pattern)
-  extractCompletionDate(text) {
-    const match = text.match(/@(\d{4}-\d{2}-\d{2})/);
-    return match ? match[1] : null;
   }
   // Strip tags from text but preserve tags inside backticks (inline code)
   stripTagsPreservingCode(text) {
@@ -4269,23 +4263,6 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
     this.renderListItem(list, todo, this.todoConfig, isChild);
   }
   renderRecentTodones(container) {
-    let allTodones = this.scanner.getTodones(100);
-    if (this.focusModeEnabled) {
-      const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
-      allTodones = allTodones.filter((todone) => {
-        const completionDate = this.extractCompletionDate(todone.text);
-        return completionDate === today;
-      });
-      if (this.focusModeIncludeProjects) {
-        const focusedProjects = this.projectManager.getProjects().filter((p) => p.hasFocusItems).map((p) => p.tag);
-        allTodones = allTodones.filter(
-          (todone) => hasTag(todone.tags, "#focus") || todone.tags.some((tag) => focusedProjects.includes(tag))
-        );
-      } else {
-        allTodones = allTodones.filter((todone) => hasTag(todone.tags, "#focus"));
-      }
-    }
-    const todones = allTodones.slice(0, this.recentTodonesLimit);
     const section = container.createEl("div", { cls: "todone-section" });
     const header = section.createEl("div", {
       cls: "todo-section-header todone-header"
@@ -4303,61 +4280,6 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
       if (file instanceof import_obsidian11.TFile) {
         await this.app.workspace.getLeaf(false).openFile(file);
       }
-    });
-    if (allTodones.length === 0) {
-      let emptyText = "No completed TODOs";
-      if (this.focusModeEnabled) {
-        emptyText = "No focused TODOs completed today";
-      }
-      section.createEl("div", {
-        text: emptyText,
-        cls: "todo-empty"
-      });
-      return;
-    }
-    const list = section.createEl("ul", { cls: "todo-list todone-list" });
-    for (const todone of todones) {
-      this.renderTodoneItem(list, todone);
-    }
-  }
-  renderTodoneItem(list, todone) {
-    const item = list.createEl("li", { cls: "todo-item todone-item" });
-    const checkbox = item.createEl("input", {
-      type: "checkbox",
-      cls: "todo-checkbox",
-      attr: { checked: "checked" }
-    });
-    checkbox.addEventListener("change", async () => {
-      checkbox.disabled = true;
-      const success = await this.processor.uncompleteTodo(todone);
-      if (!success) {
-        checkbox.disabled = false;
-        checkbox.checked = true;
-      }
-    });
-    const textSpan = item.createEl("span", { cls: "todo-text todone-text" });
-    const cleanText = todone.text.replace(/#todones?\b/g, "").trim();
-    const completionDate = this.extractCompletionDate(cleanText);
-    const displayText = this.stripMarkdownSyntax(cleanText);
-    const textWithoutTags = displayText.replace(/#[\w-]+/g, "").replace(/@\d{4}-\d{2}-\d{2}/g, "").replace(/\s+/g, " ").trim();
-    textSpan.appendText(textWithoutTags);
-    textSpan.appendText(" ");
-    const tags = extractTags(cleanText);
-    this.renderTagDropdown(tags, item, todone);
-    if (completionDate) {
-      item.createEl("span", {
-        cls: "todo-date muted-pill",
-        text: completionDate
-      });
-    }
-    const link = item.createEl("a", {
-      text: "\u2192",
-      cls: "todo-link",
-      href: "#"
-    });
-    link.addEventListener("click", (e) => {
-      e.preventDefault();
-      openFileAtLine(this.app, todone.file, todone.lineNumber);
     });
   }
   renderPrinciples(container) {
@@ -4506,7 +4428,6 @@ var DEFAULT_SETTINGS = {
   focusListLimit: 5,
   activeTodosLimit: 0,
   priorityTags: ["#p0", "#p1", "#p2", "#p3", "#p4"],
-  recentTodonesLimit: 5,
   excludeFoldersFromProjects: ["log"],
   // Focus mode settings
   focusModeIncludeProjects: false,
@@ -5099,7 +5020,6 @@ var SpaceCommandPlugin = class extends import_obsidian12.Plugin {
         this.projectManager,
         this.settings.defaultTodoneFile,
         this.settings.priorityTags,
-        this.settings.recentTodonesLimit,
         this.settings.activeTodosLimit,
         this.settings.focusListLimit,
         this.settings.focusModeIncludeProjects,
@@ -5692,15 +5612,6 @@ var SpaceCommandSettingTab = class extends import_obsidian12.PluginSettingTab {
           this.plugin.settings.excludeFoldersFromProjects
         );
         await this.plugin.saveSettings();
-      })
-    );
-    new import_obsidian12.Setting(containerEl).setName("Recent TODONEs limit").setDesc("Maximum number of recent TODONEs to show in sidebar").addText(
-      (text) => text.setPlaceholder("5").setValue(String(this.plugin.settings.recentTodonesLimit)).onChange(async (value) => {
-        const num = parseInt(value);
-        if (!isNaN(num) && num > 0) {
-          this.plugin.settings.recentTodonesLimit = num;
-          await this.plugin.saveSettings();
-        }
       })
     );
     containerEl.createEl("h3", { text: "Triage" });

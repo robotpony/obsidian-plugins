@@ -2,6 +2,13 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.113] - 2026-03-30
+
+### Changed
+
+- **Simplified sidebar DONE section**: Removed the TODONE item list from the sidebar. The DONE section now shows only the heading and a link to the done file. Open the file to see completed items.
+- Removed the "Recent TODONEs limit" setting (no longer applicable).
+
 ## [0.9.112] - 2026-03-30
 
 ### Added

@@ -186,7 +186,6 @@ export default class SpaceCommandPlugin extends Plugin {
           this.projectManager,
           this.settings.defaultTodoneFile,
           this.settings.priorityTags,
-          this.settings.recentTodonesLimit,
           this.settings.activeTodosLimit,
           this.settings.focusListLimit,
           this.settings.focusModeIncludeProjects,
@@ -1059,22 +1058,6 @@ class SpaceCommandSettingTab extends PluginSettingTab {
             );
 
             await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName("Recent TODONEs limit")
-      .setDesc("Maximum number of recent TODONEs to show in sidebar")
-      .addText((text) =>
-        text
-          .setPlaceholder("5")
-          .setValue(String(this.plugin.settings.recentTodonesLimit))
-          .onChange(async (value) => {
-            const num = parseInt(value);
-            if (!isNaN(num) && num > 0) {
-              this.plugin.settings.recentTodonesLimit = num;
-              await this.plugin.saveSettings();
-            }
           })
       );
 
