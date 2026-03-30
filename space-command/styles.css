@@ -1917,3 +1917,24 @@
   margin-bottom: 16px;
 }
 
+/* #moved lines: dimmed to show provenance without visual noise */
+/* Reading mode: dim the paragraph/list-item containing #moved */
+.markdown-preview-view p:has(a.tag[href="#moved"]),
+.markdown-preview-view li:has(a.tag[href="#moved"]) {
+  opacity: 0.45;
+}
+
+.markdown-preview-view p:has(a.tag[href="#moved"]):hover,
+.markdown-preview-view li:has(a.tag[href="#moved"]):hover {
+  opacity: 0.8;
+}
+
+/* Live Preview: dim the editor line containing #moved */
+.cm-line:has(.cm-tag-moved) {
+  opacity: 0.45;
+}
+
+.cm-line:has(.cm-tag-moved):hover {
+  opacity: 0.8;
+}
+

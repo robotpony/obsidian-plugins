@@ -2,6 +2,12 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.114] - 2026-03-30
+
+### Added
+
+- **`#moved` lines visually dimmed in documents**: Lines containing `#moved` tags now render at reduced opacity (0.45) in both Reading mode and Live Preview, making them visually distinct from active TODOs and completed TODONEs. Hover restores readability (0.8). Uses Obsidian's native `a.tag[href]` and `.cm-tag-*` CSS selectors with `:has()` for line-level targeting.
+
 ## [0.9.113] - 2026-03-30
 
 ### Changed
