@@ -16,6 +16,7 @@ export const showNotice = createNoticeFactory(LOGO_PREFIX, "space-command-logo")
  */
 export const PLUGIN_TAGS = new Set([
   '#todo', '#todos', '#todone', '#todones',
+  '#moved',
   '#idea', '#ideas', '#ideation',
   '#principle', '#principles'
 ]);
@@ -137,6 +138,7 @@ export function getPriorityValue(tags: string[]): number {
 export function getTagCount(tags: string[]): number {
   const systemTags = new Set([
     "#todo", "#todos", "#todone", "#todones",
+    "#moved",
     "#idea", "#ideas", "#ideation",
     "#principle", "#principles",
     "#focus", "#today", "#future", "#snooze", "#snoozed",
@@ -293,6 +295,24 @@ export function replaceTodoWithTodone(text: string, date: string): string {
     return text.replace(/#todos\b/, `#todones @${date}`);
   }
   return text.replace(/#todo\b/, `#todone @${date}`);
+}
+
+export function replaceTodoWithMoved(text: string, date: string): string {
+  // Handle both singular #todo and plural #todos
+  if (text.includes('#todos')) {
+    return text.replace(/#todos\b/, `#moved @${date}`);
+  }
+  return text.replace(/#todo\b/, `#moved @${date}`);
+}
+
+/**
+ * Extract a YYYY-MM-DD date from a filename.
+ * Matches filenames like "2026-03-30.md" or "2026-03-30 daily notes.md".
+ * Returns null if no date pattern is found.
+ */
+export function extractDateFromFilename(basename: string): string | null {
+  const match = basename.match(/(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : null;
 }
 
 export function replaceTodoneWithTodo(text: string): string {

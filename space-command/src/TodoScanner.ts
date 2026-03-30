@@ -1,6 +1,6 @@
 import { App, TFile, Vault, Events, debounce } from "obsidian";
 import { TodoItem } from "./types";
-import { createFingerprint, extractTags, filenameToTag, hasCachedRelevantTags, hasCheckboxFormat, isCheckboxChecked } from "./utils";
+import { createFingerprint, extractDateFromFilename, extractTags, filenameToTag, hasCachedRelevantTags, hasCheckboxFormat, isCheckboxChecked } from "./utils";
 
 export class TodoScanner extends Events {
   private app: App;
@@ -82,6 +82,7 @@ export class TodoScanner extends Events {
       const linesToCleanup: number[] = [];
       const linesToSyncTodone: number[] = [];
       const linesToRemoveIdea: number[] = [];
+      const linesToStampMoved: number[] = [];
 
       // Track code block state
       let inCodeBlock = false;
@@ -109,6 +110,15 @@ export class TodoScanner extends Events {
         // so tags inside inline code (like `#todo`) are correctly ignored.
 
         const tags = extractTags(line);
+
+        // #moved lines are excluded from all caches (deduplication).
+        // Auto-stamp a date if missing (same pattern as checkbox-sync for #todone).
+        if (tags.includes("#moved")) {
+          if (!/@\d{4}-\d{2}-\d{2}/.test(line)) {
+            linesToStampMoved.push(i);
+          }
+          continue;
+        }
 
         // Check if this is a header with #todo or #todone
         const headerInfo = this.detectHeader(line);
@@ -286,7 +296,7 @@ export class TodoScanner extends Events {
       }
 
       // Apply all queued line mutations in one write to avoid concurrent vault.modify() calls
-      await this.applyLineMutations(file, lines, linesToCleanup, linesToSyncTodone, linesToRemoveIdea);
+      await this.applyLineMutations(file, lines, linesToCleanup, linesToSyncTodone, linesToRemoveIdea, linesToStampMoved);
 
       if (todos.length > 0) {
         this.todosCache.set(file.path, todos);
@@ -471,9 +481,10 @@ export class TodoScanner extends Events {
     lines: string[],
     linesToCleanup: number[],
     linesToSyncTodone: number[],
-    linesToRemoveIdea: number[]
+    linesToRemoveIdea: number[],
+    linesToStampMoved: number[] = []
   ): Promise<void> {
-    if (linesToCleanup.length === 0 && linesToSyncTodone.length === 0 && linesToRemoveIdea.length === 0) {
+    if (linesToCleanup.length === 0 && linesToSyncTodone.length === 0 && linesToRemoveIdea.length === 0 && linesToStampMoved.length === 0) {
       return;
     }
 
@@ -493,6 +504,15 @@ export class TodoScanner extends Events {
     for (const lineNum of linesToRemoveIdea) {
       const newLine = lines[lineNum].replace(/#idea(?:s|tion)?\b\s*/g, "");
       if (newLine !== lines[lineNum]) { lines[lineNum] = newLine; modified = true; }
+    }
+
+    // Auto-stamp #moved lines that are missing a @date
+    if (linesToStampMoved.length > 0) {
+      const movedDate = extractDateFromFilename(file.basename) || today;
+      for (const lineNum of linesToStampMoved) {
+        const newLine = lines[lineNum].trimEnd() + ` @${movedDate}`;
+        if (newLine !== lines[lineNum]) { lines[lineNum] = newLine; modified = true; }
+      }
     }
 
     if (modified) {

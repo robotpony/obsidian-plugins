@@ -4,6 +4,7 @@ import {
   formatDate,
   modifyFileLine,
   replaceTodoWithTodone,
+  replaceTodoWithMoved,
   markCheckboxComplete,
   replaceTodoneWithTodo,
   markCheckboxIncomplete,
@@ -18,6 +19,7 @@ export class TodoProcessor {
   private app: App;
   private dateFormat: string;
   private onComplete?: () => void;
+  private onMoveHistoryUpdate?: (path: string) => void;
   private scanner?: TodoScanner;
 
   constructor(app: App, dateFormat: string = "YYYY-MM-DD") {
@@ -31,6 +33,10 @@ export class TodoProcessor {
 
   setOnCompleteCallback(callback: () => void): void {
     this.onComplete = callback;
+  }
+
+  setOnMoveHistoryUpdate(callback: (path: string) => void): void {
+    this.onMoveHistoryUpdate = callback;
   }
 
   async completeTodo(
@@ -130,6 +136,113 @@ export class TodoProcessor {
       showNotice("Failed to uncomplete TODO. See console for details.");
       return false;
     }
+  }
+
+  /**
+   * Move a TODO from its current file to a destination file.
+   * Source line gets #todo → #moved @date; destination gets a fresh #todo copy.
+   * Header TODOs move with all their children as a block.
+   */
+  async moveTodo(todo: TodoItem, destinationPath: string): Promise<boolean> {
+    try {
+      if (todo.filePath === destinationPath) {
+        showNotice("Cannot move to the same file.");
+        return false;
+      }
+
+      const today = formatDate(new Date(), this.dateFormat);
+
+      // Collect lines to move (header + children, or single item)
+      const sourceContent = await this.app.vault.read(todo.file);
+      const sourceLines = sourceContent.split("\n");
+
+      const lineNumbers = [todo.lineNumber];
+      if (todo.isHeader && todo.childLineNumbers && todo.childLineNumbers.length > 0) {
+        lineNumbers.push(...todo.childLineNumbers);
+      }
+      lineNumbers.sort((a, b) => a - b);
+
+      // Build the text block for the destination (fresh #todo copies)
+      const destLines: string[] = [];
+      for (const lineNum of lineNumbers) {
+        if (lineNum < 0 || lineNum >= sourceLines.length) continue;
+        destLines.push(sourceLines[lineNum]);
+      }
+
+      // Append to destination file
+      await this.appendToDestination(destinationPath, destLines.join("\n"));
+
+      // Mark source lines as #moved @date
+      for (const lineNum of lineNumbers) {
+        if (lineNum < 0 || lineNum >= sourceLines.length) continue;
+        let line = sourceLines[lineNum];
+        if (line.includes("#todo")) {
+          line = replaceTodoWithMoved(line, today);
+        } else {
+          // Child item without explicit #todo tag — append #moved @date
+          line = line.trimEnd() + ` #moved @${today}`;
+        }
+        sourceLines[lineNum] = line;
+      }
+      await this.app.vault.modify(todo.file, sourceLines.join("\n"));
+
+      // Rescan both files
+      if (this.scanner) {
+        await this.scanner.scanFile(todo.file);
+        const destFile = this.app.vault.getAbstractFileByPath(destinationPath);
+        if (destFile instanceof TFile) {
+          await this.scanner.scanFile(destFile);
+        }
+      }
+
+      // Record move target in history
+      if (this.onMoveHistoryUpdate) {
+        this.onMoveHistoryUpdate(destinationPath);
+      }
+
+      if (this.onComplete) {
+        this.onComplete();
+      }
+
+      const basename = destinationPath.split("/").pop()?.replace(/\.md$/, "") || destinationPath;
+      const childCount = (todo.isHeader && todo.childLineNumbers?.length) || 0;
+      const message = childCount > 0
+        ? `Moved to ${basename} (including ${childCount} child item${childCount > 1 ? 's' : ''})`
+        : `Moved to ${basename}`;
+      showNotice(message);
+      return true;
+    } catch (error) {
+      console.error("Error moving TODO:", error);
+      showNotice("Failed to move TODO. See console for details.");
+      return false;
+    }
+  }
+
+  /**
+   * Append text to a destination file, creating it if it doesn't exist.
+   */
+  private async appendToDestination(filePath: string, text: string): Promise<void> {
+    let file = this.app.vault.getAbstractFileByPath(filePath);
+
+    if (!file) {
+      const pathParts = filePath.split("/");
+      pathParts.pop();
+      const folderPath = pathParts.join("/");
+      if (folderPath) {
+        await this.ensureFolderExists(folderPath);
+      }
+      file = await this.app.vault.create(filePath, "");
+    }
+
+    if (!(file instanceof TFile)) {
+      throw new Error(`${filePath} is not a file`);
+    }
+
+    const currentContent = await this.app.vault.read(file);
+    const newContent = currentContent
+      ? `${currentContent}\n${text}`
+      : text;
+    await this.app.vault.modify(file, newContent);
   }
 
   private async revertSourceFile(todo: TodoItem): Promise<void> {

@@ -48,7 +48,8 @@ export class TodoSidebarView extends ItemView {
     triageActiveThreshold: number,
     onShowAbout: () => void,
     onShowStats: () => void,
-    onShowTriage: () => void
+    onShowTriage: () => void,
+    getMoveHistory: () => string[] = () => []
   ) {
     super(leaf);
     this.scanner = scanner;
@@ -70,7 +71,8 @@ export class TodoSidebarView extends ItemView {
     this.contextMenuHandler = new ContextMenuHandler(
       this.app,
       processor,
-      priorityTags
+      priorityTags,
+      getMoveHistory
     );
   }
 

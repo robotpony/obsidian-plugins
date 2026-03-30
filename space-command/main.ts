@@ -1,5 +1,6 @@
 import {
   App,
+  MarkdownView,
   Modal,
   Plugin,
   PluginSettingTab,
@@ -22,7 +23,8 @@ import {
   TodoItem,
 } from "./src/types";
 import { convertToSlackMarkdown } from "./src/SlackConverter";
-import { showNotice } from "./src/utils";
+import { extractTags, showNotice } from "./src/utils";
+import { MoveTargetModal } from "./src/MoveTargetModal";
 import { TabLockManager } from "./src/TabLockManager";
 import { createHeaderSortPlugin } from "./src/HeaderSortExtension";
 import { createHeaderChecklistExtension } from "./src/HeaderChecklistExtension";
@@ -62,7 +64,8 @@ export default class SpaceCommandPlugin extends Plugin {
       this.settings.defaultTodoneFile,
       this.settings.focusListLimit,
       this.settings.priorityTags,
-      this.settings.makeLinksClickable
+      this.settings.makeLinksClickable,
+      () => this.settings.moveHistory
     );
 
     // Initialize tab lock manager
@@ -85,6 +88,14 @@ export default class SpaceCommandPlugin extends Plugin {
       // File will be modified, which will trigger scanner's file watcher
       // But we can also refresh the workspace to update embeds
       this.app.workspace.trigger("markdown-changed");
+    });
+
+    // Track move-to targets for the file picker
+    this.processor.setOnMoveHistoryUpdate(async (path: string) => {
+      const history = this.settings.moveHistory.filter(p => p !== path);
+      history.unshift(path);
+      this.settings.moveHistory = history.slice(0, 10);
+      await this.saveData(this.settings);
     });
 
     // Set up file watchers immediately so changes during startup are not missed.
@@ -184,7 +195,8 @@ export default class SpaceCommandPlugin extends Plugin {
           this.settings.triageActiveThreshold,
           () => this.showAboutModal(),
           () => this.showStatsModal(),
-          () => this.showTriageModal()
+          () => this.showTriageModal(),
+          () => this.settings.moveHistory
         )
     );
 
@@ -263,6 +275,44 @@ export default class SpaceCommandPlugin extends Plugin {
       callback: async () => {
         await this.scanner.scanVault();
         this.sidebarManager.refresh();
+      },
+    });
+
+    this.addCommand({
+      id: "move-todo",
+      name: "Move TODO to another file",
+      editorCallback: (editor) => {
+        const cursor = editor.getCursor();
+        const line = editor.getLine(cursor.line);
+        const tags = extractTags(line);
+
+        if (!tags.includes("#todo") && !tags.includes("#todos")) {
+          showNotice("Cursor is not on a #todo line");
+          return;
+        }
+
+        // Find the matching TodoItem from scanner
+        const file = this.app.workspace.getActiveViewOfType(MarkdownView)?.file;
+        if (!file) return;
+
+        const todos = this.scanner.getTodos();
+        const todo = todos.find(
+          (t) => t.file.path === file.path && t.lineNumber === cursor.line
+        );
+
+        if (!todo) {
+          showNotice("Could not find TODO at cursor");
+          return;
+        }
+
+        new MoveTargetModal(
+          this.app,
+          this.settings.moveHistory,
+          file.path,
+          async (targetFile) => {
+            await this.processor.moveTodo(todo, targetFile.path);
+          }
+        ).open();
       },
     });
 

@@ -49,7 +49,11 @@ Items sort by: focus → priority → tag count (more tags = more context = high
 - [ ] Update welcome email #todo #onboarding
 ```
 
-Right-click any TODO for quick actions: Focus, Later, Snooze, Copy.
+Right-click any TODO for quick actions: Focus, Later, Snooze, Copy, Move to.
+
+### Moving TODOs between files
+
+Use "Move to..." (right-click menu or command palette) to relocate a TODO to another file. The source line becomes `#moved @date` (hidden from all views), and a fresh copy appears in the destination. Header TODOs move with all their children. You can also type `#moved` manually—the plugin auto-stamps the date.
 
 ## Ideas Tab
 

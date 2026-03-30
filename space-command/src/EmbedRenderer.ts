@@ -35,7 +35,8 @@ export class EmbedRenderer {
     defaultTodoneFile: string = "todos/done.md",
     focusListLimit: number = 5,
     priorityTags: string[] = ["#p0", "#p1", "#p2", "#p3", "#p4"],
-    makeLinksClickable: boolean = true
+    makeLinksClickable: boolean = true,
+    getMoveHistory: () => string[] = () => []
   ) {
     this.app = app;
     this.scanner = scanner;
@@ -45,7 +46,7 @@ export class EmbedRenderer {
     this.focusListLimit = focusListLimit;
     this.priorityTags = priorityTags;
     this.makeLinksClickable = makeLinksClickable;
-    this.contextMenuHandler = new ContextMenuHandler(app, processor, priorityTags);
+    this.contextMenuHandler = new ContextMenuHandler(app, processor, priorityTags, getMoveHistory);
   }
 
   // Get project colour map for tag colouring (cached per render cycle)

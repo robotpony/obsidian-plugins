@@ -13,7 +13,10 @@
     "strictNullChecks": true,
     "lib": ["DOM", "ES2018"],
     "skipLibCheck": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "paths": {
+      "obsidian": ["./node_modules/obsidian"]
+    }
   },
   "include": ["**/*.ts", "../shared/**/*.ts"]
 }

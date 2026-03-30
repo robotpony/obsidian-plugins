@@ -2,6 +2,17 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.112] - 2026-03-30
+
+### Added
+
+- **`#moved` tag for TODO provenance tracking**: When TODOs are relocated between files, the source line gets `#todo` replaced with `#moved @date`, keeping an audit trail while eliminating duplicates. The scanner excludes `#moved` lines from all caches, sidebar, and embeds.
+- **"Move to..." context menu action**: Right-click any TODO in the sidebar or embed to move it to another file. Opens a file picker showing pinned/bookmarked files, open tabs, recent move targets, then all vault files.
+- **"Move TODO to another file" command**: Available from the command palette, operates on the TODO at the cursor position.
+- **Auto-stamp dates on `#moved` lines**: Manually typing `#moved` without a date triggers automatic date stamping. Uses the filename date (for log files like `2026-03-30.md`) or today's date as fallback.
+- **Move history tracking**: Recent move destinations (last 10) are persisted in settings and shown first in the file picker.
+- Unit tests for `replaceTodoWithMoved`, `extractDateFromFilename`, and `#moved` tag handling.
+
 ## [0.9.111] - 2026-03-26
 
 ### Fixed

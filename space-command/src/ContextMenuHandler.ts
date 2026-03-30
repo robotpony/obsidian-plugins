@@ -1,21 +1,25 @@
-import { App, Menu } from "obsidian";
+import { App, Menu, TFile } from "obsidian";
 import { TodoItem, ProjectInfo } from "./types";
 import { TodoProcessor } from "./TodoProcessor";
 import { TodoScanner } from "./TodoScanner";
+import { MoveTargetModal } from "./MoveTargetModal";
 
 export class ContextMenuHandler {
   private app: App;
   private processor: TodoProcessor;
   private priorityTags: string[];
+  private getMoveHistory: () => string[];
 
   constructor(
     app: App,
     processor: TodoProcessor,
-    priorityTags: string[]
+    priorityTags: string[],
+    getMoveHistory: () => string[]
   ) {
     this.app = app;
     this.processor = processor;
     this.priorityTags = priorityTags;
+    this.getMoveHistory = getMoveHistory;
   }
 
   /**
@@ -36,6 +40,24 @@ export class ContextMenuHandler {
         .setIcon("copy")
         .onClick(async () => {
           await navigator.clipboard.writeText(todo.text);
+        });
+    });
+
+    // Move to... - move TODO to another file
+    menu.addItem((item) => {
+      item
+        .setTitle("Move to...")
+        .setIcon("arrow-right")
+        .onClick(() => {
+          new MoveTargetModal(
+            this.app,
+            this.getMoveHistory(),
+            todo.filePath,
+            async (file: TFile) => {
+              const success = await this.processor.moveTodo(todo, file.path);
+              if (success) onRefresh();
+            }
+          ).open();
         });
     });
 

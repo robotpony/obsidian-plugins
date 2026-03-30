@@ -69,6 +69,8 @@ export interface SpaceCommandSettings {
   // Triage settings
   triageSnoozedThreshold: number;
   triageActiveThreshold: number;
+  // Move history (recent move-to targets)
+  moveHistory: string[];
 }
 
 export const DEFAULT_SETTINGS: SpaceCommandSettings = {
@@ -91,4 +93,6 @@ export const DEFAULT_SETTINGS: SpaceCommandSettings = {
   // Triage settings
   triageSnoozedThreshold: 10,
   triageActiveThreshold: 20,
+  // Move history
+  moveHistory: [],
 };
