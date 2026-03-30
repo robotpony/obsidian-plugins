@@ -2,6 +2,12 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.115] - 2026-03-30
+
+### Added
+
+- **Copy as Notion Markdown** command (Cmd/Ctrl+Shift+N): Copies selected text as Notion-compatible markdown. Converts Obsidian wiki links to plain text, strips embeds, converts callouts to blockquotes, and removes plugin-specific tags (#todo, #todone, #p0–#p4, #focus, #future, #moved). Standard markdown (bold, italic, code, links, lists, headings, checkboxes) is preserved. Also available from the editor right-click menu.
+
 ## [0.9.114] - 2026-03-30
 
 ### Added

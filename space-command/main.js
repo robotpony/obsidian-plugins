@@ -4498,6 +4498,43 @@ function convertInlineFormatting(text) {
   return result;
 }
 
+// src/NotionConverter.ts
+var PLUGIN_TAGS2 = /\s*#(?:todo|todone|idea|ideas|ideation|principle|p[0-4]|focus|future|moved)\b/g;
+var CALLOUT_RE = /^(>\s*)\[!(\w+)\]\s*(.*)/;
+var WIKI_LINK_ALIAS_RE = /\[\[([^\]|]+)\|([^\]]+)\]\]/g;
+var WIKI_LINK_RE = /\[\[([^\]|]+)\]\]/g;
+var EMBED_RE = /!\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g;
+function convertToNotionMarkdown(markdown) {
+  const lines = markdown.split("\n");
+  const result = [];
+  let inCodeBlock = false;
+  for (const line of lines) {
+    if (line.trim().startsWith("```")) {
+      inCodeBlock = !inCodeBlock;
+      result.push(line);
+      continue;
+    }
+    if (inCodeBlock) {
+      result.push(line);
+      continue;
+    }
+    let processed = line;
+    const calloutMatch = processed.match(CALLOUT_RE);
+    if (calloutMatch) {
+      const [, prefix, type, title] = calloutMatch;
+      const label = type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
+      processed = title ? `${prefix}**${label}:** ${title}` : `${prefix}**${label}**`;
+    }
+    processed = processed.replace(EMBED_RE, "");
+    processed = processed.replace(WIKI_LINK_ALIAS_RE, "$2");
+    processed = processed.replace(WIKI_LINK_RE, "$1");
+    processed = processed.replace(PLUGIN_TAGS2, "");
+    processed = processed.replace(/\s+$/, "");
+    result.push(processed);
+  }
+  return result.join("\n");
+}
+
 // src/TabLockManager.ts
 var TabLockManager = class {
   constructor(app) {
@@ -5147,6 +5184,26 @@ var SpaceCommandPlugin = class extends import_obsidian12.Plugin {
         }
       ]
     });
+    this.addCommand({
+      id: "copy-as-notion",
+      name: "Copy as Notion Markdown",
+      editorCallback: async (editor) => {
+        const selection = editor.getSelection();
+        if (!selection) {
+          showNotice2("No text selected");
+          return;
+        }
+        const notionMd = convertToNotionMarkdown(selection);
+        await navigator.clipboard.writeText(notionMd);
+        showNotice2("Copied as Notion markdown");
+      },
+      hotkeys: [
+        {
+          modifiers: ["Mod", "Shift"],
+          key: "n"
+        }
+      ]
+    });
     this.registerEvent(
       this.app.workspace.on("editor-menu", (menu, editor) => {
         const selection = editor.getSelection();
@@ -5156,6 +5213,13 @@ var SpaceCommandPlugin = class extends import_obsidian12.Plugin {
               const slackMd = convertToSlackMarkdown(selection);
               await navigator.clipboard.writeText(slackMd);
               showNotice2("Copied as Slack markdown");
+            });
+          });
+          menu.addItem((item) => {
+            item.setTitle("Copy as Notion").setIcon("clipboard-copy").onClick(async () => {
+              const notionMd = convertToNotionMarkdown(selection);
+              await navigator.clipboard.writeText(notionMd);
+              showNotice2("Copied as Notion markdown");
             });
           });
         }

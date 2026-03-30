@@ -177,6 +177,10 @@ Dates use your configured format (default: `YYYY-MM-DD`).
 
 Select text and use `Cmd/Ctrl+Shift+C` or right-click → "Copy as Slack" to copy markdown formatted for Slack (bold, italic, links, lists).
 
+## Copy as Notion
+
+Select text and use `Cmd/Ctrl+Shift+N` or right-click → "Copy as Notion" to copy markdown formatted for Notion. Converts wiki links to plain text, strips embeds and plugin tags (#todo, #p0, etc.), and converts callouts to blockquotes. Standard markdown is preserved as-is.
+
 ## Installation
 
 From the repo root, run `./install.sh` and follow the prompts to select vaults.

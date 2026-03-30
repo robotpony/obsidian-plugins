@@ -23,6 +23,7 @@ import {
   TodoItem,
 } from "./src/types";
 import { convertToSlackMarkdown } from "./src/SlackConverter";
+import { convertToNotionMarkdown } from "./src/NotionConverter";
 import { extractTags, showNotice } from "./src/utils";
 import { MoveTargetModal } from "./src/MoveTargetModal";
 import { TabLockManager } from "./src/TabLockManager";
@@ -336,7 +337,28 @@ export default class SpaceCommandPlugin extends Plugin {
       ],
     });
 
-    // Editor context menu: Copy as Slack and Define
+    this.addCommand({
+      id: "copy-as-notion",
+      name: "Copy as Notion Markdown",
+      editorCallback: async (editor) => {
+        const selection = editor.getSelection();
+        if (!selection) {
+          showNotice("No text selected");
+          return;
+        }
+        const notionMd = convertToNotionMarkdown(selection);
+        await navigator.clipboard.writeText(notionMd);
+        showNotice("Copied as Notion markdown");
+      },
+      hotkeys: [
+        {
+          modifiers: ["Mod", "Shift"],
+          key: "n",
+        },
+      ],
+    });
+
+    // Editor context menu: Copy as Slack, Copy as Notion, and Define
     this.registerEvent(
       this.app.workspace.on("editor-menu", (menu, editor) => {
         const selection = editor.getSelection();
@@ -349,6 +371,16 @@ export default class SpaceCommandPlugin extends Plugin {
                 const slackMd = convertToSlackMarkdown(selection);
                 await navigator.clipboard.writeText(slackMd);
                 showNotice("Copied as Slack markdown");
+              });
+          });
+          menu.addItem((item) => {
+            item
+              .setTitle("Copy as Notion")
+              .setIcon("clipboard-copy")
+              .onClick(async () => {
+                const notionMd = convertToNotionMarkdown(selection);
+                await navigator.clipboard.writeText(notionMd);
+                showNotice("Copied as Notion markdown");
               });
           });
         }
