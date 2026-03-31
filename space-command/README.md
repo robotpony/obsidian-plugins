@@ -40,7 +40,9 @@ That's it. Everything else is optional.
 | `#p0` – `#p4` | Priority levels (0 = highest) |
 | `#future` | Snoozed—hidden from active list |
 
-Items sort by: focus → priority → tag count (more tags = more context = higher). Focus projects list shows top 5 by default; TODO list shows all. Configure limits in Settings. Click the eye icon in the Focus header to toggle focus mode—filters projects, TODOs, Ideas, and Principles to show only `#focus` items (or items from focused projects when that setting is enabled). The DONE section links to your done file.
+Items sort by: focus → priority → tag count (more tags = more context = higher).
+
+**Focus mode**: Click the eye icon in the sidebar header to filter everything to `#focus` items only. When "Focus mode includes project TODOs" is enabled in Settings, Ideas and Principles from focused projects also appear.
 
 **Project tags** group TODOs in the sidebar's Focus section. Any tag that isn't a priority or type tag becomes a project:
 
@@ -49,13 +51,17 @@ Items sort by: focus → priority → tag count (more tags = more context = high
 - [ ] Update welcome email #todo #onboarding
 ```
 
+The Focus section shows your top 5 projects by default. The DONE section links to your done file. Both limits are configurable in Settings.
+
 Right-click any TODO for quick actions: Focus, Later, Snooze, Copy, Move to.
 
 ### Moving TODOs between files
 
-Use "Move to..." (right-click menu or command palette) to relocate a TODO to another file. The source line becomes `#moved @date` (hidden from all views), and a fresh copy appears in the destination. Header TODOs move with all their children. You can also type `#moved` manually—the plugin auto-stamps the date.
+Use "Move to..." (right-click menu or command palette) to relocate a TODO to another file. The source line becomes `#moved @date`, and a fresh copy appears in the destination. Header TODOs move with all their children.
 
-## Ideas Tab
+Moved lines are dimmed in both Reading mode and Live Preview, so they stay visible as an audit trail without cluttering your active view. You can also type `#moved` manually—the plugin auto-stamps the date.
+
+## Ideas and Principles
 
 Capture ideas separately from actionable TODOs. The sidebar has two tabs—TODOs and Ideas.
 
@@ -66,31 +72,17 @@ Capture ideas separately from actionable TODOs. The sidebar has two tabs—TODOs
 
 Click an idea's checkbox to dismiss it. Right-click to promote it to a TODO.
 
-## Tab Lock
+## Header TODOs
 
-Keep documents open while navigating. When you click links from a locked tab, they open in new tabs instead of replacing the current view.
+Add `#todo` to a heading—all list items below become children:
 
-1. Enable in Settings → "Show tab lock buttons"
-2. Click the padlock icon on any tab header to lock the tab
-3. Locked tabs show a pushpin; click it to unlock
-
-Uses Obsidian's native pinning, so locked tabs also stay open when closing other tabs.
-
-## Clickable Links
-
-Links in TODOs, ideas, and principles are clickable by default in both sidebar and embeds. Both wiki-style links (`[[page]]`, `[[page|alias]]`) and markdown links (`[text](url)`) work:
-
-- **Wiki links** navigate to the page in Obsidian when clicked
-- **External links** open in a new browser window
-- **Disable in Settings** → "Make links clickable in lists" to show links as plain text instead
-
-Example:
 ```markdown
-- [ ] Review the [[API Spec|spec]] #todo
-- [ ] Check [documentation](https://example.com) #todo
+## Sprint 12 #todo
+- Fix auth bug
+- Update docs
 ```
 
-Both links will be clickable in the sidebar and embeds.
+Completing the header completes all children. Sort buttons appear inline to re-sort children by priority tag.
 
 ## Embed and Filter
 
@@ -120,20 +112,6 @@ Filters: `path:` (folder), `tags:` (require tags), `limit:` (cap list), `todone:
 {{focus-ideas | tags:#project path:notes/}}
 ```
 
-## Header TODOs
-
-Add `#todo` to a heading—all list items below become children:
-
-```markdown
-## Sprint 12 #todo
-- Fix auth bug
-- Update docs
-```
-
-Completing the header completes all children.
-
-Header TODO sections also show sort buttons inline—click to re-sort children by priority tag.
-
 ## Automatic File Tags
 
 TODOs in your projects folder without explicit project tags are grouped by filename:
@@ -146,9 +124,11 @@ TODOs in your projects folder without explicit project tags are grouped by filen
 
 Add an explicit project tag to override. Files outside the projects folder don't get inferred tags. Configure excluded folders (like `log`) in Settings.
 
-## Slash Commands
+## Editor Shortcuts
 
-Type `/` at the start of a line to see quick-insert options:
+### Slash commands
+
+Type `/` at the start of a line:
 
 | Command | Inserts |
 |---------|---------|
@@ -157,29 +137,32 @@ Type `/` at the start of a line to see quick-insert options:
 | `/today` | Today's date |
 | `/tomorrow` | Tomorrow's date |
 
-## Date Suggestions
+### Date suggestions
 
-Type `@` anywhere to insert dates quickly:
+Type `@` anywhere to insert dates: `@today`, `@tomorrow`, `@yesterday`. Format is configurable (default: `YYYY-MM-DD`).
 
-- `@today` → current date
-- `@tomorrow` → next day
-- `@yesterday` → previous day
+### Copy for other tools
 
-Dates use your configured format (default: `YYYY-MM-DD`).
+Select text and right-click, or use the keyboard shortcuts:
 
-## Stats and Triage
+- **Copy as Slack** (`Cmd/Ctrl+Shift+C`): Converts markdown to Slack's mrkdwn format (headings become bold, adjusted emphasis markers).
+- **Copy as Notion** (`Cmd/Ctrl+Shift+N`): Strips Obsidian-specific syntax (wiki links become plain text, embeds removed, callouts become blockquotes, plugin tags stripped). Standard markdown is preserved.
 
-**Stats**: Click the chart icon in the sidebar header to see counts of active TODOs, focused items, snoozed items, ideas, and principles.
+## Sidebar Features
 
-**Triage**: When you have too many snoozed or active items (configurable thresholds), a triage alert appears. Click it to process items one by one with quick actions: Snooze, Clear, Convert (TODO ↔ Idea), Focus, Skip.
+### Stats and triage
 
-## Copy as Slack
+Click the chart icon in the sidebar header to see counts of active TODOs, focused items, snoozed items, ideas, and principles.
 
-Select text and use `Cmd/Ctrl+Shift+C` or right-click → "Copy as Slack" to copy markdown formatted for Slack (bold, italic, links, lists).
+When you have too many snoozed or active items (configurable thresholds), a triage alert appears. Click it to process items one by one: Snooze, Clear, Convert (TODO ↔ Idea), Focus, Skip.
 
-## Copy as Notion
+### Clickable links
 
-Select text and use `Cmd/Ctrl+Shift+N` or right-click → "Copy as Notion" to copy markdown formatted for Notion. Converts wiki links to plain text, strips embeds and plugin tags (#todo, #p0, etc.), and converts callouts to blockquotes. Standard markdown is preserved as-is.
+Links in TODOs, ideas, and principles are clickable in both sidebar and embeds. Wiki links (`[[page]]`) navigate within Obsidian; external links open in a browser. Disable in Settings → "Make links clickable in lists."
+
+### Tab lock
+
+Keep documents open while navigating. Enable in Settings → "Show tab lock buttons," then click the padlock icon on any tab header. Links clicked from a locked tab open in new tabs instead of replacing the current view. Uses Obsidian's native pinning.
 
 ## Installation
 
