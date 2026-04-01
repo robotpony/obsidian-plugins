@@ -931,6 +931,7 @@
   display: flex;
   align-items: flex-start;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .todo-header-row > .todo-text {
@@ -1112,9 +1113,9 @@
   font-family: var(--font-monospace);
   font-size: 0.75em;
   color: var(--text-faint);
-  margin-left: 6px;
-  flex-shrink: 0;
-  align-self: center;
+  flex-basis: 100%;
+  margin-left: 24px;
+  order: 99;
 }
 
 /* Tag dropdown styles - styled to match Obsidian's tag appearance */
