@@ -1,11 +1,39 @@
 import { App, Plugin, PluginSettingTab, Setting } from "obsidian";
 import { GCommandSettings, DEFAULT_SETTINGS } from "./src/types";
+import { GDriveSidebar, VIEW_TYPE_GDRIVE_SIDEBAR } from "./src/GDriveSidebar";
+import { DriveProvider } from "./src/DriveProvider";
+import { SidebarManager } from "../shared";
 
 export default class GCommandPlugin extends Plugin {
   settings: GCommandSettings;
+  private drive: DriveProvider;
+  private sidebarManager: SidebarManager;
 
   async onload() {
     await this.loadSettings();
+
+    this.drive = new DriveProvider(this.settings.rcloneRemote);
+    this.sidebarManager = new SidebarManager(this.app, VIEW_TYPE_GDRIVE_SIDEBAR);
+
+    this.registerView(
+      VIEW_TYPE_GDRIVE_SIDEBAR,
+      (leaf) => new GDriveSidebar(leaf, this.drive, this.settings)
+    );
+
+    this.app.workspace.onLayoutReady(() => {
+      this.sidebarManager.activate();
+    });
+
+    this.addCommand({
+      id: "open-drive-browser",
+      name: "Open Drive browser",
+      callback: () => this.sidebarManager.toggle(),
+    });
+
+    this.addRibbonIcon("hard-drive", "Google Drive", () => {
+      this.sidebarManager.toggle();
+    });
+
     this.addSettingTab(new GCommandSettingTab(this.app, this));
   }
 

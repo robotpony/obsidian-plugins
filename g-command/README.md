@@ -1,8 +1,13 @@
 # g-command
 
-Read-only access to Google Docs, Sheets, and other Drive files from Claude Code.
+Google Drive browser and sync for Obsidian, plus an MCP server for Claude Code.
 
-Google Drive files on a local mount (`.gdoc`, `.gsheet`) are JSON pointers — the actual content lives behind the API. This MCP server bridges that gap: Claude Code can read a Google Doc or Sheet without a manual export step.
+Two components in one package:
+
+1. **Obsidian plugin** — sidebar Drive browser that syncs Docs (→ markdown), Sheets (→ CSV), and other files into your vault
+2. **MCP server** — lets Claude Code search and read Drive files directly
+
+Google Drive files on a local mount (`.gdoc`, `.gsheet`) are JSON pointers — the actual content lives behind the API. Both components bridge that gap using rclone.
 
 ## What it does
 

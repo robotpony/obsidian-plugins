@@ -24,7 +24,7 @@ Adds a sidebar Drive browser to Obsidian. Users check files and folders to track
 
 - [x] Step 1: Plugin scaffold
 - [x] Step 2: DriveProvider — list and cat via rclone
-- [ ] Step 3: GDriveSidebar — file tree (no selection yet)
+- [x] Step 3: GDriveSidebar — file tree (no selection yet)
 - [ ] Step 4: Checkbox selection and settings persistence
 - [ ] Step 5: SyncManager — basic sync (overwrite all selected)
 - [ ] Step 6: Converter — HTML → markdown via turndown, CSV passthrough
