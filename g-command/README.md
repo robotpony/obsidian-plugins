@@ -2,92 +2,108 @@
 
 Read-only access to Google Docs, Sheets, and other Drive files from Claude Code.
 
-Google Drive files on a local mount (`.gdoc`, `.gsheet`) are JSON pointers — the actual content lives behind the API. This MCP server bridges that gap: Claude Code can read a Google Doc as markdown or a Sheet as CSV without a manual export step.
+Google Drive files on a local mount (`.gdoc`, `.gsheet`) are JSON pointers — the actual content lives behind the API. This MCP server bridges that gap: Claude Code can read a Google Doc or Sheet without a manual export step.
 
 ## What it does
 
-- **Search** your Drive by query (file name, content, type)
-- **Read** any Drive file, auto-converted to a usable format:
-  - Google Docs → Markdown
+- **Search** your Drive by filename (partial match)
+- **Read** any Drive file, auto-converted:
+  - Google Docs → plain text
   - Google Sheets → CSV
   - Google Slides → plain text
-  - Google Drawings → PNG
   - Everything else → native format
 - **Scope:** `drive.readonly` — no write access
 
 ## Prerequisites
 
 - Node.js 18+
-- A Google Cloud project with the Drive API enabled
+- [rclone](https://rclone.org/) (replaces GCP OAuth setup)
 - Claude Code
 
 ## Setup
 
-### 1. Get the server code
+### 1. Install rclone
 
 ```bash
-git clone https://github.com/modelcontextprotocol/servers-archived gdrive-mcp
-cd gdrive-mcp/src/gdrive
+brew install rclone
+```
+
+### 2. Configure a Google Drive remote
+
+```bash
+rclone config
+```
+
+In the wizard:
+1. `n` — new remote
+2. Name: `gdrive` (must match — the server looks for this name)
+3. Type: `drive`
+4. Client ID / secret: leave blank (uses rclone's built-in credentials)
+5. Scope: `2` (read-only)
+6. Root folder ID, service account: leave blank
+7. Advanced config: `n`
+8. Auto config: `y` — browser opens, log in and grant access
+9. Team drive: `n`
+
+Verify it works:
+
+```bash
+rclone lsjson gdrive: --max-depth 1
+```
+
+You should see a JSON array of your Drive contents.
+
+### 3. Build the server
+
+```bash
+cd src/gdrive
 npm install
 npm run build
 ```
 
-Forking the repo first is recommended — the original is archived.
-
-### 2. Create GCP credentials
-
-1. Create a project at [Google Cloud Console](https://console.cloud.google.com/)
-2. Enable the **Google Drive API**
-3. Create an **OAuth 2.0 Client ID** (Desktop app type)
-4. Download the JSON credentials file
-5. Save it to `~/.config/gdrive-mcp/gcp-oauth.json`
-
-See [PLAN.md](PLAN.md) for the full walkthrough.
-
-### 3. Authenticate
-
-```bash
-export GDRIVE_OAUTH_PATH=~/.config/gdrive-mcp/gcp-oauth.json
-node dist/index.js auth
-```
-
-This opens a browser OAuth flow and saves a token to `.gdrive-server-credentials.json`.
-
 ### 4. Register with Claude Code
 
 ```bash
-claude mcp add gdrive node /path/to/gdrive-mcp/src/gdrive/dist/index.js
+claude mcp add gdrive node /Users/you/writing/obsidian-plugins/g-command/src/gdrive/dist/index.js
 ```
 
-Or add to `.claude/settings.json`:
+Or add to `~/.claude/settings.json` (use absolute paths):
 
 ```json
 {
   "mcpServers": {
     "gdrive": {
       "command": "node",
-      "args": ["/path/to/gdrive-mcp/src/gdrive/dist/index.js"],
-      "env": {
-        "GDRIVE_OAUTH_PATH": "~/.config/gdrive-mcp/gcp-oauth.json"
-      }
+      "args": ["/Users/you/writing/obsidian-plugins/g-command/src/gdrive/dist/index.js"]
     }
   }
 }
 ```
 
+If your rclone remote is named something other than `gdrive`, set:
+
+```json
+"env": { "GDRIVE_RCLONE_REMOTE": "your-remote-name" }
+```
+
 ### 5. Verify
 
-Run `/mcp` in Claude Code. The `gdrive` server should appear as connected. Use the `search` tool to find a known document, then fetch it by ID to confirm markdown output.
+Run `/mcp` in Claude Code. The `gdrive` server should appear as connected. Use the `search` tool to find a known document, then fetch it by path to confirm output.
 
 ## Security notes
 
-- OAuth token is stored at `.gdrive-server-credentials.json` — keep it out of version control
-- `drive.readonly` scope limits blast radius if credentials are compromised
+- No credentials are stored by this server — auth is managed entirely by rclone
+- rclone token is stored at `~/.config/rclone/rclone.conf`
+- `drive.readonly` scope limits blast radius if the token is compromised
 - Server is a single auditable TypeScript file
-- Pin dependencies after install (`npm audit`; lock versions in `package.json`)
+
+## Configuration
+
+| Env var | Default | Purpose |
+|---------|---------|---------|
+| `GDRIVE_RCLONE_REMOTE` | `gdrive` | rclone remote name to use |
 
 ## References
 
-- [Archived server source](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/gdrive)
-- [Google Drive API docs](https://developers.google.com/drive/api/guides/about-sdk)
+- [rclone Google Drive docs](https://rclone.org/drive/)
 - [Claude Code MCP setup](https://docs.anthropic.com/en/docs/claude-code/mcp)
