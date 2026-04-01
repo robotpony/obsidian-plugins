@@ -11,6 +11,7 @@ Replaced the original GCP OAuth approach (googleapis + @google-cloud/local-auth)
 - Removed `googleapis` and `@google-cloud/local-auth` dependencies
 - Fixed `tsconfig.json` — made standalone (removed broken extends reference)
 - Updated `package.json`: new name (`g-command-gdrive`), version `1.0.0`
+- Added `setup.sh` — handles rclone install, Drive auth, build, and Claude Code registration
 - Updated `README.md` and `ARCHITECTURE.md` to document rclone setup
 
 **Limitations vs. original:**

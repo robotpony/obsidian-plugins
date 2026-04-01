@@ -22,73 +22,30 @@ Google Drive files on a local mount (`.gdoc`, `.gsheet`) are JSON pointers — t
 
 ## Setup
 
-### 1. Install rclone
+```bash
+./setup.sh
+```
+
+The script handles everything: installs rclone if needed, walks you through Google Drive authentication, builds the server, and registers it with Claude Code. You'll need to log into Google in a browser window — that's the only interactive step.
+
+If your rclone remote is already named something other than `gdrive`:
 
 ```bash
-brew install rclone
+GDRIVE_RCLONE_REMOTE=my-remote ./setup.sh
 ```
 
-### 2. Configure a Google Drive remote
+### Manual setup
 
-```bash
-rclone config
-```
+If you prefer to do it step by step:
 
-In the wizard:
-1. `n` — new remote
-2. Name: `gdrive` (must match — the server looks for this name)
-3. Type: `drive`
-4. Client ID / secret: leave blank (uses rclone's built-in credentials)
-5. Scope: `2` (read-only)
-6. Root folder ID, service account: leave blank
-7. Advanced config: `n`
-8. Auto config: `y` — browser opens, log in and grant access
-9. Team drive: `n`
+1. `brew install rclone`
+2. `rclone config` — create a remote named `gdrive`, type `drive`, scope read-only
+3. `cd src/gdrive && npm install && npm run build`
+4. `claude mcp add gdrive node /absolute/path/to/src/gdrive/dist/index.js`
 
-Verify it works:
+### Verify
 
-```bash
-rclone lsjson gdrive: --max-depth 1
-```
-
-You should see a JSON array of your Drive contents.
-
-### 3. Build the server
-
-```bash
-cd src/gdrive
-npm install
-npm run build
-```
-
-### 4. Register with Claude Code
-
-```bash
-claude mcp add gdrive node /Users/you/writing/obsidian-plugins/g-command/src/gdrive/dist/index.js
-```
-
-Or add to `~/.claude/settings.json` (use absolute paths):
-
-```json
-{
-  "mcpServers": {
-    "gdrive": {
-      "command": "node",
-      "args": ["/Users/you/writing/obsidian-plugins/g-command/src/gdrive/dist/index.js"]
-    }
-  }
-}
-```
-
-If your rclone remote is named something other than `gdrive`, set:
-
-```json
-"env": { "GDRIVE_RCLONE_REMOTE": "your-remote-name" }
-```
-
-### 5. Verify
-
-Run `/mcp` in Claude Code. The `gdrive` server should appear as connected. Use the `search` tool to find a known document, then fetch it by path to confirm output.
+Run `/mcp` in Claude Code — `gdrive` should appear as connected. Then try searching for a document by filename.
 
 ## Security notes
 

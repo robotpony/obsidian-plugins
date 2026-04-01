@@ -8,7 +8,7 @@ Auth approach changed from direct GCP OAuth to rclone. See ARCHITECTURE.md for t
 
 - [x] Step 1: Fork and extract the server — `src/gdrive/` added with `index.ts`, `package.json`, `tsconfig.json`, `Dockerfile`
 - [x] Step 2: Switch auth approach — rclone replaces GCP OAuth
-- [ ] Step 3: Install rclone and configure the Drive remote  ← **you need to run this**
+- [ ] Step 3: Install rclone and configure the Drive remote  ← **run `./setup.sh`**
 - [x] Step 4: Rewrite `index.ts` to use rclone subprocesses
 - [x] Step 5: Build — passes (`npm run build` clean) ← register with Claude Code after Step 3
 - [ ] Step 6: Verify and smoke test
