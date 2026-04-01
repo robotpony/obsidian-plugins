@@ -17,7 +17,10 @@ export default class GCommandPlugin extends Plugin {
 
     this.registerView(
       VIEW_TYPE_GDRIVE_SIDEBAR,
-      (leaf) => new GDriveSidebar(leaf, this.drive, this.settings)
+      (leaf) =>
+        new GDriveSidebar(leaf, this.drive, this.settings, () =>
+          this.openSettings()
+        )
     );
 
     this.app.workspace.onLayoutReady(() => {
@@ -38,6 +41,15 @@ export default class GCommandPlugin extends Plugin {
   }
 
   onunload() {}
+
+  private openSettings(): void {
+    // Open the Obsidian settings pane and navigate to this plugin's tab
+    const setting = (this.app as any).setting;
+    if (setting) {
+      setting.open();
+      setting.openTabById("g-command");
+    }
+  }
 
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());

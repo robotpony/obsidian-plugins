@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.1 — 2026-04-01
+
+Fixes three sidebar bugs from initial Step 3 implementation.
+
+**Fixes:**
+- Error banner now shows readable text instead of a solid red rectangle. Uses left-border accent with muted background, matching Obsidian's callout style
+- Sidebar header now matches sibling plugins: `GC` logo badge, `<h4>` title, kebab menu with Refresh and Settings
+- Plugin name corrected from "g-command" to "G Command" in manifest
+
+---
+
 ## 0.2.0 — 2026-04-01
 
 Drive browser sidebar — Phase 2, Step 3.

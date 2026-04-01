@@ -8,22 +8,63 @@
   overflow: hidden;
 }
 
-/* Header bar with sync button */
+/* Logo badge */
+.g-command-logo {
+  display: inline-block;
+  background-color: #e74c3c;
+  color: white;
+  border-radius: 4px;
+  padding: 3px 3px 2px;
+  font-weight: 600;
+  font-size: 0.9em;
+  text-align: center;
+  line-height: 1.2;
+  vertical-align: middle;
+}
+
+/* Header bar */
 .g-command-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--background-modifier-border);
+  padding: 2px 4px;
+  background-color: var(--background-secondary);
   flex-shrink: 0;
+  z-index: 1;
 }
 
 .g-command-header-title {
-  font-size: var(--font-ui-small);
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.g-command-header-title h4 {
+  margin: 0;
+}
+
+.g-command-button-group {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.g-command-menu-btn {
+  padding: 4px;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s, background-color 0.15s;
+  flex-shrink: 0;
+  border-radius: 4px;
+}
+
+.g-command-menu-btn:hover {
+  opacity: 1;
+  background-color: var(--background-modifier-hover) !important;
 }
 
 /* Status line */
@@ -49,18 +90,26 @@
 .g-command-error-banner {
   margin: 12px;
   padding: 10px 12px;
-  background: var(--background-modifier-error);
+  background: var(--background-secondary);
+  border-left: 3px solid var(--text-error);
   border-radius: var(--radius-s);
   font-size: var(--font-ui-small);
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.g-command-error-banner .g-command-error-title {
   color: var(--text-error);
-  line-height: 1.5;
+  font-weight: 600;
+  margin-bottom: 6px;
 }
 
 .g-command-error-banner code {
-  background: var(--background-modifier-error-hover);
+  background: var(--background-modifier-hover);
   padding: 1px 4px;
   border-radius: 3px;
   font-size: 0.9em;
+  color: var(--text-normal);
 }
 
 .g-command-error-banner p {

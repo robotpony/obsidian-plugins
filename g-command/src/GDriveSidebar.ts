@@ -1,8 +1,11 @@
-import { ItemView, WorkspaceLeaf } from "obsidian";
+import { ItemView, Menu, WorkspaceLeaf } from "obsidian";
 import { DriveProvider } from "./DriveProvider";
 import { DriveFile, GCommandSettings } from "./types";
 
 export const VIEW_TYPE_GDRIVE_SIDEBAR = "g-command-drive";
+
+const KEBAB_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>';
 
 /** In-memory tree node wrapping a DriveFile with UI state. */
 interface TreeNode {
@@ -17,15 +20,18 @@ export class GDriveSidebar extends ItemView {
   private rootNodes: TreeNode[] | null = null;
   private error: string | null = null;
   private loadingRoot = false;
+  private onOpenSettings: () => void;
 
   constructor(
     leaf: WorkspaceLeaf,
     drive: DriveProvider,
-    settings: GCommandSettings
+    settings: GCommandSettings,
+    onOpenSettings: () => void
   ) {
     super(leaf);
     this.drive = drive;
     this.settings = settings;
+    this.onOpenSettings = onOpenSettings;
   }
 
   getViewType(): string {
@@ -120,15 +126,47 @@ export class GDriveSidebar extends ItemView {
 
   private renderHeader(parent: HTMLElement): void {
     const header = parent.createDiv({ cls: "g-command-header" });
-    header.createSpan({ cls: "g-command-header-title", text: "Google Drive" });
+
+    // Title with logo badge
+    const titleEl = header.createEl("div", { cls: "g-command-header-title" });
+    titleEl.createEl("span", { cls: "g-command-logo", text: "GC" });
+    titleEl.createEl("h4", { text: "Drive" });
+
+    // Button group: sync + kebab menu
+    const buttonGroup = header.createEl("div", { cls: "g-command-button-group" });
 
     // Sync button placeholder — wired up in Step 5
-    const syncBtn = header.createEl("button", {
+    const syncBtn = buttonGroup.createEl("button", {
       cls: "g-command-sync-btn clickable-icon",
       attr: { "aria-label": "Sync Drive files" },
     });
     syncBtn.createSpan({ text: "↻" });
     syncBtn.disabled = true;
+
+    // Kebab menu
+    const menuBtn = buttonGroup.createEl("button", {
+      cls: "clickable-icon g-command-menu-btn",
+      attr: { "aria-label": "Menu" },
+    });
+    menuBtn.innerHTML = KEBAB_SVG;
+
+    menuBtn.addEventListener("click", (evt) => {
+      const menu = new Menu();
+      menu.addItem((item) =>
+        item
+          .setTitle("Refresh")
+          .setIcon("refresh-cw")
+          .onClick(() => this.loadRoot())
+      );
+      menu.addSeparator();
+      menu.addItem((item) =>
+        item
+          .setTitle("Settings")
+          .setIcon("settings")
+          .onClick(() => this.onOpenSettings())
+      );
+      menu.showAtMouseEvent(evt);
+    });
   }
 
   private renderStatusLine(parent: HTMLElement): void {
@@ -137,11 +175,19 @@ export class GDriveSidebar extends ItemView {
 
   private renderErrorBanner(parent: HTMLElement, message: string): void {
     const banner = parent.createDiv({ cls: "g-command-error-banner" });
-    // Preserve line breaks in error messages from DriveProvider
-    for (const line of message.split("\n")) {
+
+    // First line is the title; remaining lines are help text
+    const lines = message.split("\n").filter((l) => l.length > 0);
+    const title = lines[0] || "Connection failed";
+    const details = lines.slice(1);
+
+    banner.createDiv({ cls: "g-command-error-title", text: title });
+
+    for (const line of details) {
       const p = banner.createEl("p");
-      // Wrap backtick-delimited text in <code>
-      if (line.includes("`")) {
+      // Wrap text between backticks in <code>
+      const codePattern = /`([^`]+)`/g;
+      if (codePattern.test(line)) {
         p.innerHTML = line.replace(/`([^`]+)`/g, "<code>$1</code>");
       } else {
         p.textContent = line;
