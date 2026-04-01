@@ -13,6 +13,10 @@ Replaced the original GCP OAuth approach (googleapis + @google-cloud/local-auth)
 - Updated `package.json`: new name (`g-command-gdrive`), version `1.0.0`
 - Added `setup.sh` — handles rclone install, Drive auth, build, and Claude Code registration
 - Updated `README.md` and `ARCHITECTURE.md` to document rclone setup
+- Upgraded `@modelcontextprotocol/sdk` 1.0.1 → 1.29.0 (fixes ReDoS + DNS rebinding vulns)
+- Pinned all dependencies to exact versions; `npm audit` clean
+- Added `g-command/src/gdrive/dist/` to root `.gitignore`
+- Verified: server connects, Drive root lists 18 items, registered in Claude Code
 
 **Limitations vs. original:**
 - Filename search only (no full-text content search)
