@@ -1,4 +1,4 @@
-import { App, Plugin, PluginSettingTab, Setting } from "obsidian";
+import { App, debounce, Plugin, PluginSettingTab, Setting } from "obsidian";
 import { GCommandSettings, DEFAULT_SETTINGS } from "./src/types";
 import { GDriveSidebar, VIEW_TYPE_GDRIVE_SIDEBAR } from "./src/GDriveSidebar";
 import { DriveProvider } from "./src/DriveProvider";
@@ -6,13 +6,16 @@ import { SidebarManager } from "../shared";
 
 export default class GCommandPlugin extends Plugin {
   settings: GCommandSettings;
-  private drive: DriveProvider;
-  private sidebarManager: SidebarManager;
+  drive: DriveProvider;
+  sidebarManager: SidebarManager;
 
   async onload() {
     await this.loadSettings();
 
     this.drive = new DriveProvider(this.settings.rcloneRemote);
+    if (this.settings.rclonePath) {
+      this.drive.setPath(this.settings.rclonePath);
+    }
     this.sidebarManager = new SidebarManager(this.app, VIEW_TYPE_GDRIVE_SIDEBAR);
 
     const pluginDir = this.manifest.dir ?? "";
@@ -22,8 +25,10 @@ export default class GCommandPlugin extends Plugin {
       (leaf) =>
         new GDriveSidebar(
           leaf,
+          this.app,
           this.drive,
           this.settings,
+          () => this.saveSettings(),
           () => this.openSettings(),
           pluginDir
         )
@@ -37,6 +42,15 @@ export default class GCommandPlugin extends Plugin {
       id: "open-drive-browser",
       name: "Open Drive browser",
       callback: () => this.sidebarManager.toggle(),
+    });
+
+    this.addCommand({
+      id: "sync-drive-files",
+      name: "Sync Drive files",
+      callback: () => {
+        const view = this.sidebarManager.getView() as GDriveSidebar | null;
+        if (view) view.resyncAll();
+      },
     });
 
     this.addRibbonIcon("hard-drive", "Google Drive", () => {
@@ -57,6 +71,12 @@ export default class GCommandPlugin extends Plugin {
     }
   }
 
+  /** Push remote name change to the provider and reload the sidebar. */
+  updateRemote(): void {
+    this.drive.setRemote(this.settings.rcloneRemote);
+    this.sidebarManager.refresh();
+  }
+
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
   }
@@ -68,10 +88,12 @@ export default class GCommandPlugin extends Plugin {
 
 class GCommandSettingTab extends PluginSettingTab {
   plugin: GCommandPlugin;
+  private debouncedUpdateRemote: ReturnType<typeof debounce>;
 
   constructor(app: App, plugin: GCommandPlugin) {
     super(app, plugin);
     this.plugin = plugin;
+    this.debouncedUpdateRemote = debounce(() => this.plugin.updateRemote(), 500, true);
   }
 
   display(): void {
@@ -91,6 +113,25 @@ class GCommandSettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.rcloneRemote = value.trim() || "gdrive";
             await this.plugin.saveSettings();
+            this.debouncedUpdateRemote();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("rclone path")
+      .setDesc(
+        "Absolute path to the rclone binary. " +
+        "Leave empty to auto-detect (Homebrew, /usr/local/bin, PATH)."
+      )
+      .addText((text) =>
+        text
+          .setPlaceholder("auto-detect")
+          .setValue(this.plugin.settings.rclonePath)
+          .onChange(async (value) => {
+            this.plugin.settings.rclonePath = value.trim();
+            await this.plugin.saveSettings();
+            this.plugin.drive.setPath(this.plugin.settings.rclonePath);
+            this.plugin.sidebarManager.refresh();
           })
       );
 

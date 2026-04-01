@@ -93,14 +93,16 @@ var SidebarManager = class {
   }
   /**
    * Refresh all instances of the sidebar view.
-   * Calls render() on each view instance.
+   * Calls reload() if available (full data refresh), otherwise render().
    */
   refresh() {
     const { workspace } = this.app;
     const leaves = workspace.getLeavesOfType(this.viewType);
     for (const leaf of leaves) {
       const view = leaf.view;
-      if (view && "render" in view && typeof view.render === "function") {
+      if (view && "reload" in view && typeof view.reload === "function") {
+        view.reload();
+      } else if (view && "render" in view && typeof view.render === "function") {
         view.render();
       }
     }

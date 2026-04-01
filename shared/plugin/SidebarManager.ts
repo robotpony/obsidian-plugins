@@ -2,10 +2,12 @@ import { App, ItemView, WorkspaceLeaf } from "obsidian";
 
 /**
  * Interface for sidebar views that can be refreshed.
- * Sidebar views should implement a render() method.
+ * Sidebar views should implement render() for UI-only redraws.
+ * Optionally implement reload() for full data refresh (e.g. reconnecting).
  */
 export interface RefreshableView extends ItemView {
   render(): void;
+  reload?(): Promise<void>;
 }
 
 /**
@@ -82,7 +84,7 @@ export class SidebarManager {
 
   /**
    * Refresh all instances of the sidebar view.
-   * Calls render() on each view instance.
+   * Calls reload() if available (full data refresh), otherwise render().
    */
   refresh(): void {
     const { workspace } = this.app;
@@ -90,7 +92,9 @@ export class SidebarManager {
 
     for (const leaf of leaves) {
       const view = leaf.view;
-      if (view && "render" in view && typeof view.render === "function") {
+      if (view && "reload" in view && typeof view.reload === "function") {
+        (view as RefreshableView).reload!();
+      } else if (view && "render" in view && typeof view.render === "function") {
         (view as RefreshableView).render();
       }
     }

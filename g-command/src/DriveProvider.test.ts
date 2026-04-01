@@ -55,8 +55,22 @@ const sampleFolder: DriveFile = {
 describe("DriveProvider", () => {
   let provider: DriveProvider;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
     provider = new DriveProvider("gdrive");
+    // Set explicit path so run() doesn't reject with "path not resolved".
+    // checkBinary() with explicitPath only needs one execFile mock.
+    provider.setPath("/usr/bin/rclone");
+    mockExecFile
+      .mockImplementationOnce((_cmd: any, _args: any, _opts: any, cb: any) => {
+        cb(null, "rclone v1.73.3", ""); // checkBinary → tryBinary
+        return {} as any;
+      })
+      .mockImplementationOnce((_cmd: any, _args: any, _opts: any, cb: any) => {
+        cb(null, "[]", ""); // checkRemote
+        return {} as any;
+      });
+    await provider.check();
     vi.clearAllMocks();
   });
 
@@ -191,8 +205,10 @@ describe("DriveProvider", () => {
     });
 
     it("throws a DriveError with code binary-missing when rclone is absent", async () => {
+      const freshProvider = new DriveProvider("gdrive");
+      freshProvider.setPath("/nonexistent/rclone");
       mockFailure("rclone: command not found");
-      await expect(provider.check()).rejects.toMatchObject({
+      await expect(freshProvider.check()).rejects.toMatchObject({
         name: "DriveError",
         code: "binary-missing",
       });
@@ -218,6 +234,7 @@ describe("DriveProvider", () => {
 
     it("uses the configured remote name in the check call", async () => {
       const customProvider = new DriveProvider("my-drive");
+      customProvider.setPath("/usr/bin/rclone");
       mockExecFile
         .mockImplementationOnce((_cmd: any, _args: any, _opts: any, cb: any) => {
           cb(null, "rclone v1.73.3", "");

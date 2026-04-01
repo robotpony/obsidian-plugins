@@ -1,6 +1,6 @@
 {
   "name": "g-command",
-  "version": "0.2.3",
+  "version": "0.5.1",
   "description": "Google Drive browser and sync for Obsidian",
   "main": "main.js",
   "scripts": {

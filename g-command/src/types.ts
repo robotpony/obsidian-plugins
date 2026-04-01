@@ -18,6 +18,7 @@ export interface SyncRecord {
 
 export interface GCommandSettings {
   rcloneRemote: string;
+  rclonePath: string;                      // explicit binary path; empty = auto-detect
   vaultRoot: string;
   selectedPaths: string[];                 // Drive paths the user has checked
   syncState: Record<string, SyncRecord>;   // Drive path → last sync record
@@ -25,6 +26,7 @@ export interface GCommandSettings {
 
 export const DEFAULT_SETTINGS: GCommandSettings = {
   rcloneRemote: "gdrive",
+  rclonePath: "",
   vaultRoot: "gdrive",
   selectedPaths: [],
   syncState: {},

@@ -65,6 +65,32 @@ const anotherFolder: DriveFile = {
   ID: "folder2",
 };
 
+// Mirror filterTree and flattenToNodes from GDriveSidebar.ts
+function filterTree(nodes: TreeNode[], query: string): TreeNode[] {
+  const lq = query.toLowerCase();
+  const result: TreeNode[] = [];
+  for (const node of nodes) {
+    const nameMatch = node.file.Name.toLowerCase().includes(lq);
+    if (node.file.IsDir && node.children && node.children.length > 0) {
+      const filteredChildren = filterTree(node.children, query);
+      if (nameMatch || filteredChildren.length > 0) {
+        result.push({
+          file: node.file,
+          children: filteredChildren.length > 0 ? filteredChildren : node.children,
+          expanded: nameMatch || filteredChildren.length > 0,
+        });
+      }
+    } else if (nameMatch) {
+      result.push(node);
+    }
+  }
+  return result;
+}
+
+function flattenToNodes(files: DriveFile[]): TreeNode[] {
+  return files.sort(sortDirsFirst).map(toTreeNode);
+}
+
 // --- Tests -------------------------------------------------------------------
 
 describe("toTreeNode", () => {
@@ -146,5 +172,91 @@ describe("TreeNode structure", () => {
   it("expanded defaults to false", () => {
     expect(toTreeNode(folder).expanded).toBe(false);
     expect(toTreeNode(fileA).expanded).toBe(false);
+  });
+});
+
+describe("filterTree", () => {
+  // Build a tree: Work/ contains Brief.gdoc and Notes.md; Archive/ has no loaded children
+  const workNode: TreeNode = {
+    file: folder,
+    children: [toTreeNode(fileA), toTreeNode(fileB)],
+    expanded: true,
+  };
+  const archiveNode: TreeNode = {
+    file: anotherFolder,
+    children: null, // not loaded
+    expanded: false,
+  };
+
+  it("returns all nodes when query is empty string", () => {
+    // Empty query should match everything via includes("")
+    const result = filterTree([workNode, archiveNode], "");
+    expect(result.length).toBe(2);
+  });
+
+  it("matches files by name (case-insensitive)", () => {
+    const result = filterTree([workNode, archiveNode], "brief");
+    expect(result.length).toBe(1); // Work folder kept as ancestor
+    expect(result[0].file.Name).toBe("Work");
+    expect(result[0].children!.length).toBe(1);
+    expect(result[0].children![0].file.Name).toBe("Brief.gdoc");
+  });
+
+  it("matches folder names directly", () => {
+    const result = filterTree([workNode, archiveNode], "archive");
+    // Archive has null children (unloaded), but name matches
+    expect(result.length).toBe(1);
+    expect(result[0].file.Name).toBe("Archive");
+  });
+
+  it("excludes nodes with no name match and no matching children", () => {
+    const result = filterTree([workNode, archiveNode], "zzz-no-match");
+    expect(result.length).toBe(0);
+  });
+
+  it("keeps parent when child matches", () => {
+    const result = filterTree([workNode], "notes");
+    expect(result.length).toBe(1);
+    expect(result[0].file.Name).toBe("Work");
+    expect(result[0].children!.length).toBe(1);
+    expect(result[0].children![0].file.Name).toBe("Notes.md");
+  });
+
+  it("skips folders with unloaded children unless name matches", () => {
+    const result = filterTree([archiveNode], "brief");
+    expect(result.length).toBe(0);
+  });
+
+  it("auto-expands folders with matching descendants", () => {
+    const collapsed: TreeNode = {
+      file: folder,
+      children: [toTreeNode(fileA)],
+      expanded: false,
+    };
+    const result = filterTree([collapsed], "brief");
+    expect(result[0].expanded).toBe(true);
+  });
+});
+
+describe("flattenToNodes", () => {
+  it("sorts dirs first and converts to tree nodes", () => {
+    const files = [fileB, folder, fileA, anotherFolder];
+    const nodes = flattenToNodes(files);
+    expect(nodes.map((n) => n.file.Name)).toEqual([
+      "Archive",
+      "Work",
+      "Brief.gdoc",
+      "Notes.md",
+    ]);
+  });
+
+  it("returns empty array for empty input", () => {
+    expect(flattenToNodes([])).toEqual([]);
+  });
+
+  it("creates proper tree nodes", () => {
+    const nodes = flattenToNodes([fileA, folder]);
+    expect(nodes[0].children).toBeNull(); // folder
+    expect(nodes[1].children).toEqual([]); // file
   });
 });

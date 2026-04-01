@@ -1,6 +1,7 @@
-import { ItemView, Menu, WorkspaceLeaf } from "obsidian";
+import { App, ItemView, Menu, WorkspaceLeaf } from "obsidian";
 import { DriveProvider, DriveError } from "./DriveProvider";
 import { DriveFile, GCommandSettings } from "./types";
+import { syncFiles, getFormatMapping } from "./SyncManager";
 
 export const VIEW_TYPE_GDRIVE_SIDEBAR = "g-command-drive";
 
@@ -15,24 +16,36 @@ interface TreeNode {
 }
 
 export class GDriveSidebar extends ItemView {
+  private appRef: App;
   private drive: DriveProvider;
   private settings: GCommandSettings;
+  private saveSettings: () => Promise<void>;
   private rootNodes: TreeNode[] | null = null;
   private error: DriveError | Error | null = null;
   private loadingRoot = false;
+  private searchQuery = "";
+  private allFiles: DriveFile[] | null = null; // cached recursive results
+  private searchingAll = false;
+  private syncing = false;
+  private selectedPaths: Set<string>;
   private onOpenSettings: () => void;
   private pluginDir: string;
 
   constructor(
     leaf: WorkspaceLeaf,
+    app: App,
     drive: DriveProvider,
     settings: GCommandSettings,
+    saveSettings: () => Promise<void>,
     onOpenSettings: () => void,
     pluginDir: string
   ) {
     super(leaf);
+    this.appRef = app;
     this.drive = drive;
     this.settings = settings;
+    this.saveSettings = saveSettings;
+    this.selectedPaths = new Set(settings.selectedPaths);
     this.onOpenSettings = onOpenSettings;
     this.pluginDir = pluginDir;
   }
@@ -55,10 +68,134 @@ export class GDriveSidebar extends ItemView {
 
   onClose(): Promise<void> {
     this.rootNodes = null;
+    this.allFiles = null;
+    this.searchQuery = "";
     return Promise.resolve();
   }
 
   // --- Public API -----------------------------------------------------------
+
+  /** Full data reload: re-checks rclone and reloads the Drive root. */
+  async reload(): Promise<void> {
+    await this.loadRoot();
+  }
+
+  /** Sync selected files to the vault. */
+  async syncSelected(): Promise<void> {
+    if (this.selectedPaths.size === 0 || this.syncing) return;
+    const files = this.collectSelectedFiles();
+    if (files.length === 0) return;
+    await this.runSync(files);
+  }
+
+  /** Resync all previously synced files. */
+  async resyncAll(): Promise<void> {
+    if (this.syncing) return;
+    const paths = Object.keys(this.settings.syncState);
+    if (paths.length === 0) return;
+
+    // Build DriveFile stubs from syncState + any loaded tree nodes
+    const files = this.collectSyncedFiles(paths);
+    if (files.length === 0) return;
+    await this.runSync(files);
+  }
+
+  private async runSync(files: DriveFile[]): Promise<void> {
+    this.syncing = true;
+    this.render();
+
+    try {
+      const result = await syncFiles(
+        files,
+        this.appRef,
+        this.drive,
+        this.settings,
+        this.saveSettings,
+      );
+      const parts: string[] = [];
+      if (result.synced > 0) parts.push(`${result.synced} synced`);
+      if (result.skipped > 0) parts.push(`${result.skipped} unchanged`);
+      if (result.failed.length > 0) parts.push(`${result.failed.length} failed`);
+      console.log("[G Command] Sync complete:", parts.join(", "));
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("[G Command] Sync error:", msg);
+    } finally {
+      this.syncing = false;
+      this.render();
+    }
+  }
+
+  /** Collect DriveFile objects for all selected paths from the loaded tree. */
+  private collectSelectedFiles(): DriveFile[] {
+    const files: DriveFile[] = [];
+    const collect = (nodes: TreeNode[] | null) => {
+      if (!nodes) return;
+      for (const node of nodes) {
+        if (!node.file.IsDir && this.selectedPaths.has(node.file.Path)) {
+          files.push(node.file);
+        }
+        if (node.children) collect(node.children);
+      }
+    };
+    collect(this.rootNodes);
+    // Also check allFiles from recursive search
+    if (this.allFiles) {
+      for (const f of this.allFiles) {
+        if (!f.IsDir && this.selectedPaths.has(f.Path) && !files.find(e => e.Path === f.Path)) {
+          files.push(f);
+        }
+      }
+    }
+    return files;
+  }
+
+  /** Build DriveFile list for resync from syncState paths, using loaded tree data. */
+  private collectSyncedFiles(paths: string[]): DriveFile[] {
+    const fileMap = new Map<string, DriveFile>();
+    const index = (nodes: TreeNode[] | null) => {
+      if (!nodes) return;
+      for (const node of nodes) {
+        if (!node.file.IsDir) fileMap.set(node.file.Path, node.file);
+        if (node.children) index(node.children);
+      }
+    };
+    index(this.rootNodes);
+    if (this.allFiles) {
+      for (const f of this.allFiles) {
+        if (!f.IsDir) fileMap.set(f.Path, f);
+      }
+    }
+
+    const files: DriveFile[] = [];
+    for (const p of paths) {
+      const f = fileMap.get(p);
+      if (f) {
+        files.push(f);
+      } else {
+        // File not in loaded tree — build stub from syncState
+        const rec = this.settings.syncState[p];
+        if (rec) {
+          const name = p.split("/").pop() ?? p;
+          files.push({
+            Path: p,
+            Name: name,
+            Size: -1,
+            MimeType: "", // syncFiles uses getFormatMapping which handles unknown mimes
+            ModTime: "", // empty forces re-download (won't match stored modTime)
+            IsDir: false,
+            ID: rec.fileId,
+          });
+        }
+      }
+    }
+    return files;
+  }
+
+  private persistSelectedPaths(): void {
+    this.settings.selectedPaths = Array.from(this.selectedPaths);
+    this.saveSettings();
+  }
 
   render(): void {
     const container = this.containerEl.children[1] as HTMLElement;
@@ -66,6 +203,7 @@ export class GDriveSidebar extends ItemView {
     container.addClass("g-command-sidebar");
 
     this.renderHeader(container);
+    this.renderSearchBar(container);
     this.renderStatusLine(container);
 
     if (this.error) {
@@ -85,8 +223,35 @@ export class GDriveSidebar extends ItemView {
       return;
     }
 
-    for (const node of this.rootNodes) {
-      this.renderNode(tree, node, 0);
+    // Apply search filter
+    const query = this.searchQuery.trim();
+    let displayNodes: TreeNode[];
+
+    if (query) {
+      // If we have cached recursive results, search those; otherwise filter loaded tree
+      if (this.allFiles) {
+        const allNodes = flattenToNodes(this.allFiles);
+        displayNodes = filterTree(allNodes, query);
+      } else {
+        displayNodes = filterTree(this.rootNodes, query);
+      }
+    } else {
+      displayNodes = this.rootNodes;
+    }
+
+    if (query && displayNodes.length === 0 && !this.allFiles) {
+      tree.createDiv({ cls: "g-command-empty", text: "No matches in loaded folders" });
+    } else if (query && displayNodes.length === 0) {
+      tree.createDiv({ cls: "g-command-empty", text: "No matches found" });
+    } else {
+      for (const node of displayNodes) {
+        this.renderNode(tree, node, 0);
+      }
+    }
+
+    // "Search all" button when filtering locally and results may be incomplete
+    if (query && !this.allFiles) {
+      this.renderSearchAllButton(tree);
     }
   }
 
@@ -95,6 +260,7 @@ export class GDriveSidebar extends ItemView {
   private async loadRoot(): Promise<void> {
     this.loadingRoot = true;
     this.error = null;
+    this.allFiles = null; // invalidate search-all cache on refresh
     this.render();
 
     try {
@@ -104,10 +270,11 @@ export class GDriveSidebar extends ItemView {
         .sort(sortDirsFirst)
         .map(toTreeNode);
     } catch (e: unknown) {
-      this.error =
-        e instanceof DriveError || e instanceof Error
-          ? e
-          : new Error(String(e));
+      const err = e instanceof DriveError || e instanceof Error
+        ? e
+        : new Error(String(e));
+      console.error("[G Command] loadRoot failed:", err.message);
+      this.error = err;
       this.rootNodes = null;
     } finally {
       this.loadingRoot = false;
@@ -122,10 +289,10 @@ export class GDriveSidebar extends ItemView {
         .sort(sortDirsFirst)
         .map(toTreeNode);
     } catch (e: unknown) {
+      const msg = `Failed to load ${node.file.Name}: ${e instanceof Error ? e.message : String(e)}`;
+      console.error("[G Command]", msg);
       node.children = [];
-      this.error = new Error(
-        `Failed to load ${node.file.Name}: ${e instanceof Error ? e.message : String(e)}`
-      );
+      this.error = new Error(msg);
     }
   }
 
@@ -142,13 +309,18 @@ export class GDriveSidebar extends ItemView {
     // Button group: sync + kebab menu
     const buttonGroup = header.createEl("div", { cls: "g-command-button-group" });
 
-    // Sync button placeholder — wired up in Step 5
+    // Sync button — active when files are selected
+    const hasSelection = this.selectedPaths.size > 0;
     const syncBtn = buttonGroup.createEl("button", {
       cls: "g-command-sync-btn clickable-icon",
-      attr: { "aria-label": "Sync Drive files" },
+      attr: { "aria-label": hasSelection ? `Sync ${this.selectedPaths.size} file(s)` : "Select files to sync" },
     });
-    syncBtn.createSpan({ text: "↻" });
-    syncBtn.disabled = true;
+    syncBtn.createSpan({ text: this.syncing ? "⏳" : "↻" });
+    syncBtn.disabled = !hasSelection || this.syncing;
+    if (hasSelection && !this.syncing) {
+      syncBtn.addClass("g-command-sync-btn--active");
+    }
+    syncBtn.addEventListener("click", () => this.syncSelected());
 
     // Kebab menu
     const menuBtn = buttonGroup.createEl("button", {
@@ -156,6 +328,8 @@ export class GDriveSidebar extends ItemView {
       attr: { "aria-label": "Menu" },
     });
     menuBtn.innerHTML = KEBAB_SVG;
+
+    const hasSyncedFiles = Object.keys(this.settings.syncState).length > 0;
 
     menuBtn.addEventListener("click", (evt) => {
       const menu = new Menu();
@@ -165,6 +339,14 @@ export class GDriveSidebar extends ItemView {
           .setIcon("refresh-cw")
           .onClick(() => this.loadRoot())
       );
+      if (hasSyncedFiles) {
+        menu.addItem((item) =>
+          item
+            .setTitle("Resync all")
+            .setIcon("refresh-cw")
+            .onClick(() => this.resyncAll())
+        );
+      }
       menu.addSeparator();
       menu.addItem((item) =>
         item
@@ -176,8 +358,76 @@ export class GDriveSidebar extends ItemView {
     });
   }
 
+  private renderSearchBar(parent: HTMLElement): void {
+    const row = parent.createDiv({ cls: "g-command-search-row" });
+
+    const input = row.createEl("input", {
+      cls: "g-command-search",
+      attr: { type: "text", placeholder: "Search files…" },
+    });
+    input.value = this.searchQuery;
+
+    input.addEventListener("input", () => {
+      this.searchQuery = input.value;
+      this.render();
+    });
+
+    // Preserve focus after re-render
+    requestAnimationFrame(() => {
+      if (this.searchQuery) {
+        input.focus();
+        input.selectionStart = input.selectionEnd = input.value.length;
+      }
+    });
+
+    if (this.searchQuery) {
+      const clearBtn = row.createEl("button", {
+        cls: "g-command-search-clear clickable-icon",
+        attr: { "aria-label": "Clear search" },
+      });
+      clearBtn.textContent = "✕";
+      clearBtn.addEventListener("click", () => {
+        this.searchQuery = "";
+        this.allFiles = null;
+        this.render();
+      });
+    }
+  }
+
+  private renderSearchAllButton(parent: HTMLElement): void {
+    const btn = parent.createEl("button", {
+      cls: "g-command-search-all-btn",
+      text: this.searchingAll ? "Searching…" : "Search all of Drive",
+    });
+    btn.disabled = this.searchingAll;
+
+    btn.addEventListener("click", async () => {
+      this.searchingAll = true;
+      this.render();
+      try {
+        this.allFiles = await this.drive.listRecursive("");
+        console.log("[G Command] Search all: loaded", this.allFiles.length, "files");
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error("[G Command] Search all failed:", msg);
+        this.error = new Error(`Search failed: ${msg}`);
+      } finally {
+        this.searchingAll = false;
+        this.render();
+      }
+    });
+  }
+
   private renderStatusLine(parent: HTMLElement): void {
-    parent.createDiv({ cls: "g-command-status", text: "Browse your Drive" });
+    let text: string;
+    if (this.syncing) {
+      text = "Syncing…";
+    } else if (this.selectedPaths.size > 0) {
+      text = `${this.selectedPaths.size} file(s) selected`;
+    } else {
+      text = "Read only access to Google Drive documents, in Markdown or CSV.";
+    }
+    parent.createDiv({ cls: "g-command-status", text });
   }
 
   private renderErrorBanner(parent: HTMLElement): void {
@@ -225,16 +475,9 @@ export class GDriveSidebar extends ItemView {
       setTimeout(() => (copyBtn.textContent = "Copy"), 1500);
     });
 
-    // README link
-    const readmePath = `${this.pluginDir}/README.md`;
-    const link = banner.createEl("a", {
-      cls: "g-command-error-link",
-      text: "Setup instructions →",
-      href: readmePath,
-    });
-    link.addEventListener("click", (e) => {
-      e.preventDefault();
-      this.app.workspace.openLinkText(readmePath, "", false);
+    banner.createEl("p", {
+      cls: "g-command-error-ref",
+      text: `See: ${this.pluginDir}/README.md`,
     });
   }
 
@@ -289,9 +532,29 @@ export class GDriveSidebar extends ItemView {
   }
 
   private renderFileRow(row: HTMLElement, node: TreeNode): void {
-    // Spacer matching arrow width for alignment
-    row.createSpan({ cls: "g-command-arrow g-command-arrow--spacer" });
+    // Checkbox for file selection
+    const cb = row.createEl("input", {
+      cls: "g-command-checkbox",
+      attr: { type: "checkbox" },
+    }) as HTMLInputElement;
+    cb.checked = this.selectedPaths.has(node.file.Path);
+    cb.addEventListener("change", () => {
+      if (cb.checked) {
+        this.selectedPaths.add(node.file.Path);
+      } else {
+        this.selectedPaths.delete(node.file.Path);
+      }
+      this.persistSelectedPaths();
+      this.render();
+    });
+
     row.createSpan({ cls: "g-command-name", text: node.file.Name });
+
+    // Sync badge for previously synced files
+    if (this.settings.syncState[node.file.Path]) {
+      row.createSpan({ cls: "g-command-sync-badge", text: "✓" });
+    }
+
     row.addClass("g-command-row--file");
   }
 }
@@ -305,4 +568,39 @@ function toTreeNode(file: DriveFile): TreeNode {
 function sortDirsFirst(a: DriveFile, b: DriveFile): number {
   if (a.IsDir !== b.IsDir) return a.IsDir ? -1 : 1;
   return a.Name.localeCompare(b.Name);
+}
+
+/**
+ * Filter tree nodes by name, keeping ancestors of matching descendants.
+ * Only walks loaded children (non-null). Case-insensitive.
+ */
+export function filterTree(nodes: TreeNode[], query: string): TreeNode[] {
+  const lq = query.toLowerCase();
+  const result: TreeNode[] = [];
+
+  for (const node of nodes) {
+    const nameMatch = node.file.Name.toLowerCase().includes(lq);
+
+    if (node.file.IsDir && node.children && node.children.length > 0) {
+      const filteredChildren = filterTree(node.children, query);
+      if (nameMatch || filteredChildren.length > 0) {
+        result.push({
+          file: node.file,
+          children: filteredChildren.length > 0 ? filteredChildren : node.children,
+          expanded: nameMatch || filteredChildren.length > 0,
+        });
+      }
+    } else if (nameMatch) {
+      result.push(node);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Flatten a recursive DriveFile list into sorted TreeNodes for search-all results.
+ */
+export function flattenToNodes(files: DriveFile[]): TreeNode[] {
+  return files.sort(sortDirsFirst).map(toTreeNode);
 }

@@ -1,5 +1,98 @@
 # Changelog
 
+## 0.5.1 — 2026-04-01
+
+Fixes sync failures and improves settings UX.
+
+- Debounced rclone remote name setting — no longer fires a connectivity check per keystroke
+- Fixed "directory not found" when syncing Google Docs: virtual extensions (`.gdoc`, `.gsheet`, `.gslides`, `.gform`) are now stripped before calling `rclone cat`
+- Filenames are sanitized for vault compatibility — `< > : " | ? * \` replaced with underscores, leading dots handled
+- 10 new unit tests for filename sanitization
+
+---
+
+## 0.5.0 — 2026-04-01
+
+Adds file sync from Drive sidebar to vault.
+
+- Checkbox on each file row selects files for sync
+- Sync button (↻) downloads selected files to the configured vault root
+- Google Docs export as Markdown (HTML → turndown), Sheets as CSV, Slides as Markdown (plain text)
+- YAML frontmatter (`gdrive_id`, `gdrive_path`, `synced`) added to synced `.md` files
+- Synced files show ✓ badge in the sidebar
+- Skip-if-unchanged: files with same Drive ModTime are not re-downloaded
+- "Resync all" kebab menu item re-syncs all previously synced files
+- `g-command: Sync Drive files` command palette entry (runs resync-all)
+- New `SyncManager` module with 23 unit tests for format mapping, path conversion, frontmatter, and content conversion
+- Virtual extensions (`.gdoc`, `.gsheet`, `.gslides`, `.gform`) stripped during sync
+
+---
+
+## 0.4.0 — 2026-04-01
+
+Adds file search to the Drive sidebar.
+
+- Search bar between header and status line filters the loaded tree by filename (case-insensitive, instant)
+- "Search all of Drive" button triggers a recursive fetch via `rclone lsjson --recursive` for results beyond expanded folders
+- Recursive results are cached until the next refresh or clear
+- Clear button (✕) resets search and cache
+- `filterTree()` and `flattenToNodes()` extracted as testable pure functions with 10 new unit tests
+- Fixed DriveProvider tests broken by rclonePath guard (added `setPath` to test setup)
+
+---
+
+## 0.3.4 — 2026-04-01
+
+Updated sidebar status line to clarify read-only access and export formats.
+
+---
+
+## 0.3.3 — 2026-04-01
+
+Adds optional rclone path setting for non-standard installs.
+
+- New "rclone path" setting: absolute path to the rclone binary
+- When empty (default), auto-detection probes Homebrew and common locations
+- When set, skips auto-detection and uses the configured path directly
+- Changes take effect immediately (reloads sidebar on save)
+
+---
+
+## 0.3.2 — 2026-04-01
+
+Fixes rclone not found in Obsidian (Electron PATH issue).
+
+- Obsidian's Electron shell doesn't inherit the user's shell PATH, so Homebrew binaries like rclone are invisible via bare name
+- DriveProvider now probes `/opt/homebrew/bin/rclone`, `/usr/local/bin/rclone`, `/usr/bin/rclone`, and bare `rclone` on each `check()` call
+- Resolved path is cached and used for all subsequent `execFile` calls
+- Console logs which path was found (or lists all paths tried on failure)
+- Re-resolves on each check so mid-session installs are picked up
+
+---
+
+## 0.3.1 — 2026-04-01
+
+Adds console diagnostics for rclone auth and connectivity failures.
+
+- `[G Command]` prefixed logging to Obsidian dev console (matches repo convention)
+- `checkBinary()` logs rclone version on success, full error on failure
+- `checkRemote()` captures rclone stderr and includes it in both the console log and the error banner detail text — previously the banner only said "not reachable" with no reason
+- `run()` logs stderr on any rclone subprocess failure
+- `loadRoot()` and `loadChildren()` log caught errors before displaying them
+
+---
+
+## 0.3.0 — 2026-04-01
+
+Fixes sidebar reconnection — refresh and reinstall now retry rclone connectivity.
+
+- Sidebar refresh (kebab menu → Refresh) now re-checks rclone and reloads Drive root instead of re-rendering cached error state
+- Changing the rclone remote name in settings immediately updates the provider and reloads the sidebar
+- Added `reload()` to shared `RefreshableView` interface for sidebars that need data-level refresh
+- Added `setRemote()` to `DriveProvider` so settings changes propagate without plugin restart
+
+---
+
 ## 0.2.3 — 2026-04-01
 
 Richer error banner when rclone is missing or Drive is unreachable.
