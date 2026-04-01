@@ -3507,10 +3507,14 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
       textSpan.appendText(finalText);
     }
     if (hasChildren) {
-      rowContainer.createEl("span", {
-        cls: "header-filename",
-        text: item.file.basename
-      });
+      const basename = item.file.basename;
+      const isDate = /^\d{4}-\d{2}-\d{2}$/.test(basename);
+      if (!isDate) {
+        rowContainer.createEl("span", {
+          cls: "header-filename",
+          text: basename
+        });
+      }
     }
     const itemTags = extractTags(cleanText).filter((tag) => !config.tagToStrip.test(tag));
     const mergedTags = [.../* @__PURE__ */ new Set([...parentTags, ...itemTags])];
