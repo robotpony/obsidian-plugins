@@ -56,3 +56,11 @@ Manage and browse Hugo content from Obsidian. View posts, drafts, and filter by 
 Content is grouped by folder with subfolder "folder tags" for filtering. Edit your Hugo site configuration (hugo.toml) directly from the sidebar. Supports both TOML and YAML frontmatter formats.
 
 LLM features (requires Ollama, OpenAI, Gemini, or Anthropic): **Content Review** evaluates posts against a checklist; **Outline Enhancement** adds questions and suggestions as inline comment bubbles.
+
+### [g-command](./g-command)
+
+Google Drive browser and sync for Obsidian. Pull Docs, Sheets, and files into your vault without leaving the app.
+
+Browse your Drive in a sidebar, check files and folders to track, and press Sync to pull them in. Google Docs are converted to markdown, Sheets to CSV. Drive folder structure is mirrored under a configurable vault folder. Sync is one-way (Drive → vault) and skips unchanged files.
+
+Requires [rclone](https://rclone.org/) for Drive access — run `g-command/setup.sh` to install and authenticate. Desktop only.

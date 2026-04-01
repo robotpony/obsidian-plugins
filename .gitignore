@@ -3,3 +3,4 @@ node_modules/
 package-lock.json
 .install-vaults
 g-command/src/gdrive/dist/
+g-command/main.js
