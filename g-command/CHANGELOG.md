@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.1.0 — 2026-03-31
+
+Obsidian plugin scaffold — Phase 2, Steps 1–2.
+
+Adds the g-command Obsidian plugin alongside the existing MCP server. Plugin loads in Obsidian, exposes a settings tab (rclone remote name, vault sync root), and provides a fully-tested `DriveProvider` class for all Drive I/O via rclone subprocesses.
+
+**New files:**
+- `main.ts` — Plugin entry point and settings tab
+- `manifest.json`, `package.json`, `esbuild.config.mjs`, `tsconfig.json` — standard Obsidian build scaffold
+- `styles.css` — sidebar container and status styles
+- `src/types.ts` — `DriveFile`, `SyncRecord`, `GCommandSettings` interfaces
+- `src/DriveProvider.ts` — rclone wrapper: `list()`, `listRecursive()`, `cat()`, `check()`
+- `src/DriveProvider.test.ts` — 19 unit tests; all passing
+
+**Notes:**
+- `isDesktopOnly: true` — uses `child_process` (rclone), unavailable on mobile
+- esbuild dev-server moderate vuln is a known issue shared across all plugins in this repo (dev-only dep, dev server not used)
+
+---
+
 ## 1.0.0 — 2026-03-31
 
 Initial release.

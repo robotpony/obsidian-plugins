@@ -1,145 +1,286 @@
-# Architecture
+# Architecture: g-command
 
-## Overview
+g-command has two components:
 
-g-command is an MCP server that gives Claude Code read access to Google Drive. It exposes Drive files as MCP resources and a filename-search tool.
+1. **MCP server** (`src/gdrive/`) — gives Claude Code read access to Google Drive via rclone subprocesses. Done.
+2. **Obsidian plugin** (root `g-command/`) — gives Obsidian a Drive browser sidebar and a sync command. This document covers both, with emphasis on the plugin.
 
-```
-Claude Code
-    │
-    │  MCP (stdio)
-    ▼
-g-command (Node.js process)
-    │
-    │  child_process.execFile
-    ▼
-rclone binary
-    │
-    │  Google Drive API (HTTPS + OAuth2)
-    ▼
-Google Drive
-```
+Both components use rclone for all Drive access. Auth is shared — configured once via `rclone config` or `./setup.sh`.
 
-The server runs as a local subprocess. Claude Code spawns it on startup and communicates over stdio using the MCP protocol. All Drive access goes through rclone subprocesses. The server itself holds no credentials and no state between calls.
+---
 
-## Auth approach: rclone instead of GCP OAuth
+## MCP server (existing)
 
-### Why rclone
+See `src/gdrive/index.ts`. Single-file TypeScript MCP server. Exposes:
+- `ListResources` — lists Drive files via `rclone lsjson`
+- `ReadResource` — downloads a file via `rclone cat`
+- `search` tool — filename search via `rclone lsjson --include`
 
-The original approach used `googleapis` + `@google-cloud/local-auth`, which requires creating a GCP project and configuring an OAuth consent screen to obtain a `client_id` and `client_secret`. That is roughly six steps in the Google Cloud Console.
+No changes needed to the MCP server for the plugin work.
 
-rclone ships with its own registered OAuth credentials for Google Drive. Running `rclone config` is a single terminal command that handles the browser auth flow and stores a token. No GCP Console, no OAuth app registration.
+---
 
-### Trade-offs
+## Obsidian plugin
 
-| Capability | Direct GCP | rclone (current) |
-|-----------|-----------|--------|
-| Full-text content search | Yes | No (filename matching only) |
-| Google Docs export to markdown | Yes | No (plain text) |
-| Setup time | ~15 min (console) | ~3 min (terminal) |
-| Runtime dependencies | `googleapis` npm package | `rclone` binary |
-| Token storage | `.gdrive-server-credentials.json` | `~/.config/rclone/rclone.conf` |
-
-Full-text search and markdown export are acceptable losses. The primary use case is listing documents and reading their content. Plain text is sufficient for Claude to work with Google Docs.
-
-### Auth lifecycle
+### Component map
 
 ```
-One-time setup:
-  brew install rclone
-  rclone config  →  creates [gdrive] remote in ~/.config/rclone/rclone.conf
-
-Runtime (each MCP call):
-  rclone reads token from rclone.conf
-  rclone refreshes token automatically if expired
-  rclone makes Drive API call, returns result to stdout
+main.ts (Plugin)
+├── GDriveSidebar (ItemView)       — sidebar tree UI
+│   └── DriveProvider              — rclone subprocess calls
+├── SyncManager                    — sync orchestration
+│   ├── DriveProvider
+│   └── Converter                  — format conversion
+└── SettingsTab (PluginSettingTab) — settings UI
 ```
 
-Token refresh is handled entirely by rclone. The MCP server does not manage credentials.
-
-## Components
-
-### Server process (`index.ts`)
-
-Single-file TypeScript server. Responsibilities:
-
-- Implements the MCP `resources` interface — exposes Drive files at `gdrive:///path/to/file`
-- Implements the MCP `tools` interface — exposes one tool: `search`
-- Executes rclone subprocesses and maps output to MCP response format
-
-### rclone subprocess layer
-
-All Drive operations are rclone CLI calls via `child_process.execFile`. No npm Drive library is used at runtime.
-
-| Operation | rclone command |
-|-----------|---------------|
-| List root | `rclone lsjson gdrive: --max-depth 1` |
-| List folder | `rclone lsjson "gdrive:Folder" --max-depth 1` |
-| Search by filename | `rclone lsjson gdrive: --include "*term*" --recursive --files-only` |
-| Read Google Doc | `rclone cat --drive-export-formats txt "gdrive:Doc.gdoc"` |
-| Read Google Sheet | `rclone cat --drive-export-formats csv "gdrive:Sheet.gsheet"` |
-| Read regular file | `rclone cat "gdrive:path/to/file"` |
-
-### Format conversion
-
-| Drive type | Export format | Notes |
-|------------|--------------|-------|
-| Google Docs | `txt` (plain text) | Formatting lost, content preserved |
-| Google Sheets | `csv` | Full fidelity |
-| Google Slides | `txt` | Plain text |
-| Binary files | native | Raw bytes, base64-encoded in MCP response |
-
-## MCP interface
-
-### Tool: `search`
-
-Finds files in Drive whose names match a query string. Returns file names and paths. Filename matching only — does not search document contents.
-
-### Resource: `gdrive:///path/to/file`
-
-Fetches and converts a file by its Drive path. Claude Code can read any file it discovers via `search` or `ListResources` using this URI scheme.
-
-## Resource URI scheme
+### Data flow
 
 ```
-gdrive:///path/to/file
+User checks a file in GDriveSidebar
+  → selectedPaths updated in GCommandSettings
+  → settings saved to .obsidian/plugins/g-command/data.json
+
+User clicks Sync
+  → SyncManager.syncAll(selectedPaths)
+    → DriveProvider.list(path)      — rclone lsjson
+      ↳ returns DriveFile[]
+    → compare file.ModTime with settings.syncState[path].modTime
+    → if newer:
+        DriveProvider.cat(path, 'html')  — rclone cat --drive-export-formats html
+        Converter.convert(html, file)
+          ↳ turndown(html) → markdown
+          ↳ prepend frontmatter
+        vault.adapter.write(vaultPath, content)
+        settings.syncState[path] = { modTime, vaultPath, fileId }
+    → if same: skip
+  → Notice("Synced N, skipped M")
 ```
 
-Maps to rclone remote path: `gdrive:path/to/file`
+---
 
-Path is relative to the Drive root. Spaces are preserved; the server handles quoting when constructing rclone commands.
+## Plugin components
+
+### `main.ts`
+
+Entry point. Standard Obsidian `Plugin` subclass.
+
+Responsibilities:
+- Registers `GDriveSidebar` as a view
+- Registers commands (`sync`, `open sidebar`)
+- Loads/saves settings
+- Passes settings and a `DriveProvider` instance to sidebar and sync manager
+
+### `DriveProvider`
+
+Wraps `child_process.execFile` calls to the `rclone` binary. All Drive I/O goes through this class.
+
+```typescript
+class DriveProvider {
+  constructor(private remote: string) {}
+
+  // Returns files/folders at path (one level deep)
+  async list(drivePath: string): Promise<DriveFile[]>
+
+  // Returns recursive listing for sync
+  async listRecursive(drivePath: string): Promise<DriveFile[]>
+
+  // Downloads file content. exportFormat only applies to Google Workspace types.
+  async cat(drivePath: string, exportFormat?: ExportFormat): Promise<Buffer>
+
+  // Verifies rclone is installed and remote is reachable.
+  async check(): Promise<void>
+}
+```
+
+rclone commands used:
+
+| Method | rclone command |
+|--------|---------------|
+| `list` | `rclone lsjson remote:path --max-depth 1` |
+| `listRecursive` | `rclone lsjson remote:path --recursive --files-only` |
+| `cat` (Docs) | `rclone cat --drive-export-formats html remote:path` |
+| `cat` (Sheets) | `rclone cat --drive-export-formats csv remote:path` |
+| `cat` (binary) | `rclone cat remote:path` |
+| `check` | `rclone lsjson remote: --max-depth 1 --files-only` |
+
+### `GDriveSidebar`
+
+Obsidian `ItemView` subclass. View type id: `g-command-drive`.
+
+State:
+- Tree of `DriveNode` objects (file or folder, with `checked: boolean | 'partial'`)
+- Loaded lazily — children fetched on first expand
+- Root loaded on view open and after each sync
+
+Behaviour:
+- Checkbox click: toggle selection, propagate to children, update parent to partial if needed
+- Folder expand: call `DriveProvider.list()`, render children
+- Sync button: delegate to `SyncManager.syncAll()`, show spinner, refresh tree after
+- Error state: if `DriveProvider.check()` fails, render error banner instead of tree
+
+Selected paths are stored as a `Set<string>` (Drive paths, e.g. `"Work/Projects/Brief.gdoc"`) in plugin settings. The tree is rebuilt from Drive on each open; checkbox states are restored from settings.
+
+### `SyncManager`
+
+Orchestrates the sync. No UI logic.
+
+```typescript
+class SyncManager {
+  async syncAll(selectedPaths: Set<string>): Promise<SyncResult>
+  async syncPath(drivePath: string): Promise<FileSyncResult>
+  private vaultPath(drivePath: string): string
+  private needsSync(file: DriveFile): boolean
+}
+```
+
+`syncAll` expands any selected folders (via `DriveProvider.listRecursive`) before syncing, so folder selections are always resolved to individual files.
+
+`needsSync` compares `file.ModTime` (ISO string from rclone) against the stored `modTime` in `settings.syncState`. If no record exists (first sync), the file is always downloaded.
+
+### `Converter`
+
+Stateless. Converts raw file content to a vault-ready string.
+
+```typescript
+function convert(
+  content: Buffer,
+  file: DriveFile,
+  options: { vaultPath: string }
+): ConvertResult
+```
+
+Conversion by MIME type:
+
+| MIME type | Action |
+|-----------|--------|
+| `application/vnd.google-apps.document` | HTML → markdown via Turndown, + frontmatter |
+| `application/vnd.google-apps.spreadsheet` | CSV passthrough, no frontmatter |
+| `application/vnd.google-apps.presentation` | Plain text → .md, + frontmatter |
+| `text/*` | String passthrough |
+| `application/json` | String passthrough |
+| anything else | Binary passthrough (returned as `Buffer`) |
+
+Turndown is configured with GFM (GitHub Flavoured Markdown) tables enabled, which preserves Google Docs table structure.
+
+### `SettingsTab`
+
+Standard Obsidian `PluginSettingTab`. Two fields:
+
+- **rclone remote** (text, default `"gdrive"`) — must match the name used in `rclone config`
+- **Vault sync root** (text, default `"gdrive"`) — folder created at vault root; Drive structure mirrored inside
+
+Selected paths and sync state are managed internally and not exposed in the settings tab.
+
+---
+
+## Settings schema
+
+Stored in `.obsidian/plugins/g-command/data.json` via `plugin.saveData()`.
+
+```typescript
+interface GCommandSettings {
+  rcloneRemote: string;           // default: "gdrive"
+  vaultRoot: string;              // default: "gdrive"
+  selectedPaths: string[];        // Drive paths (files or folders) the user has checked
+  syncState: Record<string, SyncRecord>;
+}
+
+interface SyncRecord {
+  modTime: string;    // Drive ModTime at last sync (ISO 8601)
+  vaultPath: string;  // Relative vault path where file was written
+  fileId: string;     // Drive file ID (for future URL construction)
+}
+```
+
+---
+
+## Frontmatter
+
+Injected at the top of every `.md` file written during sync.
+
+```yaml
+---
+gdrive_id: "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
+gdrive_url: "https://docs.google.com/document/d/1BxiMVs0.../edit"
+gdrive_path: "Work/Projects/Project Brief.gdoc"
+gdrive_type: "application/vnd.google-apps.document"
+synced: "2026-03-31T14:22:00.000Z"
+---
+```
+
+On re-sync, the frontmatter block is replaced and the document body is overwritten. The vault copy is not considered authoritative — Drive is the source of truth.
+
+---
+
+## File layout
+
+The Obsidian plugin lives at the `g-command/` root level alongside the existing MCP server directory.
+
+```
+g-command/
+├── main.ts                   # Plugin entry point
+├── manifest.json             # Obsidian plugin manifest
+├── package.json              # Build config
+├── styles.css                # Sidebar and status CSS
+├── esbuild.config.mjs
+├── tsconfig.json
+├── setup.sh                  # MCP server setup (existing)
+└── src/
+    ├── types.ts              # Shared interfaces (DriveFile, SyncRecord, etc.)
+    ├── DriveProvider.ts
+    ├── SyncManager.ts
+    ├── Converter.ts
+    ├── GDriveSidebar.ts
+    ├── SettingsTab.ts
+    └── gdrive/               # MCP server (existing, unchanged)
+        ├── index.ts
+        ├── package.json
+        └── ...
+```
+
+`install.sh` discovers plugins by looking for `manifest.json` in immediate subdirectories of the repo root. `g-command/manifest.json` is the Obsidian plugin manifest; the MCP server at `g-command/src/gdrive/` is built separately via `src/gdrive/package.json`.
+
+---
 
 ## Dependencies
 
-**Removed:**
-- `@google-cloud/local-auth` — handled by rclone config
-- `googleapis` — replaced by rclone subprocesses
+### Plugin (`g-command/package.json`)
 
-**Kept:**
-- `@modelcontextprotocol/sdk` — MCP transport and protocol
-- Node.js built-in `child_process` — subprocess execution
+| Package | Purpose |
+|---------|---------|
+| `obsidian` | Obsidian plugin API (dev dep) |
+| `turndown` | HTML → markdown conversion |
+| `turndown-plugin-gfm` | Adds GFM table support to turndown |
+| `@types/turndown` | TypeScript types for turndown |
+| `esbuild` | Bundler |
+| `typescript` | Compiler |
 
-**New system dependency:**
-- `rclone` binary (installed via Homebrew, not bundled)
+`child_process` (built-in Node.js) is used for rclone calls — no additional dependency.
 
-## Scope
+### Why turndown
 
-rclone is configured with `drive.readonly` scope during `rclone config`. This allows listing and reading files but no write, delete, or share operations.
+The only JS HTML-to-markdown library with active maintenance, GFM table support, and zero runtime dependencies of its own. The GFM plugin is required for table conversion from Google Docs.
 
-## Known limitations
+### Why not a Drive API client
 
-1. **Filename search only.** The `search` tool matches filenames using glob patterns. It cannot search document contents.
+All Drive access is via rclone subprocess calls. This reuses the auth configured during MCP server setup and adds no new OAuth credentials or API keys to manage. The trade-off is a runtime dependency on the rclone binary, which is already required by the MCP server.
 
-2. **Plain text export for Docs.** Formatting (headings, bold, lists) is lost. Content is preserved.
+---
 
-3. **rclone must be installed and configured.** The server fails with a clear error if `rclone` is not in PATH or if the `gdrive` remote is not configured.
+## Key decisions
 
-4. **No Drive File Stream integration.** Even though Drive for Desktop is mounted at `~/Library/CloudStorage/`, the server uses rclone for all operations. The local mount is not used (Google Workspace stubs don't contain document content).
+**rclone HTML export, not plain text**
+Google Docs exported as HTML preserve headings, bold, italic, lists, and tables. Turndown converts these to markdown. Plain text loses all formatting. HTML export adds no complexity — it's one flag to rclone.
 
-5. **Concurrent calls.** Each MCP call spawns a rclone subprocess. For interactive use this is not a concern.
+**Lazy tree loading**
+Drive roots can have hundreds of files. Loading the full tree on sidebar open would be slow and make unnecessary API calls. Children are fetched only when a folder is expanded.
 
-## Future extension points
+**Skip-if-unchanged by ModTime**
+Drive's `ModTime` field is reliable and returned by `rclone lsjson`. Comparing it against a stored timestamp is cheap and avoids re-downloading unchanged files. No hashing or diffing needed.
 
-1. **`.gdoc` resolver:** read local Drive mount stubs, extract the embedded `resource_id`, and auto-fetch via the MCP server — closing the loop without knowing file paths manually
-2. **`/gdoc-pull` skill:** a Claude Code skill that takes a document name, searches Drive, and saves the result as markdown to the Obsidian vault
-3. **Upgrade to direct API:** if markdown export becomes necessary, reintroduce `googleapis` with rclone config as the token source (read `~/.config/rclone/rclone.conf` for the stored token + rclone's client credentials)
+**Selected folders, not files**
+Users check folders, not individual files. This means adding a file to a tracked Drive folder picks it up on the next sync without any user action. Individual files can still be unchecked within an expanded folder.
+
+**Drive is source of truth**
+Sync is one-way: Drive → vault. Local edits to synced files are silently overwritten when the Drive file changes. This is intentional — the use case is pulling research docs, meeting notes, and reference material into Obsidian for reading and linking, not editing.
