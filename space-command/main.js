@@ -1106,7 +1106,8 @@ ${todoneText}` : todoneText;
         todo.file,
         todo.lineNumber,
         (line) => {
-          const tagPattern = new RegExp(`${tag}\\b\\s*`, "g");
+          const escapedTag = tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const tagPattern = new RegExp(`${escapedTag}\\b\\s*`, "g");
           return line.replace(tagPattern, "").replace(/\s+/g, " ").trim();
         },
         void 0,
@@ -1132,7 +1133,8 @@ ${todoneText}` : todoneText;
         item.lineNumber,
         (line) => line.trimEnd() + ` ${tag}`,
         (line) => {
-          const tagPattern = new RegExp(`${tag}\\b`);
+          const escapedTag = tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const tagPattern = new RegExp(`${escapedTag}\\b`);
           return tagPattern.test(line) ? `Tag ${tag} already present` : null;
         },
         item.fingerprint
@@ -1418,7 +1420,8 @@ ${todoneText}` : todoneText;
         todo.file,
         todo.lineNumber,
         (line) => {
-          const tagPattern = new RegExp(`${tag}\\b\\s*`, "g");
+          const escapedTag = tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const tagPattern = new RegExp(`${escapedTag}\\b\\s*`, "g");
           return line.replace(tagPattern, "").replace(/\s+/g, " ").trim();
         },
         void 0,
@@ -3426,7 +3429,9 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
         });
         link.addEventListener("click", (e) => {
           e.preventDefault();
-          window.open(url, "_blank");
+          if (url.startsWith("http://") || url.startsWith("https://")) {
+            window.open(url, "_blank");
+          }
         });
         remaining = remaining.substring(match[0].length);
         continue;
@@ -3509,12 +3514,10 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
     if (hasChildren) {
       const basename = item.file.basename;
       const isDate = /^\d{4}-\d{2}-\d{2}$/.test(basename);
-      if (!isDate) {
-        rowContainer.createEl("span", {
-          cls: "header-filename",
-          text: basename
-        });
-      }
+      rowContainer.createEl("span", {
+        cls: isDate ? "header-filename-inline" : "header-filename",
+        text: basename
+      });
     }
     const itemTags = extractTags(cleanText).filter((tag) => !config.tagToStrip.test(tag));
     const mergedTags = [.../* @__PURE__ */ new Set([...parentTags, ...itemTags])];

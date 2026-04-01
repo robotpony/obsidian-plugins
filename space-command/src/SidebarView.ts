@@ -227,7 +227,9 @@ export class TodoSidebarView extends ItemView {
 
         link.addEventListener('click', (e) => {
           e.preventDefault();
-          window.open(url, '_blank');
+          if (url.startsWith('http://') || url.startsWith('https://')) {
+            window.open(url, '_blank');
+          }
         });
 
         remaining = remaining.substring(match[0].length);
@@ -373,17 +375,15 @@ export class TodoSidebarView extends ItemView {
       textSpan.appendText(finalText);
     }
 
-    // Show filename for header items with children, but only when it adds
-    // information beyond the header text (skip dates and near-matches)
+    // Show filename for header items with children
+    // Dates stay inline; descriptive names get their own line
     if (hasChildren) {
       const basename = item.file.basename;
       const isDate = /^\d{4}-\d{2}-\d{2}$/.test(basename);
-      if (!isDate) {
-        rowContainer.createEl("span", {
-          cls: "header-filename",
-          text: basename,
-        });
-      }
+      rowContainer.createEl("span", {
+        cls: isDate ? "header-filename-inline" : "header-filename",
+        text: basename,
+      });
     }
 
     // Get tags (excluding the type tag) and merge with parent header tags for child items

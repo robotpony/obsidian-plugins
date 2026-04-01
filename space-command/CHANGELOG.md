@@ -2,6 +2,17 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.116] - 2026-04-01
+
+### Improved
+
+- **Sidebar header filenames**: Project file headers (e.g., "gdrive mcp") now show descriptive filenames on a separate line below the header for better readability. Date-based filenames (daily notes) remain inline on the same row.
+
+### Fixed
+
+- **URL scheme injection**: Markdown links in the sidebar now only open `http://` and `https://` URLs, blocking `javascript:` and other dangerous schemes.
+- **Regex escaping in tag operations**: Tag values are now escaped before regex interpolation in TodoProcessor for defence-in-depth against potential ReDoS.
+
 ## [0.9.115] - 2026-03-30
 
 ### Added

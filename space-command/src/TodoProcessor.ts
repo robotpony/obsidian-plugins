@@ -397,7 +397,8 @@ export class TodoProcessor {
         todo.file,
         todo.lineNumber,
         (line) => {
-          const tagPattern = new RegExp(`${tag}\\b\\s*`, "g");
+          const escapedTag = tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const tagPattern = new RegExp(`${escapedTag}\\b\\s*`, "g");
           return line.replace(tagPattern, "").replace(/\s+/g, " ").trim();
         },
         undefined,
@@ -424,7 +425,8 @@ export class TodoProcessor {
         (line) => line.trimEnd() + ` ${tag}`,
         (line) => {
           // Word-boundary check to avoid matching #todo inside #todone etc.
-          const tagPattern = new RegExp(`${tag}\\b`);
+          const escapedTag = tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const tagPattern = new RegExp(`${escapedTag}\\b`);
           return tagPattern.test(line) ? `Tag ${tag} already present` : null;
         },
         item.fingerprint
@@ -720,7 +722,8 @@ export class TodoProcessor {
         todo.file,
         todo.lineNumber,
         (line) => {
-          const tagPattern = new RegExp(`${tag}\\b\\s*`, "g");
+          const escapedTag = tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const tagPattern = new RegExp(`${escapedTag}\\b\\s*`, "g");
           return line.replace(tagPattern, "").replace(/\s+/g, " ").trim();
         },
         undefined,
