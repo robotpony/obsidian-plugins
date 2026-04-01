@@ -4,9 +4,26 @@ vi.mock("child_process", () => ({
   execFile: vi.fn(),
 }));
 
+vi.mock("fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("fs")>();
+  return {
+    ...actual,
+    mkdtempSync: vi.fn(() => "/tmp/gc-test123"),
+    readdirSync: vi.fn(() => ["exported.html"]),
+    readFileSync: vi.fn(() => "<h1>Hello</h1>"),
+    rmSync: vi.fn(),
+  };
+});
+
 import { execFile } from "child_process";
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from "fs";
 import { DriveProvider } from "./DriveProvider";
 import type { DriveFile } from "./types";
+
+const mockMkdtempSync = vi.mocked(mkdtempSync);
+const mockReaddirSync = vi.mocked(readdirSync);
+const mockReadFileSync = vi.mocked(readFileSync);
+const mockRmSync = vi.mocked(rmSync);
 
 const mockExecFile = vi.mocked(execFile);
 
@@ -142,47 +159,90 @@ describe("DriveProvider", () => {
     });
   });
 
-  // --- cat() ---
+  // --- download() ---
 
-  describe("cat()", () => {
-    it("calls rclone cat with the remote path", async () => {
-      mockSuccess("<html>content</html>");
-      await provider.cat("Work/Brief.gdoc");
+  describe("download()", () => {
+    it("uses rclone copy with --include from parent directory", async () => {
+      mockSuccess("");
+      await provider.download("Folder/Brief.docx", "html");
       const args = lastArgs();
-      expect(args[0]).toBe("cat");
-      expect(args).toContain("gdrive:Work/Brief.gdoc");
+      expect(args[0]).toBe("copy");
+      expect(args).toContain("--include");
+      expect(args).toContain("gdrive:Folder");
+    });
+
+    it("swaps extension in --include filter to match export format", async () => {
+      mockSuccess("");
+      await provider.download("Folder/Brief.docx", "html");
+      const args = lastArgs();
+      const includeIdx = args.indexOf("--include");
+      expect(args[includeIdx + 1]).toBe("Brief.html");
+    });
+
+    it("uses original filename in --include when no export format", async () => {
+      mockSuccess("");
+      await provider.download("Folder/notes.txt");
+      const args = lastArgs();
+      const includeIdx = args.indexOf("--include");
+      expect(args[includeIdx + 1]).toBe("notes.txt");
     });
 
     it("adds --drive-export-formats when exportFormat is provided", async () => {
-      mockSuccess("<html>content</html>");
-      await provider.cat("Work/Brief.gdoc", "html");
+      mockSuccess("");
+      await provider.download("Work/Brief.gdoc", "html");
       const args = lastArgs();
       expect(args).toContain("--drive-export-formats");
       expect(args).toContain("html");
     });
 
     it("omits --drive-export-formats when no exportFormat", async () => {
-      mockSuccess("plain text");
-      await provider.cat("Readme.txt");
+      mockSuccess("");
+      await provider.download("Readme.txt");
       const args = lastArgs();
       expect(args).not.toContain("--drive-export-formats");
     });
 
-    it("supports csv export format for Sheets", async () => {
-      mockSuccess("a,b,c\n1,2,3");
-      await provider.cat("Budget.gsheet", "csv");
-      expect(lastArgs()).toContain("csv");
+    it("uses remote root for files without parent directory", async () => {
+      mockSuccess("");
+      await provider.download("Brief.docx", "html");
+      const args = lastArgs();
+      expect(args).toContain("gdrive:");
     });
 
-    it("returns stdout as string", async () => {
-      mockSuccess("<h1>Hello</h1>");
-      const result = await provider.cat("Doc.gdoc", "html");
+    it("reads the first file from the temp directory", async () => {
+      mockSuccess("");
+      const result = await provider.download("Doc.gdoc", "html");
       expect(result).toBe("<h1>Hello</h1>");
+      expect(mockReadFileSync).toHaveBeenCalledWith("/tmp/gc-test123/exported.html", "utf-8");
+    });
+
+    it("cleans up temp directory after success", async () => {
+      mockSuccess("");
+      await provider.download("Doc.gdoc", "html");
+      expect(mockRmSync).toHaveBeenCalledWith("/tmp/gc-test123", { recursive: true, force: true });
+    });
+
+    it("cleans up temp directory after failure", async () => {
+      mockFailure("connection error");
+      await expect(provider.download("Doc.gdoc", "html")).rejects.toThrow();
+      expect(mockRmSync).toHaveBeenCalledWith("/tmp/gc-test123", { recursive: true, force: true });
+    });
+
+    it("throws when rclone copy produces no output files", async () => {
+      mockSuccess("");
+      (readdirSync as any).mockReturnValueOnce([]);
+      await expect(provider.download("empty.gdoc", "html")).rejects.toThrow("no output");
+    });
+
+    it("supports csv export format for Sheets", async () => {
+      mockSuccess("");
+      await provider.download("Budget.gsheet", "csv");
+      expect(lastArgs()).toContain("csv");
     });
 
     it("rejects on rclone error", async () => {
       mockFailure("file not found");
-      await expect(provider.cat("missing.gdoc", "html")).rejects.toThrow("file not found");
+      await expect(provider.download("missing.gdoc", "html")).rejects.toThrow("file not found");
     });
   });
 

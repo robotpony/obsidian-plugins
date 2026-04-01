@@ -1,5 +1,7 @@
 import { execFile } from "child_process";
-import { existsSync } from "fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "fs";
+import { join } from "path";
+import { tmpdir } from "os";
 import { DriveFile, ExportFormat } from "./types";
 
 const MAX_BUFFER = 50 * 1024 * 1024; // 50 MB
@@ -68,33 +70,52 @@ export class DriveProvider {
   }
 
   /**
-   * Downloads a file and returns its content as a string.
-   * For Google Workspace files, pass an exportFormat to trigger rclone's
-   * Drive export (e.g. "html" for Docs, "csv" for Sheets).
-   * For regular files, omit exportFormat.
+   * Downloads a single file and returns its content as a string.
+   *
+   * Uses `rclone copy --include <filename>` from the parent directory.
+   * Google Workspace virtual files can't be addressed by full path (rclone
+   * treats them as directories), but they CAN be found via directory listing
+   * with an include filter. For exports, the filter uses the target extension
+   * (e.g. .html) since --drive-export-formats changes the virtual filename.
+   *
+   * For Google Workspace files, pass an exportFormat (e.g. "html" for Docs,
+   * "csv" for Sheets). For regular files, omit exportFormat.
    */
-  async cat(drivePath: string, exportFormat?: ExportFormat): Promise<string> {
-    // Google Workspace files have virtual extensions (rclone adds .gdoc, .docx,
-    // .gsheet, .xlsx, etc. depending on config). When exporting, strip the old
-    // extension and append the target export extension — rclone resolves the
-    // path using the export format's extension (e.g. "file.html" for html).
-    let catPath = drivePath;
-    if (exportFormat) {
-      const dotIdx = catPath.lastIndexOf(".");
-      if (dotIdx > 0) {
-        catPath = catPath.substring(0, dotIdx);
-      }
-      catPath = `${catPath}.${exportFormat}`;
-    }
+  async download(drivePath: string, exportFormat?: ExportFormat): Promise<string> {
+    const tmpDir = mkdtempSync(join(tmpdir(), "gc-"));
+    try {
+      // Split path into parent directory + filename
+      const lastSlash = drivePath.lastIndexOf("/");
+      const parentDir = lastSlash > 0 ? drivePath.substring(0, lastSlash) : "";
+      const fileName = lastSlash > 0 ? drivePath.substring(lastSlash + 1) : drivePath;
 
-    const remotePath = `${this.remote}:${catPath}`;
-    const args = ["cat"];
-    if (exportFormat) {
-      args.push("--drive-export-formats", exportFormat);
+      // For exports, the include filter must match the target extension
+      let includeFilter = fileName;
+      if (exportFormat) {
+        const dotIdx = fileName.lastIndexOf(".");
+        const baseName = dotIdx > 0 ? fileName.substring(0, dotIdx) : fileName;
+        includeFilter = `${baseName}.${exportFormat}`;
+      }
+
+      const remotePath = parentDir
+        ? `${this.remote}:${parentDir}`
+        : `${this.remote}:`;
+      const args = ["copy", "--include", includeFilter];
+      if (exportFormat) {
+        args.push("--drive-export-formats", exportFormat);
+      }
+      args.push(remotePath, tmpDir);
+      console.log(TAG, `download args: [${args.map(a => `"${a}"`).join(", ")}]`);
+      await this.run(args);
+
+      const files = readdirSync(tmpDir);
+      if (files.length === 0) {
+        throw new Error(`rclone copy produced no output for ${drivePath}`);
+      }
+      return readFileSync(join(tmpDir, files[0]), "utf-8");
+    } finally {
+      try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore cleanup errors */ }
     }
-    args.push(remotePath);
-    console.log(TAG, `cat args: [${args.map(a => `"${a}"`).join(", ")}]`);
-    return this.run(args);
   }
 
   /**

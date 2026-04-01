@@ -1,12 +1,48 @@
 # Changelog
 
-## 0.5.6 — 2026-04-01
+## 0.6.3 — 2026-04-01
 
-Fixes sync of files inside Drive folders (not just root files).
+Fixes Google Workspace file download — rclone can't address virtual files by path.
 
-- Root cause: rclone `lsjson` returns `Path` relative to the listed folder, not the remote root. Files inside subfolders (e.g. `Alderson Family Recipes/recipe.docx`) were being catted with just the filename (`recipe.docx`), causing "directory not found".
-- `loadChildren()` now prefixes each child's `Path` with the parent folder path, so sync uses the full remote path (e.g. `Alderson Family Recipes/recipe.docx`)
-- `DriveProvider.cat()` also swaps the virtual extension to the target export format (`.docx` → `.html`) since rclone resolves exported files by target extension
+- Root cause: rclone's `cat`, `copy`, and `copyto` all fail with "directory not found" when given the full path to a Google Workspace virtual file (Size -1). These files can only be downloaded via directory listing.
+- Fix: `download()` now uses `rclone copy --include <filename>` from the parent directory. rclone lists the parent, finds the matching file, and copies it to a temp dir.
+- For Google Workspace exports, the `--include` filter uses the **target** extension (e.g. `.html` not `.docx`) since `--drive-export-formats` changes the virtual filename.
+- Verified working: Google Doc exported as 1.6 MB HTML, converted to Markdown via Turndown.
+- 12 tests for `download()` covering: include filter construction, extension swap, parent dir extraction, root-level files, cleanup on success/failure, empty output.
+- 83 tests total, all passing.
+
+---
+
+## 0.6.2 — 2026-04-01
+
+(Superseded by 0.6.3 — `copyto` also fails for virtual files.)
+
+---
+
+## 0.6.1 — 2026-04-01
+
+Adds "Clear sync cache" to the kebab menu.
+
+- Previous failed sync attempts left stale `syncState` entries, causing files to show "unchanged" on resync even though they never downloaded successfully
+- Kebab menu → "Clear sync cache" resets all sync state so every file re-downloads on next sync
+- Only visible when sync state has entries (same as "Resync all")
+
+---
+
+## 0.6.0 — 2026-04-01
+
+Fixes Google Workspace file export by replacing `rclone cat` with `rclone copy`.
+
+Two root causes behind the persistent "directory not found" failures:
+
+1. **Relative paths**: rclone `lsjson` returns `Path` relative to the listed folder, not the remote root. Files inside subfolders were synced with just the filename. `loadChildren()` now prefixes each child's `Path` with the parent folder path.
+
+2. **Extension manipulation**: `rclone cat` with `--drive-export-formats` required matching the filename extension to the target format, which varied by remote configuration. Replaced with `rclone copy` to a temp directory — uses the original listed path with no extension manipulation. rclone handles export naming internally.
+
+- New `DriveProvider.download()` method: copies file to temp dir via `rclone copy`, reads result, cleans up
+- Removed `DriveProvider.cat()` and all extension-stripping logic
+- 10 new/updated tests for `download()` (temp dir creation, cleanup on success/failure, empty output)
+- 81 tests total, all passing
 
 ---
 

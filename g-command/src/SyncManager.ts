@@ -174,7 +174,7 @@ export async function syncFiles(
       onLog("info", `${file.Name} — ${detail}`);
       console.log(TAG, `Sync: ${file.Path} (${detail})`);
 
-      const raw = await drive.cat(file.Path, mapping.exportFormat);
+      const raw = await drive.download(file.Path, mapping.exportFormat);
       const content = convertContent(raw, mapping, file);
       const vaultPath = toVaultPath(file, settings.vaultRoot);
 

@@ -389,6 +389,17 @@ export class GDriveSidebar extends ItemView {
             .setIcon("refresh-cw")
             .onClick(() => this.resyncAll())
         );
+        menu.addItem((item) =>
+          item
+            .setTitle("Clear sync cache")
+            .setIcon("trash")
+            .onClick(async () => {
+              this.settings.syncState = {};
+              await this.saveSettings();
+              this.log("info", "Sync cache cleared — all files will re-download on next sync");
+              this.render();
+            })
+        );
       }
       menu.addSeparator();
       menu.addItem((item) =>
