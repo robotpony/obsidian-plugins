@@ -1,18 +1,36 @@
 # Plan
 
-Scope: get the server running locally and registered with Claude Code. Read-only. No new features until the basics work.
+## Phase 1: MCP server for Claude Code — Complete ✓
 
-Auth approach changed from direct GCP OAuth to rclone. See ARCHITECTURE.md for the rationale.
+All steps done. Claude Code can search and read Drive files via the `gdrive` MCP server.
 
-## Status
+### Status
 
-- [x] Step 1: Fork and extract the server — `src/gdrive/` added with `index.ts`, `package.json`, `tsconfig.json`, `Dockerfile`
+- [x] Step 1: Fork and extract the server
 - [x] Step 2: Switch auth approach — rclone replaces GCP OAuth
-- [ ] Step 3: Install rclone and configure the Drive remote  ← **you need to run this**
+- [x] Step 3: Install rclone and configure the Drive remote
 - [x] Step 4: Rewrite `index.ts` to use rclone subprocesses
-- [x] Step 5: Build — passes (`npm run build` clean) ← register with Claude Code after Step 3
-- [ ] Step 6: Verify and smoke test
-- [ ] Step 7: Lock down dependencies
+- [x] Step 5: Build
+- [x] Step 6: Verify and smoke test
+- [x] Step 7: Lock down dependencies
+
+---
+
+## Phase 2: Obsidian plugin — Drive browser and sync
+
+Adds a sidebar Drive browser to Obsidian. Users check files and folders to track, press Sync to pull them into the vault. Google Docs → markdown, Sheets → CSV. Mirrors Drive folder structure under a configurable vault root. See ARCHITECTURE.md and DESIGN.md for full detail.
+
+### Status
+
+- [x] Step 1: Plugin scaffold
+- [x] Step 2: DriveProvider — list and cat via rclone
+- [ ] Step 3: GDriveSidebar — file tree (no selection yet)
+- [ ] Step 4: Checkbox selection and settings persistence
+- [ ] Step 5: SyncManager — basic sync (overwrite all selected)
+- [ ] Step 6: Converter — HTML → markdown via turndown, CSV passthrough
+- [ ] Step 7: Skip-if-unchanged (ModTime comparison)
+- [ ] Step 8: Frontmatter injection
+- [ ] Step 9: Polish — error states, progress feedback, partial folder selection
 
 ---
 
@@ -182,11 +200,136 @@ Smoke tests:
 | Filename search misses files | Known limitation; document it and consider path browsing as the primary workflow |
 | Google Workspace files look like stubs in local mount | Server uses rclone, not the local mount — not an issue |
 
-## Nice-to-haves (post-MVP)
+---
 
-These are out of scope until the server is working reliably:
+## Phase 2 step detail
 
-- **`.gdoc` resolver:** read a local Drive mount stub, extract `resource_id` from the JSON, fetch via rclone — no more typing file paths manually
-- **`/gdoc-pull` skill:** Claude Code skill that takes a doc name, searches Drive, writes the text output into the Obsidian vault
-- **Sheets workflow:** assess whether CSV output is useful enough to build around
-- **Markdown export:** if plain text proves insufficient, reintroduce `googleapis` using the rclone token as the auth source (avoids GCP setup while regaining markdown export)
+### Step 1: Plugin scaffold
+
+Create the Obsidian plugin skeleton at `g-command/` root level. The plugin coexists with the MCP server at `src/gdrive/`.
+
+Files to create:
+- `manifest.json` — Obsidian plugin manifest (id: `g-command`, name: `g-command`)
+- `package.json` — esbuild + TypeScript build, depends on `obsidian`, `turndown`, `turndown-plugin-gfm`
+- `esbuild.config.mjs` — standard Obsidian esbuild config
+- `tsconfig.json` — targets ES2018, bundler module resolution
+- `styles.css` — minimal sidebar styles
+- `main.ts` — `Plugin` subclass with empty `onload()`/`onunload()`
+- `src/types.ts` — `DriveFile`, `SyncRecord`, `GCommandSettings` interfaces
+
+Verify: plugin appears in Obsidian's community plugins list and loads without error.
+
+### Step 2: DriveProvider
+
+`src/DriveProvider.ts`. Wraps rclone subprocess calls. No UI dependencies.
+
+```typescript
+class DriveProvider {
+  list(drivePath: string): Promise<DriveFile[]>
+  listRecursive(drivePath: string): Promise<DriveFile[]>
+  cat(drivePath: string, exportFormat?: 'html' | 'csv' | 'txt'): Promise<Buffer>
+  check(): Promise<void>  // throws if rclone missing or remote unreachable
+}
+```
+
+Uses Node.js built-in `child_process.execFile` (available in Obsidian's Electron environment). Max buffer: 50 MB.
+
+### Step 3: GDriveSidebar — file tree
+
+`src/GDriveSidebar.ts`. Registered as view type `g-command-drive`.
+
+Phase 3 scope (no selection yet):
+- Loads Drive root on open via `DriveProvider.list("")`
+- Renders a collapsible tree using Obsidian's standard DOM APIs
+- Expand/collapse folders on click (lazy-loads children)
+- Error banner if `DriveProvider.check()` fails
+
+### Step 4: Checkbox selection and persistence
+
+Extend `GDriveSidebar` with three-state checkboxes (☑ / □ / ⊟). 
+
+- Checking a folder marks all loaded children as checked; further children inherit when loaded
+- `selectedPaths` stored in plugin settings as `string[]`
+- Settings saved after each checkbox change via `plugin.saveData()`
+- On tree rebuild (re-open or post-sync), restore check states from `settings.selectedPaths`
+
+### Step 5: SyncManager — basic sync
+
+`src/SyncManager.ts`. First version: download and overwrite all selected files unconditionally.
+
+```typescript
+class SyncManager {
+  async syncAll(selectedPaths: string[]): Promise<SyncResult>
+}
+```
+
+- Expands folder paths via `DriveProvider.listRecursive`
+- Downloads each file via `DriveProvider.cat`
+- Writes to vault via `this.app.vault.adapter.write(path, content)`
+- Creates intermediate folders via `this.app.vault.adapter.mkdir`
+- Returns `{ synced: number, failed: string[] }`
+
+At this step, all selected files are re-downloaded on every sync (no skip logic yet).
+
+### Step 6: Converter
+
+`src/Converter.ts`. Stateless conversion by MIME type.
+
+```typescript
+function convert(content: Buffer, file: DriveFile): { text: string; ext: string }
+```
+
+- Google Docs (`application/vnd.google-apps.document`): turndown(html) → markdown, ext `.md`
+- Sheets (`application/vnd.google-apps.spreadsheet`): CSV passthrough, ext `.csv`
+- Slides / Forms: plain text, ext `.md`
+- Text types: UTF-8 string passthrough, original ext
+- Binary: not converted at this step (write as-is to vault)
+
+Turndown config: GFM plugin enabled (tables), headingStyle `atx`, bulletListMarker `-`.
+
+Strip the rclone-added extension from the output filename: `Brief.gdoc` → `Brief.md`.
+
+### Step 7: Skip-if-unchanged
+
+Extend `SyncManager` to compare Drive `ModTime` against stored state before downloading.
+
+- `settings.syncState` maps Drive path → `{ modTime, vaultPath, fileId }`
+- If `file.ModTime === syncState[path].modTime`: skip
+- After writing: update `syncState[path]` with new ModTime and vault path
+- Sync result now reports `{ synced, skipped, failed }`
+
+Notice text: `"Synced 3 files, 12 up to date"` or `"All files up to date"`.
+
+### Step 8: Frontmatter injection
+
+Extend `Converter` to prepend frontmatter to all `.md` output.
+
+```yaml
+---
+gdrive_id: "..."
+gdrive_url: "https://docs.google.com/..."
+gdrive_path: "Work/Brief.gdoc"
+gdrive_type: "application/vnd.google-apps.document"
+synced: "2026-03-31T14:22:00.000Z"
+---
+```
+
+On re-sync, detect existing frontmatter block (lines 1–N between `---` delimiters) and replace it. Use a regex or line scanner — do not use a YAML parser to avoid adding a dependency.
+
+### Step 9: Polish
+
+- **Sync button state** — spinner during sync, disabled to prevent double-trigger
+- **Status line** — "Synced N · 2 min ago" shown below sidebar header; updates after sync
+- **Partial folder selection** — ⊟ state for folders with mixed child selection
+- **Error handling** — per-file failures shown as notices; partial sync still completes
+- **Command palette** — register `g-command: Sync Drive files` and `g-command: Open Drive browser`
+- **Refresh after sync** — reload modified tree nodes after sync so ✓ badges appear
+
+---
+
+## Nice-to-haves (post-Phase 2)
+
+- **`.gdoc` resolver:** read local Drive mount stubs, extract `resource_id`, sync that specific file — closing the loop without browsing
+- **`/gdoc-pull` skill:** Claude Code skill that takes a doc name, searches Drive via MCP server, writes markdown into the vault
+- **Sheets workflow:** render CSV as a table preview in a Obsidian leaf
+- **Open in browser:** right-click synced file → open source Doc in browser using `gdrive_url` frontmatter field

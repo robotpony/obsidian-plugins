@@ -1,0 +1,10 @@
+{
+  "id": "g-command",
+  "name": "g-command",
+  "version": "0.1.0",
+  "minAppVersion": "0.15.0",
+  "description": "Google Drive browser and sync for Obsidian. Pull Docs, Sheets, and files into your vault.",
+  "author": "Bruce Alderson",
+  "authorUrl": "https://github.com/robotpony/obsidian-plugins",
+  "isDesktopOnly": true
+}

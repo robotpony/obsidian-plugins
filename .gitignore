@@ -2,3 +2,5 @@ node_modules/
 .DS_Store
 package-lock.json
 .install-vaults
+g-command/src/gdrive/dist/
+g-command/main.js
