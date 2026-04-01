@@ -1,5 +1,5 @@
 import { ItemView, Menu, WorkspaceLeaf } from "obsidian";
-import { DriveProvider } from "./DriveProvider";
+import { DriveProvider, DriveError } from "./DriveProvider";
 import { DriveFile, GCommandSettings } from "./types";
 
 export const VIEW_TYPE_GDRIVE_SIDEBAR = "g-command-drive";
@@ -18,20 +18,23 @@ export class GDriveSidebar extends ItemView {
   private drive: DriveProvider;
   private settings: GCommandSettings;
   private rootNodes: TreeNode[] | null = null;
-  private error: string | null = null;
+  private error: DriveError | Error | null = null;
   private loadingRoot = false;
   private onOpenSettings: () => void;
+  private pluginDir: string;
 
   constructor(
     leaf: WorkspaceLeaf,
     drive: DriveProvider,
     settings: GCommandSettings,
-    onOpenSettings: () => void
+    onOpenSettings: () => void,
+    pluginDir: string
   ) {
     super(leaf);
     this.drive = drive;
     this.settings = settings;
     this.onOpenSettings = onOpenSettings;
+    this.pluginDir = pluginDir;
   }
 
   getViewType(): string {
@@ -66,7 +69,7 @@ export class GDriveSidebar extends ItemView {
     this.renderStatusLine(container);
 
     if (this.error) {
-      this.renderErrorBanner(container, this.error);
+      this.renderErrorBanner(container);
       return;
     }
 
@@ -101,7 +104,10 @@ export class GDriveSidebar extends ItemView {
         .sort(sortDirsFirst)
         .map(toTreeNode);
     } catch (e: unknown) {
-      this.error = e instanceof Error ? e.message : String(e);
+      this.error =
+        e instanceof DriveError || e instanceof Error
+          ? e
+          : new Error(String(e));
       this.rootNodes = null;
     } finally {
       this.loadingRoot = false;
@@ -117,8 +123,9 @@ export class GDriveSidebar extends ItemView {
         .map(toTreeNode);
     } catch (e: unknown) {
       node.children = [];
-      const msg = e instanceof Error ? e.message : String(e);
-      this.error = `Failed to load ${node.file.Name}: ${msg}`;
+      this.error = new Error(
+        `Failed to load ${node.file.Name}: ${e instanceof Error ? e.message : String(e)}`
+      );
     }
   }
 
@@ -173,26 +180,62 @@ export class GDriveSidebar extends ItemView {
     parent.createDiv({ cls: "g-command-status", text: "Browse your Drive" });
   }
 
-  private renderErrorBanner(parent: HTMLElement, message: string): void {
+  private renderErrorBanner(parent: HTMLElement): void {
+    const err = this.error!;
     const banner = parent.createDiv({ cls: "g-command-error-banner" });
 
-    // First line is the title; remaining lines are help text
-    const lines = message.split("\n").filter((l) => l.length > 0);
-    const title = lines[0] || "Connection failed";
-    const details = lines.slice(1);
-
-    banner.createDiv({ cls: "g-command-error-title", text: title });
-
-    for (const line of details) {
-      const p = banner.createEl("p");
-      // Wrap text between backticks in <code>
-      const codePattern = /`([^`]+)`/g;
-      if (codePattern.test(line)) {
-        p.innerHTML = line.replace(/`([^`]+)`/g, "<code>$1</code>");
-      } else {
-        p.textContent = line;
-      }
+    if (err instanceof DriveError) {
+      this.renderDriveError(banner, err);
+    } else {
+      banner.createDiv({ cls: "g-command-error-title", text: err.message });
     }
+  }
+
+  private renderDriveError(banner: HTMLElement, err: DriveError): void {
+    banner.createDiv({
+      cls: "g-command-error-title",
+      text: "Authenticate with Google Drive",
+    });
+
+    const commands =
+      err.code === "binary-missing"
+        ? "brew install rclone\nrclone config"
+        : "rclone config";
+
+    const detail =
+      err.code === "binary-missing"
+        ? "Install and authenticate with rclone:"
+        : err.message;
+
+    banner.createEl("p", { text: detail });
+
+    // Code block with commands
+    const codeWrap = banner.createDiv({ cls: "g-command-code-block" });
+    const pre = codeWrap.createEl("pre");
+    pre.createEl("code", { text: commands });
+
+    const copyBtn = codeWrap.createEl("button", {
+      cls: "g-command-copy-btn clickable-icon",
+      attr: { "aria-label": "Copy to clipboard" },
+    });
+    copyBtn.textContent = "Copy";
+    copyBtn.addEventListener("click", () => {
+      navigator.clipboard.writeText(commands);
+      copyBtn.textContent = "Copied";
+      setTimeout(() => (copyBtn.textContent = "Copy"), 1500);
+    });
+
+    // README link
+    const readmePath = `${this.pluginDir}/README.md`;
+    const link = banner.createEl("a", {
+      cls: "g-command-error-link",
+      text: "Setup instructions →",
+      href: readmePath,
+    });
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      this.app.workspace.openLinkText(readmePath, "", false);
+    });
   }
 
   private renderNode(parent: HTMLElement, node: TreeNode, depth: number): void {

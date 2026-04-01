@@ -15,11 +15,17 @@ export default class GCommandPlugin extends Plugin {
     this.drive = new DriveProvider(this.settings.rcloneRemote);
     this.sidebarManager = new SidebarManager(this.app, VIEW_TYPE_GDRIVE_SIDEBAR);
 
+    const pluginDir = this.manifest.dir ?? "";
+
     this.registerView(
       VIEW_TYPE_GDRIVE_SIDEBAR,
       (leaf) =>
-        new GDriveSidebar(leaf, this.drive, this.settings, () =>
-          this.openSettings()
+        new GDriveSidebar(
+          leaf,
+          this.drive,
+          this.settings,
+          () => this.openSettings(),
+          pluginDir
         )
     );
 

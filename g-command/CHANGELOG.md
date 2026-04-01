@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.2.3 — 2026-04-01
+
+Richer error banner when rclone is missing or Drive is unreachable.
+
+- Error shows setup commands in a copyable code block instead of separate lines
+- "Copy" button appears on hover to copy commands to clipboard
+- "Setup instructions →" link opens the plugin's README directly in Obsidian
+- Binary-missing error now reads "Install and authenticate with rclone:"
+- DriveProvider errors are now typed (`DriveError` with `code` field) for structured rendering
+
+---
+
+## 0.2.2 — 2026-04-01
+
+Clearer error messages when rclone is missing or Drive is unreachable.
+
+- Error title is now "Authenticate with Google Drive" for both failure modes
+- Detail lines explain the specific issue (binary missing vs. remote unreachable)
+- References the g-command README for setup instructions
+
+---
+
 ## 0.2.1 — 2026-04-01
 
 Fixes three sidebar bugs from initial Step 3 implementation.

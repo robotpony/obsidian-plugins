@@ -190,12 +190,15 @@ describe("DriveProvider", () => {
       await expect(provider.check()).resolves.toBeUndefined();
     });
 
-    it("throws a helpful message when rclone binary is missing", async () => {
+    it("throws a DriveError with code binary-missing when rclone is absent", async () => {
       mockFailure("rclone: command not found");
-      await expect(provider.check()).rejects.toThrow(/brew install rclone/);
+      await expect(provider.check()).rejects.toMatchObject({
+        name: "DriveError",
+        code: "binary-missing",
+      });
     });
 
-    it("throws a helpful message when remote is not configured", async () => {
+    it("throws a DriveError with code remote-unreachable when remote fails", async () => {
       // First call (version) succeeds, second call (lsjson) fails
       mockExecFile
         .mockImplementationOnce((_cmd: any, _args: any, _opts: any, cb: any) => {
@@ -207,7 +210,10 @@ describe("DriveProvider", () => {
           return {} as any;
         });
 
-      await expect(provider.check()).rejects.toThrow(/rclone config/);
+      await expect(provider.check()).rejects.toMatchObject({
+        name: "DriveError",
+        code: "remote-unreachable",
+      });
     });
 
     it("uses the configured remote name in the check call", async () => {

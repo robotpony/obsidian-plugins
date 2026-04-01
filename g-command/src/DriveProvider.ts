@@ -3,6 +3,18 @@ import { DriveFile, ExportFormat } from "./types";
 
 const MAX_BUFFER = 50 * 1024 * 1024; // 50 MB
 
+export type DriveErrorCode = "binary-missing" | "remote-unreachable";
+
+export class DriveError extends Error {
+  constructor(
+    public readonly code: DriveErrorCode,
+    message: string
+  ) {
+    super(message);
+    this.name = "DriveError";
+  }
+}
+
 /**
  * Wraps rclone subprocess calls for all Google Drive I/O.
  * All Drive access goes through this class — no credentials are held here;
@@ -67,10 +79,9 @@ export class DriveProvider {
       execFile("rclone", ["version"], { maxBuffer: MAX_BUFFER }, (err) => {
         if (err) {
           reject(
-            new Error(
-              "rclone not found in PATH.\n" +
-              "Install with: brew install rclone\n" +
-              "Then configure Google Drive: rclone config"
+            new DriveError(
+              "binary-missing",
+              "rclone is not installed."
             )
           );
         } else {
@@ -89,11 +100,9 @@ export class DriveProvider {
         (err) => {
           if (err) {
             reject(
-              new Error(
-                `Could not connect to rclone remote "${this.remote}".\n` +
-                `Run: rclone config\n` +
-                `Create a remote named "${this.remote}" with type "drive",\n` +
-                `or update the remote name in g-command settings.`
+              new DriveError(
+                "remote-unreachable",
+                `Remote "${this.remote}" is not reachable.`
               )
             );
           } else {

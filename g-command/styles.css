@@ -120,6 +120,59 @@
   margin-bottom: 0;
 }
 
+/* Code block inside error banner */
+.g-command-code-block {
+  position: relative;
+  margin: 8px 0;
+}
+
+.g-command-code-block pre {
+  margin: 0;
+  padding: 8px 10px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  overflow-x: auto;
+}
+
+.g-command-code-block code {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-normal);
+  white-space: pre;
+  background: none;
+  padding: 0;
+}
+
+.g-command-copy-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: var(--font-ui-smaller);
+  padding: 2px 6px;
+  border-radius: var(--radius-s);
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+  cursor: pointer;
+  border: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.g-command-code-block:hover .g-command-copy-btn {
+  opacity: 1;
+}
+
+.g-command-error-link {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-accent);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.g-command-error-link:hover {
+  text-decoration: underline;
+}
+
 /* Tree rows */
 .g-command-row {
   display: flex;
