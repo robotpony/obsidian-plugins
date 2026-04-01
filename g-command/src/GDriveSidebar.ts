@@ -15,6 +15,14 @@ interface TreeNode {
   expanded: boolean;
 }
 
+interface LogEntry {
+  time: string; // HH:MM:SS
+  level: "info" | "error";
+  message: string;
+}
+
+const MAX_LOG_ENTRIES = 50;
+
 export class GDriveSidebar extends ItemView {
   private appRef: App;
   private drive: DriveProvider;
@@ -28,6 +36,8 @@ export class GDriveSidebar extends ItemView {
   private searchingAll = false;
   private syncing = false;
   private selectedPaths: Set<string>;
+  private logEntries: LogEntry[] = [];
+  private logCollapsed = true;
   private onOpenSettings: () => void;
   private pluginDir: string;
 
@@ -102,6 +112,8 @@ export class GDriveSidebar extends ItemView {
 
   private async runSync(files: DriveFile[]): Promise<void> {
     this.syncing = true;
+    this.logCollapsed = false; // auto-expand log on sync
+    this.log("info", `Syncing ${files.length} file(s)…`);
     this.render();
 
     try {
@@ -115,11 +127,16 @@ export class GDriveSidebar extends ItemView {
       const parts: string[] = [];
       if (result.synced > 0) parts.push(`${result.synced} synced`);
       if (result.skipped > 0) parts.push(`${result.skipped} unchanged`);
-      if (result.failed.length > 0) parts.push(`${result.failed.length} failed`);
-      console.log("[G Command] Sync complete:", parts.join(", "));
+      if (result.failed.length > 0) {
+        parts.push(`${result.failed.length} failed`);
+        for (const path of result.failed) {
+          this.log("error", `Failed: ${path}`);
+        }
+      }
+      this.log("info", `Sync complete: ${parts.join(", ")}`);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.error("[G Command] Sync error:", msg);
+      this.log("error", `Sync error: ${msg}`);
     } finally {
       this.syncing = false;
       this.render();
@@ -197,6 +214,20 @@ export class GDriveSidebar extends ItemView {
     this.saveSettings();
   }
 
+  private log(level: "info" | "error", message: string): void {
+    const now = new Date();
+    const time = now.toTimeString().slice(0, 8);
+    this.logEntries.push({ time, level, message });
+    if (this.logEntries.length > MAX_LOG_ENTRIES) {
+      this.logEntries.shift();
+    }
+    if (level === "error") {
+      console.error("[G Command]", message);
+    } else {
+      console.log("[G Command]", message);
+    }
+  }
+
   render(): void {
     const container = this.containerEl.children[1] as HTMLElement;
     container.empty();
@@ -252,6 +283,11 @@ export class GDriveSidebar extends ItemView {
     // "Search all" button when filtering locally and results may be incomplete
     if (query && !this.allFiles) {
       this.renderSearchAllButton(tree);
+    }
+
+    // Log pane at bottom
+    if (this.logEntries.length > 0) {
+      this.renderLogPane(container);
     }
   }
 
@@ -428,6 +464,46 @@ export class GDriveSidebar extends ItemView {
       text = "Read only access to Google Drive documents, in Markdown or CSV.";
     }
     parent.createDiv({ cls: "g-command-status", text });
+  }
+
+  private renderLogPane(parent: HTMLElement): void {
+    const pane = parent.createDiv({ cls: "g-command-log-pane" });
+
+    // Header with toggle
+    const header = pane.createDiv({ cls: "g-command-log-header" });
+    const arrow = header.createSpan({ cls: "g-command-log-arrow", text: this.logCollapsed ? "▶" : "▼" });
+    header.createSpan({ text: `Sync log (${this.logEntries.length})` });
+
+    const clearBtn = header.createEl("button", {
+      cls: "g-command-log-clear clickable-icon",
+      attr: { "aria-label": "Clear log" },
+    });
+    clearBtn.textContent = "✕";
+    clearBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.logEntries = [];
+      this.render();
+    });
+
+    header.addEventListener("click", () => {
+      this.logCollapsed = !this.logCollapsed;
+      this.render();
+    });
+
+    if (!this.logCollapsed) {
+      const body = pane.createDiv({ cls: "g-command-log-body" });
+      for (const entry of this.logEntries) {
+        const row = body.createDiv({
+          cls: `g-command-log-entry ${entry.level === "error" ? "g-command-log-entry--error" : ""}`,
+        });
+        row.createSpan({ cls: "g-command-log-time", text: entry.time });
+        row.createSpan({ text: entry.message });
+      }
+      // Scroll to bottom
+      requestAnimationFrame(() => {
+        body.scrollTop = body.scrollHeight;
+      });
+    }
   }
 
   private renderErrorBanner(parent: HTMLElement): void {

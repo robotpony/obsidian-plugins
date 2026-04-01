@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.2 — 2026-04-01
+
+Sync folder creation, Finder reveal, and sidebar sync log.
+
+- Vault sync folder is now created automatically if it doesn't exist (recursive folder creation)
+- "Show in Finder" button on the vault sync root setting reveals the sync folder in macOS Finder
+- Collapsible sync log pane at the bottom of the Drive sidebar shows sync activity and errors
+- Log pane auto-expands during sync, shows timestamps, and supports clear/collapse
+
+---
+
 ## 0.5.1 — 2026-04-01
 
 Fixes sync failures and improves settings UX.

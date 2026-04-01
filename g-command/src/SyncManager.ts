@@ -165,14 +165,16 @@ export async function syncFiles(
 
 /** Write content to a vault path, creating parent folders as needed. */
 async function writeToVault(app: App, path: string, content: string): Promise<void> {
-  // Ensure parent folder exists
+  // Ensure parent folders exist (create from root down)
   const parts = path.split("/");
   parts.pop();
-  const folderPath = parts.join("/");
-  if (folderPath) {
-    const folder = app.vault.getAbstractFileByPath(folderPath);
-    if (!folder) {
-      await app.vault.createFolder(folderPath);
+  if (parts.length > 0) {
+    let current = "";
+    for (const seg of parts) {
+      current = current ? `${current}/${seg}` : seg;
+      if (!app.vault.getAbstractFileByPath(current)) {
+        await app.vault.createFolder(current);
+      }
     }
   }
 

@@ -151,6 +151,7 @@
 /* File tree */
 .g-command-tree {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 4px 0;
 }
@@ -335,4 +336,78 @@
 .g-command-sync-btn--active {
   opacity: 1;
   color: var(--text-accent);
+}
+
+/* Log pane */
+.g-command-log-pane {
+  flex-shrink: 0;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.g-command-log-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+  background: var(--background-secondary);
+}
+
+.g-command-log-header:hover {
+  color: var(--text-normal);
+}
+
+.g-command-log-arrow {
+  font-size: 10px;
+  width: 12px;
+  flex-shrink: 0;
+}
+
+.g-command-log-clear {
+  margin-left: auto;
+  padding: 0 4px;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.g-command-log-header:hover .g-command-log-clear {
+  opacity: 0.6;
+}
+
+.g-command-log-clear:hover {
+  opacity: 1 !important;
+}
+
+.g-command-log-body {
+  max-height: 150px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.g-command-log-entry {
+  display: flex;
+  gap: 6px;
+  padding: 1px 8px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.g-command-log-entry--error {
+  color: var(--text-error);
+}
+
+.g-command-log-time {
+  color: var(--text-faint);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 }

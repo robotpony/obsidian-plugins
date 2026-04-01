@@ -149,6 +149,25 @@ class GCommandSettingTab extends PluginSettingTab {
             this.plugin.settings.vaultRoot = value.trim() || "gdrive";
             await this.plugin.saveSettings();
           })
+      )
+      .addButton((btn) =>
+        btn
+          .setButtonText("Show in Finder")
+          .onClick(async () => {
+            const adapter = this.app.vault.adapter as any;
+            const basePath: string = adapter.getBasePath?.() ?? "";
+            if (!basePath) return;
+
+            const syncRoot = this.plugin.settings.vaultRoot;
+            // Ensure folder exists before revealing
+            if (!this.app.vault.getAbstractFileByPath(syncRoot)) {
+              await this.app.vault.createFolder(syncRoot);
+            }
+
+            const fullPath = `${basePath}/${syncRoot}`;
+            const { shell } = require("electron").remote ?? require("electron");
+            shell.showItemInFolder(fullPath);
+          })
       );
   }
 }
