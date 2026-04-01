@@ -11,6 +11,10 @@ interface SyncResult {
   failed: string[];
 }
 
+export type SyncLogFn = (level: "info" | "error", message: string) => void;
+
+const noop: SyncLogFn = () => {};
+
 interface FormatMapping {
   exportFormat?: ExportFormat;
   extension: string;
@@ -18,10 +22,27 @@ interface FormatMapping {
   addFrontmatter: boolean;
 }
 
+// Office MIME types that rclone uses when exporting Google Workspace files.
+// These appear when rclone's --drive-export-formats includes docx/xlsx/pptx.
+const OFFICE_DOC_MIMES = new Set([
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/msword",
+]);
+const OFFICE_SHEET_MIMES = new Set([
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel",
+]);
+const OFFICE_SLIDES_MIMES = new Set([
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.ms-powerpoint",
+]);
+
 /** Determine export format, target extension, and conversion for a Drive file. */
 export function getFormatMapping(file: DriveFile): FormatMapping {
   const mime = file.MimeType;
+  const isVirtual = file.Size === -1; // Google Workspace files have Size -1
 
+  // Google-native MIME types (always virtual)
   if (mime === "application/vnd.google-apps.document") {
     return { exportFormat: "html", extension: ".md", convert: "turndown", addFrontmatter: true };
   }
@@ -29,6 +50,17 @@ export function getFormatMapping(file: DriveFile): FormatMapping {
     return { exportFormat: "csv", extension: ".csv", convert: "passthrough", addFrontmatter: false };
   }
   if (mime === "application/vnd.google-apps.presentation") {
+    return { exportFormat: "txt", extension: ".md", convert: "passthrough", addFrontmatter: true };
+  }
+
+  // Office MIME types with Size -1 = Google Workspace file exported as Office format
+  if (isVirtual && OFFICE_DOC_MIMES.has(mime)) {
+    return { exportFormat: "html", extension: ".md", convert: "turndown", addFrontmatter: true };
+  }
+  if (isVirtual && OFFICE_SHEET_MIMES.has(mime)) {
+    return { exportFormat: "csv", extension: ".csv", convert: "passthrough", addFrontmatter: false };
+  }
+  if (isVirtual && OFFICE_SLIDES_MIMES.has(mime)) {
     return { exportFormat: "txt", extension: ".md", convert: "passthrough", addFrontmatter: true };
   }
 
@@ -122,6 +154,7 @@ export async function syncFiles(
   drive: DriveProvider,
   settings: GCommandSettings,
   saveSettings: () => Promise<void>,
+  onLog: SyncLogFn = noop,
 ): Promise<SyncResult> {
   const result: SyncResult = { synced: 0, skipped: 0, failed: [] };
 
@@ -137,6 +170,10 @@ export async function syncFiles(
       }
 
       const mapping = getFormatMapping(file);
+      const detail = `mime=${file.MimeType}, export=${mapping.exportFormat ?? "native"}, ext=${mapping.extension}`;
+      onLog("info", `${file.Name} — ${detail}`);
+      console.log(TAG, `Sync: ${file.Path} (${detail})`);
+
       const raw = await drive.cat(file.Path, mapping.exportFormat);
       const content = convertContent(raw, mapping, file);
       const vaultPath = toVaultPath(file, settings.vaultRoot);
@@ -152,10 +189,14 @@ export async function syncFiles(
       await saveSettings();
 
       result.synced++;
+      onLog("info", `✓ ${file.Name} → ${vaultPath}`);
       console.log(TAG, `Synced: ${file.Path} → ${vaultPath}`);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
+      // Log full file metadata on failure for debugging
       console.error(TAG, `Failed to sync ${file.Path}:`, msg);
+      console.error(TAG, `File metadata:`, JSON.stringify(file, null, 2));
+      onLog("error", `✗ ${file.Name}: ${msg}`);
       result.failed.push(file.Path);
     }
   }

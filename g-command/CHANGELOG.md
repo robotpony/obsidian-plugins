@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.5.6 — 2026-04-01
+
+Fixes sync of files inside Drive folders (not just root files).
+
+- Root cause: rclone `lsjson` returns `Path` relative to the listed folder, not the remote root. Files inside subfolders (e.g. `Alderson Family Recipes/recipe.docx`) were being catted with just the filename (`recipe.docx`), causing "directory not found".
+- `loadChildren()` now prefixes each child's `Path` with the parent folder path, so sync uses the full remote path (e.g. `Alderson Family Recipes/recipe.docx`)
+- `DriveProvider.cat()` also swaps the virtual extension to the target export format (`.docx` → `.html`) since rclone resolves exported files by target extension
+
+---
+
+## 0.5.5 — 2026-04-01
+
+Fixes sync for Google Docs presented as .docx by rclone.
+
+- Root cause: rclone reports Google Docs with Office MIME types (`application/vnd.openxmlformats-officedocument.wordprocessingml.document`) and `.docx` extension, but Size -1. Previously only `application/vnd.google-apps.document` was detected.
+- `getFormatMapping()` now detects Google Workspace files by Office MIME type + Size -1, mapping them to the correct export format (HTML→MD for docs, CSV for sheets, TXT→MD for slides)
+- Real uploaded .docx/.xlsx files (Size > 0) are still treated as native files
+- 3 new tests for Office MIME detection
+
+---
+
+## 0.5.4 — 2026-04-01
+
+Sync diagnostics now visible in the sidebar log pane.
+
+- Per-file sync progress streams live to the sidebar log (MIME type, export format, success/failure)
+- Error details include the full error message, not just the file path
+- Console logs full file metadata JSON on failure for debugging
+- `rclone cat` args logged to console so the exact command is visible
+
+---
+
+## 0.5.3 — 2026-04-01
+
+Fixes Google Doc sync failure and improves sync diagnostics.
+
+- Fixed "directory not found" when syncing Google Docs presented as `.docx`/`.xlsx`/`.pptx` — rclone cat now strips any virtual extension for Workspace exports, not just `.gdoc`
+- Added diagnostic logging: file MIME type, export format, and rclone command logged to console during sync
+- Sync log pane now has a dark background for better visual separation from the file tree
+
+---
+
 ## 0.5.2 — 2026-04-01
 
 Sync folder creation, Finder reveal, and sidebar sync log.

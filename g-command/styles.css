@@ -342,6 +342,7 @@
 .g-command-log-pane {
   flex-shrink: 0;
   border-top: 1px solid var(--background-modifier-border);
+  background: var(--background-primary-alt);
 }
 
 .g-command-log-header {
@@ -391,6 +392,7 @@
   max-height: 150px;
   overflow-y: auto;
   padding: 4px 0;
+  background: var(--background-primary-alt);
 }
 
 .g-command-log-entry {

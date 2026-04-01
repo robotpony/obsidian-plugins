@@ -1,7 +1,7 @@
 import { App, ItemView, Menu, WorkspaceLeaf } from "obsidian";
 import { DriveProvider, DriveError } from "./DriveProvider";
 import { DriveFile, GCommandSettings } from "./types";
-import { syncFiles, getFormatMapping } from "./SyncManager";
+import { syncFiles, getFormatMapping, SyncLogFn } from "./SyncManager";
 
 export const VIEW_TYPE_GDRIVE_SIDEBAR = "g-command-drive";
 
@@ -116,6 +116,12 @@ export class GDriveSidebar extends ItemView {
     this.log("info", `Syncing ${files.length} file(s)…`);
     this.render();
 
+    // Pass our log method so syncFiles can report per-file progress
+    const onLog: SyncLogFn = (level, msg) => {
+      this.log(level, msg);
+      this.render(); // live-update the log pane
+    };
+
     try {
       const result = await syncFiles(
         files,
@@ -123,17 +129,13 @@ export class GDriveSidebar extends ItemView {
         this.drive,
         this.settings,
         this.saveSettings,
+        onLog,
       );
       const parts: string[] = [];
       if (result.synced > 0) parts.push(`${result.synced} synced`);
       if (result.skipped > 0) parts.push(`${result.skipped} unchanged`);
-      if (result.failed.length > 0) {
-        parts.push(`${result.failed.length} failed`);
-        for (const path of result.failed) {
-          this.log("error", `Failed: ${path}`);
-        }
-      }
-      this.log("info", `Sync complete: ${parts.join(", ")}`);
+      if (result.failed.length > 0) parts.push(`${result.failed.length} failed`);
+      this.log("info", `Done: ${parts.join(", ")}`);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       this.log("error", `Sync error: ${msg}`);
@@ -321,6 +323,11 @@ export class GDriveSidebar extends ItemView {
   private async loadChildren(node: TreeNode): Promise<void> {
     try {
       const files = await this.drive.list(node.file.Path);
+      // rclone lsjson returns Path relative to the listed folder.
+      // Prefix with parent path so cat/sync use full remote paths.
+      for (const f of files) {
+        f.Path = `${node.file.Path}/${f.Path}`;
+      }
       node.children = files
         .sort(sortDirsFirst)
         .map(toTreeNode);

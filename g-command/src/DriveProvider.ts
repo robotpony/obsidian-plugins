@@ -74,11 +74,17 @@ export class DriveProvider {
    * For regular files, omit exportFormat.
    */
   async cat(drivePath: string, exportFormat?: ExportFormat): Promise<string> {
-    // For Google Workspace files, rclone lists them with virtual extensions
-    // (.gdoc, .gsheet, etc.) but cat needs the logical path without them.
+    // Google Workspace files have virtual extensions (rclone adds .gdoc, .docx,
+    // .gsheet, .xlsx, etc. depending on config). When exporting, strip the old
+    // extension and append the target export extension — rclone resolves the
+    // path using the export format's extension (e.g. "file.html" for html).
     let catPath = drivePath;
     if (exportFormat) {
-      catPath = drivePath.replace(/\.(gdoc|gsheet|gslides|gform)$/, "");
+      const dotIdx = catPath.lastIndexOf(".");
+      if (dotIdx > 0) {
+        catPath = catPath.substring(0, dotIdx);
+      }
+      catPath = `${catPath}.${exportFormat}`;
     }
 
     const remotePath = `${this.remote}:${catPath}`;
@@ -87,6 +93,7 @@ export class DriveProvider {
       args.push("--drive-export-formats", exportFormat);
     }
     args.push(remotePath);
+    console.log(TAG, `cat args: [${args.map(a => `"${a}"`).join(", ")}]`);
     return this.run(args);
   }
 

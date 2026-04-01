@@ -107,6 +107,53 @@ describe("getFormatMapping", () => {
     expect(m.extension).toBe(".pdf");
     expect(m.exportFormat).toBeUndefined();
   });
+
+  it("maps Office MIME .docx with Size -1 as Google Doc", () => {
+    const officeDoc: DriveFile = {
+      Path: "About the Alderson Family book of recipes.docx",
+      Name: "About the Alderson Family book of recipes.docx",
+      Size: -1,
+      MimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ModTime: "2025-07-09T18:36:42.687Z",
+      IsDir: false,
+      ID: "doc-office1",
+    };
+    const m = getFormatMapping(officeDoc);
+    expect(m.exportFormat).toBe("html");
+    expect(m.extension).toBe(".md");
+    expect(m.convert).toBe("turndown");
+    expect(m.addFrontmatter).toBe(true);
+  });
+
+  it("maps Office MIME .xlsx with Size -1 as Google Sheet", () => {
+    const officeSheet: DriveFile = {
+      Path: "Budget.xlsx",
+      Name: "Budget.xlsx",
+      Size: -1,
+      MimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      ModTime: "2026-01-01T00:00:00.000Z",
+      IsDir: false,
+      ID: "sheet-office1",
+    };
+    const m = getFormatMapping(officeSheet);
+    expect(m.exportFormat).toBe("csv");
+    expect(m.extension).toBe(".csv");
+  });
+
+  it("treats real .docx (Size > 0) as native file", () => {
+    const realDocx: DriveFile = {
+      Path: "uploaded.docx",
+      Name: "uploaded.docx",
+      Size: 8192,
+      MimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ModTime: "2026-01-01T00:00:00.000Z",
+      IsDir: false,
+      ID: "real-docx1",
+    };
+    const m = getFormatMapping(realDocx);
+    expect(m.exportFormat).toBeUndefined();
+    expect(m.extension).toBe(".docx");
+  });
 });
 
 describe("stripVirtualExt", () => {
