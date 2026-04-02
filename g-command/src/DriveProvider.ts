@@ -109,10 +109,19 @@ export class DriveProvider {
       await this.run(args);
 
       const files = readdirSync(tmpDir);
+      console.log(TAG, `download tmpDir contents: [${files.join(", ")}] (${files.length} file(s))`);
       if (files.length === 0) {
-        throw new Error(`rclone copy produced no output for ${drivePath}`);
+        throw new Error(
+          `rclone copy produced no output for "${drivePath}"` +
+          ` (include="${includeFilter}", exportFormat=${exportFormat ?? "none"})`
+        );
       }
-      return readFileSync(join(tmpDir, files[0]), "utf-8");
+      const outPath = join(tmpDir, files[0]);
+      const raw = readFileSync(outPath, "utf-8");
+      const fileSize = raw.length;
+      const preview = raw.substring(0, 200).replace(/\n/g, "\\n");
+      console.log(TAG, `download result: file="${files[0]}", size=${fileSize}, preview="${preview}…"`);
+      return raw;
     } finally {
       try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore cleanup errors */ }
     }

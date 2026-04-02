@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.7.1 — 2026-04-02
+
+Adds diagnostic logging to trace markdown conversion failures.
+
+- Console now logs: rclone tmpDir file list, raw content preview (first 200 chars), converted content preview, and file size at each pipeline stage
+- Download errors now include the include filter and export format in the message
+- Conversion errors are caught separately with raw content dump (first 500 chars) for debugging
+- Sync detail log includes `size` and `convert` strategy alongside existing MIME/export info
+
+**How to use**: Open Obsidian dev console (Cmd+Opt+I), filter for `[G Command]`, trigger a sync. The logs show:
+1. `Sync:` — file metadata, MIME type, Size, export format, convert strategy
+2. `download args:` — exact rclone command
+3. `download tmpDir contents:` — what rclone produced (filename tells you if export worked)
+4. `download result:` — file size and first 200 chars (HTML tags = good, binary = export didn't work)
+5. `Raw content:` — confirms what enters the converter
+6. `Converted content:` — confirms what comes out
+7. If conversion throws: `Conversion failed` with raw content dump
+
+---
+
+## 0.7.0 — 2026-04-01
+
+Synced Google Workspace files now save with correct vault extensions (.md, .csv).
+
+- Root cause: `toVaultPath()` relied on `stripVirtualExt()` to remove rclone's virtual extensions (.gdoc, .gsheet), but rclone presents Google Docs with Office extensions (.docx, .xlsx, .pptx). Since `.docx` isn't a virtual extension, the original filename was kept as-is.
+- Fix: `toVaultPath()` now checks `mapping.exportFormat` first. When a file is a Google Workspace export (any MIME type), the current extension is always stripped and replaced with the target extension (.md for Docs, .csv for Sheets).
+- 3 new tests for Office MIME vault path mapping (.docx→.md, .xlsx→.csv, real .docx kept)
+- 86 tests total, all passing
+
+---
+
 ## 0.6.3 — 2026-04-01
 
 Fixes Google Workspace file download — rclone can't address virtual files by path.

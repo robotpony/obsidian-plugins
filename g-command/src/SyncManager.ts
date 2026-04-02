@@ -89,11 +89,19 @@ export function toVaultPath(file: DriveFile, vaultRoot: string): string {
   const mapping = getFormatMapping(file);
   const stripped = stripVirtualExt(file.Name);
 
-  // For virtual extensions (.gdoc etc), stripped name + new extension
-  // For native files, stripped === original name (already has extension)
-  const baseName = stripped !== file.Name
-    ? `${stripped}${mapping.extension}`
-    : stripped;
+  let baseName: string;
+  if (mapping.exportFormat) {
+    // Google Workspace file (native or Office MIME) — strip any extension, use target
+    const dotIdx = stripped.lastIndexOf(".");
+    const nameWithoutExt = dotIdx > 0 ? stripped.substring(0, dotIdx) : stripped;
+    baseName = `${nameWithoutExt}${mapping.extension}`;
+  } else if (stripped !== file.Name) {
+    // Virtual extension was stripped but no export — use mapping extension
+    baseName = `${stripped}${mapping.extension}`;
+  } else {
+    // Native file — keep original name
+    baseName = stripped;
+  }
   const fileName = sanitizeFilename(baseName);
 
   const dirParts = file.Path.split("/");
@@ -170,12 +178,24 @@ export async function syncFiles(
       }
 
       const mapping = getFormatMapping(file);
-      const detail = `mime=${file.MimeType}, export=${mapping.exportFormat ?? "native"}, ext=${mapping.extension}`;
+      const detail = `mime=${file.MimeType}, size=${file.Size}, export=${mapping.exportFormat ?? "native"}, convert=${mapping.convert}, ext=${mapping.extension}`;
       onLog("info", `${file.Name} — ${detail}`);
       console.log(TAG, `Sync: ${file.Path} (${detail})`);
 
       const raw = await drive.download(file.Path, mapping.exportFormat);
-      const content = convertContent(raw, mapping, file);
+      console.log(TAG, `Raw content: length=${raw.length}, convert=${mapping.convert}, first200="${raw.substring(0, 200).replace(/\n/g, "\\n")}"`);
+
+      let content: string;
+      try {
+        content = convertContent(raw, mapping, file);
+      } catch (convErr) {
+        const msg = convErr instanceof Error ? convErr.message : String(convErr);
+        console.error(TAG, `Conversion failed for ${file.Path}: ${msg}`);
+        console.error(TAG, `Raw content that failed conversion (first 500 chars):`, raw.substring(0, 500));
+        throw new Error(`Conversion failed (${mapping.convert}): ${msg}`);
+      }
+      console.log(TAG, `Converted content: length=${content.length}, first200="${content.substring(0, 200).replace(/\n/g, "\\n")}"`);
+
       const vaultPath = toVaultPath(file, settings.vaultRoot);
 
       await writeToVault(app, vaultPath, content);

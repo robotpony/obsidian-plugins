@@ -215,6 +215,45 @@ describe("toVaultPath", () => {
   it("respects custom vault root", () => {
     expect(toVaultPath(googleDoc, "drive-sync")).toBe("drive-sync/Work/Brief.md");
   });
+
+  it("maps Office MIME .docx Google Doc to .md", () => {
+    const officeDoc: DriveFile = {
+      Path: "Folder/Recipe.docx",
+      Name: "Recipe.docx",
+      Size: -1,
+      MimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ModTime: "2025-07-09T18:36:42.687Z",
+      IsDir: false,
+      ID: "doc-office1",
+    };
+    expect(toVaultPath(officeDoc, "gdrive")).toBe("gdrive/Folder/Recipe.md");
+  });
+
+  it("maps Office MIME .xlsx Google Sheet to .csv", () => {
+    const officeSheet: DriveFile = {
+      Path: "Budget.xlsx",
+      Name: "Budget.xlsx",
+      Size: -1,
+      MimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      ModTime: "2026-01-01T00:00:00.000Z",
+      IsDir: false,
+      ID: "sheet-office1",
+    };
+    expect(toVaultPath(officeSheet, "gdrive")).toBe("gdrive/Budget.csv");
+  });
+
+  it("keeps .docx for real uploaded Word file", () => {
+    const realDocx: DriveFile = {
+      Path: "Work/uploaded.docx",
+      Name: "uploaded.docx",
+      Size: 8192,
+      MimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ModTime: "2026-01-01T00:00:00.000Z",
+      IsDir: false,
+      ID: "real-docx1",
+    };
+    expect(toVaultPath(realDocx, "gdrive")).toBe("gdrive/Work/uploaded.docx");
+  });
 });
 
 describe("buildFrontmatter", () => {
