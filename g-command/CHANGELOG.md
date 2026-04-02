@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.2 — 2026-04-02
+
+Strip Google Docs CSS and metadata from HTML before markdown conversion.
+
+- Google Docs HTML export includes `<style>` blocks with CSS (`@import`, counter-reset rules, font declarations) that turndown passed through as raw text into the markdown output
+- Turndown now strips `<style>`, `<script>`, `<meta>`, and `<link>` elements before conversion
+- 2 new tests for CSS/metadata stripping
+- 88 tests total, all passing
+
+---
+
 ## 0.7.1 — 2026-04-02
 
 Adds diagnostic logging to trace markdown conversion failures.

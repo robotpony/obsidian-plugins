@@ -131,6 +131,10 @@ const turndown = new TurndownService({
   codeBlockStyle: "fenced",
 });
 
+// Strip elements that Google Docs HTML includes but have no markdown equivalent.
+// Without this, <style> CSS leaks into the converted markdown as raw text.
+turndown.remove(["style", "script", "meta", "link"]);
+
 /** Convert downloaded content to vault-ready content. */
 export function convertContent(
   raw: string,

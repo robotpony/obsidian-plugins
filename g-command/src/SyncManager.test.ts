@@ -300,6 +300,36 @@ describe("convertContent", () => {
     const result = convertContent("hello world", mapping, plainText);
     expect(result).toBe("hello world");
   });
+
+  it("strips Google Docs CSS from HTML before conversion", () => {
+    const mapping = getFormatMapping(googleDoc);
+    const html = [
+      '<html><head>',
+      '<style>@import url(https://themes.googleusercontent.com/fonts/css?kit=abc);',
+      'ol.lst-kix_foo-8.start{counter-reset:lst-ctn-kix_foo-8 0}',
+      '.c1{font-weight:700}</style>',
+      '<link rel="stylesheet" href="https://themes.googleusercontent.com/default.css">',
+      '</head><body>',
+      '<h1>Title</h1><p>Body text</p>',
+      '</body></html>',
+    ].join("");
+    const result = convertContent(html, mapping, googleDoc);
+    expect(result).toContain("# Title");
+    expect(result).toContain("Body text");
+    expect(result).not.toContain("@import");
+    expect(result).not.toContain("lst-kix");
+    expect(result).not.toContain("font-weight");
+    expect(result).not.toContain("googleusercontent");
+  });
+
+  it("strips script and meta tags from HTML", () => {
+    const mapping = getFormatMapping(googleDoc);
+    const html = '<html><head><meta charset="utf-8"><script>alert(1)</script></head><body><p>Content</p></body></html>';
+    const result = convertContent(html, mapping, googleDoc);
+    expect(result).toContain("Content");
+    expect(result).not.toContain("alert");
+    expect(result).not.toContain("charset");
+  });
 });
 
 describe("sanitizeFilename", () => {
