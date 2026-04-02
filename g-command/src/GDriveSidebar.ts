@@ -1,6 +1,6 @@
 import { App, ItemView, Menu, WorkspaceLeaf } from "obsidian";
 import { DriveProvider, DriveError } from "./DriveProvider";
-import { DriveFile, GCommandSettings } from "./types";
+import { DriveFile, GCommandSettings, SyncRecord } from "./types";
 import { syncFiles, getFormatMapping, SyncLogFn } from "./SyncManager";
 
 export const VIEW_TYPE_GDRIVE_SIDEBAR = "g-command-drive";
@@ -93,7 +93,7 @@ export class GDriveSidebar extends ItemView {
   /** Sync selected files to the vault. */
   async syncSelected(): Promise<void> {
     if (this.selectedPaths.size === 0 || this.syncing) return;
-    const files = this.collectSelectedFiles();
+    const files = await this.collectSelectedFiles();
     if (files.length === 0) return;
     await this.runSync(files);
   }
@@ -112,7 +112,6 @@ export class GDriveSidebar extends ItemView {
 
   private async runSync(files: DriveFile[]): Promise<void> {
     this.syncing = true;
-    this.logCollapsed = false; // auto-expand log on sync
     this.log("info", `Syncing ${files.length} file(s)…`);
     this.render();
 
@@ -146,27 +145,69 @@ export class GDriveSidebar extends ItemView {
   }
 
   /** Collect DriveFile objects for all selected paths from the loaded tree. */
-  private collectSelectedFiles(): DriveFile[] {
+  private async collectSelectedFiles(): Promise<DriveFile[]> {
+    const seen = new Set<string>();
     const files: DriveFile[] = [];
+
+    const addFile = (f: DriveFile) => {
+      if (!f.IsDir && !seen.has(f.Path)) {
+        seen.add(f.Path);
+        files.push(f);
+      }
+    };
+
+    // Collect individual files from tree
     const collect = (nodes: TreeNode[] | null) => {
       if (!nodes) return;
       for (const node of nodes) {
         if (!node.file.IsDir && this.selectedPaths.has(node.file.Path)) {
-          files.push(node.file);
+          addFile(node.file);
         }
         if (node.children) collect(node.children);
       }
     };
     collect(this.rootNodes);
+
     // Also check allFiles from recursive search
     if (this.allFiles) {
       for (const f of this.allFiles) {
-        if (!f.IsDir && this.selectedPaths.has(f.Path) && !files.find(e => e.Path === f.Path)) {
-          files.push(f);
-        }
+        if (this.selectedPaths.has(f.Path)) addFile(f);
       }
     }
+
+    // Expand selected folders via listRecursive
+    const folderPaths = this.findSelectedFolders();
+    for (const folderPath of folderPaths) {
+      try {
+        const children = await this.drive.listRecursive(folderPath);
+        for (const f of children) {
+          // rclone returns paths relative to the listed folder
+          f.Path = `${folderPath}/${f.Path}`;
+          addFile(f);
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        this.log("error", `Failed to list folder ${folderPath}: ${msg}`);
+      }
+    }
+
     return files;
+  }
+
+  /** Find selected paths that are known folder nodes in the loaded tree. */
+  private findSelectedFolders(): string[] {
+    const folders: string[] = [];
+    const walk = (nodes: TreeNode[] | null) => {
+      if (!nodes) return;
+      for (const node of nodes) {
+        if (node.file.IsDir && this.selectedPaths.has(node.file.Path)) {
+          folders.push(node.file.Path);
+        }
+        if (node.children) walk(node.children);
+      }
+    };
+    walk(this.rootNodes);
+    return folders;
   }
 
   /** Build DriveFile list for resync from syncState paths, using loaded tree data. */
@@ -242,6 +283,11 @@ export class GDriveSidebar extends ItemView {
     if (this.error) {
       this.renderErrorBanner(container);
       return;
+    }
+
+    // Synced files section above the tree
+    if (Object.keys(this.settings.syncState).length > 0) {
+      this.renderSyncedPane(container);
     }
 
     const tree = container.createDiv({ cls: "g-command-tree" });
@@ -484,6 +530,49 @@ export class GDriveSidebar extends ItemView {
     parent.createDiv({ cls: "g-command-status", text });
   }
 
+  private renderSyncedPane(parent: HTMLElement): void {
+    const pane = parent.createDiv({ cls: "g-command-synced-pane" });
+    const entries = Object.entries(this.settings.syncState);
+    pane.createDiv({
+      cls: "g-command-section-header",
+      text: `Synced files (${entries.length})`,
+    });
+
+    const body = pane.createDiv({ cls: "g-command-synced-body" });
+    for (const [drivePath, rec] of entries) {
+      this.renderSyncedRow(body, drivePath, rec);
+    }
+  }
+
+  private renderSyncedRow(parent: HTMLElement, drivePath: string, rec: SyncRecord): void {
+    const row = parent.createDiv({ cls: "g-command-synced-row" });
+
+    // Display the vault filename (last segment of vault path, or drive path)
+    const displayName = (rec.vaultPath ?? drivePath).split("/").pop() ?? drivePath;
+    row.createSpan({ cls: "g-command-synced-name", text: displayName });
+
+    // Resync button
+    const btn = row.createEl("button", {
+      cls: "g-command-resync-btn clickable-icon",
+      attr: { "aria-label": `Resync ${displayName}` },
+    });
+    btn.textContent = "↻";
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const name = drivePath.split("/").pop() ?? drivePath;
+      const stub: DriveFile = {
+        Path: drivePath,
+        Name: name,
+        Size: -1,
+        MimeType: rec.mimeType ?? "",
+        ModTime: "",
+        IsDir: false,
+        ID: rec.fileId,
+      };
+      this.runSync([stub]);
+    });
+  }
+
   private renderLogPane(parent: HTMLElement): void {
     const pane = parent.createDiv({ cls: "g-command-log-pane" });
 
@@ -591,6 +680,20 @@ export class GDriveSidebar extends ItemView {
     node: TreeNode,
     depth: number
   ): void {
+    // Checkbox for folder selection (recursive sync)
+    const cb = row.createEl("input", {
+      cls: "g-command-checkbox",
+      attr: { type: "checkbox" },
+    }) as HTMLInputElement;
+    cb.checked = this.selectedPaths.has(node.file.Path);
+    cb.addEventListener("change", (e) => {
+      e.stopPropagation();
+      if (cb.checked) this.selectedPaths.add(node.file.Path);
+      else this.selectedPaths.delete(node.file.Path);
+      this.persistSelectedPaths();
+      this.render();
+    });
+
     // Expand/collapse arrow
     const arrow = row.createSpan({ cls: "g-command-arrow" });
     arrow.textContent = node.expanded ? "▼" : "▶";
@@ -598,7 +701,8 @@ export class GDriveSidebar extends ItemView {
     row.createSpan({ cls: "g-command-name", text: node.file.Name });
     row.addClass("g-command-row--folder");
 
-    row.addEventListener("click", async () => {
+    row.addEventListener("click", async (e) => {
+      if ((e.target as HTMLElement).tagName === "INPUT") return;
       if (node.expanded) {
         node.expanded = false;
         this.render();

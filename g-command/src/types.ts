@@ -14,6 +14,7 @@ export interface SyncRecord {
   modTime: string;   // Drive ModTime at last sync
   vaultPath: string; // Relative vault path where file was written
   fileId: string;    // Drive file ID
+  mimeType?: string; // Drive MIME type (for correct export format on resync)
 }
 
 export interface GCommandSettings {

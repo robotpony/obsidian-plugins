@@ -254,6 +254,7 @@ export async function syncFiles(
         modTime: file.ModTime,
         vaultPath,
         fileId: file.ID,
+        mimeType: file.MimeType,
       };
       await saveSettings();
 

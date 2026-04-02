@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.0.0 — 2026-04-02
+
+Synced files pane, folder sync, and sidebar improvements.
+
+**Synced files pane** — Fixed section above the file tree showing all previously synced files. Each row shows the vault filename and a resync button (↻) that appears on hover to re-download that single file.
+
+**Folder recursive sync** — Folders now have checkboxes in the file tree. Checking a folder and syncing downloads all files inside it recursively via `rclone lsjson --recursive`.
+
+**Sync log collapsed by default** — The log pane no longer auto-expands during sync. Open it manually if needed.
+
+**Schema: mimeType stored in sync state** — `SyncRecord` now persists the file's MIME type so resync correctly exports Google Docs as HTML (previously stubs had empty MimeType, falling through to native-file handling).
+
+- 94 tests, all passing
+
+---
+
 ## 0.9.0 — 2026-04-02
 
 Preserve nested list structure from Google Docs in converted markdown.
