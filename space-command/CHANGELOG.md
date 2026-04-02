@@ -2,6 +2,14 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.117] - 2026-04-02
+
+### Fixed
+
+- **Header TODO block disappears after completing a child item**: `scanFile()` checked `fileHasRelevantTags()` against the metadataCache before reading the file. When called directly from `completeTodo()` (after `vault.modify()`), the metadataCache hadn't updated yet, returning `null` and causing the entire file to be evicted from cache. Moved the metadataCache guard to the watcher callback where the cache is guaranteed fresh; `scanFile()` now always reads and parses the file content.
+
+---
+
 ## [0.9.116] - 2026-04-01
 
 ### Improved

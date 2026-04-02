@@ -479,11 +479,6 @@ var TodoScanner = class extends import_obsidian4.Events {
     this.trigger("todos-updated");
   }
   async scanFile(file) {
-    if (!this.fileHasRelevantTags(file)) {
-      this.evictFile(file.path);
-      this.trigger("todos-updated");
-      return;
-    }
     try {
       const content = await this.app.vault.read(file);
       const lines = content.split("\n");
@@ -749,6 +744,11 @@ var TodoScanner = class extends import_obsidian4.Events {
   watchFiles() {
     this.app.metadataCache.on("changed", (file) => {
       if (file instanceof import_obsidian4.TFile && file.extension === "md") {
+        if (!this.fileHasRelevantTags(file)) {
+          this.evictFile(file.path);
+          this.trigger("todos-updated");
+          return;
+        }
         this.debouncedScanFile(file);
       }
     });

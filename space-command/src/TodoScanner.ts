@@ -63,15 +63,6 @@ export class TodoScanner extends Events {
   }
 
   async scanFile(file: TFile): Promise<void> {
-    // If all plugin tags were removed from this file, evict it from cache and skip the read.
-    // fileHasRelevantTags() uses metadataCache which already reflects the current file state
-    // (it fires only after Obsidian's parser has finished via metadataCache.on("changed")).
-    if (!this.fileHasRelevantTags(file)) {
-      this.evictFile(file.path);
-      this.trigger("todos-updated");
-      return;
-    }
-
     try {
       const content = await this.app.vault.read(file);
       const lines = content.split("\n");
@@ -446,6 +437,13 @@ export class TodoScanner extends Events {
     // producing a redundant scan against stale cache state.
     this.app.metadataCache.on("changed", (file) => {
       if (file instanceof TFile && file.extension === "md") {
+        // metadataCache is fresh here — if all plugin tags were removed, evict
+        // instead of scanning. This avoids reading files that are no longer relevant.
+        if (!this.fileHasRelevantTags(file)) {
+          this.evictFile(file.path);
+          this.trigger("todos-updated");
+          return;
+        }
         this.debouncedScanFile(file);
       }
     });
