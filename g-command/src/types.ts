@@ -24,6 +24,7 @@ export interface GCommandSettings {
   selectedPaths: string[];                 // Drive paths the user has checked
   syncState: Record<string, SyncRecord>;   // Drive path → last sync record
   frontmatterGdriveFields: boolean;        // include gdrive_id and gdrive_path in frontmatter
+  driveCache: DriveTreeCache | null;       // cached tree for instant sidebar render
 }
 
 export const DEFAULT_SETTINGS: GCommandSettings = {
@@ -33,7 +34,16 @@ export const DEFAULT_SETTINGS: GCommandSettings = {
   selectedPaths: [],
   syncState: {},
   frontmatterGdriveFields: true,
+  driveCache: null,
 };
+
+// Cached Drive tree for instant sidebar rendering
+export interface DriveTreeCache {
+  /** ISO timestamp of last successful refresh */
+  lastRefresh: string;
+  /** Cached folder listings, keyed by Drive path ("" = root) */
+  folders: Record<string, DriveFile[]>;
+}
 
 // Export format passed to rclone cat --drive-export-formats
 export type ExportFormat = "html" | "csv" | "txt";

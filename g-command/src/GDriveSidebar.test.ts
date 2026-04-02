@@ -1,12 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { DriveFile } from "./types";
+import type { DriveFile, DriveTreeCache } from "./types";
 
-// We can't import GDriveSidebar directly because it extends Obsidian's ItemView
-// (which isn't available in Node). Instead, test the extracted pure functions
-// and verify the class structure indirectly.
+// Mock obsidian module (not available in Node test environment)
+vi.mock("obsidian", () => ({
+  App: class {},
+  ItemView: class { containerEl = { children: [null, { empty() {}, addClass() {} }] }; },
+  Menu: class {},
+  WorkspaceLeaf: class {},
+}));
 
-// Re-create the pure helpers from GDriveSidebar to test them.
-// These mirror the module-level functions in GDriveSidebar.ts.
+import { buildTreeFromCache, syncedParentPaths } from "./GDriveSidebar";
+
+// We can't import GDriveSidebar class directly because it extends Obsidian's ItemView.
+// But we can import the exported pure functions above.
+
+// Re-create the simpler helpers locally for tree/filter tests.
 
 interface TreeNode {
   file: DriveFile;
@@ -258,5 +266,104 @@ describe("flattenToNodes", () => {
     const nodes = flattenToNodes([fileA, folder]);
     expect(nodes[0].children).toBeNull(); // folder
     expect(nodes[1].children).toEqual([]); // file
+  });
+});
+
+describe("syncedParentPaths", () => {
+  it("extracts unique parent folders from syncState keys", () => {
+    const syncState = {
+      "Projects/Brief.md": { modTime: "", vaultPath: "", fileId: "1" },
+      "Projects/Notes.md": { modTime: "", vaultPath: "", fileId: "2" },
+      "Work/Sub/File.md": { modTime: "", vaultPath: "", fileId: "3" },
+    };
+    const paths = syncedParentPaths(syncState).sort();
+    expect(paths).toEqual(["Projects", "Work/Sub"]);
+  });
+
+  it("excludes root-level files (no parent folder)", () => {
+    const syncState = {
+      "Root.md": { modTime: "", vaultPath: "", fileId: "1" },
+      "Sub/File.md": { modTime: "", vaultPath: "", fileId: "2" },
+    };
+    const paths = syncedParentPaths(syncState);
+    expect(paths).toEqual(["Sub"]);
+  });
+
+  it("returns empty array for empty syncState", () => {
+    expect(syncedParentPaths({})).toEqual([]);
+  });
+
+  it("handles deeply nested paths", () => {
+    const syncState = {
+      "A/B/C/D/file.md": { modTime: "", vaultPath: "", fileId: "1" },
+    };
+    const paths = syncedParentPaths(syncState);
+    expect(paths).toEqual(["A/B/C/D"]);
+  });
+});
+
+describe("buildTreeFromCache", () => {
+  it("builds root nodes from cache", () => {
+    const cache: DriveTreeCache = {
+      lastRefresh: "2026-04-02T10:00:00.000Z",
+      folders: {
+        "": [folder, fileA, fileB],
+      },
+    };
+    const nodes = buildTreeFromCache(cache);
+    expect(nodes.length).toBe(3);
+    // Dirs first
+    expect(nodes[0].file.Name).toBe("Work");
+    expect(nodes[0].file.Path).toBe("Work");
+    expect(nodes[1].file.Name).toBe("Brief.gdoc");
+    expect(nodes[2].file.Name).toBe("Notes.md");
+  });
+
+  it("attaches cached subfolder children", () => {
+    const subFile: DriveFile = {
+      Path: "Report.gdoc",
+      Name: "Report.gdoc",
+      Size: -1,
+      MimeType: "application/vnd.google-apps.document",
+      ModTime: "2026-01-20T09:00:00.000Z",
+      IsDir: false,
+      ID: "sub1",
+    };
+    const cache: DriveTreeCache = {
+      lastRefresh: "2026-04-02T10:00:00.000Z",
+      folders: {
+        "": [folder],
+        "Work": [subFile],
+      },
+    };
+    const nodes = buildTreeFromCache(cache);
+    expect(nodes.length).toBe(1);
+    expect(nodes[0].file.Name).toBe("Work");
+    expect(nodes[0].expanded).toBe(true); // has cached children
+    expect(nodes[0].children).not.toBeNull();
+    expect(nodes[0].children!.length).toBe(1);
+    expect(nodes[0].children![0].file.Name).toBe("Report.gdoc");
+    expect(nodes[0].children![0].file.Path).toBe("Work/Report.gdoc");
+  });
+
+  it("returns empty array when root is not cached", () => {
+    const cache: DriveTreeCache = {
+      lastRefresh: "",
+      folders: {},
+    };
+    expect(buildTreeFromCache(cache)).toEqual([]);
+  });
+
+  it("leaves uncached folder children as null (lazy load)", () => {
+    const cache: DriveTreeCache = {
+      lastRefresh: "2026-04-02T10:00:00.000Z",
+      folders: {
+        "": [folder],
+        // "Work" not cached
+      },
+    };
+    const nodes = buildTreeFromCache(cache);
+    expect(nodes[0].children).toBeNull();
+    expect(nodes[0].expanded).toBe(false);
   });
 });

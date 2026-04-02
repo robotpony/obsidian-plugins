@@ -395,13 +395,13 @@ Example: if `syncState` has `Projects/Brief.md`, the cache pre-fetches `Projects
 
 ### Steps
 
-- [ ] Step 1: Add `DriveTreeCache` type to `types.ts`, add `driveCache` to settings with default `null`
-- [ ] Step 2: On sidebar open, build tree from cache if available, render immediately
-- [ ] Step 3: Background refresh — fetch root listing after rendering cached tree, update cache + re-render if changed
-- [ ] Step 4: Cache folder expansions — save to `driveCache.folders[path]` after each `loadChildren`
-- [ ] Step 5: Pre-fetch synced-file parent folders during background refresh
-- [ ] Step 6: Cache invalidation — refresh button clears cache and fetches fresh; TTL optional later
-- [ ] Step 7: Tests for cache hydration, background refresh, and synced-parent pre-fetch
+- [x] Step 1: Add `DriveTreeCache` type to `types.ts`, add `driveCache` to settings with default `null`
+- [x] Step 2: On sidebar open, build tree from cache if available, render immediately
+- [x] Step 3: Background refresh — fetch root listing after rendering cached tree, update cache + re-render if changed
+- [x] Step 4: Cache folder expansions — save to `driveCache.folders[path]` after each `loadChildren`
+- [x] Step 5: Pre-fetch synced-file parent folders during background refresh
+- [x] Step 6: Cache invalidation — refresh button clears cache and fetches fresh; TTL optional later
+- [x] Step 7: Tests for cache hydration, background refresh, and synced-parent pre-fetch
 
 ### Design decisions
 

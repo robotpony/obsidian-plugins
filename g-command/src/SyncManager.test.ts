@@ -13,6 +13,7 @@ import {
   toVaultPath,
   buildFrontmatter,
   convertContent,
+  driveEditUrl,
 } from "./SyncManager";
 
 // --- Test data ---------------------------------------------------------------
@@ -256,12 +257,50 @@ describe("toVaultPath", () => {
   });
 });
 
+describe("driveEditUrl", () => {
+  it("returns Google Docs URL for native doc MIME", () => {
+    expect(driveEditUrl(googleDoc)).toBe("https://docs.google.com/document/d/doc1");
+  });
+
+  it("returns Google Sheets URL for native sheet MIME", () => {
+    expect(driveEditUrl(googleSheet)).toBe("https://docs.google.com/spreadsheets/d/sheet1");
+  });
+
+  it("returns Google Slides URL for native slides MIME", () => {
+    expect(driveEditUrl(googleSlides)).toBe("https://docs.google.com/presentation/d/slides1");
+  });
+
+  it("returns Google Docs URL for Office .docx MIME with Size -1", () => {
+    const officeDoc: DriveFile = {
+      Path: "Recipe.docx", Name: "Recipe.docx", Size: -1,
+      MimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ModTime: "2026-01-01T00:00:00.000Z", IsDir: false, ID: "office-doc1",
+    };
+    expect(driveEditUrl(officeDoc)).toBe("https://docs.google.com/document/d/office-doc1");
+  });
+
+  it("returns Google Sheets URL for Office .xlsx MIME", () => {
+    const officeSheet: DriveFile = {
+      Path: "Budget.xlsx", Name: "Budget.xlsx", Size: -1,
+      MimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      ModTime: "2026-01-01T00:00:00.000Z", IsDir: false, ID: "office-sheet1",
+    };
+    expect(driveEditUrl(officeSheet)).toBe("https://docs.google.com/spreadsheets/d/office-sheet1");
+  });
+
+  it("returns undefined for native files", () => {
+    expect(driveEditUrl(plainText)).toBeUndefined();
+    expect(driveEditUrl(pdfFile)).toBeUndefined();
+  });
+});
+
 describe("buildFrontmatter", () => {
-  it("includes gdrive_id, gdrive_path, and synced timestamp by default", () => {
+  it("includes gdrive_id, gdrive_path, google_document, and synced timestamp by default", () => {
     const fm = buildFrontmatter(googleDoc);
     expect(fm).toContain("---");
     expect(fm).toContain('gdrive_id: "doc1"');
     expect(fm).toContain('gdrive_path: "Work/Brief.gdoc"');
+    expect(fm).toContain('google_document: "https://docs.google.com/document/d/doc1"');
     expect(fm).toMatch(/synced: "\d{4}-\d{2}-\d{2} \d{2}:\d{2}"/);
   });
 
@@ -269,6 +308,7 @@ describe("buildFrontmatter", () => {
     const fm = buildFrontmatter(googleDoc, false);
     expect(fm).not.toContain("gdrive_id");
     expect(fm).not.toContain("gdrive_path");
+    expect(fm).not.toContain("google_document");
     expect(fm).toMatch(/synced: "\d{4}-\d{2}-\d{2} \d{2}:\d{2}"/);
   });
 

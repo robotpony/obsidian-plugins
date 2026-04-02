@@ -119,6 +119,21 @@ function formatSyncDate(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+/** Map a Google Workspace MIME type to its web-app URL prefix. */
+export function driveEditUrl(file: DriveFile): string | undefined {
+  const mime = file.MimeType;
+  if (mime === "application/vnd.google-apps.document" || OFFICE_DOC_MIMES.has(mime)) {
+    return `https://docs.google.com/document/d/${file.ID}`;
+  }
+  if (mime === "application/vnd.google-apps.spreadsheet" || OFFICE_SHEET_MIMES.has(mime)) {
+    return `https://docs.google.com/spreadsheets/d/${file.ID}`;
+  }
+  if (mime === "application/vnd.google-apps.presentation" || OFFICE_SLIDES_MIMES.has(mime)) {
+    return `https://docs.google.com/presentation/d/${file.ID}`;
+  }
+  return undefined;
+}
+
 /** Build YAML frontmatter block for a synced .md file. */
 export function buildFrontmatter(file: DriveFile, includeGdriveFields = true): string {
   const now = formatSyncDate(new Date());
@@ -126,6 +141,10 @@ export function buildFrontmatter(file: DriveFile, includeGdriveFields = true): s
   if (includeGdriveFields) {
     lines.push(`gdrive_id: "${file.ID}"`);
     lines.push(`gdrive_path: "${file.Path}"`);
+    const url = driveEditUrl(file);
+    if (url) {
+      lines.push(`google_document: "${url}"`);
+    }
   }
   lines.push(`synced: "${now}"`);
   lines.push("---", "");

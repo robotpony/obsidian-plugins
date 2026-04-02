@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.6.0 — 2026-04-02
+
+Drive tree caching — sidebar renders instantly from cache, refreshes in background (Phase 3).
+
+**Problem**: The sidebar called `rclone lsjson` on every open and folder expand, causing 2-5 second delays on slow connections.
+
+**Solution**: Cache folder listings in plugin settings. On sidebar open, render the cached tree immediately, then fetch fresh data in the background and update if changed.
+
+- New `DriveTreeCache` type storing per-folder listings keyed by Drive path
+- Cache-first `onOpen()`: if cache exists, build and render tree instantly, then background refresh
+- `loadChildren()` uses cached subfolder listings immediately, fetches fresh in background
+- Background refresh: fetches root listing, compares with cache, re-renders only if changed
+- Pre-fetches parent folders of all synced files so their paths are visible without manual expansion
+- Kebab menu "Refresh" clears cache and fetches fresh
+- After sync, parent folders of synced files are refreshed in cache
+- New exported `buildTreeFromCache()` and `syncedParentPaths()` pure functions
+- 8 new tests for cache hydration and synced-parent extraction
+- 109 tests total, all passing
+
+---
+
+## 1.5.0 — 2026-04-02
+
+Add `google_document` URL to synced file frontmatter.
+
+- Synced Google Docs, Sheets, and Slides now include a `google_document` field in YAML frontmatter with the full web URL (e.g. `https://docs.google.com/document/d/{id}`)
+- Allows readers to click through to the source document on Google Drive for viewing or editing
+- URL is constructed from the file ID and MIME type: Docs, Sheets, and Slides each get their correct web-app URL
+- Controlled by the existing "Include Drive metadata in frontmatter" setting
+- New `driveEditUrl()` helper with 7 tests
+- 101 tests total, all passing
+
+---
+
 ## 1.4.0 — 2026-04-02
 
 Fix sync failure for filenames containing square brackets.

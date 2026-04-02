@@ -1,6 +1,6 @@
 import { App, ItemView, Menu, WorkspaceLeaf } from "obsidian";
 import { DriveProvider, DriveError } from "./DriveProvider";
-import { DriveFile, GCommandSettings, SyncRecord } from "./types";
+import { DriveFile, DriveTreeCache, GCommandSettings, SyncRecord } from "./types";
 import { syncFiles, getFormatMapping, SyncLogFn } from "./SyncManager";
 
 export const VIEW_TYPE_GDRIVE_SIDEBAR = "g-command-drive";
@@ -74,7 +74,16 @@ export class GDriveSidebar extends ItemView {
   }
 
   async onOpen(): Promise<void> {
-    await this.loadRoot();
+    const cache = this.settings.driveCache;
+    if (cache && cache.folders[""]) {
+      // Instant render from cache
+      this.rootNodes = buildTreeFromCache(cache);
+      this.render();
+      // Background refresh (non-blocking)
+      this.backgroundRefresh();
+    } else {
+      await this.loadRoot();
+    }
   }
 
   onClose(): Promise<void> {
@@ -138,6 +147,11 @@ export class GDriveSidebar extends ItemView {
       if (result.failed.length > 0) parts.push(`${result.failed.length} failed`);
       this.log("info", `Done: ${parts.join(", ")}`);
       this.syncStatus = result.failed.length > 0 ? "error" : "idle";
+
+      // Refresh cached parent folders of synced files
+      if (result.synced > 0 && this.settings.driveCache) {
+        this.prefetchSyncedParents();
+      }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       this.log("error", `Sync error: ${msg}`);
@@ -358,6 +372,12 @@ export class GDriveSidebar extends ItemView {
       this.rootNodes = files
         .sort(sortDirsFirst)
         .map(toTreeNode);
+
+      // Save to cache
+      this.ensureCache();
+      this.settings.driveCache!.folders[""] = files;
+      this.settings.driveCache!.lastRefresh = new Date().toISOString();
+      await this.saveSettings();
     } catch (e: unknown) {
       const err = e instanceof DriveError || e instanceof Error
         ? e
@@ -372,12 +392,26 @@ export class GDriveSidebar extends ItemView {
   }
 
   private async loadChildren(node: TreeNode): Promise<void> {
+    const path = node.file.Path;
+
+    // Use cached children if available
+    const cached = this.settings.driveCache?.folders[path];
+    if (cached) {
+      const files = cached.map(f => ({ ...f, Path: `${path}/${f.Path}` }));
+      node.children = files.sort(sortDirsFirst).map(toTreeNode);
+      // Fetch fresh in background
+      this.backgroundRefreshFolder(node);
+      return;
+    }
+
     try {
-      const files = await this.drive.list(node.file.Path);
+      const files = await this.drive.list(path);
+      // Save raw (relative-path) listing to cache before mutating paths
+      this.saveFolderToCache(path, files.map(f => ({ ...f })));
       // rclone lsjson returns Path relative to the listed folder.
       // Prefix with parent path so cat/sync use full remote paths.
       for (const f of files) {
-        f.Path = `${node.file.Path}/${f.Path}`;
+        f.Path = `${path}/${f.Path}`;
       }
       node.children = files
         .sort(sortDirsFirst)
@@ -387,6 +421,86 @@ export class GDriveSidebar extends ItemView {
       console.error("[G Command]", msg);
       node.children = [];
       this.error = new Error(msg);
+    }
+  }
+
+  // --- Caching --------------------------------------------------------------
+
+  /** Ensure driveCache is initialised. */
+  private ensureCache(): void {
+    if (!this.settings.driveCache) {
+      this.settings.driveCache = { lastRefresh: "", folders: {} };
+    }
+  }
+
+  /** Save a folder listing (with raw relative paths) to cache. */
+  private saveFolderToCache(path: string, files: DriveFile[]): void {
+    this.ensureCache();
+    this.settings.driveCache!.folders[path] = files;
+    // Fire-and-forget save
+    this.saveSettings();
+  }
+
+  /** Background refresh: fetch fresh root listing and update cache if changed. */
+  private async backgroundRefresh(): Promise<void> {
+    try {
+      await this.drive.check();
+      const freshRoot = await this.drive.list("");
+      const cache = this.settings.driveCache;
+      const cachedRoot = cache?.folders[""];
+
+      const changed = !cachedRoot || JSON.stringify(freshRoot) !== JSON.stringify(cachedRoot);
+      if (changed) {
+        this.ensureCache();
+        this.settings.driveCache!.folders[""] = freshRoot;
+        this.rootNodes = buildTreeFromCache(this.settings.driveCache!);
+        this.render();
+        console.log("[G Command] Background refresh: root updated");
+      } else {
+        console.log("[G Command] Background refresh: root unchanged");
+      }
+
+      // Pre-fetch parent folders of synced files
+      await this.prefetchSyncedParents();
+
+      this.settings.driveCache!.lastRefresh = new Date().toISOString();
+      await this.saveSettings();
+    } catch (e: unknown) {
+      // Background refresh failures are silent — cached tree is still visible
+      console.error("[G Command] Background refresh failed:", e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  /** Background refresh a single folder node. */
+  private async backgroundRefreshFolder(node: TreeNode): Promise<void> {
+    const path = node.file.Path;
+    try {
+      const freshFiles = await this.drive.list(path);
+      const cached = this.settings.driveCache?.folders[path];
+      if (!cached || JSON.stringify(freshFiles) !== JSON.stringify(cached)) {
+        this.saveFolderToCache(path, freshFiles.map(f => ({ ...f })));
+        const files = freshFiles.map(f => ({ ...f, Path: `${path}/${f.Path}` }));
+        node.children = files.sort(sortDirsFirst).map(toTreeNode);
+        this.render();
+      }
+    } catch {
+      // Silent — cached children are already rendered
+    }
+  }
+
+  /** Pre-fetch parent folders of all synced files so their paths are visible. */
+  private async prefetchSyncedParents(): Promise<void> {
+    const parentPaths = syncedParentPaths(this.settings.syncState);
+    const cache = this.settings.driveCache!;
+
+    for (const parentPath of parentPaths) {
+      if (cache.folders[parentPath]) continue; // already cached
+      try {
+        const files = await this.drive.list(parentPath);
+        cache.folders[parentPath] = files;
+      } catch {
+        // Skip folders that fail (may have been deleted from Drive)
+      }
     }
   }
 
@@ -428,7 +542,10 @@ export class GDriveSidebar extends ItemView {
         item
           .setTitle("Refresh")
           .setIcon("refresh-cw")
-          .onClick(() => this.loadRoot())
+          .onClick(() => {
+            this.settings.driveCache = null;
+            this.loadRoot();
+          })
       );
       if (hasSyncedFiles) {
         menu.addItem((item) =>
@@ -805,4 +922,47 @@ export function filterTree(nodes: TreeNode[], query: string): TreeNode[] {
  */
 export function flattenToNodes(files: DriveFile[]): TreeNode[] {
   return files.sort(sortDirsFirst).map(toTreeNode);
+}
+
+/**
+ * Build a full TreeNode[] from a DriveTreeCache.
+ * Root nodes come from folders[""], and any cached subfolder listings
+ * are attached as pre-loaded children on folder nodes.
+ */
+export function buildTreeFromCache(cache: DriveTreeCache): TreeNode[] {
+  const rootFiles = cache.folders[""];
+  if (!rootFiles) return [];
+
+  const buildNodes = (files: DriveFile[], parentPath: string): TreeNode[] => {
+    return files.sort(sortDirsFirst).map(f => {
+      const fullPath = parentPath ? `${parentPath}/${f.Path}` : f.Path;
+      const fileWithPath = { ...f, Path: fullPath };
+      if (f.IsDir) {
+        const cachedChildren = cache.folders[fullPath];
+        const children = cachedChildren
+          ? buildNodes(cachedChildren, fullPath)
+          : null;
+        return { file: fileWithPath, children, expanded: !!cachedChildren };
+      }
+      return { file: fileWithPath, children: [] as TreeNode[], expanded: false };
+    });
+  };
+
+  return buildNodes(rootFiles, "");
+}
+
+/**
+ * Extract unique parent folder paths from syncState keys.
+ * e.g. "Projects/Brief.md" → "Projects", "Work/Sub/File.md" → "Work/Sub"
+ * Root-level files (no slash) are excluded since root is always cached.
+ */
+export function syncedParentPaths(syncState: Record<string, unknown>): string[] {
+  const parents = new Set<string>();
+  for (const drivePath of Object.keys(syncState)) {
+    const lastSlash = drivePath.lastIndexOf("/");
+    if (lastSlash > 0) {
+      parents.add(drivePath.substring(0, lastSlash));
+    }
+  }
+  return Array.from(parents);
 }
