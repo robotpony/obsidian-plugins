@@ -4,13 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Structure
 
-This is a mono-repo containing three Obsidian plugins and shared utilities:
+This is a mono-repo containing four Obsidian plugins and shared utilities:
 
 | Directory | Description |
 |-----------|-------------|
 | [space-command/](space-command/) | TODO/TODONE tracking with sidebar, embeds, slash commands |
 | [hugo-command/](hugo-command/) | Hugo content browser and management |
 | [link-command/](link-command/) | URL unfurling with format cycling and sidebar |
+| [notate-command/](notate-command/) | Quick note capture to daily/weekly logs with sidebar and history |
 | [shared/](shared/) | Common utilities used by all plugins |
 
 See plugin-specific CLAUDE.md files for detailed architecture.
