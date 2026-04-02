@@ -26,12 +26,11 @@ No changes needed to the MCP server for the plugin work.
 
 ```
 main.ts (Plugin)
-├── GDriveSidebar (ItemView)       — sidebar tree UI
+├── GDriveSidebar (ItemView)       — sidebar tree UI, search, synced files pane
 │   └── DriveProvider              — rclone subprocess calls
-├── SyncManager                    — sync orchestration
-│   ├── DriveProvider
-│   └── Converter                  — format conversion
-└── SettingsTab (PluginSettingTab) — settings UI
+├── SyncManager (module)           — sync orchestration + format conversion
+│   └── DriveProvider
+└── SettingsTab (PluginSettingTab) — settings UI (inline in main.ts)
 ```
 
 ### Data flow
@@ -42,19 +41,21 @@ User checks a file in GDriveSidebar
   → settings saved to .obsidian/plugins/g-command/data.json
 
 User clicks Sync
-  → SyncManager.syncAll(selectedPaths)
-    → DriveProvider.list(path)      — rclone lsjson
-      ↳ returns DriveFile[]
-    → compare file.ModTime with settings.syncState[path].modTime
-    → if newer:
-        DriveProvider.cat(path, 'html')  — rclone cat --drive-export-formats html
-        Converter.convert(html, file)
-          ↳ turndown(html) → markdown
-          ↳ prepend frontmatter
-        vault.adapter.write(vaultPath, content)
-        settings.syncState[path] = { modTime, vaultPath, fileId }
-    → if same: skip
-  → Notice("Synced N, skipped M")
+  → GDriveSidebar.collectSelectedFiles()
+    → expands folder selections via DriveProvider.listRecursive()
+  → syncFiles(files, app, drive, settings, saveSettings, onLog)
+    → for each file:
+      → compare file.ModTime with settings.syncState[path].modTime
+      → if same: skip (result.skipped++)
+      → if newer:
+          DriveProvider.download(path, exportFormat)
+            — rclone copy --include <filename> from parent dir
+          convertContent(raw)
+            ↳ turndown(html) → markdown (strips CSS, handles nested lists)
+          buildFrontmatter(file) + content
+          writeToVault(app, vaultPath, content)
+          settings.syncState[path] = { modTime, vaultPath, fileId, mimeType }
+  → onLog reports per-file progress to sidebar sync log
 ```
 
 ---
@@ -82,11 +83,12 @@ class DriveProvider {
   // Returns files/folders at path (one level deep)
   async list(drivePath: string): Promise<DriveFile[]>
 
-  // Returns recursive listing for sync
+  // Returns all files recursively under path
   async listRecursive(drivePath: string): Promise<DriveFile[]>
 
-  // Downloads file content. exportFormat only applies to Google Workspace types.
-  async cat(drivePath: string, exportFormat?: ExportFormat): Promise<Buffer>
+  // Downloads file content as string. Uses rclone copy --include from parent dir.
+  // For Google Workspace exports, pass exportFormat (e.g. "html", "csv").
+  async download(drivePath: string, exportFormat?: ExportFormat): Promise<string>
 
   // Verifies rclone is installed and remote is reachable.
   async check(): Promise<void>
@@ -99,76 +101,83 @@ rclone commands used:
 |--------|---------------|
 | `list` | `rclone lsjson remote:path --max-depth 1` |
 | `listRecursive` | `rclone lsjson remote:path --recursive --files-only` |
-| `cat` (Docs) | `rclone cat --drive-export-formats html remote:path` |
-| `cat` (Sheets) | `rclone cat --drive-export-formats csv remote:path` |
-| `cat` (binary) | `rclone cat remote:path` |
+| `download` | `rclone copy --include <filename> [--drive-export-formats fmt] remote:parent/ tmpDir` |
 | `check` | `rclone lsjson remote: --max-depth 1 --files-only` |
+
+The `download` method uses `--include` from the parent directory instead of addressing the file directly. This is required because rclone can't address Google Workspace virtual files (Size -1) by full path. Glob special characters in filenames are escaped before passing to `--include`.
 
 ### `GDriveSidebar`
 
 Obsidian `ItemView` subclass. View type id: `g-command-drive`.
 
 State:
-- Tree of `DriveNode` objects (file or folder, with `checked: boolean | 'partial'`)
-- Loaded lazily — children fetched on first expand
-- Root loaded on view open and after each sync
+- `rootNodes: TreeNode[]` — tree of `{ file: DriveFile, children: TreeNode[] | null, expanded: boolean }`
+- `selectedPaths: Set<string>` — user checkbox selections (persisted)
+- `allFiles: DriveFile[] | null` — cached recursive search results (session only)
+- `syncStatus: "idle" | "syncing" | "error"` — tri-state status for log indicator
+- `logEntries: LogEntry[]` — sync log with timestamps and levels
+
+Layout (top to bottom):
+1. Header bar (logo, sync button, kebab menu)
+2. Search bar with clear button
+3. Status line (file count, connection status)
+4. Synced files pane (if syncState has entries) — fixed section with per-file resync buttons
+5. "Drive" section header
+6. File tree (lazy-loading folders, checkboxes on files and folders)
+7. Sync log (collapsible, tri-state status dot, clear button)
 
 Behaviour:
-- Checkbox click: toggle selection, propagate to children, update parent to partial if needed
-- Folder expand: call `DriveProvider.list()`, render children
-- Sync button: delegate to `SyncManager.syncAll()`, show spinner, refresh tree after
-- Error state: if `DriveProvider.check()` fails, render error banner instead of tree
+- Checkbox click: toggle selection, persist to settings
+- Folder expand: call `DriveProvider.list()`, lazy-load children
+- Folder checkbox: selecting a folder syncs all files recursively via `listRecursive()`
+- Sync button: collect selected files/folders → `syncFiles()` → per-file progress in log
+- Search: filter loaded tree; "Search all of Drive" fetches recursive listing
+- Resync: per-file resync from synced files pane, builds DriveFile stub from SyncRecord
+- Error state: error banner with setup instructions and copy button
 
-Selected paths are stored as a `Set<string>` (Drive paths, e.g. `"Work/Projects/Brief.gdoc"`) in plugin settings. The tree is rebuilt from Drive on each open; checkbox states are restored from settings.
+### `SyncManager` (module)
 
-### `SyncManager`
-
-Orchestrates the sync. No UI logic.
-
-```typescript
-class SyncManager {
-  async syncAll(selectedPaths: Set<string>): Promise<SyncResult>
-  async syncPath(drivePath: string): Promise<FileSyncResult>
-  private vaultPath(drivePath: string): string
-  private needsSync(file: DriveFile): boolean
-}
-```
-
-`syncAll` expands any selected folders (via `DriveProvider.listRecursive`) before syncing, so folder selections are always resolved to individual files.
-
-`needsSync` compares `file.ModTime` (ISO string from rclone) against the stored `modTime` in `settings.syncState`. If no record exists (first sync), the file is always downloaded.
-
-### `Converter`
-
-Stateless. Converts raw file content to a vault-ready string.
+Exported functions in `src/SyncManager.ts`. No class — stateless functions that accept dependencies as parameters.
 
 ```typescript
-function convert(
-  content: Buffer,
-  file: DriveFile,
-  options: { vaultPath: string }
-): ConvertResult
+// Main sync entry point
+function syncFiles(
+  files: DriveFile[], app: App, drive: DriveProvider,
+  settings: GCommandSettings, saveSettings: () => Promise<void>,
+  onLog?: SyncLogFn
+): Promise<SyncResult>
+
+// Format detection: MIME type + Size → export format, vault extension, conversion strategy
+function getFormatMapping(file: DriveFile): FormatMapping
+
+// HTML → markdown conversion via turndown (strips CSS, handles Google Docs nested lists)
+function convertContent(raw: string): string
+
+// YAML frontmatter block (gdrive_id, gdrive_path, synced timestamp)
+function buildFrontmatter(file: DriveFile, includeGdriveFields?: boolean): string
 ```
 
-Conversion by MIME type:
+`syncFiles` iterates each file, compares `file.ModTime` against `syncState`, downloads if changed, converts, prepends frontmatter, and writes to vault. Reports per-file progress via `onLog` callback.
 
-| MIME type | Action |
-|-----------|--------|
-| `application/vnd.google-apps.document` | HTML → markdown via Turndown, + frontmatter |
-| `application/vnd.google-apps.spreadsheet` | CSV passthrough, no frontmatter |
-| `application/vnd.google-apps.presentation` | Plain text → .md, + frontmatter |
-| `text/*` | String passthrough |
-| `application/json` | String passthrough |
-| anything else | Binary passthrough (returned as `Buffer`) |
+Format mapping by MIME type:
 
-Turndown is configured with GFM (GitHub Flavoured Markdown) tables enabled, which preserves Google Docs table structure.
+| MIME type | Export | Vault ext | Convert |
+|-----------|--------|-----------|---------|
+| Google Docs (native or Office MIME, Size -1) | HTML | `.md` | turndown + frontmatter |
+| Google Sheets (native or Office MIME, Size -1) | CSV | `.csv` | passthrough |
+| Google Slides (native or Office MIME, Size -1) | TXT | `.md` | frontmatter only |
+| Real uploaded files (Size > 0) | native | original | passthrough |
+
+Turndown config: ATX headings, fenced code blocks. Custom rules strip `<style>`, `<script>`, `<meta>`, `<link>` elements and decode Google Docs CSS-encoded list nesting (`lst-kix_*-N` classes on `<ol>` parents).
 
 ### `SettingsTab`
 
-Standard Obsidian `PluginSettingTab`. Two fields:
+`GCommandSettingTab` class defined inline in `main.ts`. Four settings:
 
-- **rclone remote** (text, default `"gdrive"`) — must match the name used in `rclone config`
-- **Vault sync root** (text, default `"gdrive"`) — folder created at vault root; Drive structure mirrored inside
+- **rclone remote** (text, default `"gdrive"`) — must match the name used in `rclone config`. Debounced connectivity check.
+- **rclone path** (text, default empty = auto-detect) — explicit path for non-standard installs
+- **Vault sync root** (text, default `"gdrive"`) — folder created at vault root; "Show in Finder" button
+- **Include Drive metadata in frontmatter** (toggle, default on) — controls gdrive_id/gdrive_path fields
 
 Selected paths and sync state are managed internally and not exposed in the settings tab.
 
@@ -180,16 +189,26 @@ Stored in `.obsidian/plugins/g-command/data.json` via `plugin.saveData()`.
 
 ```typescript
 interface GCommandSettings {
-  rcloneRemote: string;           // default: "gdrive"
-  vaultRoot: string;              // default: "gdrive"
-  selectedPaths: string[];        // Drive paths (files or folders) the user has checked
-  syncState: Record<string, SyncRecord>;
+  rcloneRemote: string;                       // default: "gdrive"
+  rclonePath: string;                         // explicit rclone binary path; empty = auto-detect
+  vaultRoot: string;                          // default: "gdrive"
+  selectedPaths: string[];                    // Drive paths the user has checked
+  syncState: Record<string, SyncRecord>;      // Drive path → last sync record
+  frontmatterGdriveFields: boolean;           // include gdrive_id/gdrive_path in frontmatter
+  driveCache: DriveTreeCache | null;          // (Phase 3) Cached folder listings for instant load
 }
 
 interface SyncRecord {
   modTime: string;    // Drive ModTime at last sync (ISO 8601)
   vaultPath: string;  // Relative vault path where file was written
-  fileId: string;     // Drive file ID (for future URL construction)
+  fileId: string;     // Drive file ID
+  mimeType?: string;  // Drive MIME type (for correct export format on resync)
+}
+
+// Phase 3
+interface DriveTreeCache {
+  lastRefresh: string;                    // ISO timestamp of last successful background refresh
+  folders: Record<string, DriveFile[]>;   // folder path → rclone lsjson result ("" = root)
 }
 ```
 
@@ -202,12 +221,12 @@ Injected at the top of every `.md` file written during sync.
 ```yaml
 ---
 gdrive_id: "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
-gdrive_url: "https://docs.google.com/document/d/1BxiMVs0.../edit"
 gdrive_path: "Work/Projects/Project Brief.gdoc"
-gdrive_type: "application/vnd.google-apps.document"
-synced: "2026-03-31T14:22:00.000Z"
+synced: "2026-04-02 14:22"
 ---
 ```
+
+The `gdrive_id` and `gdrive_path` fields are optional (controlled by "Include Drive metadata in frontmatter" setting, default on). The `synced` timestamp uses human-readable `YYYY-MM-DD HH:mm` local time.
 
 On re-sync, the frontmatter block is replaced and the document body is overwritten. The vault copy is not considered authoritative — Drive is the source of truth.
 
@@ -219,21 +238,25 @@ The Obsidian plugin lives at the `g-command/` root level alongside the existing 
 
 ```
 g-command/
-├── main.ts                   # Plugin entry point
-├── manifest.json             # Obsidian plugin manifest
-├── package.json              # Build config
-├── styles.css                # Sidebar and status CSS
+├── main.ts                       # Plugin entry point + inline SettingsTab
+├── manifest.json                 # Obsidian plugin manifest
+├── package.json                  # Build config
+├── styles.css                    # Sidebar and status CSS
 ├── esbuild.config.mjs
 ├── tsconfig.json
-├── setup.sh                  # MCP server setup (existing)
+├── setup.sh                      # MCP server setup (existing)
+├── ARCHITECTURE.md
+├── CHANGELOG.md
+├── PLAN.md
 └── src/
-    ├── types.ts              # Shared interfaces (DriveFile, SyncRecord, etc.)
-    ├── DriveProvider.ts
-    ├── SyncManager.ts
-    ├── Converter.ts
-    ├── GDriveSidebar.ts
-    ├── SettingsTab.ts
-    └── gdrive/               # MCP server (existing, unchanged)
+    ├── types.ts                  # Shared interfaces (DriveFile, SyncRecord, GCommandSettings)
+    ├── DriveProvider.ts          # rclone wrapper: list, listRecursive, download, check
+    ├── DriveProvider.test.ts     # 25 tests
+    ├── SyncManager.ts            # Sync orchestration + format conversion + frontmatter
+    ├── SyncManager.test.ts       # 58 tests
+    ├── GDriveSidebar.ts          # Sidebar view: tree, search, synced pane, sync log
+    ├── GDriveSidebar.test.ts     # 12 tests
+    └── gdrive/                   # MCP server (existing, unchanged)
         ├── index.ts
         ├── package.json
         └── ...
@@ -273,14 +296,20 @@ All Drive access is via rclone subprocess calls. This reuses the auth configured
 **rclone HTML export, not plain text**
 Google Docs exported as HTML preserve headings, bold, italic, lists, and tables. Turndown converts these to markdown. Plain text loses all formatting. HTML export adds no complexity — it's one flag to rclone.
 
-**Lazy tree loading**
-Drive roots can have hundreds of files. Loading the full tree on sidebar open would be slow and make unnecessary API calls. Children are fetched only when a folder is expanded.
+**Cached tree with background refresh**
+The Drive tree is cached in plugin settings (`driveCache`) so the sidebar renders instantly on open. A background refresh fetches the current root listing and updates the cache silently. Parent folders of synced files are pre-fetched so those paths are visible without manual expansion. Folder expansions are also cached.
+
+**Lazy tree loading (with cache)**
+Children are fetched on first folder expand. Once fetched, the listing is saved to `driveCache.folders[path]` and served from cache on subsequent opens. Background refresh updates stale entries.
 
 **Skip-if-unchanged by ModTime**
 Drive's `ModTime` field is reliable and returned by `rclone lsjson`. Comparing it against a stored timestamp is cheap and avoids re-downloading unchanged files. No hashing or diffing needed.
 
-**Selected folders, not files**
-Users check folders, not individual files. This means adding a file to a tracked Drive folder picks it up on the next sync without any user action. Individual files can still be unchecked within an expanded folder.
+**Download via copy --include, not cat**
+Google Workspace virtual files (Size -1) can't be addressed by full path in rclone. The `download()` method uses `rclone copy --include <filename>` from the parent directory instead. Glob special characters in filenames are escaped. This approach also handles export format renaming (e.g. `.docx` → `.html`) correctly.
+
+**Selected folders and files**
+Users can check both individual files and entire folders. Folder selections are expanded via `listRecursive()` at sync time, so adding a file to a tracked Drive folder picks it up on the next sync without any user action.
 
 **Drive is source of truth**
 Sync is one-way: Drive → vault. Local edits to synced files are silently overwritten when the Drive file changes. This is intentional — the use case is pulling research docs, meeting notes, and reference material into Obsidian for reading and linking, not editing.

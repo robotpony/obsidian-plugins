@@ -20,17 +20,27 @@ All steps done. Claude Code can search and read Drive files via the `gdrive` MCP
 
 Adds a sidebar Drive browser to Obsidian. Users check files and folders to track, press Sync to pull them into the vault. Google Docs → markdown, Sheets → CSV. Mirrors Drive folder structure under a configurable vault root. See ARCHITECTURE.md and DESIGN.md for full detail.
 
-### Status
+### Status — Complete ✓
 
 - [x] Step 1: Plugin scaffold
-- [x] Step 2: DriveProvider — list and cat via rclone
-- [x] Step 3: GDriveSidebar — file tree (no selection yet)
-- [ ] Step 4: Checkbox selection and settings persistence
-- [ ] Step 5: SyncManager — basic sync (overwrite all selected)
-- [ ] Step 6: Converter — HTML → markdown via turndown, CSV passthrough
-- [ ] Step 7: Skip-if-unchanged (ModTime comparison)
-- [ ] Step 8: Frontmatter injection
-- [ ] Step 9: Polish — error states, progress feedback, partial folder selection
+- [x] Step 2: DriveProvider — list, download, check via rclone
+- [x] Step 3: GDriveSidebar — file tree with lazy-loading folders
+- [x] Step 4: Checkbox selection (files + folders) and settings persistence
+- [x] Step 5: SyncManager — sync pipeline with per-file progress
+- [x] Step 6: HTML → markdown via turndown, CSS stripping, nested list handling
+- [x] Step 7: Skip-if-unchanged (ModTime comparison against syncState)
+- [x] Step 8: Frontmatter injection (configurable gdrive fields, human-readable dates)
+- [x] Step 9: Polish — sync button states, status line, error banner, command palette, sync log
+
+Additional features shipped beyond original plan:
+- File search with "Search all of Drive" recursive fetch
+- Synced files pane with per-file resync
+- Folder recursive sync via listRecursive
+- Collapsible sync log with live per-file progress
+- Tri-state sync status indicator (idle/syncing/error)
+- Google Docs nested list indentation preservation
+- Glob character escaping in rclone include filters
+- Configurable rclone binary path for non-standard installs
 
 ---
 
@@ -327,7 +337,85 @@ On re-sync, detect existing frontmatter block (lines 1–N between `---` delimit
 
 ---
 
-## Nice-to-haves (post-Phase 2)
+## Phase 3: Drive tree caching
+
+The sidebar currently calls `rclone lsjson` on every open and folder expand. On slow connections this means a 2-5 second delay before the tree renders. The goal: display cached tree instantly, refresh in the background.
+
+### Cache scope
+
+Cache the root-level listing plus any user-expanded folders. On load, also pre-fetch parent folders of all synced files (from `settings.syncState`) so those paths are visible without delay.
+
+### Cache schema
+
+```typescript
+interface DriveTreeCache {
+  /** ISO timestamp of last successful refresh */
+  lastRefresh: string;
+  /** Cached folder listings, keyed by Drive path ("" = root) */
+  folders: Record<string, DriveFile[]>;
+}
+```
+
+Stored in `settings.driveCache` via `saveData()`. Each folder entry is the raw `DriveFile[]` from `rclone lsjson`. The cache stores flat listings per folder, not a nested tree — the sidebar rebuilds `TreeNode[]` from cache on open.
+
+### Data flow
+
+```
+onOpen()
+  ├── if driveCache exists:
+  │     build rootNodes from driveCache.folders[""]
+  │     restore expanded folders from driveCache.folders[path]
+  │     render() immediately (instant UI)
+  │     start background refresh →
+  │       drive.check()
+  │       drive.list("") → compare with cache
+  │       if changed: update cache, re-render
+  │       refresh synced-file parent folders
+  │
+  └── if no cache:
+        loadRoot() as today (loading spinner, fetch, render)
+        save result to driveCache
+
+loadChildren(node)
+  ├── if driveCache.folders[path] exists:
+  │     use cached children immediately
+  │     fetch fresh in background → update if changed
+  └── else:
+        fetch, render, save to cache
+
+After sync:
+  refresh parent folders of synced files in cache
+```
+
+### Pre-fetching synced-file parents
+
+On background refresh, extract unique parent folder paths from `settings.syncState` keys and fetch those folders. This ensures that when a user opens the sidebar, the tree can show the path to any previously synced file without waiting for manual folder expansion.
+
+Example: if `syncState` has `Projects/Brief.md`, the cache pre-fetches `Projects/` listing.
+
+### Steps
+
+- [ ] Step 1: Add `DriveTreeCache` type to `types.ts`, add `driveCache` to settings with default `null`
+- [ ] Step 2: On sidebar open, build tree from cache if available, render immediately
+- [ ] Step 3: Background refresh — fetch root listing after rendering cached tree, update cache + re-render if changed
+- [ ] Step 4: Cache folder expansions — save to `driveCache.folders[path]` after each `loadChildren`
+- [ ] Step 5: Pre-fetch synced-file parent folders during background refresh
+- [ ] Step 6: Cache invalidation — refresh button clears cache and fetches fresh; TTL optional later
+- [ ] Step 7: Tests for cache hydration, background refresh, and synced-parent pre-fetch
+
+### Design decisions
+
+**Why plugin settings, not a separate file**: `saveData()` is already used for syncState and selectedPaths. Adding the cache keeps everything in one persistence layer. Typical cache size is 50-200KB (root + 5-10 folders × ~50 files each).
+
+**Why per-folder entries, not a nested tree**: Flat structure is simpler to update incrementally (replace one folder's listing without rebuilding the whole tree). Also matches rclone's output format directly.
+
+**Why pre-fetch synced parents**: The primary use case is "open sidebar, see my synced files in context." Without this, the user would see root-level items but have to manually expand folders to see synced files deeper in the tree.
+
+**No TTL for now**: Background refresh on every open is lightweight (one rclone call for root). Adding a configurable TTL would add complexity without clear benefit at this scale.
+
+---
+
+## Nice-to-haves (post-Phase 3)
 
 - **`.gdoc` resolver:** read local Drive mount stubs, extract `resource_id`, sync that specific file — closing the loop without browsing
 - **`/gdoc-pull` skill:** Claude Code skill that takes a doc name, searches Drive via MCP server, writes markdown into the vault
