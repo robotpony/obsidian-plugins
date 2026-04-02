@@ -121,9 +121,10 @@ Should show `gdrive` as a connected server. Then test:
 
 ## Nice-to-haves (later)
 
-- Add a helper that reads local `.gdoc` files, extracts the `doc_id`, and fetches via the MCP server — closing the loop with the local Drive mount
-- Add a `/gdoc-pull` skill that takes a doc name, searches Drive, and saves the markdown to the notes vault
-- Consider whether Sheets-as-CSV is useful enough to build a workflow around (e.g., pulling the notifications bootstrap sheet)
+- **`.gdoc` resolver:** read local Drive mount stubs, extract `resource_id`, sync that specific file — closing the loop without browsing
+- **`/gdoc-pull` skill:** Claude Code skill that takes a doc name, searches Drive via MCP server, writes markdown into the vault
+- **Sheets workflow:** render CSV as a table preview in an Obsidian leaf
+- **Open in browser:** right-click synced file → open source Doc in browser using `google_document` frontmatter field
 
 ## References
 

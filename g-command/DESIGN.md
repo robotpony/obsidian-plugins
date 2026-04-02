@@ -115,16 +115,15 @@ Added to all text files (`.md`) at sync time. Placed before the document content
 ```yaml
 ---
 gdrive_id: "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
-gdrive_url: "https://docs.google.com/document/d/1BxiMVs0.../edit"
 gdrive_path: "Work/Projects/Project Brief.gdoc"
-gdrive_type: "application/vnd.google-apps.document"
-synced: "2026-03-31T14:22:00.000Z"
+google_document: "https://docs.google.com/document/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
+synced: "2026-04-02 14:22"
 ---
 ```
 
 On subsequent syncs, the frontmatter block is replaced in-place. Document content below it is overwritten.
 
-The `gdrive_id` and `gdrive_path` fields enable future features (e.g. opening the doc in a browser, resolving `.gdoc` stub files from the local Drive mount).
+The `gdrive_id` and `gdrive_path` fields enable future features (e.g. resolving `.gdoc` stub files from the local Drive mount). The `google_document` URL lets readers click through to the source on Google Drive. All three fields are controlled by the "Include Drive metadata in frontmatter" setting.
 
 ---
 

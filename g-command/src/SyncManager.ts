@@ -79,6 +79,7 @@ export function stripVirtualExt(name: string): string {
 export function sanitizeFilename(name: string): string {
   let s = name
     .replace(/[<>:"|?*\\]/g, "_")
+    .replace(/[#^\[\]]/g, "")
     .replace(/^\./, "_")
     .trim();
   return s || "_";

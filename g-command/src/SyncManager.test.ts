@@ -469,6 +469,18 @@ describe("sanitizeFilename", () => {
   it("leaves clean filenames untouched", () => {
     expect(sanitizeFilename("My Document.md")).toBe("My Document.md");
   });
+
+  it("strips Obsidian-invalid characters (# ^ [ ])", () => {
+    expect(sanitizeFilename("Meeting #3 [Draft].md")).toBe("Meeting 3 Draft.md");
+  });
+
+  it("strips caret", () => {
+    expect(sanitizeFilename("foo^bar.md")).toBe("foobar.md");
+  });
+
+  it("handles mix of replaced and stripped characters", () => {
+    expect(sanitizeFilename('My: Doc #2 [v1].md')).toBe("My_ Doc 2 v1.md");
+  });
 });
 
 describe("toVaultPath with special characters", () => {

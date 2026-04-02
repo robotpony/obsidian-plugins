@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.8.0 — 2026-04-02
+
+Sanitize Obsidian-invalid characters from synced filenames.
+
+Obsidian forbids `# ^ [ ]` in filenames. These characters are now stripped from Drive filenames when computing vault paths and displaying names in the sidebar. Filesystem-invalid characters (`< > : " | ? * \`) continue to be replaced with underscores.
+
+- Strip `# ^ [ ]` from filenames in `sanitizeFilename()`
+- Sidebar tree displays sanitized names instead of raw Drive names
+- 3 new test cases for Obsidian-specific character handling
+
+---
+
+## 1.7.0 — 2026-04-02
+
+Invalidate sync state when vault files are deleted.
+
+Deleting a synced file from Obsidian's file explorer now removes its `syncState` entry and deselects it in the Drive sidebar. Previously, resyncing would silently re-download deleted files.
+
+- Register vault `delete` event to detect removal of synced files
+- Remove matching `syncState` and `selectedPaths` entries on deletion
+- Refresh sidebar to reflect the change immediately
+
+---
+
 ## 1.6.0 — 2026-04-02
 
 Drive tree caching — sidebar renders instantly from cache, refreshes in background (Phase 3).

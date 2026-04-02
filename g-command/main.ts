@@ -58,6 +58,24 @@ export default class GCommandPlugin extends Plugin {
     });
 
     this.addSettingTab(new GCommandSettingTab(this.app, this));
+
+    // Invalidate sync state when a synced file is deleted from the vault
+    this.registerEvent(
+      this.app.vault.on("delete", (file) => {
+        const drivePath = Object.keys(this.settings.syncState).find(
+          (k) => this.settings.syncState[k].vaultPath === file.path
+        );
+        if (!drivePath) return;
+
+        delete this.settings.syncState[drivePath];
+
+        const idx = this.settings.selectedPaths.indexOf(drivePath);
+        if (idx !== -1) this.settings.selectedPaths.splice(idx, 1);
+
+        this.saveSettings();
+        this.sidebarManager.refresh();
+      })
+    );
   }
 
   onunload() {}

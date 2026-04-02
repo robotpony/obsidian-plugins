@@ -1,7 +1,7 @@
 import { App, ItemView, Menu, WorkspaceLeaf } from "obsidian";
 import { DriveProvider, DriveError } from "./DriveProvider";
 import { DriveFile, DriveTreeCache, GCommandSettings, SyncRecord } from "./types";
-import { syncFiles, getFormatMapping, SyncLogFn } from "./SyncManager";
+import { syncFiles, getFormatMapping, sanitizeFilename, SyncLogFn } from "./SyncManager";
 
 export const VIEW_TYPE_GDRIVE_SIDEBAR = "g-command-drive";
 
@@ -819,7 +819,7 @@ export class GDriveSidebar extends ItemView {
     const arrow = row.createSpan({ cls: "g-command-arrow" });
     arrow.textContent = node.expanded ? "▼" : "▶";
 
-    row.createSpan({ cls: "g-command-name", text: node.file.Name });
+    row.createSpan({ cls: "g-command-name", text: sanitizeFilename(node.file.Name) });
     row.addClass("g-command-row--folder");
 
     row.addEventListener("click", async (e) => {
@@ -867,7 +867,7 @@ export class GDriveSidebar extends ItemView {
       this.render();
     });
 
-    row.createSpan({ cls: "g-command-name", text: node.file.Name });
+    row.createSpan({ cls: "g-command-name", text: sanitizeFilename(node.file.Name) });
 
     // Sync badge for previously synced files
     if (this.settings.syncState[node.file.Path]) {
