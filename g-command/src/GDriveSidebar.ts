@@ -35,6 +35,7 @@ export class GDriveSidebar extends ItemView {
   private allFiles: DriveFile[] | null = null; // cached recursive results
   private searchingAll = false;
   private syncing = false;
+  private syncStatus: "idle" | "syncing" | "error" = "idle";
   private selectedPaths: Set<string>;
   private logEntries: LogEntry[] = [];
   private logCollapsed = true;
@@ -112,6 +113,7 @@ export class GDriveSidebar extends ItemView {
 
   private async runSync(files: DriveFile[]): Promise<void> {
     this.syncing = true;
+    this.syncStatus = "syncing";
     this.log("info", `Syncing ${files.length} file(s)…`);
     this.render();
 
@@ -135,9 +137,11 @@ export class GDriveSidebar extends ItemView {
       if (result.skipped > 0) parts.push(`${result.skipped} unchanged`);
       if (result.failed.length > 0) parts.push(`${result.failed.length} failed`);
       this.log("info", `Done: ${parts.join(", ")}`);
+      this.syncStatus = result.failed.length > 0 ? "error" : "idle";
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       this.log("error", `Sync error: ${msg}`);
+      this.syncStatus = "error";
     } finally {
       this.syncing = false;
       this.render();
@@ -290,6 +294,7 @@ export class GDriveSidebar extends ItemView {
       this.renderSyncedPane(container);
     }
 
+    container.createDiv({ cls: "g-command-section-header", text: "Drive" });
     const tree = container.createDiv({ cls: "g-command-tree" });
 
     if (this.loadingRoot) {
@@ -406,9 +411,6 @@ export class GDriveSidebar extends ItemView {
     });
     syncBtn.createSpan({ text: this.syncing ? "⏳" : "↻" });
     syncBtn.disabled = !hasSelection || this.syncing;
-    if (hasSelection && !this.syncing) {
-      syncBtn.addClass("g-command-sync-btn--active");
-    }
     syncBtn.addEventListener("click", () => this.syncSelected());
 
     // Kebab menu
@@ -579,6 +581,7 @@ export class GDriveSidebar extends ItemView {
     // Header with toggle
     const header = pane.createDiv({ cls: "g-command-log-header" });
     const arrow = header.createSpan({ cls: "g-command-log-arrow", text: this.logCollapsed ? "▶" : "▼" });
+    header.createDiv({ cls: `g-command-log-status g-command-log-status--${this.syncStatus}` });
     header.createSpan({ text: `Sync log (${this.logEntries.length})` });
 
     const clearBtn = header.createEl("button", {
@@ -589,6 +592,7 @@ export class GDriveSidebar extends ItemView {
     clearBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       this.logEntries = [];
+      this.syncStatus = "idle";
       this.render();
     });
 

@@ -97,6 +97,9 @@ export class DriveProvider {
         includeFilter = `${baseName}.${exportFormat}`;
       }
 
+      // Escape rclone glob characters so filenames with [ ] * ? { } match literally
+      includeFilter = includeFilter.replace(/([[\]*?{}])/g, "\\$1");
+
       const remotePath = parentDir
         ? `${this.remote}:${parentDir}`
         : `${this.remote}:`;

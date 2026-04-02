@@ -179,6 +179,14 @@ describe("DriveProvider", () => {
       expect(args[includeIdx + 1]).toBe("Brief.html");
     });
 
+    it("escapes glob characters in --include filter", async () => {
+      mockSuccess("");
+      await provider.download("Projects/Report [CONFIDENTIAL].docx", "html");
+      const args = lastArgs();
+      const includeIdx = args.indexOf("--include");
+      expect(args[includeIdx + 1]).toBe("Report \\[CONFIDENTIAL\\].html");
+    });
+
     it("uses original filename in --include when no export format", async () => {
       mockSuccess("");
       await provider.download("Folder/notes.txt");

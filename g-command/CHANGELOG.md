@@ -1,5 +1,47 @@
 # Changelog
 
+## 1.4.0 — 2026-04-02
+
+Fix sync failure for filenames containing square brackets.
+
+- Root cause: rclone's `--include` filter treats `[` and `]` as glob character-class delimiters. A file named `Report [CONFIDENTIAL].docx` would match single characters instead of the literal brackets, producing zero results.
+- Fix: escape glob special characters (`[ ] * ? { }`) in the include filter before passing to rclone
+- 1 new test for bracket escaping
+- 95 tests total, all passing
+
+---
+
+## 1.3.0 — 2026-04-02
+
+Sync log clear button always visible.
+
+- The ✕ clear button on the Sync log header is now always visible (was hidden until hover)
+- Clearing the log also resets the status indicator to idle (grey)
+
+---
+
+## 1.2.0 — 2026-04-02
+
+Sync button and status indicator UX improvements.
+
+- Sync button uses default icon colour instead of accent green when files are selected
+- Sync status moved to a tri-state circle on the Sync log header line: grey (idle), green (syncing), red (error)
+- Green and red states pulse to draw attention without dominating the UI
+- Sync button still disables during sync and swaps to hourglass icon
+
+---
+
+## 1.1.0 — 2026-04-02
+
+Sidebar typography and section headers aligned with Space Command.
+
+- Section headers ("Synced files", "Drive") now use 14px/600 weight with bottom border, matching space-command's `todo-section-header` pattern
+- Added "Drive" section header above the file tree
+- Tree rows and synced rows use 13px font (was `var(--font-ui-small)` ~12px), matching space-command item sizing
+- Row padding and gap increased slightly for consistent spacing
+
+---
+
 ## 1.0.0 — 2026-04-02
 
 Synced files pane, folder sync, and sidebar improvements.
