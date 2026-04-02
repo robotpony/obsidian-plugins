@@ -113,17 +113,23 @@ export function toVaultPath(file: DriveFile, vaultRoot: string): string {
   return `${fullDir}/${fileName}`;
 }
 
+/** Format a Date as "YYYY-MM-DD HH:mm" in local time. */
+function formatSyncDate(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 /** Build YAML frontmatter block for a synced .md file. */
-export function buildFrontmatter(file: DriveFile): string {
-  const now = new Date().toISOString();
-  return [
-    "---",
-    `gdrive_id: "${file.ID}"`,
-    `gdrive_path: "${file.Path}"`,
-    `synced: "${now}"`,
-    "---",
-    "",
-  ].join("\n");
+export function buildFrontmatter(file: DriveFile, includeGdriveFields = true): string {
+  const now = formatSyncDate(new Date());
+  const lines = ["---"];
+  if (includeGdriveFields) {
+    lines.push(`gdrive_id: "${file.ID}"`);
+    lines.push(`gdrive_path: "${file.Path}"`);
+  }
+  lines.push(`synced: "${now}"`);
+  lines.push("---", "");
+  return lines.join("\n");
 }
 
 const turndown = new TurndownService({
@@ -135,22 +141,61 @@ const turndown = new TurndownService({
 // Without this, <style> CSS leaks into the converted markdown as raw text.
 turndown.remove(["style", "script", "meta", "link"]);
 
+// Google Docs HTML encodes list nesting via CSS classes on the parent <ol>/<ul>
+// (e.g. lst-kix_abc123-2 = depth 2) rather than nested DOM elements.
+// Override the default list item rule to read nesting depth from the parent class.
+turndown.addRule("googleDocsListItem", {
+  filter: "li",
+  replacement(content: string, node: any, options: any): string {
+    const parentClass = node.parentNode?.getAttribute?.("class") ?? "";
+    const depthMatch = parentClass.match(/lst-kix_[a-z0-9]+-(\d+)/);
+    const depth = depthMatch ? parseInt(depthMatch[1], 10) : 0;
+    const indent = "    ".repeat(depth);
+
+    content = content
+      .replace(/^\n+/, "")
+      .replace(/\n+$/, "\n")
+      .replace(/\n/gm, "\n" + indent + "    ");
+
+    let prefix: string;
+    const parent = node.parentNode;
+    if (parent?.nodeName === "OL") {
+      const start = parent.getAttribute?.("start");
+      const index = Array.prototype.indexOf.call(parent.children, node);
+      prefix = (start ? Number(start) + index : index + 1) + ". ";
+    } else {
+      prefix = options.bulletListMarker + " ";
+    }
+
+    return indent + prefix + content + (node.nextSibling && !/\n$/.test(content) ? "\n" : "");
+  },
+});
+
 /** Convert downloaded content to vault-ready content. */
 export function convertContent(
   raw: string,
   mapping: FormatMapping,
-  file: DriveFile
+  file: DriveFile,
+  includeGdriveFields = true
 ): string {
   let content: string;
 
   if (mapping.convert === "turndown") {
+    // Diagnostic: dump the first few list items' raw HTML to console
+    const liSample = raw.match(/<li[^>]*>.*?<\/li>/gs)?.slice(0, 3) ?? [];
+    const olSample = raw.match(/<ol[^>]*>/g)?.slice(0, 3) ?? [];
+    const ulSample = raw.match(/<ul[^>]*>/g)?.slice(0, 3) ?? [];
+    console.log(TAG, `List diagnostics: ${liSample.length > 0 ? "found <li>" : "no <li>"}`);
+    for (const s of liSample) console.log(TAG, `  <li> sample: ${s.substring(0, 200)}`);
+    for (const s of olSample) console.log(TAG, `  <ol> sample: ${s}`);
+    for (const s of ulSample) console.log(TAG, `  <ul> sample: ${s}`);
     content = turndown.turndown(raw);
   } else {
     content = raw;
   }
 
   if (mapping.addFrontmatter) {
-    content = buildFrontmatter(file) + content;
+    content = buildFrontmatter(file, includeGdriveFields) + content;
   }
 
   return content;
@@ -191,7 +236,7 @@ export async function syncFiles(
 
       let content: string;
       try {
-        content = convertContent(raw, mapping, file);
+        content = convertContent(raw, mapping, file, settings.frontmatterGdriveFields);
       } catch (convErr) {
         const msg = convErr instanceof Error ? convErr.message : String(convErr);
         console.error(TAG, `Conversion failed for ${file.Path}: ${msg}`);

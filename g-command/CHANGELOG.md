@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.9.0 — 2026-04-02
+
+Preserve nested list structure from Google Docs in converted markdown.
+
+- Google Docs HTML exports encode list nesting via CSS classes (`li-bullet-0`, `li-bullet-1`, …) instead of nested `<ol>`/`<ul>` elements. Turndown treated them all as top-level, flattening sub-lists.
+- Custom turndown rule reads `li-bullet-N` class to determine depth and applies `4 × N` spaces of markdown indentation
+- Ordered list numbering respects the `start` attribute on each `<ol>` element
+- Works for both ordered and unordered Google Docs lists
+- Non-Google-Docs HTML (no `li-bullet` classes) is unaffected — depth defaults to 0
+- 3 new tests for nested list indentation (ordered, unordered, standard HTML)
+- 94 tests total, all passing
+
+---
+
+## 0.8.0 — 2026-04-02
+
+Configurable frontmatter and human-readable sync dates.
+
+- New setting: "Include Drive metadata in frontmatter" (toggle, default on). When off, `gdrive_id` and `gdrive_path` are omitted from synced markdown files. The `synced` timestamp is always included.
+- Sync date now uses `YYYY-MM-DD HH:mm` local time instead of ISO 8601 (`2026-04-02T10:51:04.123Z` → `2026-04-02 10:51`)
+- 3 new tests: frontmatter without gdrive fields, date format validation, convertContent with gdrive fields disabled
+- 91 tests total, all passing
+
+---
+
 ## 0.7.2 — 2026-04-02
 
 Strip Google Docs CSS and metadata from HTML before markdown conversion.

@@ -150,8 +150,7 @@ class GCommandSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
       )
-      .addButton((btn) =>
-        btn
+      .addButton((btn) => btn
           .setButtonText("Show in Finder")
           .onClick(async () => {
             const adapter = this.app.vault.adapter as any;
@@ -167,6 +166,21 @@ class GCommandSettingTab extends PluginSettingTab {
             const fullPath = `${basePath}/${syncRoot}`;
             const { shell } = require("electron").remote ?? require("electron");
             shell.showItemInFolder(fullPath);
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Include Drive metadata in frontmatter")
+      .setDesc(
+        "Add gdrive_id and gdrive_path fields to synced markdown files. " +
+        "The synced timestamp is always included."
+      )
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.frontmatterGdriveFields)
+          .onChange(async (value) => {
+            this.plugin.settings.frontmatterGdriveFields = value;
+            await this.plugin.saveSettings();
           })
       );
   }

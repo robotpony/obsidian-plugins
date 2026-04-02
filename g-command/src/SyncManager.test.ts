@@ -257,12 +257,26 @@ describe("toVaultPath", () => {
 });
 
 describe("buildFrontmatter", () => {
-  it("includes gdrive_id, gdrive_path, and synced timestamp", () => {
+  it("includes gdrive_id, gdrive_path, and synced timestamp by default", () => {
     const fm = buildFrontmatter(googleDoc);
     expect(fm).toContain("---");
     expect(fm).toContain('gdrive_id: "doc1"');
     expect(fm).toContain('gdrive_path: "Work/Brief.gdoc"');
-    expect(fm).toMatch(/synced: "\d{4}-\d{2}-\d{2}T/);
+    expect(fm).toMatch(/synced: "\d{4}-\d{2}-\d{2} \d{2}:\d{2}"/);
+  });
+
+  it("omits gdrive fields when includeGdriveFields is false", () => {
+    const fm = buildFrontmatter(googleDoc, false);
+    expect(fm).not.toContain("gdrive_id");
+    expect(fm).not.toContain("gdrive_path");
+    expect(fm).toMatch(/synced: "\d{4}-\d{2}-\d{2} \d{2}:\d{2}"/);
+  });
+
+  it("uses YYYY-MM-DD HH:mm date format", () => {
+    const fm = buildFrontmatter(googleDoc);
+    // Should NOT contain ISO 8601 "T" separator or milliseconds
+    expect(fm).not.toMatch(/synced: "\d{4}-\d{2}-\d{2}T/);
+    expect(fm).not.toContain(".000Z");
   });
 
   it("starts and ends with --- delimiters", () => {
@@ -279,6 +293,15 @@ describe("convertContent", () => {
     expect(result).toContain("# Hello");
     expect(result).toContain("World");
     expect(result).toContain("gdrive_id"); // frontmatter
+  });
+
+  it("omits gdrive fields from frontmatter when disabled", () => {
+    const mapping = getFormatMapping(googleDoc);
+    const result = convertContent("<h1>Hello</h1>", mapping, googleDoc, false);
+    expect(result).toContain("# Hello");
+    expect(result).toContain("synced:");
+    expect(result).not.toContain("gdrive_id");
+    expect(result).not.toContain("gdrive_path");
   });
 
   it("passes through CSV for Google Sheets", () => {
@@ -329,6 +352,48 @@ describe("convertContent", () => {
     expect(result).toContain("Content");
     expect(result).not.toContain("alert");
     expect(result).not.toContain("charset");
+  });
+
+  it("indents Google Docs nested lists based on parent ol lst-kix class", () => {
+    const mapping = getFormatMapping(googleDoc);
+    // Mimics actual Google Docs HTML: nesting encoded in parent <ol> class suffix
+    const html = [
+      '<ol class="lst-kix_abc123-0 start" start="1"><li class="c8 li-bullet-0">Top item</li></ol>',
+      '<ol class="lst-kix_abc123-1 start" start="1"><li class="c8 li-bullet-0">Sub item a</li></ol>',
+      '<ol class="lst-kix_abc123-1" start="2"><li class="c8 li-bullet-0">Sub item b</li></ol>',
+      '<ol class="lst-kix_abc123-2 start" start="1"><li class="c8 li-bullet-0">Sub-sub item</li></ol>',
+      '<ol class="lst-kix_abc123-0" start="2"><li class="c8 li-bullet-0">Second top item</li></ol>',
+    ].join("");
+    const result = convertContent(html, mapping, googleDoc);
+
+    // Top-level items (depth 0) should have no indentation
+    expect(result).toMatch(/^1\. Top item/m);
+    expect(result).toMatch(/^2\. Second top item/m);
+    // Depth-1 items should have 4-space indent
+    expect(result).toMatch(/^    1\. Sub item a/m);
+    expect(result).toMatch(/^    2\. Sub item b/m);
+    // Depth-2 items should have 8-space indent
+    expect(result).toMatch(/^        1\. Sub-sub item/m);
+  });
+
+  it("handles unordered Google Docs lists with nesting", () => {
+    const mapping = getFormatMapping(googleDoc);
+    const html = [
+      '<ul class="lst-kix_xyz789-0"><li class="li-bullet-0">Top bullet</li></ul>',
+      '<ul class="lst-kix_xyz789-1"><li class="li-bullet-0">Nested bullet</li></ul>',
+    ].join("");
+    const result = convertContent(html, mapping, googleDoc);
+
+    expect(result).toMatch(/^\* Top bullet/m);
+    expect(result).toMatch(/^    \* Nested bullet/m);
+  });
+
+  it("preserves standard HTML list nesting without lst-kix classes", () => {
+    const mapping = getFormatMapping(googleDoc);
+    const html = '<ol><li>First</li><li>Second</li></ol>';
+    const result = convertContent(html, mapping, googleDoc);
+    expect(result).toContain("1. First");
+    expect(result).toContain("2. Second");
   });
 });
 

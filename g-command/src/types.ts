@@ -22,6 +22,7 @@ export interface GCommandSettings {
   vaultRoot: string;
   selectedPaths: string[];                 // Drive paths the user has checked
   syncState: Record<string, SyncRecord>;   // Drive path → last sync record
+  frontmatterGdriveFields: boolean;        // include gdrive_id and gdrive_path in frontmatter
 }
 
 export const DEFAULT_SETTINGS: GCommandSettings = {
@@ -30,6 +31,7 @@ export const DEFAULT_SETTINGS: GCommandSettings = {
   vaultRoot: "gdrive",
   selectedPaths: [],
   syncState: {},
+  frontmatterGdriveFields: true,
 };
 
 // Export format passed to rclone cat --drive-export-formats
