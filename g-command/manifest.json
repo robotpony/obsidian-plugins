@@ -1,7 +1,7 @@
 {
   "id": "g-command",
   "name": "G Command",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "minAppVersion": "0.15.0",
   "description": "Google Drive browser and sync for Obsidian. Pull Docs, Sheets, and files into your vault.",
   "author": "Bruce Alderson",

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.9.0 — 2026-04-02
+
+Sidebar QoL improvements.
+
+- Remove redundant "x file(s) selected" status — the selected files are listed directly below
+- Clarify kebab menu labels: "Refresh drive contents", "Resync files", "Clear history"
+
+---
+
 ## 1.8.0 — 2026-04-02
 
 Sanitize Obsidian-invalid characters from synced filenames.

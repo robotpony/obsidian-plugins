@@ -540,7 +540,7 @@ export class GDriveSidebar extends ItemView {
       const menu = new Menu();
       menu.addItem((item) =>
         item
-          .setTitle("Refresh")
+          .setTitle("Refresh drive contents")
           .setIcon("refresh-cw")
           .onClick(() => {
             this.settings.driveCache = null;
@@ -550,13 +550,13 @@ export class GDriveSidebar extends ItemView {
       if (hasSyncedFiles) {
         menu.addItem((item) =>
           item
-            .setTitle("Resync all")
+            .setTitle("Resync files")
             .setIcon("refresh-cw")
             .onClick(() => this.resyncAll())
         );
         menu.addItem((item) =>
           item
-            .setTitle("Clear sync cache")
+            .setTitle("Clear history")
             .setIcon("trash")
             .onClick(async () => {
               this.settings.syncState = {};
@@ -638,14 +638,9 @@ export class GDriveSidebar extends ItemView {
   }
 
   private renderStatusLine(parent: HTMLElement): void {
-    let text: string;
-    if (this.syncing) {
-      text = "Syncing…";
-    } else if (this.selectedPaths.size > 0) {
-      text = `${this.selectedPaths.size} file(s) selected`;
-    } else {
-      text = "Read only access to Google Drive documents, in Markdown or CSV.";
-    }
+    const text = this.syncing
+      ? "Syncing…"
+      : "Read only access to Google Drive documents, in Markdown or CSV.";
     parent.createDiv({ cls: "g-command-status", text });
   }
 
