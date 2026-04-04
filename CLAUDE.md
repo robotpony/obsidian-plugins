@@ -71,19 +71,7 @@ All plugins follow Obsidian's plugin architecture:
 - **Sidebar**: Custom `ItemView` subclass registered via `registerView()`
 - **Build**: esbuild bundles to `main.js`, TypeScript checked via `tsc -noEmit`
 
-### File Layout
-
-```
-<plugin>/
-├── main.ts           # Plugin entry point
-├── manifest.json     # Obsidian plugin manifest (id, version, name)
-├── package.json      # npm dependencies and scripts
-├── styles.css        # Plugin CSS
-├── esbuild.config.mjs
-├── tsconfig.json
-└── src/              # TypeScript modules
-    └── types.ts      # Shared interfaces
-```
+See [plugin-conventions.md](plugin-conventions.md) for the full conventions reference: sidebar patterns, CSS naming, branding, button styles, settings tab structure, TypeScript conventions, and file layout. Follow those patterns when building or modifying any plugin in this repo.
 
 ### Release Checklist
 
