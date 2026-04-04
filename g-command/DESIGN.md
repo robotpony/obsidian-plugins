@@ -59,12 +59,21 @@ Accessible via Obsidian Settings → g-command.
 ```
 ┌─ g-command ──────────────────────────────────────────────────┐
 │                                                               │
-│  rclone remote                                                │
-│  ┌────────────────────────────┐                               │
-│  │ gdrive                     │                               │
-│  └────────────────────────────┘                               │
-│  Name of the rclone remote to use. Must match the name        │
-│  created during setup (default: gdrive).                      │
+│  Google Drive          Connected ✓        [Disconnect]        │
+│                                                               │
+│  ── or if not connected ──                                    │
+│                                                               │
+│  Google Drive          Not connected      [Connect]           │
+│  Opens Google login in your browser.                          │
+│  Requires rclone (brew install rclone).                       │
+│                                                               │
+│  ── or if rclone missing ──                                   │
+│                                                               │
+│  Google Drive          rclone not found                       │
+│  Install rclone first: brew install rclone                    │
+│  https://rclone.org/install                                   │
+│                                                               │
+├──────────────────────────────────────────────────────────────┤
 │                                                               │
 │  Vault sync root                                              │
 │  ┌────────────────────────────┐                               │
@@ -73,8 +82,18 @@ Accessible via Obsidian Settings → g-command.
 │  Folder in this vault where synced files will be written.     │
 │  Drive structure is mirrored under this folder.               │
 │                                                               │
+│  Advanced                                                     │
+│  ┌────────────────────────────────────────────────────┐       │
+│  │ rclone remote    gdrive                            │       │
+│  │ rclone path      (auto-detect)                     │       │
+│  └────────────────────────────────────────────────────┘       │
+│                                                               │
 └───────────────────────────────────────────────────────────────┘
 ```
+
+The Connect button runs `rclone config create gdrive drive scope=drive.readonly config_is_local=true config_change_team_drive=false` non-interactively. The only user action is clicking "Allow" in Google's OAuth consent screen.
+
+The rclone remote name and binary path settings move under an "Advanced" section — most users won't need to change them.
 
 Selected paths are not shown in settings — they are managed entirely through the sidebar checkboxes and persisted automatically.
 
@@ -162,12 +181,47 @@ Available via Obsidian's command palette (Cmd+P):
 
 ---
 
+## Claude Code interface (planned — Phase 4)
+
+### `/gdoc-pull` skill
+
+A Claude Code slash command for pulling Drive docs into the vault during conversation.
+
+```
+/gdoc-pull Q2 Brief
+```
+
+Behaviour:
+1. Searches Drive for matching files via the `vault` MCP `pull` tool
+2. If one match: converts to markdown and writes to vault
+3. If multiple matches: shows the list, asks which one
+4. Reports: "Pulled Q2 Brief → gdrive/Work/Q2 Brief.md"
+
+The file appears in the Obsidian sidebar's synced files pane (syncState is updated by the MCP server).
+
+### MCP tools available to Claude
+
+| Tool | Purpose |
+|------|---------|
+| `search` | Search vault files, Drive files, or both |
+| `pull` | Pull a Drive doc into the vault as markdown |
+| `list-vaults` | List all known Obsidian vaults |
+
+### MCP resources available to Claude
+
+| Resource | Example |
+|----------|---------|
+| `vault://{name}/{path}` | `vault://notes/daily/2026-04-03.md` — vault file with parsed frontmatter |
+| `gdrive:///{path}` | `gdrive:///Work/Brief.gdoc` — raw Drive file content |
+
+---
+
 ## Error states
 
 | Condition | User-facing message |
 |-----------|-------------------|
-| rclone not in PATH | Banner in sidebar: "rclone not found — run setup.sh" |
-| Remote not configured | Banner: "Drive remote 'gdrive' not found — run rclone config" |
+| rclone not installed | Banner: "rclone is required" + install link (rclone.org/install, `brew install rclone`) |
+| Remote not configured | Banner: "Not connected to Google Drive" + [Connect] button |
 | File download failed | Obsidian notice: "Sync failed: Work/Brief.gdoc — [error]" |
 | Vault write failed | Obsidian notice: "Could not write gdrive/Work/Brief.md — [error]" |
 | Partial sync failure | Notice lists failed files; successful files are still written |
