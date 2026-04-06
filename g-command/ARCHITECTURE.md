@@ -253,7 +253,7 @@ g-command/
     ├── types.ts                  # Shared interfaces (DriveFile, SyncRecord, GCommandSettings)
     ├── DriveProvider.ts          # rclone wrapper: list, listRecursive, download, check
     ├── DriveProvider.test.ts     # 25 tests
-    ├── SyncManager.ts            # Sync orchestration + format conversion + frontmatter
+    ├── SyncManager.ts            # Sync orchestration (imports from convert/)
     ├── SyncManager.test.ts       # 58 tests
     ├── GDriveSidebar.ts          # Sidebar view: tree, search, synced pane, sync log
     ├── GDriveSidebar.test.ts     # 12 tests

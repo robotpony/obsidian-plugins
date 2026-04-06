@@ -16,10 +16,13 @@
     "watch": "tsc --watch"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.29.0"
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "turndown": "7.2.0",
+    "turndown-plugin-gfm": "1.0.2"
   },
   "devDependencies": {
     "@types/node": "22.19.15",
+    "@types/turndown": "5.0.4",
     "shx": "0.3.4",
     "typescript": "5.9.3"
   }

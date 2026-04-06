@@ -34,16 +34,16 @@ Rename the MCP server from `gdrive` to `vault`. Expand it into an Obsidian knowl
 
 See ARCHITECTURE.md "Phase 4: Vault MCP" for full design, gap analysis, and data flow.
 
-### 4a: Extract shared conversion module
+### Phase 4a: Extract shared conversion module ✅
 
-- [ ] Step 1: Create `src/convert/` with `index.ts`, `format.ts`, `turndown.ts`, `types.ts`
-- [ ] Step 2: Move conversion functions from `SyncManager.ts` into `src/convert/`
-- [ ] Step 3: Update `SyncManager.ts` to import from `./convert` — verify all existing tests pass
-- [ ] Step 4: Add turndown + turndown-plugin-gfm to MCP server's `package.json`
-- [ ] Step 5: Update MCP server's `tsconfig.json` to include `../convert/`
-- [ ] Step 6: Test heading hierarchy preservation — verify Google Docs headings, tab titles, title/subtitle styles convert to correct `#` levels
-- [ ] Step 7: Implement `extractSections()` in `src/convert/` — heading name + numeric index selectors, `not_found` reporting, `available_headings` index
-- [ ] Step 8: Tests for `extractSections()` — multi-heading select, mixed name/index, case-insensitive match, preamble as index 0, no-match fallback
+- [x] Step 1: Create `src/convert/` with `index.ts`, `format.ts`, `turndown.ts`, `types.ts`
+- [x] Step 2: Move conversion functions from `SyncManager.ts` into `src/convert/`
+- [x] Step 3: Update `SyncManager.ts` to import from `./convert` — verify all existing tests pass
+- [x] Step 4: Add turndown + turndown-plugin-gfm to MCP server's `package.json`
+- [x] Step 5: Update MCP server's `tsconfig.json` to include `../convert/`
+- [x] Step 6: Heading hierarchy preservation verified — standard turndown ATX conversion handles Google Docs `<h1>`–`<h6>` correctly; nested list depth via `lst-kix` classes preserved in shared turndown rule
+- [x] Step 7: Implement `extractSections()` in `src/convert/` — heading name + numeric index selectors, `not_found` reporting, `available_headings` index
+- [x] Step 8: Tests for `extractSections()` — 14 tests covering multi-heading select, mixed name/index, case-insensitive match, preamble as index 0, sub-section inclusion, no-match fallback, edge cases
 
 ### 4b: Vault provider — read vault files via MCP
 
@@ -65,11 +65,11 @@ See ARCHITECTURE.md "Phase 4: Vault MCP" for full design, gap analysis, and data
 - [ ] Step 15: Update Claude Code MCP registration
 - [ ] Step 16: End-to-end test: `/gdoc-pull "Q2 Brief"` → vault file + sidebar sync
 
-### Open questions
+### Resolved questions
 
-- Vault content search: simple substring for v1, or use something like fuse.js for fuzzy matching?
-- Should `pull` support writing to a user-specified vault path, or always use `vaultRoot/drive-structure`?
-- Platform support: macOS first (Obsidian registry path), Linux/Windows later?
+- **Vault content search**: Fuzzy search (fuse.js or similar). Substring is too rigid for natural-language queries against note titles and content.
+- **`pull` target path**: Mirror Drive/vault structure under `vaultRoot`. No user-specified overrides.
+- **Platform support**: macOS first, then Linux/Windows. Ship macOS, add cross-platform vault discovery as a fast follow if complexity is low.
 
 ---
 

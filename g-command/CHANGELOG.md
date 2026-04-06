@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.10.0 — 2026-04-06
+
+Extract shared conversion module (Phase 4a).
+
+Conversion logic (turndown, frontmatter, format mapping, path utilities) extracted from `SyncManager.ts` into `src/convert/`, a standalone module with no Obsidian dependencies. This enables the MCP server to reuse the same conversion pipeline in Phase 4c.
+
+- New `src/convert/` module: `index.ts`, `format.ts`, `turndown.ts`, `types.ts`
+- `SyncManager.ts` now imports from `./convert` and re-exports for backwards compatibility
+- New `extractSections()` function: extracts document sections by heading name or numeric index, with case-insensitive matching, sub-section inclusion, and `not_found`/`available_headings` reporting
+- MCP server `package.json` adds turndown + turndown-plugin-gfm dependencies
+- MCP server `tsconfig.json` widened to include `../convert/`
+- 14 new tests for `extractSections()`
+- 126 tests total, all passing
+
+---
+
 ## 1.9.0 — 2026-04-02
 
 Sidebar QoL improvements.
