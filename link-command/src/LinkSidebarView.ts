@@ -422,7 +422,8 @@ export class LinkSidebarView extends ItemView {
 
     // Find and replace the markdown link [old title](url) with [new title](url)
     const mdLinkPattern = new RegExp(`\\[([^\\]]*)\\]\\(${urlEscaped}\\)`);
-    const newLine = line.replace(mdLinkPattern, `[${newTitle}](${link.url})`);
+    const safeTitle = newTitle.replace(/[\[\]\(\)]/g, "");
+    const newLine = line.replace(mdLinkPattern, `[${safeTitle}](${link.url})`);
 
     if (newLine !== line) {
       lines[link.lineNumber] = newLine;

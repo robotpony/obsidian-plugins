@@ -170,15 +170,22 @@ export default class LinkCommandPlugin extends Plugin {
   /**
    * Format metadata title for display, including subreddit if configured
    */
+  /** Escape characters that would break markdown link syntax */
+  private sanitizeMarkdownTitle(title: string): string {
+    return title.replace(/[\[\]\(\)]/g, "");
+  }
+
   private formatLinkTitle(metadata: UrlMetadata, url: string): string {
     if (!metadata.title) return url;
 
+    const title = this.sanitizeMarkdownTitle(metadata.title);
+
     // For Reddit links, optionally include subreddit
     if (metadata.subreddit && this.settings.redditLinkFormat === 'title_subreddit') {
-      return `${metadata.title} (${metadata.subreddit})`;
+      return `${title} (${metadata.subreddit})`;
     }
 
-    return metadata.title;
+    return title;
   }
 
   /**
@@ -250,7 +257,8 @@ export default class LinkCommandPlugin extends Plugin {
         from = { line: cursor.line, ch: match.index };
         to = { line: cursor.line, ch: match.index + match[0].length };
 
-        const title = result.success && result.metadata?.title || url;
+        const rawTitle = result.success && result.metadata?.title || url;
+        const title = this.sanitizeMarkdownTitle(rawTitle);
         let extra = "";
 
         if (result.success && result.metadata?.subreddit) {

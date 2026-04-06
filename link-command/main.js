@@ -1008,7 +1008,8 @@ var LinkSidebarView = class extends import_obsidian3.ItemView {
     const line = lines[link.lineNumber];
     const urlEscaped = link.url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const mdLinkPattern = new RegExp(`\\[([^\\]]*)\\]\\(${urlEscaped}\\)`);
-    const newLine = line.replace(mdLinkPattern, `[${newTitle}](${link.url})`);
+    const safeTitle = newTitle.replace(/[\[\]\(\)]/g, "");
+    const newLine = line.replace(mdLinkPattern, `[${safeTitle}](${link.url})`);
     if (newLine !== line) {
       lines[link.lineNumber] = newLine;
       await this.app.vault.modify(file, lines.join("\n"));
@@ -1383,13 +1384,18 @@ var LinkCommandPlugin = class extends import_obsidian6.Plugin {
   /**
    * Format metadata title for display, including subreddit if configured
    */
+  /** Escape characters that would break markdown link syntax */
+  sanitizeMarkdownTitle(title) {
+    return title.replace(/[\[\]\(\)]/g, "");
+  }
   formatLinkTitle(metadata, url) {
     if (!metadata.title)
       return url;
+    const title = this.sanitizeMarkdownTitle(metadata.title);
     if (metadata.subreddit && this.settings.redditLinkFormat === "title_subreddit") {
-      return `${metadata.title} (${metadata.subreddit})`;
+      return `${title} (${metadata.subreddit})`;
     }
-    return metadata.title;
+    return title;
   }
   /**
    * Detect if cursor is on a URL and return it
@@ -1443,7 +1449,8 @@ var LinkCommandPlugin = class extends import_obsidian6.Plugin {
       if (match) {
         from = { line: cursor.line, ch: match.index };
         to = { line: cursor.line, ch: match.index + match[0].length };
-        const title = result.success && ((_a = result.metadata) == null ? void 0 : _a.title) || url;
+        const rawTitle = result.success && ((_a = result.metadata) == null ? void 0 : _a.title) || url;
+        const title = this.sanitizeMarkdownTitle(rawTitle);
         let extra = "";
         if (result.success && ((_b = result.metadata) == null ? void 0 : _b.subreddit)) {
           extra = result.metadata.subreddit;
