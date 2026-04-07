@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.11.0 — 2026-04-06
+
+Vault provider for MCP server (Phase 4b).
+
+The MCP server can now discover Obsidian vaults, list files, read with parsed frontmatter, and search vault content using fuzzy matching. This gives Claude Code read access to vault notes alongside Google Drive files.
+
+- New `vault-discovery.ts`: reads Obsidian's registry to discover vaults (macOS, Linux, Windows)
+- New `vault-provider.ts`: list files, read with frontmatter parsing, fuzzy search via fuse.js
+- New `list-vaults` tool: returns all registered vaults with names, paths, and open status
+- New `vault://` resource scheme: `vault://{name}/{path}` returns content with structured frontmatter
+- Section filter support: `vault://name/file.md?sections=Budget,Timeline` extracts specific sections
+- Extended `search` tool: `scope` parameter (`drive`, `vault`, `both`) for cross-source searching
+- Vault search uses fuse.js fuzzy matching against filenames (weighted 2x) and content
+- rclone is no longer required at startup — vault features work independently
+- MCP server version bumped to 1.1.0
+- 16 new tests (8 parseFrontmatter, 4 listVaultFiles/readVaultFile, 4 searchVault)
+- 142 tests total, all passing
+
+---
+
 ## 1.10.0 — 2026-04-06
 
 Extract shared conversion module (Phase 4a).

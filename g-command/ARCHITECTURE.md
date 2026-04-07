@@ -257,10 +257,13 @@ g-command/
     ├── SyncManager.test.ts       # 58 tests
     ├── GDriveSidebar.ts          # Sidebar view: tree, search, synced pane, sync log
     ├── GDriveSidebar.test.ts     # 12 tests
-    └── gdrive/                   # MCP server (existing, unchanged)
-        ├── index.ts
+    └── gdrive/                   # MCP server
+        ├── index.ts              # MCP server entry point (resources + tools)
+        ├── vault-discovery.ts    # Reads obsidian.json, resolves vault paths
+        ├── vault-provider.ts     # Vault file listing, reading, fuzzy search
         ├── package.json
-        └── ...
+        ├── tsconfig.json
+        └── dist/
 ```
 
 `install.sh` discovers plugins by looking for `manifest.json` in immediate subdirectories of the repo root. `g-command/manifest.json` is the Obsidian plugin manifest; the MCP server at `g-command/src/gdrive/` is built separately via `src/gdrive/package.json`.

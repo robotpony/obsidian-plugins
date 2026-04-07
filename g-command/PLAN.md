@@ -45,13 +45,13 @@ See ARCHITECTURE.md "Phase 4: Vault MCP" for full design, gap analysis, and data
 - [x] Step 7: Implement `extractSections()` in `src/convert/` — heading name + numeric index selectors, `not_found` reporting, `available_headings` index
 - [x] Step 8: Tests for `extractSections()` — 14 tests covering multi-heading select, mixed name/index, case-insensitive match, preamble as index 0, sub-section inclusion, no-match fallback, edge cases
 
-### 4b: Vault provider — read vault files via MCP
+### Phase 4b: Vault provider — read vault files via MCP ✅
 
-- [ ] Step 6: Add `vault-discovery.ts` — read `obsidian.json`, resolve vault paths, derive names
-- [ ] Step 7: Add `vault-provider.ts` — list files, read with frontmatter parsing, content search
-- [ ] Step 8: Add `list-vaults` tool
-- [ ] Step 9: Add `vault://` resources (ListResources + ReadResource with parsed frontmatter)
-- [ ] Step 10: Add vault scope to `search` tool (filename + content match)
+- [x] Step 6: Add `vault-discovery.ts` — read `obsidian.json`, resolve vault paths, derive names (macOS, Linux, Windows)
+- [x] Step 7: Add `vault-provider.ts` — list files, read with frontmatter parsing, fuzzy search via fuse.js
+- [x] Step 8: Add `list-vaults` tool — discovers and caches vaults, returns names/paths/open status
+- [x] Step 9: Add `vault://` resources — ListResources with `vault:` cursor, ReadResource with frontmatter parsing and `?sections=` query parameter support
+- [x] Step 10: Add vault scope to `search` tool — `scope` parameter (drive/vault/both), fuzzy matching across all vaults
 
 ### 4c: Pull — Drive to vault pipeline
 

@@ -8,10 +8,14 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "declaration": true
+    "declaration": false
   },
   "include": [
     "./**/*.ts",
     "../convert/**/*.ts"
+  ],
+  "exclude": [
+    "./**/*.test.ts",
+    "../convert/**/*.test.ts"
   ]
 }
