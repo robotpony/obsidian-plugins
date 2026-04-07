@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.13.0 — 2026-04-06
+
+Rename MCP server from `gdrive` to `vault` (Phase 4d).
+
+The MCP server now registers as `vault` in Claude Code, reflecting its expanded scope: vault file access, Drive integration, and the pull pipeline. The `src/gdrive/` directory name is kept for provenance.
+
+- Server identity: `g-command/vault` (was `g-command/gdrive`)
+- Package name: `g-command-vault` (was `g-command-gdrive`)
+- `setup.sh` registers as `vault` via `claude mcp add vault`
+- Manual registration key changed from `"gdrive"` to `"vault"` in settings.json examples
+- ARCHITECTURE.md updated to reflect current state (no longer "planned")
+- MCP server version bumped to 1.3.0
+
+**Unchanged:** rclone remote name (`gdrive`), `GDRIVE_RCLONE_REMOTE` env var, `gdrive://` resource URI scheme, frontmatter field names (`gdrive_id`, `gdrive_path`), plugin settings defaults.
+
+### Manual E2E verification checklist
+
+- [ ] `./setup.sh` registers MCP server as `vault` in Claude Code
+- [ ] `/mcp` in Claude Code shows `vault` as connected
+- [ ] `/gdoc-pull "Q2 Brief"` downloads, converts, writes to vault, updates syncState
+- [ ] Obsidian sidebar shows the pulled file in synced files
+
+---
+
 ## 1.12.0 — 2026-04-06
 
 Pull pipeline for MCP server (Phase 4c).

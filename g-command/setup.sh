@@ -101,12 +101,12 @@ build_server() {
 # --- Claude Code registration ---
 
 claude_mcp_registered() {
-    command -v claude &>/dev/null && claude mcp list 2>/dev/null | grep -q "^gdrive"
+    command -v claude &>/dev/null && claude mcp list 2>/dev/null | grep -q "^vault"
 }
 
 register_with_claude() {
     echo -n "Registering with Claude Code... "
-    if claude mcp add gdrive node "$SERVER_DIST" &>/dev/null; then
+    if claude mcp add vault node "$SERVER_DIST" &>/dev/null; then
         print_success "Registered"
     else
         print_warn "Could not register automatically."
@@ -121,7 +121,7 @@ show_manual_registration() {
     cat <<EOF
   {
     "mcpServers": {
-      "gdrive": {
+      "vault": {
         "command": "node",
         "args": ["$SERVER_DIST"]
       }
@@ -130,7 +130,7 @@ show_manual_registration() {
 EOF
     if [[ "$REMOTE" != "gdrive" ]]; then
         echo ""
-        print_info "Also add to the gdrive server config:"
+        print_info "Also add to the vault server config:"
         print_info "  \"env\": { \"GDRIVE_RCLONE_REMOTE\": \"$REMOTE\" }"
     fi
 }

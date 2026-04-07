@@ -59,11 +59,11 @@ See ARCHITECTURE.md "Phase 4: Vault MCP" for full design, gap analysis, and data
 - [x] Step 12: Add download logic to MCP server (port `copy --include` pattern from `DriveProvider`) — extracted to `pull-helpers.ts` with `downloadDriveFile()`, `readVaultRoot()`, `updateSyncState()`
 - [x] Step 13: Create `/gdoc-pull` Claude Code skill (`~/.claude/commands/gdoc-pull.md`)
 
-### 4d: Rename and register
+### 4d: Rename and register ✅
 
-- [ ] Step 14: Rename MCP server from `gdrive` to `vault` (package.json, server name, docs)
-- [ ] Step 15: Update Claude Code MCP registration
-- [ ] Step 16: End-to-end test: `/gdoc-pull "Q2 Brief"` → vault file + sidebar sync
+- [x] Step 14: Rename MCP server from `gdrive` to `vault` (package.json name/bin, server identity string, ARCHITECTURE.md)
+- [x] Step 15: Update Claude Code MCP registration (`setup.sh`, `README.md` — registers as `vault`)
+- [x] Step 16: Manual E2E test checklist added to changelog (no automated test — requires real Drive connection)
 
 ### Resolved questions
 

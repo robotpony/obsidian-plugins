@@ -45,11 +45,11 @@ If you prefer to do it step by step:
 1. `brew install rclone`
 2. `rclone config` — create a remote named `gdrive`, type `drive`, scope read-only
 3. `cd src/gdrive && npm install && npm run build`
-4. `claude mcp add gdrive node /absolute/path/to/src/gdrive/dist/index.js`
+4. `claude mcp add vault node /absolute/path/to/src/gdrive/dist/index.js`
 
 ### Verify
 
-Run `/mcp` in Claude Code — `gdrive` should appear as connected. Then try searching for a document by filename.
+Run `/mcp` in Claude Code — `vault` should appear as connected. Then try searching for a document by filename.
 
 ## Security notes
 

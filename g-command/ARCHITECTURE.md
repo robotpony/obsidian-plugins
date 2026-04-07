@@ -2,9 +2,9 @@
 
 g-command has two components today, with a third planned:
 
-1. **MCP server** (`src/gdrive/`) — gives Claude Code read access to Google Drive via rclone subprocesses. Currently named `gdrive`; planned to become `vault` (a unified Obsidian knowledge server). See Phase 4.
+1. **MCP server** (`src/gdrive/`) — unified Obsidian knowledge server registered as `vault` in Claude Code. Exposes vault files and Google Drive docs through one interface via rclone subprocesses. See Phase 4.
 2. **Obsidian plugin** (root `g-command/`) — gives Obsidian a Drive browser sidebar and a sync command.
-3. **Shared conversion module** (planned, `src/convert/`) — turndown, frontmatter, format mapping. Used by both plugin and MCP server.
+3. **Shared conversion module** (`src/convert/`) — turndown, frontmatter, format mapping. Used by both plugin and MCP server.
 
 Both components use rclone for all Drive access. Auth is shared — configured once via `rclone config` or `./setup.sh`.
 

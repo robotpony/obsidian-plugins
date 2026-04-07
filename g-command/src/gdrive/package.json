@@ -1,11 +1,11 @@
 {
-  "name": "g-command-gdrive",
+  "name": "g-command-vault",
   "version": "1.0.0",
   "description": "MCP server for read-only Google Drive access via rclone",
   "license": "MIT",
   "type": "module",
   "bin": {
-    "g-command-gdrive": "dist/gdrive/index.js"
+    "g-command-vault": "dist/gdrive/index.js"
   },
   "files": [
     "dist"
