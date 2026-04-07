@@ -5,19 +5,18 @@ Google Drive browser and sync for Obsidian, plus an MCP server for Claude Code.
 Two components in one package:
 
 1. **Obsidian plugin** — sidebar Drive browser that syncs Docs (→ markdown), Sheets (→ CSV), and other files into your vault
-2. **MCP server** — lets Claude Code search and read Drive files directly
+2. **MCP server** — lets Claude Code search Drive, read vault notes, and pull Drive files into the vault
 
 Google Drive files on a local mount (`.gdoc`, `.gsheet`) are JSON pointers — the actual content lives behind the API. Both components bridge that gap using rclone.
 
 ## What it does
 
-- **Search** your Drive by filename (partial match)
-- **Read** any Drive file, auto-converted:
-  - Google Docs → plain text
-  - Google Sheets → CSV
-  - Google Slides → plain text
-  - Everything else → native format
-- **Scope:** `drive.readonly` — no write access
+- **Search** Drive by filename, vault by content (fuzzy), or both
+- **Read** any Drive file or vault note via `gdrive://` and `vault://` resources
+- **Pull** Drive files into the vault — download, convert (Docs → markdown, Sheets → CSV), and update sync state in one call
+- **Section filter** — extract specific document sections by heading name or index
+- **Discover vaults** — auto-detects all Obsidian vaults registered on the machine
+- **Scope:** `drive.readonly` — no write access to Google Drive
 
 ## Prerequisites
 

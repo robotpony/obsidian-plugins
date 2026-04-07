@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.12.0 — 2026-04-06
+
+Pull pipeline for MCP server (Phase 4c).
+
+The MCP server can now pull Google Drive files into an Obsidian vault in a single tool call. Search, download, convert to markdown, write to vault, and update sync state — all from Claude Code.
+
+- New `pull` tool: searches Drive, downloads via rclone, converts (HTML→markdown for Docs, CSV for Sheets), writes to vault at `{vaultRoot}/{drive-path}`, updates plugin `data.json` syncState
+- Optional `sections` filter on `pull`: extract specific document sections by heading name or index
+- Multi-match handling: returns file list for Claude to pick from when query matches multiple files
+- New `pull-helpers.ts`: `downloadDriveFile()` (ports rclone `copy --include` pattern), `readVaultRoot()`, `updateSyncState()`
+- New `/gdoc-pull` Claude Code skill for one-command document pull
+- MCP server version bumped to 1.2.0
+- 6 new tests (3 readVaultRoot, 3 updateSyncState)
+- 148 tests total, all passing
+
+---
+
 ## 1.11.0 — 2026-04-06
 
 Vault provider for MCP server (Phase 4b).

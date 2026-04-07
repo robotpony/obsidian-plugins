@@ -10,9 +10,13 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { execFile } from "child_process";
 import { promisify } from "util";
+import { writeFileSync, mkdirSync, existsSync } from "fs";
+import { join, dirname } from "path";
 import { discoverVaults, VaultInfo } from "./vault-discovery.js";
 import { listVaultFiles, readVaultFile, searchVault, parseFrontmatter } from "./vault-provider.js";
-import { extractSections } from "../convert/index.js";
+import { extractSections, convertContent, buildFrontmatter, getFormatMapping, toVaultPath, driveEditUrl } from "../convert/index.js";
+import type { ConvertFile } from "../convert/types.js";
+import { downloadDriveFile, readVaultRoot, updateSyncState } from "./pull-helpers.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -64,7 +68,7 @@ function mimeTypeForPath(filePath: string): string {
 }
 
 const server = new Server(
-  { name: "g-command/gdrive", version: "1.1.0" },
+  { name: "g-command/gdrive", version: "1.2.0" },
   { capabilities: { resources: {}, tools: {} } },
 );
 
@@ -237,6 +241,37 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         properties: {},
       },
     },
+    {
+      name: "pull",
+      description:
+        "Pull a file from Google Drive into an Obsidian vault. " +
+        "Searches Drive, downloads the file (HTML export for Docs, CSV for Sheets), " +
+        "converts to markdown, writes to the vault, and updates sync state. " +
+        "If query matches multiple files, returns the list for you to pick one and call again with path.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "Document name to search for on Drive",
+          },
+          path: {
+            type: "string",
+            description: "Exact Drive path (skips search). Use when you know the path or picked from a previous search result.",
+          },
+          vault: {
+            type: "string",
+            description: "Target vault name. Defaults to the first open vault, or first vault if none are open.",
+          },
+          sections: {
+            type: "array",
+            items: { oneOf: [{ type: "string" }, { type: "integer" }] },
+            description: "Optional section filter — heading names or numeric indices. Only matching sections are written to the vault file.",
+          },
+        },
+        required: ["query"],
+      },
+    },
   ],
 }));
 
@@ -309,6 +344,138 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     return {
       content: [{ type: "text", text: parts.join("\n\n") }],
+      isError: false,
+    };
+  }
+
+  if (toolName === "pull") {
+    const query = request.params.arguments?.query as string;
+    const path = request.params.arguments?.path as string | undefined;
+    const vaultName = request.params.arguments?.vault as string | undefined;
+    const sections = request.params.arguments?.sections as (string | number)[] | undefined;
+
+    if (!query && !path) {
+      throw new Error("Either query or path argument is required");
+    }
+
+    // Resolve target vault
+    if (cachedVaults.length === 0) {
+      cachedVaults = await discoverVaults();
+    }
+    let vault: VaultInfo | undefined;
+    if (vaultName) {
+      vault = findVault(vaultName);
+      if (!vault) {
+        throw new Error(`Vault not found: "${vaultName}". Use list-vaults to see available vaults.`);
+      }
+    } else {
+      vault = cachedVaults.find(v => v.open) ?? cachedVaults[0];
+      if (!vault) {
+        throw new Error("No Obsidian vaults found. Is Obsidian installed?");
+      }
+    }
+
+    // Resolve Drive file — either by path or search
+    let driveFile: RcloneFile;
+    if (path) {
+      // Fetch metadata for the specific file
+      const parentDir = path.substring(0, path.lastIndexOf("/")) || "";
+      const fileName = path.substring(path.lastIndexOf("/") + 1);
+      const rclonePath = parentDir ? `${REMOTE}:${parentDir}` : `${REMOTE}:`;
+      const output = await runRclone(["lsjson", rclonePath, "--include", fileName, "--files-only"]);
+      const files: RcloneFile[] = JSON.parse(output);
+      const match = files.find(f => f.Path === path || f.Name === fileName);
+      if (!match) {
+        throw new Error(`File not found on Drive: "${path}"`);
+      }
+      driveFile = match;
+    } else {
+      // Search Drive
+      const output = await runRclone([
+        "lsjson", `${REMOTE}:`, "--include", `*${query}*`, "--recursive", "--files-only",
+      ]);
+      const files: RcloneFile[] = JSON.parse(output);
+
+      if (files.length === 0) {
+        return {
+          content: [{ type: "text", text: `No files matching "${query}" found on Drive.` }],
+          isError: false,
+        };
+      }
+
+      if (files.length > 1) {
+        const list = files.map(f => `  ${f.Path} (${f.MimeType})`).join("\n");
+        return {
+          content: [{
+            type: "text",
+            text: `Multiple matches for "${query}" — call again with the exact path:\n${list}`,
+          }],
+          isError: false,
+        };
+      }
+
+      driveFile = files[0];
+    }
+
+    // Determine format mapping and download
+    const convertFile: ConvertFile = driveFile;
+    const mapping = getFormatMapping(convertFile);
+
+    console.error(`[pull] Downloading "${driveFile.Path}" (${driveFile.MimeType}), export=${mapping.exportFormat ?? "none"}`);
+    const raw = await downloadDriveFile(REMOTE, driveFile.Path, mapping.exportFormat);
+
+    // Convert
+    let content = convertContent(raw, mapping, convertFile);
+
+    // Apply section filter if requested
+    let sectionInfo: { sections_returned: string[]; not_found: string[] } | undefined;
+    if (sections && sections.length > 0) {
+      const result = extractSections(content, sections);
+      content = result.content;
+      sectionInfo = {
+        sections_returned: result.sections_returned,
+        not_found: result.not_found,
+      };
+
+      // Re-add frontmatter if it was stripped by section extraction
+      if (mapping.addFrontmatter) {
+        content = buildFrontmatter(convertFile) + content;
+      }
+    }
+
+    // Write to vault
+    const vaultRoot = readVaultRoot(vault.path);
+    const vaultRelPath = toVaultPath(convertFile, vaultRoot);
+    const fullPath = join(vault.path, vaultRelPath);
+
+    const dir = dirname(fullPath);
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+    writeFileSync(fullPath, content, "utf-8");
+
+    // Update syncState
+    updateSyncState(vault.path, convertFile, vaultRelPath);
+
+    const editUrl = driveEditUrl(convertFile);
+    const result: Record<string, any> = {
+      vaultPath: vaultRelPath,
+      drivePath: driveFile.Path,
+      vault: vault.name,
+    };
+    if (editUrl) result.driveUrl = editUrl;
+    if (sectionInfo) {
+      result.sections_returned = sectionInfo.sections_returned;
+      if (sectionInfo.not_found.length > 0) {
+        result.not_found = sectionInfo.not_found;
+      }
+    }
+
+    return {
+      content: [{
+        type: "text",
+        text: `Pulled "${driveFile.Name}" → ${vaultRelPath}\n\n${JSON.stringify(result, null, 2)}`,
+      }],
       isError: false,
     };
   }

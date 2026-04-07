@@ -53,11 +53,11 @@ See ARCHITECTURE.md "Phase 4: Vault MCP" for full design, gap analysis, and data
 - [x] Step 9: Add `vault://` resources — ListResources with `vault:` cursor, ReadResource with frontmatter parsing and `?sections=` query parameter support
 - [x] Step 10: Add vault scope to `search` tool — `scope` parameter (drive/vault/both), fuzzy matching across all vaults
 
-### 4c: Pull — Drive to vault pipeline
+### 4c: Pull — Drive to vault pipeline ✅
 
-- [ ] Step 11: Add `pull` tool — search Drive, download HTML, convert, write to vault, update syncState. Supports optional `sections` filter for partial document retrieval.
-- [ ] Step 12: Add download logic to MCP server (port `copy --include` pattern from `DriveProvider`)
-- [ ] Step 13: Create `/gdoc-pull` Claude Code skill (`~/.claude/commands/gdoc-pull.md`)
+- [x] Step 11: Add `pull` tool — search Drive, download HTML, convert, write to vault, update syncState. Supports optional `sections` filter for partial document retrieval.
+- [x] Step 12: Add download logic to MCP server (port `copy --include` pattern from `DriveProvider`) — extracted to `pull-helpers.ts` with `downloadDriveFile()`, `readVaultRoot()`, `updateSyncState()`
+- [x] Step 13: Create `/gdoc-pull` Claude Code skill (`~/.claude/commands/gdoc-pull.md`)
 
 ### 4d: Rename and register
 
