@@ -26,11 +26,22 @@ Google Drive files on a local mount (`.gdoc`, `.gsheet`) are JSON pointers — t
 
 ## Setup
 
+### Obsidian plugin
+
+1. Install [rclone](https://rclone.org/install/) (`brew install rclone` on macOS)
+2. Install the plugin in Obsidian
+3. Open the g-command settings tab and click **Connect**
+4. Sign in with Google in the browser window that opens
+
+That's it. The plugin creates a read-only rclone remote and verifies the connection.
+
+### MCP server (for Claude Code)
+
 ```bash
 ./setup.sh
 ```
 
-The script handles everything: installs rclone if needed, walks you through Google Drive authentication, builds the server, and registers it with Claude Code. You'll need to log into Google in a browser window — that's the only interactive step.
+The script builds the MCP server and registers it with Claude Code. If rclone isn't configured yet, it walks you through authentication.
 
 If your rclone remote is already named something other than `gdrive`:
 
@@ -38,14 +49,11 @@ If your rclone remote is already named something other than `gdrive`:
 GDRIVE_RCLONE_REMOTE=my-remote ./setup.sh
 ```
 
-### Manual setup
+### Manual MCP setup
 
-If you prefer to do it step by step:
-
-1. `brew install rclone`
-2. `rclone config` — create a remote named `gdrive`, type `drive`, scope read-only
-3. `cd src/gdrive && npm install && npm run build`
-4. `claude mcp add vault node /absolute/path/to/src/gdrive/dist/index.js`
+1. `brew install rclone` (if not installed)
+2. `cd src/gdrive && npm install && npm run build`
+3. `claude mcp add vault node /absolute/path/to/src/gdrive/dist/index.js`
 
 ### Verify
 

@@ -1,5 +1,5 @@
 import { App, ItemView, Menu, WorkspaceLeaf } from "obsidian";
-import { DriveProvider, DriveError } from "./DriveProvider";
+import { DriveProvider, DriveError, getRcloneInstallInstructions } from "./DriveProvider";
 import { DriveFile, DriveTreeCache, GCommandSettings, SyncRecord } from "./types";
 import { syncFiles, getFormatMapping, sanitizeFilename, SyncLogFn } from "./SyncManager";
 
@@ -41,6 +41,7 @@ export class GDriveSidebar extends ItemView {
   private logCollapsed = true;
   private onOpenSettings: () => void;
   private pluginDir: string;
+  private connectingInProgress = false;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -734,34 +735,24 @@ export class GDriveSidebar extends ItemView {
     const banner = parent.createDiv({ cls: "g-command-error-banner" });
 
     if (err instanceof DriveError) {
-      this.renderDriveError(banner, err);
+      if (err.code === "binary-missing") {
+        this.renderBinaryMissing(banner);
+      } else {
+        this.renderRemoteSetup(banner);
+      }
     } else {
       banner.createDiv({ cls: "g-command-error-title", text: err.message });
     }
   }
 
-  private renderDriveError(banner: HTMLElement, err: DriveError): void {
-    banner.createDiv({
-      cls: "g-command-error-title",
-      text: "Authenticate with Google Drive",
-    });
+  private renderBinaryMissing(banner: HTMLElement): void {
+    banner.createDiv({ cls: "g-command-error-title", text: "rclone is required" });
+    banner.createEl("p", { text: "Install rclone to connect to Google Drive:" });
 
-    const commands =
-      err.code === "binary-missing"
-        ? "brew install rclone\nrclone config"
-        : "rclone config";
-
-    const detail =
-      err.code === "binary-missing"
-        ? "Install and authenticate with rclone:"
-        : err.message;
-
-    banner.createEl("p", { text: detail });
-
-    // Code block with commands
+    const info = getRcloneInstallInstructions();
     const codeWrap = banner.createDiv({ cls: "g-command-code-block" });
     const pre = codeWrap.createEl("pre");
-    pre.createEl("code", { text: commands });
+    pre.createEl("code", { text: info.command });
 
     const copyBtn = codeWrap.createEl("button", {
       cls: "g-command-copy-btn clickable-icon",
@@ -769,15 +760,58 @@ export class GDriveSidebar extends ItemView {
     });
     copyBtn.textContent = "Copy";
     copyBtn.addEventListener("click", () => {
-      navigator.clipboard.writeText(commands);
+      navigator.clipboard.writeText(info.command);
       copyBtn.textContent = "Copied";
       setTimeout(() => (copyBtn.textContent = "Copy"), 1500);
     });
 
-    banner.createEl("p", {
-      cls: "g-command-error-ref",
-      text: `See: ${this.pluginDir}/README.md`,
+    const linkP = banner.createEl("p", { cls: "g-command-error-ref" });
+    linkP.appendText("Other platforms: ");
+    const link = linkP.createEl("a", { text: "rclone.org/install", href: "https://rclone.org/install/" });
+    link.setAttr("target", "_blank");
+
+    const checkBtn = banner.createEl("button", {
+      cls: "mod-cta",
+      text: "Check again",
     });
+    checkBtn.addEventListener("click", () => this.loadRoot());
+  }
+
+  private renderRemoteSetup(banner: HTMLElement): void {
+    banner.createDiv({ cls: "g-command-error-title", text: "Connect to Google Drive" });
+
+    if (this.connectingInProgress) {
+      banner.createEl("p", { text: "Waiting for Google sign-in..." });
+      banner.createEl("p", { cls: "g-command-error-ref", text: "Complete the sign-in in your browser window." });
+      return;
+    }
+
+    banner.createEl("p", { text: "Click Connect to sign in with your Google account." });
+
+    const connectBtn = banner.createEl("button", {
+      cls: "mod-cta",
+      text: "Connect",
+    });
+    connectBtn.addEventListener("click", () => this.handleConnect());
+  }
+
+  private async handleConnect(): Promise<void> {
+    if (this.connectingInProgress) return;
+    this.connectingInProgress = true;
+    this.render();
+
+    const result = await this.drive.setupRemote();
+    this.connectingInProgress = false;
+
+    if (result.ok) {
+      await this.loadRoot();
+    } else {
+      this.error = new DriveError(
+        result.code === "binary-missing" ? "binary-missing" : "remote-unreachable",
+        result.message
+      );
+      this.render();
+    }
   }
 
   private renderNode(parent: HTMLElement, node: TreeNode, depth: number): void {

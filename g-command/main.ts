@@ -1,7 +1,7 @@
 import { App, debounce, Plugin, PluginSettingTab, Setting } from "obsidian";
 import { GCommandSettings, DEFAULT_SETTINGS } from "./src/types";
 import { GDriveSidebar, VIEW_TYPE_GDRIVE_SIDEBAR } from "./src/GDriveSidebar";
-import { DriveProvider } from "./src/DriveProvider";
+import { DriveProvider, DriveError, getRcloneInstallInstructions } from "./src/DriveProvider";
 import { SidebarManager } from "../shared";
 
 export default class GCommandPlugin extends Plugin {
@@ -104,9 +104,14 @@ export default class GCommandPlugin extends Plugin {
   }
 }
 
+type ConnectionStatus = "idle" | "checking" | "connecting" | "connected" | "error" | "binary-missing";
+
 class GCommandSettingTab extends PluginSettingTab {
   plugin: GCommandPlugin;
   private debouncedUpdateRemote: ReturnType<typeof debounce>;
+  private connectionStatus: ConnectionStatus = "idle";
+  private connectionError = "";
+  private hasChecked = false;
 
   constructor(app: App, plugin: GCommandPlugin) {
     super(app, plugin);
@@ -118,12 +123,14 @@ class GCommandSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
+    // --- Connection status ---
+    this.renderConnectionStatus(containerEl);
+
+    // --- Settings fields ---
+
     new Setting(containerEl)
       .setName("rclone remote")
-      .setDesc(
-        "Name of the rclone remote configured for Google Drive. " +
-        "Must match the name used in rclone config (run setup.sh to configure)."
-      )
+      .setDesc("Name of the rclone remote for Google Drive. Default: gdrive.")
       .addText((text) =>
         text
           .setPlaceholder("gdrive")
@@ -132,6 +139,8 @@ class GCommandSettingTab extends PluginSettingTab {
             this.plugin.settings.rcloneRemote = value.trim() || "gdrive";
             await this.plugin.saveSettings();
             this.debouncedUpdateRemote();
+            this.connectionStatus = "idle";
+            this.hasChecked = false;
           })
       );
 
@@ -150,6 +159,8 @@ class GCommandSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
             this.plugin.drive.setPath(this.plugin.settings.rclonePath);
             this.plugin.sidebarManager.refresh();
+            this.connectionStatus = "idle";
+            this.hasChecked = false;
           })
       );
 
@@ -176,7 +187,6 @@ class GCommandSettingTab extends PluginSettingTab {
             if (!basePath) return;
 
             const syncRoot = this.plugin.settings.vaultRoot;
-            // Ensure folder exists before revealing
             if (!this.app.vault.getAbstractFileByPath(syncRoot)) {
               await this.app.vault.createFolder(syncRoot);
             }
@@ -201,5 +211,116 @@ class GCommandSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
       );
+
+    // Check connection on first display
+    if (!this.hasChecked) {
+      this.checkConnection();
+    }
+  }
+
+  private renderConnectionStatus(containerEl: HTMLElement): void {
+    const setting = new Setting(containerEl).setName("Google Drive");
+
+    switch (this.connectionStatus) {
+      case "checking": {
+        setting.setDesc("Checking connection...");
+        setting.addButton((btn) => btn.setButtonText("Checking...").setDisabled(true));
+        break;
+      }
+      case "connected": {
+        const descEl = document.createDocumentFragment();
+        const dot = document.createElement("span");
+        dot.className = "g-command-connection-dot g-command-connection-dot--connected";
+        descEl.appendChild(dot);
+        descEl.appendText(" Connected");
+        setting.setDesc(descEl as unknown as string);
+        break;
+      }
+      case "connecting": {
+        const descEl = document.createDocumentFragment();
+        const dot = document.createElement("span");
+        dot.className = "g-command-connection-dot g-command-connection-dot--connecting";
+        descEl.appendChild(dot);
+        descEl.appendText(" Waiting for Google sign-in... Complete the sign-in in your browser.");
+        setting.setDesc(descEl as unknown as string);
+        setting.addButton((btn) => btn.setButtonText("Connecting...").setDisabled(true));
+        break;
+      }
+      case "error": {
+        setting.setDesc(this.connectionError);
+        setting.addButton((btn) =>
+          btn.setButtonText("Retry").setCta().onClick(() => this.connectDrive())
+        );
+        break;
+      }
+      case "binary-missing": {
+        const info = getRcloneInstallInstructions();
+        const descEl = document.createDocumentFragment();
+        descEl.appendText("rclone is required. Install it: ");
+        const code = document.createElement("code");
+        code.textContent = info.command;
+        descEl.appendChild(code);
+        descEl.appendText(" ");
+        const link = document.createElement("a");
+        link.href = info.url;
+        link.textContent = "More options";
+        descEl.appendChild(link);
+        setting.setDesc(descEl as unknown as string);
+        setting.addButton((btn) =>
+          btn.setButtonText("Check again").onClick(() => {
+            this.hasChecked = false;
+            this.checkConnection();
+          })
+        );
+        break;
+      }
+      default: {
+        // idle
+        setting.setDesc("Not connected to Google Drive");
+        setting.addButton((btn) =>
+          btn.setButtonText("Connect").setCta().onClick(() => this.connectDrive())
+        );
+        break;
+      }
+    }
+  }
+
+  private async checkConnection(): Promise<void> {
+    this.hasChecked = true;
+    this.connectionStatus = "checking";
+    this.display();
+
+    try {
+      await this.plugin.drive.check();
+      this.connectionStatus = "connected";
+    } catch (e) {
+      if (e instanceof DriveError && e.code === "binary-missing") {
+        this.connectionStatus = "binary-missing";
+      } else {
+        this.connectionStatus = "idle";
+      }
+    }
+    this.display();
+  }
+
+  private async connectDrive(): Promise<void> {
+    this.connectionStatus = "connecting";
+    this.display();
+
+    const result = await this.plugin.drive.setupRemote(this.plugin.settings.rcloneRemote);
+
+    if (result.ok) {
+      this.connectionStatus = "connected";
+      this.plugin.sidebarManager.refresh();
+    } else if (result.code === "binary-missing") {
+      this.connectionStatus = "binary-missing";
+    } else if (result.code === "timeout") {
+      this.connectionStatus = "error";
+      this.connectionError = "Sign-in timed out. Click Retry to try again.";
+    } else {
+      this.connectionStatus = "error";
+      this.connectionError = result.message;
+    }
+    this.display();
   }
 }

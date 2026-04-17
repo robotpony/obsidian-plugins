@@ -17,7 +17,7 @@ vi.mock("fs", async (importOriginal) => {
 
 import { execFile } from "child_process";
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "fs";
-import { DriveProvider } from "./DriveProvider";
+import { DriveProvider, SetupResult } from "./DriveProvider";
 import type { DriveFile } from "./types";
 
 const mockMkdtempSync = vi.mocked(mkdtempSync);
@@ -317,6 +317,168 @@ describe("DriveProvider", () => {
       const calls = mockExecFile.mock.calls;
       const remoteArg = calls[1][1] as string[];
       expect(remoteArg).toContain("my-drive:");
+    });
+  });
+
+  // --- setupRemote() ---
+
+  describe("setupRemote()", () => {
+    it("resolves binary before running config create", async () => {
+      mockExecFile
+        .mockImplementationOnce((_cmd: any, _args: any, _opts: any, cb: any) => {
+          cb(null, "rclone v1.73.3", ""); // checkBinary
+          return {} as any;
+        })
+        .mockImplementationOnce((_cmd: any, _args: any, _opts: any, cb: any) => {
+          cb(null, "", ""); // config create
+          return {} as any;
+        })
+        .mockImplementationOnce((_cmd: any, _args: any, _opts: any, cb: any) => {
+          cb(null, "[]", ""); // checkRemote
+          return {} as any;
+        });
+
+      await provider.setupRemote();
+      const calls = mockExecFile.mock.calls;
+      expect((calls[0][1] as string[])).toContain("version");
+      expect((calls[1][1] as string[])[0]).toBe("config");
+    });
+
+    it("returns ok when config create and remote check succeed", async () => {
+      mockExecFile
+        .mockImplementationOnce((_cmd: any, _args: any, _opts: any, cb: any) => {
+          cb(null, "rclone v1.73.3", "");
+          return {} as any;
+        })
+        .mockImplementationOnce((_cmd: any, _args: any, _opts: any, cb: any) => {
+          cb(null, "", "");
+          return {} as any;
+        })
+        .mockImplementationOnce((_cmd: any, _args: any, _opts: any, cb: any) => {
+          cb(null, "[]", "");
+          return {} as any;
+        });
+
+      const result = await provider.setupRemote();
+      expect(result).toEqual({ ok: true });
+    });
+
+    it("returns binary-missing when rclone is not installed", async () => {
+      const freshProvider = new DriveProvider("gdrive");
+      freshProvider.setPath("/nonexistent/rclone");
+      mockFailure("command not found");
+
+      const result = await freshProvider.setupRemote();
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("binary-missing");
+      }
+    });
+
+    it("returns setup-failed when config create exits with error", async () => {
+      mockExecFile
+        .mockImplementationOnce((_cmd: any, _args: any, _opts: any, cb: any) => {
+          cb(null, "rclone v1.73.3", "");
+          return {} as any;
+        })
+        .mockImplementationOnce((_cmd: any, _args: any, _opts: any, cb: any) => {
+          cb(new Error("config create failed"), "", "oauth error");
+          return {} as any;
+        });
+
+      const result = await provider.setupRemote();
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("setup-failed");
+      }
+    });
+
+    it("passes correct args to config create", async () => {
+      mockExecFile
+        .mockImplementationOnce((_cmd: any, _args: any, _opts: any, cb: any) => {
+          cb(null, "rclone v1.73.3", "");
+          return {} as any;
+        })
+        .mockImplementationOnce((_cmd: any, _args: any, _opts: any, cb: any) => {
+          cb(null, "", "");
+          return {} as any;
+        })
+        .mockImplementationOnce((_cmd: any, _args: any, _opts: any, cb: any) => {
+          cb(null, "[]", "");
+          return {} as any;
+        });
+
+      await provider.setupRemote();
+      const configArgs = mockExecFile.mock.calls[1][1] as string[];
+      expect(configArgs).toEqual([
+        "config", "create", "gdrive", "drive",
+        "scope=drive.readonly",
+        "config_is_local=true",
+        "config_change_team_drive=false",
+      ]);
+    });
+
+    it("uses custom remote name when provided", async () => {
+      mockExecFile
+        .mockImplementationOnce((_cmd: any, _args: any, _opts: any, cb: any) => {
+          cb(null, "rclone v1.73.3", "");
+          return {} as any;
+        })
+        .mockImplementationOnce((_cmd: any, _args: any, _opts: any, cb: any) => {
+          cb(null, "", "");
+          return {} as any;
+        })
+        .mockImplementationOnce((_cmd: any, _args: any, _opts: any, cb: any) => {
+          cb(null, "[]", "");
+          return {} as any;
+        });
+
+      await provider.setupRemote("my-drive");
+      const configArgs = mockExecFile.mock.calls[1][1] as string[];
+      expect(configArgs[2]).toBe("my-drive");
+    });
+
+    it("returns setup-failed when remote verification fails after create", async () => {
+      mockExecFile
+        .mockImplementationOnce((_cmd: any, _args: any, _opts: any, cb: any) => {
+          cb(null, "rclone v1.73.3", "");
+          return {} as any;
+        })
+        .mockImplementationOnce((_cmd: any, _args: any, _opts: any, cb: any) => {
+          cb(null, "", ""); // config create succeeds
+          return {} as any;
+        })
+        .mockImplementationOnce((_cmd: any, _args: any, _opts: any, cb: any) => {
+          cb(new Error("remote unreachable"), "", "token expired");
+          return {} as any;
+        });
+
+      const result = await provider.setupRemote();
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("setup-failed");
+        expect(result.message).toContain("verification failed");
+      }
+    });
+
+    it("returns timeout when execFile times out", async () => {
+      mockExecFile
+        .mockImplementationOnce((_cmd: any, _args: any, _opts: any, cb: any) => {
+          cb(null, "rclone v1.73.3", "");
+          return {} as any;
+        })
+        .mockImplementationOnce((_cmd: any, _args: any, _opts: any, cb: any) => {
+          const err = new Error("killed") as Error & { killed: boolean };
+          err.killed = true;
+          cb(err, "", "");
+          return {} as any;
+        });
+
+      const result = await provider.setupRemote();
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("timeout");
+      }
     });
   });
 });

@@ -18,6 +18,10 @@ const RCLONE_SEARCH_PATHS = [
 
 export type DriveErrorCode = "binary-missing" | "remote-unreachable";
 
+export type SetupResult =
+  | { ok: true }
+  | { ok: false; code: "binary-missing" | "setup-failed" | "timeout"; message: string };
+
 export class DriveError extends Error {
   constructor(
     public readonly code: DriveErrorCode,
@@ -140,6 +144,65 @@ export class DriveProvider {
     await this.checkRemote();
   }
 
+  /**
+   * Create (or re-create) the rclone remote for Google Drive via non-interactive config.
+   * Opens a browser for Google OAuth — the only user interaction.
+   * Returns a result object instead of throwing, so the UI can differentiate failure modes.
+   */
+  async setupRemote(remoteName?: string): Promise<SetupResult> {
+    const name = remoteName || this.remote;
+
+    // Resolve the binary first (don't check the remote — it may not exist yet)
+    try {
+      await this.checkBinary();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return { ok: false, code: "binary-missing", message: msg };
+    }
+
+    // Run rclone config create — opens browser for OAuth, blocks until complete
+    try {
+      await new Promise<void>((resolve, reject) => {
+        execFile(
+          this.rclonePath!,
+          [
+            "config", "create", name, "drive",
+            "scope=drive.readonly",
+            "config_is_local=true",
+            "config_change_team_drive=false",
+          ],
+          { maxBuffer: MAX_BUFFER, timeout: 120_000 },
+          (err, _stdout, stderr) => {
+            if (err) {
+              const detail = stderr?.trim() || err.message;
+              return reject(Object.assign(err, { detail }));
+            }
+            resolve();
+          }
+        );
+      });
+    } catch (e: unknown) {
+      const err = e as Error & { killed?: boolean; detail?: string };
+      if (err.killed) {
+        return { ok: false, code: "timeout", message: "Sign-in timed out. Try again." };
+      }
+      const detail = err.detail || err.message;
+      console.error(TAG, "setupRemote config create failed:", detail);
+      return { ok: false, code: "setup-failed", message: `Setup failed: ${detail}` };
+    }
+
+    // Verify the new remote is reachable
+    try {
+      await this.checkRemote();
+      console.log(TAG, `Remote "${name}" created and verified`);
+      return { ok: true };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(TAG, "Remote created but verification failed:", msg);
+      return { ok: false, code: "setup-failed", message: `Remote created but verification failed: ${msg}` };
+    }
+  }
+
   /** Set an explicit binary path override. Empty string = auto-detect. */
   setPath(path: string): void {
     this.explicitPath = path || null;
@@ -237,4 +300,31 @@ export class DriveProvider {
       });
     });
   }
+}
+
+/** Platform-specific rclone install instructions for UI rendering. */
+export function getRcloneInstallInstructions(): {
+  command: string;
+  label: string;
+  url: string;
+} {
+  const platform = process.platform;
+  if (platform === "darwin") {
+    return {
+      command: "brew install rclone",
+      label: "macOS (Homebrew)",
+      url: "https://rclone.org/install/#macos-homebrew",
+    };
+  } else if (platform === "linux") {
+    return {
+      command: "curl https://rclone.org/install.sh | sudo bash",
+      label: "Linux",
+      url: "https://rclone.org/install/#linux",
+    };
+  }
+  return {
+    command: "winget install Rclone.Rclone",
+    label: "Windows",
+    url: "https://rclone.org/install/#windows",
+  };
 }

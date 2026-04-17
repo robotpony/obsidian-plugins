@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.14.0 — 2026-04-16
+
+One-click Google Drive setup (Phase 5).
+
+Replaces the 10-step `rclone config` terminal wizard with a single Connect button. Users click Connect, sign in with Google in their browser, and they're done.
+
+- New `setupRemote()` method on `DriveProvider` — runs `rclone config create` with read-only scope and a 120-second timeout for the OAuth flow
+- Connection status section at the top of the settings tab — shows current state (connected, not connected, connecting, error, rclone missing) with appropriate actions
+- Sidebar error banner replaced — "remote-unreachable" now shows a Connect button instead of terminal commands; "binary-missing" shows platform-specific install instructions
+- `getRcloneInstallInstructions()` helper — detects macOS/Linux/Windows and returns the right install command and link
+- Settings tab rclone remote description simplified (removed `setup.sh` reference)
+- 8 new tests for `setupRemote()` (binary resolution, success, failure modes, timeout, custom remote name)
+- 156 tests total, all passing
+
+---
+
 ## 1.13.0 — 2026-04-06
 
 Rename MCP server from `gdrive` to `vault` (Phase 4d).

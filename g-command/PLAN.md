@@ -26,99 +26,29 @@ What shipped:
 
 Instant sidebar render from cached tree data, with background refresh. Cache stores flat per-folder listings in plugin settings. Pre-fetches parent folders of synced files so they appear in context without manual expansion.
 
----
+### Phase 4: Vault MCP — unified knowledge server
 
-## Phase 4: Vault MCP — unified knowledge server (planned)
+Renamed the MCP server from `gdrive` to `vault`. Expanded it into an Obsidian knowledge server that exposes vault files and Drive docs through one interface, with shared conversion code.
 
-Rename the MCP server from `gdrive` to `vault`. Expand it into an Obsidian knowledge server that exposes vault files and Drive docs through one interface, with shared conversion code.
+What shipped:
+- Shared conversion module (`src/convert/`): turndown, frontmatter, format mapping, section extraction
+- Vault provider: vault discovery, file listing, frontmatter parsing, fuzzy search (fuse.js)
+- Pull pipeline: search Drive → download → convert → write vault → update syncState
+- `vault://` resource scheme with section filtering
+- Cross-source search (drive/vault/both scopes)
+- `/gdoc-pull` Claude Code skill
+- Renamed and re-registered as `vault`
 
-See ARCHITECTURE.md "Phase 4: Vault MCP" for full design, gap analysis, and data flow.
+### Phase 5: One-click rclone setup
 
-### Phase 4a: Extract shared conversion module ✅
+Replaced the 10-step `rclone config` wizard with a single "Connect" button. Uses rclone's non-interactive `config create` with preset answers — the only user action is clicking "Allow" in Google's OAuth consent screen.
 
-- [x] Step 1: Create `src/convert/` with `index.ts`, `format.ts`, `turndown.ts`, `types.ts`
-- [x] Step 2: Move conversion functions from `SyncManager.ts` into `src/convert/`
-- [x] Step 3: Update `SyncManager.ts` to import from `./convert` — verify all existing tests pass
-- [x] Step 4: Add turndown + turndown-plugin-gfm to MCP server's `package.json`
-- [x] Step 5: Update MCP server's `tsconfig.json` to include `../convert/`
-- [x] Step 6: Heading hierarchy preservation verified — standard turndown ATX conversion handles Google Docs `<h1>`–`<h6>` correctly; nested list depth via `lst-kix` classes preserved in shared turndown rule
-- [x] Step 7: Implement `extractSections()` in `src/convert/` — heading name + numeric index selectors, `not_found` reporting, `available_headings` index
-- [x] Step 8: Tests for `extractSections()` — 14 tests covering multi-heading select, mixed name/index, case-insensitive match, preamble as index 0, sub-section inclusion, no-match fallback, edge cases
-
-### Phase 4b: Vault provider — read vault files via MCP ✅
-
-- [x] Step 6: Add `vault-discovery.ts` — read `obsidian.json`, resolve vault paths, derive names (macOS, Linux, Windows)
-- [x] Step 7: Add `vault-provider.ts` — list files, read with frontmatter parsing, fuzzy search via fuse.js
-- [x] Step 8: Add `list-vaults` tool — discovers and caches vaults, returns names/paths/open status
-- [x] Step 9: Add `vault://` resources — ListResources with `vault:` cursor, ReadResource with frontmatter parsing and `?sections=` query parameter support
-- [x] Step 10: Add vault scope to `search` tool — `scope` parameter (drive/vault/both), fuzzy matching across all vaults
-
-### 4c: Pull — Drive to vault pipeline ✅
-
-- [x] Step 11: Add `pull` tool — search Drive, download HTML, convert, write to vault, update syncState. Supports optional `sections` filter for partial document retrieval.
-- [x] Step 12: Add download logic to MCP server (port `copy --include` pattern from `DriveProvider`) — extracted to `pull-helpers.ts` with `downloadDriveFile()`, `readVaultRoot()`, `updateSyncState()`
-- [x] Step 13: Create `/gdoc-pull` Claude Code skill (`~/.claude/commands/gdoc-pull.md`)
-
-### 4d: Rename and register ✅
-
-- [x] Step 14: Rename MCP server from `gdrive` to `vault` (package.json name/bin, server identity string, ARCHITECTURE.md)
-- [x] Step 15: Update Claude Code MCP registration (`setup.sh`, `README.md` — registers as `vault`)
-- [x] Step 16: Manual E2E test checklist added to changelog (no automated test — requires real Drive connection)
-
-### Resolved questions
-
-- **Vault content search**: Fuzzy search (fuse.js or similar). Substring is too rigid for natural-language queries against note titles and content.
-- **`pull` target path**: Mirror Drive/vault structure under `vaultRoot`. No user-specified overrides.
-- **Platform support**: macOS first, then Linux/Windows. Ship macOS, add cross-platform vault discovery as a fast follow if complexity is low.
-
----
-
-## Phase 5: One-click rclone setup (planned)
-
-Replace the 10-step `rclone config` wizard with a single "Connect" button. Uses rclone's non-interactive `config create` with preset answers — the only user action is clicking "Allow" in Google's OAuth consent screen.
-
-### Discovery
-
-`rclone config create` supports `--non-interactive` mode and preset key-value pairs. This collapses the wizard to:
-
-```bash
-rclone config create gdrive drive scope=drive.readonly config_is_local=true config_change_team_drive=false
-```
-
-This opens a browser for Google OAuth, creates the remote, and exits. No wizard questions.
-
-### Steps
-
-- [ ] Step 1: Add `setupRemote()` to `DriveProvider` — runs the one-liner via `execFile`, returns success/error
-- [ ] Step 2: Add "Connect Google Drive" button to settings tab — runs `setupRemote()`, shows spinner, reports result
-- [ ] Step 3: Update sidebar error banner — replace "rclone config" instructions with a "Connect" button that calls the same `setupRemote()`
-- [ ] Step 4: Add connection status indicator to settings — show "Connected" with checkmark, or "Not connected" with Connect button
-- [ ] Step 5: Improve rclone-missing guidance — link to rclone.org/install with platform-specific instructions (Homebrew for macOS, package manager for Linux)
-
-### UX flow
-
-**Settings tab (happy path):**
-1. User opens g-command settings
-2. Sees "Google Drive: Not connected" with a [Connect] button
-3. Clicks Connect → browser opens Google login
-4. User clicks Allow → browser shows success page
-5. Settings update to "Google Drive: Connected ✓"
-
-**Sidebar error banner (discovery path):**
-1. User opens sidebar, sees error: "Not connected to Google Drive"
-2. Banner shows [Connect] button (instead of terminal commands)
-3. Same flow as above
-
-**rclone not installed:**
-1. Settings/banner shows: "rclone is required" with install instructions
-2. Links to rclone.org/install, mentions `brew install rclone` for macOS
-3. After installing, user clicks Connect
-
-### Design decisions
-
-- **Read-only scope by default.** `scope=drive.readonly` is safer and sufficient for browsing and syncing. Users who need write access can reconfigure manually.
-- **No auto-install of rclone.** Installing system binaries from an Obsidian plugin is unexpected. Clear instructions are better.
-- **Reuse existing `DriveProvider`.** The setup logic lives alongside `check()` since it operates on the same rclone binary and remote.
+What shipped:
+- `setupRemote()` on DriveProvider — runs `rclone config create` with read-only scope, 120s timeout, returns typed result
+- Connection status section at top of settings tab (checking/connected/idle/connecting/error/binary-missing states)
+- Sidebar error banner: Connect button for remote setup, platform-specific install instructions for binary-missing
+- `getRcloneInstallInstructions()` helper — platform-aware install commands (macOS/Linux/Windows)
+- 8 new tests for setupRemote (156 total)
 
 ---
 

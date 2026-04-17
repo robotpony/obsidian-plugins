@@ -494,3 +494,35 @@
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
 }
+
+/* --- Phase 5: Connection status & setup --- */
+
+.g-command-connection-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  vertical-align: middle;
+  margin-right: 2px;
+}
+
+.g-command-connection-dot--connected {
+  background: var(--text-success, #4caf50);
+}
+
+.g-command-connection-dot--disconnected {
+  background: var(--text-faint);
+}
+
+.g-command-connection-dot--connecting {
+  background: var(--text-accent);
+  animation: g-command-pulse 1.5s ease-in-out infinite;
+}
+
+.g-command-error-banner .mod-cta {
+  margin-top: 8px;
+}
+
+.g-command-install-instructions p {
+  margin: 4px 0;
+}
