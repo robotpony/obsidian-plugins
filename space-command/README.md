@@ -51,7 +51,7 @@ Items sort by: focus → priority → tag count (more tags = more context = high
 - [ ] Update welcome email #todo #onboarding
 ```
 
-The Focus section shows your top 5 projects by default. The DONE section links to your done file. Both limits are configurable in Settings.
+The Focus section shows your top 5 projects by default (configurable in Settings). The Summary section at the bottom shows priority breakdown, completion velocity (today/week/month), top backlogs, and a link to your done file.
 
 Right-click any TODO for quick actions: Focus, Later, Snooze, Copy, Move to.
 

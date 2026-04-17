@@ -2,6 +2,22 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.121] - 2026-04-17
+
+### Improved
+
+- **Summary top backlogs always visible**: Removed collapsible toggle from the top backlogs list in the Summary section. The list is now always shown when qualifying projects exist, matching the always-visible pattern of the other summary blocks.
+
+---
+
+## [0.9.120] - 2026-04-17
+
+### Added
+
+- **Sidebar Summary section**: Replaces the minimal "Done" link with an inline summary at the bottom of the TODOs tab. Shows priority breakdown (two-column grid of #today, #p0-#p4, #focus, unmarked, snoozed counts), completion velocity (items done today/this week/this month), and a collapsible top backlogs list highlighting projects with the most TODOs. The done file link is preserved in the section header.
+
+---
+
 ## [0.9.119] - 2026-04-17
 
 ### Fixed

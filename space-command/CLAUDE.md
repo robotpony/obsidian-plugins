@@ -33,7 +33,7 @@ This is **Space Command** (`space-command`), an Obsidian plugin for tracking TOD
 | [EmbedRenderer.ts](src/EmbedRenderer.ts) | Renders TODO lists in embeds. Handles inline markdown parsing (bold, italic, code, links) with XSS-safe DOM methods. |
 | [CodeBlockProcessor.ts](src/CodeBlockProcessor.ts) | Processes `` ```focus-todos `` and `` ```focus-list `` code blocks for Live Preview support. |
 | [FilterParser.ts](src/FilterParser.ts) | Parses filter syntax: `path:folder/`, `tags:#tag1,#tag2`, `limit:N`, `todone:show\|hide` |
-| [SidebarView.ts](src/SidebarView.ts) | Custom sidebar view with two tabs: TODOs (Active TODOs, Projects, Recent TODONEs) and Ideas (Principles, Active Ideas) |
+| [SidebarView.ts](src/SidebarView.ts) | Custom sidebar view with two tabs: TODOs (Active TODOs, Projects, Summary) and Ideas (Principles, Active Ideas) |
 | [ProjectManager.ts](src/ProjectManager.ts) | Groups TODOs by project tags (excludes priority tags like #p0-#p4) |
 | [ContextMenuHandler.ts](src/ContextMenuHandler.ts) | Right-click context menu for priority actions (Focus, Later, Snooze) |
 | [SlashCommandSuggest.ts](src/SlashCommandSuggest.ts) | EditorSuggest for `/` commands at column 0: `/todo`, `/callout`, `/today`, `/tomorrow` |

@@ -3918,7 +3918,7 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
   renderTodosContent(container) {
     this.renderProjects(container);
     this.renderActiveTodos(container);
-    this.renderRecentTodones(container);
+    this.renderSummary(container);
   }
   renderIdeasContent(container) {
     this.renderIdeasHeader(container);
@@ -4338,13 +4338,19 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
   renderTodoItem(list, todo, isChild = false) {
     this.renderListItem(list, todo, this.todoConfig, isChild);
   }
-  renderRecentTodones(container) {
-    const section = container.createEl("div", { cls: "todone-section" });
+  renderSummary(container) {
+    const section = container.createEl("div", { cls: "summary-section" });
+    this.renderSummaryHeader(section);
+    this.renderPriorityCounts(section);
+    this.renderCompletionVelocity(section);
+    this.renderTopBacklogs(section);
+  }
+  renderSummaryHeader(section) {
     const header = section.createEl("div", {
       cls: "todo-section-header todone-header"
     });
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
-    titleSpan.textContent = "DONE";
+    titleSpan.textContent = "SUMMARY";
     const fileLink = header.createEl("a", {
       text: this.defaultTodoneFile,
       cls: "done-file-link",
@@ -4357,6 +4363,108 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
         await this.app.workspace.getLeaf(false).openFile(file);
       }
     });
+  }
+  renderPriorityCounts(section) {
+    const todos = this.scanner.getTodos();
+    let today = 0, p0 = 0, p1 = 0, p2 = 0, p3 = 0, p4 = 0;
+    let focus = 0, snoozed = 0, none = 0;
+    for (const t of todos) {
+      if (hasTag(t.tags, "#today")) {
+        today++;
+      } else if (hasTag(t.tags, "#p0")) {
+        p0++;
+      } else if (hasTag(t.tags, "#p1")) {
+        p1++;
+      } else if (hasTag(t.tags, "#p2")) {
+        p2++;
+      } else if (hasTag(t.tags, "#p3")) {
+        p3++;
+      } else if (hasTag(t.tags, "#p4")) {
+        p4++;
+      } else if (hasTag(t.tags, "#future") || hasTag(t.tags, "#snooze") || hasTag(t.tags, "#snoozed")) {
+        snoozed++;
+      } else {
+        none++;
+      }
+      if (hasTag(t.tags, "#focus")) {
+        focus++;
+      }
+    }
+    const grid = section.createEl("div", { cls: "summary-counts-grid" });
+    const pairs = [
+      ["#today", today, "#p0", p0],
+      ["#p1", p1, "#p2", p2],
+      ["#p3", p3, "#p4", p4],
+      ["#focus", focus, "none", none],
+      ["snoozed", snoozed, "total", todos.length]
+    ];
+    for (const [labelA, valA, labelB, valB] of pairs) {
+      const row = grid.createEl("div", { cls: "summary-count-row" });
+      this.renderCountCell(row, labelA, valA);
+      this.renderCountCell(row, labelB, valB);
+    }
+  }
+  renderCountCell(row, label, value) {
+    const cell = row.createEl("div", { cls: "summary-count-cell" });
+    cell.createEl("span", { cls: "summary-count-label", text: label });
+    const valEl = cell.createEl("span", { cls: "summary-count-value", text: String(value) });
+    if (value === 0)
+      valEl.addClass("zero");
+  }
+  renderCompletionVelocity(section) {
+    const todones = this.scanner.getTodones();
+    const m = import_obsidian11.moment;
+    const todayStr = m().format("YYYY-MM-DD");
+    const weekStart = m().startOf("isoWeek").format("YYYY-MM-DD");
+    const monthStart = m().startOf("month").format("YYYY-MM-DD");
+    let doneToday = 0, doneWeek = 0, doneMonth = 0;
+    for (const t of todones) {
+      const date = extractCompletionDate(t.text);
+      if (!date)
+        continue;
+      if (date >= monthStart) {
+        doneMonth++;
+        if (date >= weekStart) {
+          doneWeek++;
+          if (date === todayStr) {
+            doneToday++;
+          }
+        }
+      }
+    }
+    const vel = section.createEl("div", { cls: "summary-velocity" });
+    vel.createEl("span", { text: "Done: " });
+    vel.createEl("span", { cls: "summary-velocity-num", text: String(doneToday) });
+    vel.createEl("span", { text: " today \xB7 " });
+    vel.createEl("span", { cls: "summary-velocity-num", text: String(doneWeek) });
+    vel.createEl("span", { text: " week \xB7 " });
+    vel.createEl("span", { cls: "summary-velocity-num", text: String(doneMonth) });
+    vel.createEl("span", { text: " month" });
+  }
+  renderTopBacklogs(section) {
+    const projects = this.projectManager.getProjects();
+    const qualifying = projects.filter((p) => p.count >= 3);
+    if (qualifying.length === 0)
+      return;
+    qualifying.sort((a, b) => b.count - a.count);
+    const top = qualifying.slice(0, 5);
+    const allCounts = projects.map((p) => p.count).sort((a, b) => a - b);
+    const mid = Math.floor(allCounts.length / 2);
+    const median = allCounts.length % 2 === 0 ? (allCounts[mid - 1] + allCounts[mid]) / 2 : allCounts[mid];
+    const warnThreshold = median * 2;
+    const label = section.createEl("div", { cls: "summary-backlogs-label" });
+    label.createEl("span", { text: "Top backlogs" });
+    for (const p of top) {
+      const row = section.createEl("div", { cls: "summary-backlog-row" });
+      row.createEl("span", { cls: "summary-count-label", text: p.tag });
+      const valEl = row.createEl("span", {
+        cls: "summary-count-value",
+        text: String(p.count)
+      });
+      if (p.count > warnThreshold) {
+        valEl.addClass("summary-backlog-warn");
+      }
+    }
   }
   renderPrinciples(container) {
     let principles = this.scanner.getPrinciples();
