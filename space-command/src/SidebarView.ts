@@ -403,7 +403,10 @@ export class TodoSidebarView extends ItemView {
 
     link.addEventListener("click", (e) => {
       e.preventDefault();
-      openFileAtLine(this.app, item.file, item.lineNumber);
+      const blockEnd = item.childLineNumbers?.length
+        ? Math.max(...item.childLineNumbers)
+        : undefined;
+      openFileAtLine(this.app, item.file, item.lineNumber, blockEnd);
     });
 
     // If this is a header with children, render children indented below

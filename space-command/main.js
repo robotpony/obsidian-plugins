@@ -420,14 +420,46 @@ async function modifyFileLine(vault, file, lineNumber, transform, validate, fing
   lines[resolved] = transform(currentLine);
   await vault.modify(file, lines.join("\n"));
 }
-function openFileAtLine(app, file, line) {
+function openFileAtLine(app, file, line, blockEndLine) {
   const leaf = app.workspace.getLeaf(false);
   leaf.openFile(file, { active: true }).then(() => {
+    var _a;
     const view = app.workspace.getActiveViewOfType(import_obsidian3.MarkdownView);
     if (view == null ? void 0 : view.editor) {
       const editor = view.editor;
+      const totalLines = editor.lineCount();
+      let endLine = line;
+      if (blockEndLine !== void 0 && blockEndLine > line) {
+        endLine = Math.min(blockEndLine, totalLines - 1);
+      } else {
+        const maxScan = Math.min(line + 20, totalLines - 1);
+        for (let i = line + 1; i <= maxScan; i++) {
+          const text = editor.getLine(i);
+          if (/^#{1,6}\s/.test(text))
+            break;
+          endLine = i;
+        }
+      }
       editor.setCursor({ line, ch: 0 });
-      editor.scrollIntoView({ from: { line, ch: 0 }, to: { line, ch: 0 } }, true);
+      editor.scrollIntoView(
+        { from: { line, ch: 0 }, to: { line: endLine, ch: 0 } },
+        true
+      );
+      const scrollInfo = (_a = editor.cm) == null ? void 0 : _a.scrollDOM;
+      if (scrollInfo) {
+        const coords = editor.cm.coordsAtPos(
+          editor.posToOffset({ line, ch: 0 })
+        );
+        if (coords) {
+          const viewportHeight = scrollInfo.clientHeight;
+          const targetOffset = viewportHeight / 4;
+          const currentTop = coords.top - scrollInfo.getBoundingClientRect().top;
+          const adjustment = currentTop - targetOffset;
+          if (Math.abs(adjustment) > 10) {
+            scrollInfo.scrollTop += adjustment;
+          }
+        }
+      }
       highlightLine(editor, line);
     }
   });
@@ -2544,8 +2576,10 @@ var EmbedRenderer = class {
       href: "#"
     });
     link.addEventListener("click", (e) => {
+      var _a;
       e.preventDefault();
-      openFileAtLine(this.app, todo.file, todo.lineNumber);
+      const blockEnd = ((_a = todo.childLineNumbers) == null ? void 0 : _a.length) ? Math.max(...todo.childLineNumbers) : void 0;
+      openFileAtLine(this.app, todo.file, todo.lineNumber, blockEnd);
     });
     if (isHeader && todo.childLineNumbers && todo.childLineNumbers.length > 0) {
       const childrenContainer = item.createEl("ul", { cls: "todo-children contains-task-list" });
@@ -2629,8 +2663,10 @@ var EmbedRenderer = class {
       href: "#"
     });
     link.addEventListener("click", (e) => {
+      var _a;
       e.preventDefault();
-      openFileAtLine(this.app, idea.file, idea.lineNumber);
+      const blockEnd = ((_a = idea.childLineNumbers) == null ? void 0 : _a.length) ? Math.max(...idea.childLineNumbers) : void 0;
+      openFileAtLine(this.app, idea.file, idea.lineNumber, blockEnd);
     });
     if (isHeader && idea.childLineNumbers && idea.childLineNumbers.length > 0) {
       const childrenContainer = item.createEl("ul", { cls: "idea-children" });
@@ -2711,8 +2747,10 @@ var EmbedRenderer = class {
       href: "#"
     });
     link.addEventListener("click", (e) => {
+      var _a;
       e.preventDefault();
-      openFileAtLine(this.app, principle.file, principle.lineNumber);
+      const blockEnd = ((_a = principle.childLineNumbers) == null ? void 0 : _a.length) ? Math.max(...principle.childLineNumbers) : void 0;
+      openFileAtLine(this.app, principle.file, principle.lineNumber, blockEnd);
     });
     if (isHeader && principle.childLineNumbers && principle.childLineNumbers.length > 0) {
       const childrenContainer = item.createEl("ul", { cls: "principle-children" });
@@ -3532,8 +3570,10 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
       href: "#"
     });
     link.addEventListener("click", (e) => {
+      var _a;
       e.preventDefault();
-      openFileAtLine(this.app, item.file, item.lineNumber);
+      const blockEnd = ((_a = item.childLineNumbers) == null ? void 0 : _a.length) ? Math.max(...item.childLineNumbers) : void 0;
+      openFileAtLine(this.app, item.file, item.lineNumber, blockEnd);
     });
     if (hasChildren) {
       const childrenContainer = listItem.createEl("ul", { cls: `${config.classPrefix}-children` });

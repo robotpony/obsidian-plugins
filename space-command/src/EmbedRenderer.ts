@@ -580,7 +580,10 @@ export class EmbedRenderer {
 
     link.addEventListener("click", (e) => {
       e.preventDefault();
-      openFileAtLine(this.app, todo.file, todo.lineNumber);
+      const blockEnd = todo.childLineNumbers?.length
+        ? Math.max(...todo.childLineNumbers)
+        : undefined;
+      openFileAtLine(this.app, todo.file, todo.lineNumber, blockEnd);
     });
 
     // If this is a header with children, render children indented below
@@ -717,7 +720,10 @@ export class EmbedRenderer {
 
     link.addEventListener("click", (e) => {
       e.preventDefault();
-      openFileAtLine(this.app, idea.file, idea.lineNumber);
+      const blockEnd = idea.childLineNumbers?.length
+        ? Math.max(...idea.childLineNumbers)
+        : undefined;
+      openFileAtLine(this.app, idea.file, idea.lineNumber, blockEnd);
     });
 
     // If this is a header with children, render children indented below
@@ -850,7 +856,10 @@ export class EmbedRenderer {
 
     link.addEventListener("click", (e) => {
       e.preventDefault();
-      openFileAtLine(this.app, principle.file, principle.lineNumber);
+      const blockEnd = principle.childLineNumbers?.length
+        ? Math.max(...principle.childLineNumbers)
+        : undefined;
+      openFileAtLine(this.app, principle.file, principle.lineNumber, blockEnd);
     });
 
     // If this is a header with children, render children indented below

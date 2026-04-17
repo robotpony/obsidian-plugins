@@ -2,6 +2,14 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.118] - 2026-04-17
+
+### Improved
+
+- **Block-aware scroll-to**: Clicking the → arrow in the sidebar or embeds now scrolls the full block (header + children) into view and positions the target line in the upper portion of the viewport. Previously only the target line was scrolled into view near the bottom of the window, making it hard to spot. For items without children, the scroll scans forward to the next header to include surrounding content.
+
+---
+
 ## [0.9.117] - 2026-04-02
 
 ### Fixed

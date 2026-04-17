@@ -558,21 +558,61 @@ export async function modifyFileLine(
 export function openFileAtLine(
   app: App,
   file: TFile,
-  line: number
+  line: number,
+  blockEndLine?: number
 ): void {
   const leaf = app.workspace.getLeaf(false);
   leaf.openFile(file, { active: true }).then(() => {
     const view = app.workspace.getActiveViewOfType(MarkdownView);
     if (view?.editor) {
       const editor = view.editor;
+      const totalLines = editor.lineCount();
 
-      // Set cursor to the line
+      // Determine the end of the block to scroll into view.
+      // If blockEndLine provided, use it; otherwise scan forward to find
+      // the next header or use a small buffer.
+      let endLine = line;
+      if (blockEndLine !== undefined && blockEndLine > line) {
+        endLine = Math.min(blockEndLine, totalLines - 1);
+      } else {
+        // Scan forward from the target line to find the block extent
+        const maxScan = Math.min(line + 20, totalLines - 1);
+        for (let i = line + 1; i <= maxScan; i++) {
+          const text = editor.getLine(i);
+          // Stop at the next header (any level)
+          if (/^#{1,6}\s/.test(text)) break;
+          endLine = i;
+        }
+      }
+
+      // Set cursor to the target line
       editor.setCursor({ line, ch: 0 });
 
-      // Scroll the line into view
-      editor.scrollIntoView({ from: { line, ch: 0 }, to: { line, ch: 0 } }, true);
+      // Scroll the block range into view, then nudge so the target line
+      // sits in the top third of the viewport rather than centered or at bottom
+      editor.scrollIntoView(
+        { from: { line, ch: 0 }, to: { line: endLine, ch: 0 } },
+        true
+      );
 
-      // Highlight the line
+      // Nudge: scroll up so the target line is near the top third
+      const scrollInfo = (editor as any).cm?.scrollDOM;
+      if (scrollInfo) {
+        const coords = (editor as any).cm.coordsAtPos(
+          editor.posToOffset({ line, ch: 0 })
+        );
+        if (coords) {
+          const viewportHeight = scrollInfo.clientHeight;
+          const targetOffset = viewportHeight / 4;
+          const currentTop = coords.top - scrollInfo.getBoundingClientRect().top;
+          const adjustment = currentTop - targetOffset;
+          if (Math.abs(adjustment) > 10) {
+            scrollInfo.scrollTop += adjustment;
+          }
+        }
+      }
+
+      // Highlight the target line (not the full block)
       highlightLine(editor, line);
     }
   });
