@@ -2,6 +2,14 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.119] - 2026-04-17
+
+### Fixed
+
+- **#focus items now sort to top**: Items tagged `#focus` always appear above non-focused items in the sidebar and embeds. Previously `#focus` was treated as a low priority level (value 7 of 9), causing focused items to sort near the bottom. Now `#focus` acts as a sort tier — focused items sort first, then by priority within each tier. Header TODOs inherit focus from their children, and projects with focus items also sort above those without.
+
+---
+
 ## [0.9.118] - 2026-04-17
 
 ### Improved

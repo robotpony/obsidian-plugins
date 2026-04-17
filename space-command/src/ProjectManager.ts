@@ -91,14 +91,13 @@ export class ProjectManager {
     }
 
     // Calculate colourIndex from weighted average priority for each project
-    // Priority values range from 1 (#today) to 9 (#future)
+    // Priority values range from 1 (#today) to 8 (#future)
     // Map to colourIndex 0-6 for CSS styling
     const projects: ProjectInfo[] = [];
     for (const [, project] of projectMap) {
       const avgPriority = project.prioritySum / project.count;
-      // Map avgPriority (1-9) to colourIndex (0-6)
-      // Use Math.round for reasonable mapping
-      const colourIndex = Math.min(6, Math.round((avgPriority - 1) * 6 / 8));
+      // Map avgPriority (1-8) to colourIndex (0-6)
+      const colourIndex = Math.min(6, Math.round((avgPriority - 1) * 6 / 7));
       projects.push({
         tag: project.tag,
         count: project.count,
@@ -115,14 +114,17 @@ export class ProjectManager {
   getFocusProjects(limit?: number): ProjectInfo[] {
     const projects = this.getProjects();
 
-    // Sort by: 1) priority (lowest value = highest priority), 2) count (as proxy for tag activity)
-    // Note: #focus is a visibility filter, not a priority level, so no special handling needed
+    // Sort by: 1) focus tier (projects with focus items first), 2) priority, 3) count
     projects.sort((a, b) => {
-      // Sort by priority (lower = higher priority)
+      // Focus tier: projects with focused items sort above those without
+      if (a.hasFocusItems && !b.hasFocusItems) return -1;
+      if (!a.hasFocusItems && b.hasFocusItems) return 1;
+
+      // Priority (lower = higher priority)
       const priorityDiff = a.highestPriority - b.highestPriority;
       if (priorityDiff !== 0) return priorityDiff;
 
-      // Then by count (higher count = more items/activity)
+      // Count (higher count = more items/activity)
       return b.count - a.count;
     });
 

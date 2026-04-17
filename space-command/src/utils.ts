@@ -100,7 +100,6 @@ export function formatDate(date: Date, format: string): string {
  * Get the priority value for sorting TODOs.
  * Lower values = higher priority.
  *
- * Priority order (explicit priority tags take precedence over #focus):
  * | Tag              | Value | Meaning                              |
  * |------------------|-------|--------------------------------------|
  * | #today           | 1     | Time-sensitive, due today            |
@@ -109,26 +108,21 @@ export function formatDate(date: Date, format: string): string {
  * | #p2              | 4     | Medium-high priority                 |
  * | #p3              | 5     | Medium-low priority                  |
  * | #p4              | 6     | Low priority                         |
- * | #focus (alone)   | 7     | Focused but no explicit priority     |
- * | No priority      | 8     | Unmarked items                       |
- * | #future/#snooze  | 9     | Snoozed/deferred items               |
+ * | No priority      | 7     | Unmarked items                       |
+ * | #future/#snooze  | 8     | Snoozed/deferred items               |
  *
- * Note: #focus is a visibility filter, not a priority. If an item has both
- * #focus and a priority tag (e.g., #p0), the priority tag determines sort order.
+ * #focus is handled separately as a sort tier (see compareWithEffectivePriority).
+ * Focused items always sort above non-focused items regardless of priority.
  */
 export function getPriorityValue(tags: string[]): number {
-  // Check explicit priority tags first (these take precedence over #focus)
   if (hasTag(tags, "#today")) return 1;
   if (hasTag(tags, "#p0")) return 2;
   if (hasTag(tags, "#p1")) return 3;
   if (hasTag(tags, "#p2")) return 4;
   if (hasTag(tags, "#p3")) return 5;
   if (hasTag(tags, "#p4")) return 6;
-  // Snoozed items get lowest priority
-  if (hasTag(tags, "#future") || hasTag(tags, "#snooze") || hasTag(tags, "#snoozed")) return 9;
-  // #focus without explicit priority sorts between #p4 and unmarked
-  if (hasTag(tags, "#focus")) return 7;
-  return 8; // No priority = low (after all prioritized items)
+  if (hasTag(tags, "#future") || hasTag(tags, "#snooze") || hasTag(tags, "#snoozed")) return 8;
+  return 7;
 }
 
 /**
@@ -150,20 +144,25 @@ export function getTagCount(tags: string[]): number {
 
 /**
  * Compare two items for sorting.
- * Sort order: 1) priority (today, p0-p4, focus, unmarked, snoozed), 2) more tags = higher ranking
+ * Sort order: 1) #focus tier (focused first), 2) priority, 3) tag count.
  * Returns negative if a < b, positive if a > b, 0 if equal.
  */
 export function compareTodoItems(
   a: { tags: string[] },
   b: { tags: string[] }
 ): number {
-  // 1. Priority (lower value = higher priority)
+  // 1. Focus tier: focused items always sort above non-focused
+  const aFocused = hasTag(a.tags, "#focus");
+  const bFocused = hasTag(b.tags, "#focus");
+  if (aFocused && !bFocused) return -1;
+  if (!aFocused && bFocused) return 1;
+
+  // 2. Priority (lower value = higher priority)
   const priorityDiff = getPriorityValue(a.tags) - getPriorityValue(b.tags);
   if (priorityDiff !== 0) return priorityDiff;
 
-  // 2. Tag count (more tags = higher ranking, so sort descending)
-  const tagCountDiff = getTagCount(b.tags) - getTagCount(a.tags);
-  return tagCountDiff;
+  // 3. Tag count (more tags = higher ranking, so sort descending)
+  return getTagCount(b.tags) - getTagCount(a.tags);
 }
 
 /**
@@ -186,15 +185,34 @@ function isSnoozed(tags: string[]): boolean {
 }
 
 /**
+ * Check if an item is effectively focused, considering children for headers.
+ * A header is focused if it has #focus or any active child has #focus.
+ */
+function isEffectivelyFocused(
+  item: PrioritySortableItem,
+  allItems: PrioritySortableItem[]
+): boolean {
+  if (hasTag(item.tags, "#focus")) return true;
+  if (!item.isHeader || !item.childLineNumbers || item.childLineNumbers.length === 0) {
+    return false;
+  }
+  for (const childLine of item.childLineNumbers) {
+    const child = allItems.find(
+      t => t.filePath === item.filePath && t.lineNumber === childLine
+    );
+    if (child && !isSnoozed(child.tags) && hasTag(child.tags, "#focus")) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Get effective priority for an item, considering children for header items.
  *
  * - Standalone items: returns their own priority value
  * - Header items with children: returns the better of header priority or child average
  * - Header items without active children: returns their own priority value
- *
- * This ensures header TODOs sort based on the work they contain, while still
- * respecting priority tags on the header itself. If a header has #focus but
- * children are unmarked, the header's #focus takes precedence.
  *
  * Snoozed children are excluded from the average so they don't drag down
  * the priority of headers with active work.
@@ -226,8 +244,6 @@ export function getEffectivePriority(
   }
 
   // Return the better (lower) of header priority or child average
-  // This ensures a #focus header sorts at least as high as #focus items,
-  // but can sort higher if children have better priority (e.g., #p0)
   const sum = childPriorities.reduce((a, b) => a + b, 0);
   const childAverage = sum / childPriorities.length;
   return Math.min(headerPriority, childAverage);
@@ -235,6 +251,7 @@ export function getEffectivePriority(
 
 /**
  * Compare two items for sorting, considering effective priority for headers.
+ * Sort order: 1) #focus tier (focused first), 2) effective priority, 3) tag count.
  * Use this instead of compareTodoItems when you have access to all items.
  */
 export function compareWithEffectivePriority(
@@ -242,13 +259,18 @@ export function compareWithEffectivePriority(
   b: PrioritySortableItem,
   allItems: PrioritySortableItem[]
 ): number {
-  // 1. Effective priority (considers children for headers)
+  // 1. Focus tier: focused items always sort above non-focused
+  const aFocused = isEffectivelyFocused(a, allItems);
+  const bFocused = isEffectivelyFocused(b, allItems);
+  if (aFocused && !bFocused) return -1;
+  if (!aFocused && bFocused) return 1;
+
+  // 2. Effective priority (considers children for headers)
   const priorityDiff = getEffectivePriority(a, allItems) - getEffectivePriority(b, allItems);
   if (priorityDiff !== 0) return priorityDiff;
 
-  // 2. Tag count (more tags = higher ranking, so sort descending)
-  const tagCountDiff = getTagCount(b.tags) - getTagCount(a.tags);
-  return tagCountDiff;
+  // 3. Tag count (more tags = higher ranking, so sort descending)
+  return getTagCount(b.tags) - getTagCount(a.tags);
 }
 
 export function extractTags(text: string): string[] {

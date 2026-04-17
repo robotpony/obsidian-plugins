@@ -198,10 +198,8 @@ function getPriorityValue(tags) {
   if (hasTag(tags, "#p4"))
     return 6;
   if (hasTag(tags, "#future") || hasTag(tags, "#snooze") || hasTag(tags, "#snoozed"))
-    return 9;
-  if (hasTag(tags, "#focus"))
-    return 7;
-  return 8;
+    return 8;
+  return 7;
 }
 function getTagCount(tags) {
   const systemTags = /* @__PURE__ */ new Set([
@@ -231,6 +229,22 @@ function getTagCount(tags) {
 function isSnoozed(tags) {
   return hasTag(tags, "#future") || hasTag(tags, "#snooze") || hasTag(tags, "#snoozed");
 }
+function isEffectivelyFocused(item, allItems) {
+  if (hasTag(item.tags, "#focus"))
+    return true;
+  if (!item.isHeader || !item.childLineNumbers || item.childLineNumbers.length === 0) {
+    return false;
+  }
+  for (const childLine of item.childLineNumbers) {
+    const child = allItems.find(
+      (t) => t.filePath === item.filePath && t.lineNumber === childLine
+    );
+    if (child && !isSnoozed(child.tags) && hasTag(child.tags, "#focus")) {
+      return true;
+    }
+  }
+  return false;
+}
 function getEffectivePriority(item, allItems) {
   const headerPriority = getPriorityValue(item.tags);
   if (!item.isHeader || !item.childLineNumbers || item.childLineNumbers.length === 0) {
@@ -253,11 +267,16 @@ function getEffectivePriority(item, allItems) {
   return Math.min(headerPriority, childAverage);
 }
 function compareWithEffectivePriority(a, b, allItems) {
+  const aFocused = isEffectivelyFocused(a, allItems);
+  const bFocused = isEffectivelyFocused(b, allItems);
+  if (aFocused && !bFocused)
+    return -1;
+  if (!aFocused && bFocused)
+    return 1;
   const priorityDiff = getEffectivePriority(a, allItems) - getEffectivePriority(b, allItems);
   if (priorityDiff !== 0)
     return priorityDiff;
-  const tagCountDiff = getTagCount(b.tags) - getTagCount(a.tags);
-  return tagCountDiff;
+  return getTagCount(b.tags) - getTagCount(a.tags);
 }
 function extractTags(text) {
   const textWithoutCode = text.replace(/`[^`]*`/g, "");
@@ -1606,7 +1625,7 @@ var ProjectManager = class {
     const projects = [];
     for (const [, project] of projectMap) {
       const avgPriority = project.prioritySum / project.count;
-      const colourIndex = Math.min(6, Math.round((avgPriority - 1) * 6 / 8));
+      const colourIndex = Math.min(6, Math.round((avgPriority - 1) * 6 / 7));
       projects.push({
         tag: project.tag,
         count: project.count,
@@ -1621,6 +1640,10 @@ var ProjectManager = class {
   getFocusProjects(limit) {
     const projects = this.getProjects();
     projects.sort((a, b) => {
+      if (a.hasFocusItems && !b.hasFocusItems)
+        return -1;
+      if (!a.hasFocusItems && b.hasFocusItems)
+        return 1;
       const priorityDiff = a.highestPriority - b.highestPriority;
       if (priorityDiff !== 0)
         return priorityDiff;
@@ -4038,6 +4061,10 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
       return;
     }
     projects.sort((a, b) => {
+      if (a.hasFocusItems && !b.hasFocusItems)
+        return -1;
+      if (!a.hasFocusItems && b.hasFocusItems)
+        return 1;
       const priorityDiff = a.highestPriority - b.highestPriority;
       if (priorityDiff !== 0)
         return priorityDiff;

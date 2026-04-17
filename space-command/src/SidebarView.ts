@@ -1071,14 +1071,14 @@ export class TodoSidebarView extends ItemView {
       return;
     }
 
-    // Sort projects by: 1) priority (lowest value = highest priority), 2) tag count (higher = better)
-    // Note: #focus is a visibility filter, not a priority level
+    // Sort projects by: 1) focus tier (projects with focus items first), 2) priority, 3) count
     projects.sort((a, b) => {
-      // Sort by priority (lower = higher priority)
+      if (a.hasFocusItems && !b.hasFocusItems) return -1;
+      if (!a.hasFocusItems && b.hasFocusItems) return 1;
+
       const priorityDiff = a.highestPriority - b.highestPriority;
       if (priorityDiff !== 0) return priorityDiff;
 
-      // Then by count (higher count = more tags/activity)
       return b.count - a.count;
     });
 
