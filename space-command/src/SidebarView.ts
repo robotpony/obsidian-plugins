@@ -2,9 +2,10 @@ import { ItemView, WorkspaceLeaf, TFile, Menu, Modal, MarkdownRenderer, Componen
 import { TodoScanner } from "./TodoScanner";
 import { TodoProcessor } from "./TodoProcessor";
 import { ProjectManager } from "./ProjectManager";
+import { TeamManager } from "./TeamManager";
 import { TodoItem, ProjectInfo, ItemRenderConfig } from "./types";
 import { ContextMenuHandler } from "./ContextMenuHandler";
-import { getPriorityValue, compareTodoItems, compareWithEffectivePriority, hasTag, openFileAtLine, extractTags, showNotice, getTagColourInfo, extractCompletionDate } from "./utils";
+import { getPriorityValue, compareTodoItems, compareWithEffectivePriority, hasTag, openFileAtLine, extractTags, extractMentions, resolveMentions, showNotice, getTagColourInfo, extractCompletionDate } from "./utils";
 
 export const VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 
@@ -23,6 +24,8 @@ export class TodoSidebarView extends ItemView {
   private triageActiveThreshold: number;
   private activeTab: 'todos' | 'ideas' | 'snoozed' = 'todos';
   private activeTagFilter: string | null = null;
+  private activeAssigneeFilter: string | null = null;
+  private teamManager: TeamManager;
   private focusModeEnabled: boolean = false;
   private openDropdown: HTMLElement | null = null;
   private openDropdownTrigger: HTMLElement | null = null;
@@ -47,7 +50,8 @@ export class TodoSidebarView extends ItemView {
     onShowAbout: () => void,
     onShowStats: () => void,
     onShowTriage: () => void,
-    getMoveHistory: () => string[] = () => []
+    getMoveHistory: () => string[] = () => [],
+    teamManager?: TeamManager
   ) {
     super(leaf);
     this.scanner = scanner;
@@ -63,6 +67,7 @@ export class TodoSidebarView extends ItemView {
     this.onShowAbout = onShowAbout;
     this.onShowStats = onShowStats;
     this.onShowTriage = onShowTriage;
+    this.teamManager = teamManager ?? new TeamManager(this.app, "team.md");
 
     // Initialize context menu handler
     this.contextMenuHandler = new ContextMenuHandler(
@@ -392,6 +397,11 @@ export class TodoSidebarView extends ItemView {
     const mergedTags = [...new Set([...parentTags, ...itemTags])];
     if (mergedTags.length > 0) {
       this.renderTagDropdown(mergedTags, rowContainer, item);
+    }
+
+    // Mention badges
+    if (item.mentions.length > 0) {
+      this.renderMentionBadges(item.mentions, rowContainer);
     }
 
     // Link to source
@@ -1001,16 +1011,126 @@ export class TodoSidebarView extends ItemView {
   }
 
   private sortTodosByPriority(todos: TodoItem[], allTodosForChildLookup?: TodoItem[]): TodoItem[] {
-    // Use effective priority sorting which considers children for header items
-    // Pass the full todos list (including children) for accurate child priority lookup
     const lookupList = allTodosForChildLookup || todos;
-    return [...todos].sort((a, b) => compareWithEffectivePriority(a, b, lookupList));
+    const meHandle = this.teamManager.resolveMe();
+    return [...todos].sort((a, b) => {
+      const base = compareWithEffectivePriority(a, b, lookupList);
+      if (base !== 0) return base;
+      // Soft @me boost: within the same priority tier, @me items sort first
+      if (meHandle) {
+        const aIsMe = resolveMentions(a, meHandle).includes(meHandle);
+        const bIsMe = resolveMentions(b, meHandle).includes(meHandle);
+        if (aIsMe && !bIsMe) return -1;
+        if (!aIsMe && bIsMe) return 1;
+      }
+      return 0;
+    });
   }
 
   /**
    * Render filter indicator button after section title if a filter is active.
    * Clicking the button clears the filter.
    */
+  private renderMentionBadges(mentions: string[], container: HTMLElement): void {
+    const meHandle = this.teamManager.resolveMe();
+    for (const mention of mentions) {
+      const isMe = mention === "me" || (meHandle && mention === meHandle);
+      const badge = container.createEl("span", {
+        cls: `sc-mention${isMe ? " sc-mention-me" : ""}`,
+        text: `@${mention}`,
+      });
+      const member = this.teamManager.resolveHandle(mention);
+      if (member) {
+        badge.setAttribute("title", member.name);
+      }
+    }
+  }
+
+  private renderAssigneeFilter(header: HTMLElement): void {
+    const team = this.teamManager.getTeam();
+    // Only show filter if there are team members defined
+    if (team.length === 0) return;
+
+    const label = this.activeAssigneeFilter
+      ? (this.activeAssigneeFilter === "__unassigned__" ? "?" : `@${this.activeAssigneeFilter}`)
+      : "@";
+
+    const trigger = header.createEl("span", {
+      cls: `sc-assignee-filter${this.activeAssigneeFilter ? " active" : ""}`,
+      text: label,
+      attr: { "aria-label": "Filter by assignee" },
+    });
+
+    trigger.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.closeDropdown();
+
+      const dropdown = document.createElement("div");
+      dropdown.className = "tag-dropdown-menu";
+
+      const rect = trigger.getBoundingClientRect();
+      dropdown.style.position = "fixed";
+      dropdown.style.top = `${rect.bottom + 4}px`;
+
+      const sidebarRoot = this.leaf.getRoot();
+      const isRightSidebar = sidebarRoot === this.app.workspace.rightSplit;
+      if (isRightSidebar) {
+        dropdown.style.right = `${window.innerWidth - rect.right}px`;
+        dropdown.classList.add("dropdown-left");
+      } else {
+        dropdown.style.left = `${rect.left}px`;
+      }
+
+      // "Everyone" option
+      const everyoneItem = dropdown.createEl("div", { cls: "tag-dropdown-item" });
+      everyoneItem.createEl("span", { cls: "tag-dropdown-item-label", text: "Everyone" });
+      everyoneItem.addEventListener("click", () => {
+        this.activeAssigneeFilter = null;
+        this.closeDropdown();
+        this.render();
+      });
+
+      // Team members
+      const meHandle = this.teamManager.resolveMe();
+      if (meHandle) {
+        const meItem = dropdown.createEl("div", { cls: "tag-dropdown-item" });
+        const meMember = team.find(m => m.isMe);
+        meItem.createEl("span", { cls: "tag-dropdown-item-label sc-mention sc-mention-me", text: `@me` });
+        if (meMember) meItem.createEl("span", { cls: "sc-assignee-filter-name", text: meMember.name });
+        meItem.addEventListener("click", () => {
+          this.activeAssigneeFilter = "me";
+          this.closeDropdown();
+          this.render();
+        });
+      }
+
+      for (const member of team) {
+        if (member.isMe) continue;
+        const item = dropdown.createEl("div", { cls: "tag-dropdown-item" });
+        item.createEl("span", { cls: "tag-dropdown-item-label sc-mention", text: `@${member.handle}` });
+        item.createEl("span", { cls: "sc-assignee-filter-name", text: member.name });
+        item.addEventListener("click", () => {
+          this.activeAssigneeFilter = member.handle;
+          this.closeDropdown();
+          this.render();
+        });
+      }
+
+      // Unassigned option
+      const unassignedItem = dropdown.createEl("div", { cls: "tag-dropdown-item" });
+      unassignedItem.createEl("span", { cls: "tag-dropdown-item-label", text: "Unassigned" });
+      unassignedItem.addEventListener("click", () => {
+        this.activeAssigneeFilter = "__unassigned__";
+        this.closeDropdown();
+        this.render();
+      });
+
+      document.body.appendChild(dropdown);
+      this.openDropdown = dropdown;
+      this.openDropdownTrigger = trigger;
+    });
+  }
+
   private renderFilterIndicator(header: HTMLElement): void {
     if (!this.activeTagFilter) return;
 
@@ -1395,6 +1515,20 @@ export class TodoSidebarView extends ItemView {
       todos = todos.filter(todo => todo.tags.includes(this.activeTagFilter!));
     }
 
+    // Apply assignee filter if active
+    if (this.activeAssigneeFilter) {
+      const meHandle = this.teamManager.resolveMe();
+      if (this.activeAssigneeFilter === "__unassigned__") {
+        todos = todos.filter(todo => todo.mentions.length === 0);
+      } else {
+        const filterHandle = this.activeAssigneeFilter === "me" && meHandle ? meHandle : this.activeAssigneeFilter;
+        todos = todos.filter(todo => {
+          const resolved = resolveMentions(todo, meHandle);
+          return resolved.includes(filterHandle);
+        });
+      }
+    }
+
     // Apply focus mode filter if enabled
     if (this.focusModeEnabled) {
       if (this.focusModeIncludeProjects) {
@@ -1430,6 +1564,7 @@ export class TodoSidebarView extends ItemView {
     const header = section.createEl("div", { cls: "todo-section-header" });
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
     titleSpan.textContent = "TODO";
+    this.renderAssigneeFilter(header);
     this.renderFilterIndicator(header);
 
     if (totalCount === 0) {
@@ -1470,6 +1605,7 @@ export class TodoSidebarView extends ItemView {
     const section = container.createEl("div", { cls: "summary-section" });
     this.renderSummaryHeader(section);
     this.renderPriorityCounts(section);
+    this.renderAssigneeStats(section);
     this.renderCompletionVelocity(section);
     this.renderTopBacklogs(section);
   }
@@ -1536,6 +1672,42 @@ export class TodoSidebarView extends ItemView {
     cell.createEl("span", { cls: "summary-count-label", text: label });
     const valEl = cell.createEl("span", { cls: "summary-count-value", text: String(value) });
     if (value === 0) valEl.addClass("zero");
+  }
+
+  private renderAssigneeStats(section: HTMLElement): void {
+    const todos = this.scanner.getTodos();
+    const meHandle = this.teamManager.resolveMe();
+
+    const counts = new Map<string, number>();
+    let unassigned = 0;
+    let hasMentions = false;
+
+    for (const t of todos) {
+      if (t.mentions.length === 0) {
+        unassigned++;
+        continue;
+      }
+      hasMentions = true;
+      const resolved = resolveMentions(t, meHandle);
+      for (const handle of resolved) {
+        counts.set(handle, (counts.get(handle) || 0) + 1);
+      }
+    }
+
+    if (!hasMentions) return;
+
+    const row = section.createEl("div", { cls: "sc-assignee-stats" });
+    const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+    for (const [handle, count] of sorted) {
+      const cell = row.createEl("span", { cls: "sc-assignee-stat" });
+      cell.createEl("span", { cls: "sc-mention", text: `@${handle}` });
+      cell.createEl("span", { cls: "summary-count-value", text: String(count) });
+    }
+    if (unassigned > 0) {
+      const cell = row.createEl("span", { cls: "sc-assignee-stat" });
+      cell.createEl("span", { text: "none" });
+      cell.createEl("span", { cls: "summary-count-value", text: String(unassigned) });
+    }
   }
 
   private renderCompletionVelocity(section: HTMLElement): void {

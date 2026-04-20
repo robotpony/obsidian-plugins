@@ -1,6 +1,6 @@
 import { App, TFile, Vault, Events, debounce } from "obsidian";
 import { TodoItem } from "./types";
-import { createFingerprint, extractDateFromFilename, extractTags, filenameToTag, hasCachedRelevantTags, hasCheckboxFormat, isCheckboxChecked } from "./utils";
+import { createFingerprint, extractDateFromFilename, extractMentions, extractTags, filenameToTag, hasCachedRelevantTags, hasCheckboxFormat, isCheckboxChecked } from "./utils";
 
 export class TodoScanner extends Events {
   private app: App;
@@ -289,8 +289,25 @@ export class TodoScanner extends Events {
       // Apply all queued line mutations in one write to avoid concurrent vault.modify() calls
       await this.applyLineMutations(file, lines, linesToCleanup, linesToSyncTodone, linesToRemoveIdea, linesToStampMoved);
 
-      if (todos.length > 0) {
-        this.todosCache.set(file.path, todos);
+      // Filter out header TODOs whose children are all completed, moved, or snoozed.
+      // A child is "active" if it exists in the todos array and is not snoozed.
+      // Moved children never enter childLineNumbers (scanner skips #moved before
+      // child registration), so an empty childLineNumbers means all children are
+      // gone. This runs at scan time so both sidebar and embeds see clean data.
+      const activeTodos = todos.filter(todo => {
+        if (!todo.isHeader || !todo.childLineNumbers) return true;
+        if (todo.childLineNumbers.length === 0) return false;
+        return todo.childLineNumbers.some(childLine => {
+          const child = todos.find(t => t.lineNumber === childLine);
+          if (!child) return false;
+          return !child.tags.includes("#future") &&
+                 !child.tags.includes("#snooze") &&
+                 !child.tags.includes("#snoozed");
+        });
+      });
+
+      if (activeTodos.length > 0) {
+        this.todosCache.set(file.path, activeTodos);
       } else {
         this.todosCache.delete(file.path);
       }
@@ -354,6 +371,7 @@ export class TodoScanner extends Events {
       dateCreated: file.stat.mtime,
       itemType,
       inferredFileTag: filenameToTag(file.basename),
+      mentions: extractMentions(text),
     };
   }
 

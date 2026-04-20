@@ -2,6 +2,29 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.123] - 2026-04-20
+
+### Fixed
+
+- **Header TODOs now hide when all children are done or moved**: Block-level `#todo` headers (e.g., `## Sprint 12 #todo`) no longer appear in the sidebar or embeds when every child item underneath has been completed, moved, or snoozed. The filtering now runs at scan time in the scanner itself, eliminating timing issues with render-time filters.
+
+---
+
+## [0.9.122] - 2026-04-20
+
+### Added
+
+- **@mention attribution tags**: Assign TODOs to people with `@handle` mentions (e.g., `- [ ] Review spec #todo @eric.m`). Mentions behave like topic tags but styled with a more subdued colour to distinguish them.
+- **Team file**: Define your team in `team.md` at the vault root using `- @handle — Display Name` syntax. Mark yourself with `(me)`. Unknown handles encountered in TODOs are auto-added.
+- **Autocomplete**: The `@` trigger now offers both dates and team members in a single suggestion popup. Date keywords take priority, then user handles.
+- **Sidebar assignee filter**: Filter the active TODO list by assignee using a dropdown in the sidebar header. Includes Everyone, @me, each team member, and Unassigned.
+- **Sidebar assignee stats**: Per-person mention counts shown in the Summary section when mentions exist in the vault.
+- **Embed assignee filter**: Use `assignee:@handle` (or `assignee:@me`) in code block and inline embed filters to scope embedded lists by assignee.
+- **@me sort boost**: Items mentioning `@me` get a soft sort boost within the same priority tier, surfacing your own tasks first.
+- **Team settings**: New "Team" section in settings with file path configuration, open/create buttons, and a read-only team roster display.
+
+---
+
 ## [0.9.121] - 2026-04-17
 
 ### Improved

@@ -1,5 +1,11 @@
 import { TFile } from "obsidian";
 
+export interface TeamMember {
+  handle: string;
+  name: string;
+  isMe: boolean;
+}
+
 export interface TodoItem {
   file: TFile;
   filePath: string;
@@ -19,6 +25,7 @@ export interface TodoItem {
   itemType?: 'todo' | 'todone' | 'idea' | 'principle';
   // Inferred file-level tag derived from filename (e.g., "api-tasks.md" → "#api-tasks")
   inferredFileTag?: string;
+  mentions: string[];
 }
 
 export interface TodoFilters {
@@ -26,6 +33,7 @@ export interface TodoFilters {
   tags?: string[];
   limit?: number;
   todone?: 'show' | 'hide';
+  assignee?: string;
 }
 
 export interface ProjectInfo {
@@ -70,6 +78,8 @@ export interface SpaceCommandSettings {
   triageActiveThreshold: number;
   // Move history (recent move-to targets)
   moveHistory: string[];
+  // Team file path
+  teamFilePath: string;
 }
 
 export const DEFAULT_SETTINGS: SpaceCommandSettings = {
@@ -93,4 +103,6 @@ export const DEFAULT_SETTINGS: SpaceCommandSettings = {
   triageActiveThreshold: 20,
   // Move history
   moveHistory: [],
+  // Team file
+  teamFilePath: "team.md",
 };

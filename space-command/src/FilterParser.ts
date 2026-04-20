@@ -39,12 +39,17 @@ export class FilterParser {
           filters.todone = value;
         }
       }
+      // Parse assignee:@handle
+      else if (part.startsWith("assignee:")) {
+        const value = part.substring(9).trim();
+        filters.assignee = value.startsWith("@") ? value.substring(1) : value;
+      }
     }
 
     return filters;
   }
 
-  static applyFilters(todos: TodoItem[], filters: TodoFilters): TodoItem[] {
+  static applyFilters(todos: TodoItem[], filters: TodoFilters, meHandle?: string | null): TodoItem[] {
     let filtered = [...todos];
 
     // Apply path filter
@@ -78,6 +83,21 @@ export class FilterParser {
     } else if (filters.todone === 'show') {
       // 'show' means include only todone items (useful for review blocks)
       filtered = filtered.filter((todo) => todo.itemType === 'todone');
+    }
+
+    // Apply assignee filter
+    if (filters.assignee) {
+      let handle = filters.assignee;
+      if (handle === "me" && meHandle) {
+        handle = meHandle;
+      }
+      filtered = filtered.filter((todo) => {
+        const mentions = todo.mentions ?? [];
+        return mentions.some(m => {
+          const resolved = m === "me" && meHandle ? meHandle : m;
+          return resolved === handle;
+        });
+      });
     }
 
     // Apply limit

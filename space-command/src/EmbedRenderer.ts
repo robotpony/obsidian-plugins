@@ -2,6 +2,7 @@ import { App, TFile } from "obsidian";
 import { TodoScanner } from "./TodoScanner";
 import { TodoProcessor } from "./TodoProcessor";
 import { ProjectManager } from "./ProjectManager";
+import { TeamManager } from "./TeamManager";
 import { FilterParser } from "./FilterParser";
 import { ContextMenuHandler } from "./ContextMenuHandler";
 import { TodoItem } from "./types";
@@ -17,6 +18,7 @@ export class EmbedRenderer {
   private focusListLimit: number;
   private priorityTags: string[];
   private makeLinksClickable: boolean;
+  private teamManager?: TeamManager;
 
   // Track active renders for event cleanup
   private activeRenders: Map<HTMLElement, () => void> = new Map();
@@ -36,7 +38,8 @@ export class EmbedRenderer {
     focusListLimit: number = 5,
     priorityTags: string[] = ["#p0", "#p1", "#p2", "#p3", "#p4"],
     makeLinksClickable: boolean = true,
-    getMoveHistory: () => string[] = () => []
+    getMoveHistory: () => string[] = () => [],
+    teamManager?: TeamManager
   ) {
     this.app = app;
     this.scanner = scanner;
@@ -46,7 +49,12 @@ export class EmbedRenderer {
     this.focusListLimit = focusListLimit;
     this.priorityTags = priorityTags;
     this.makeLinksClickable = makeLinksClickable;
+    this.teamManager = teamManager;
     this.contextMenuHandler = new ContextMenuHandler(app, processor, priorityTags, getMoveHistory);
+  }
+
+  private getMeHandle(): string | null {
+    return this.teamManager?.resolveMe() ?? null;
   }
 
   // Get project colour map for tag colouring (cached per render cycle)
@@ -104,8 +112,8 @@ export class EmbedRenderer {
     // Keep unfiltered list for child lookup
     const unfiltered = [...allTodos, ...allTodones];
     // Apply filters to both
-    let filteredTodos = FilterParser.applyFilters(allTodos, filters);
-    let filteredTodones = FilterParser.applyFilters(allTodones, filters);
+    let filteredTodos = FilterParser.applyFilters(allTodos, filters, this.getMeHandle());
+    let filteredTodones = FilterParser.applyFilters(allTodones, filters, this.getMeHandle());
     // Include parent headers when children match filter
     filteredTodos = this.includeParentHeaders(filteredTodos, allTodos);
     filteredTodones = this.includeParentHeaders(filteredTodones, allTodones);
@@ -126,7 +134,7 @@ export class EmbedRenderer {
   ): void {
     const filters = FilterParser.parse(filterString);
     const allIdeas = this.scanner.getIdeas();
-    const filteredIdeas = FilterParser.applyFilters(allIdeas, filters);
+    const filteredIdeas = FilterParser.applyFilters(allIdeas, filters, this.getMeHandle());
     this.renderIdeaList(container, filteredIdeas, filterString, allIdeas);
   }
 
@@ -137,7 +145,7 @@ export class EmbedRenderer {
   ): void {
     const filters = FilterParser.parse(filterString);
     const allPrinciples = this.scanner.getPrinciples();
-    const filteredPrinciples = FilterParser.applyFilters(allPrinciples, filters);
+    const filteredPrinciples = FilterParser.applyFilters(allPrinciples, filters, this.getMeHandle());
     this.renderPrincipleList(container, filteredPrinciples, filterString, allPrinciples);
   }
 
@@ -213,8 +221,8 @@ export class EmbedRenderer {
     // Keep unfiltered list for child lookup
     const unfiltered = [...allTodos, ...allTodones];
     // Apply filters
-    let filteredTodos = FilterParser.applyFilters(allTodos, filters);
-    let filteredTodones = FilterParser.applyFilters(allTodones, filters);
+    let filteredTodos = FilterParser.applyFilters(allTodos, filters, this.getMeHandle());
+    let filteredTodones = FilterParser.applyFilters(allTodones, filters, this.getMeHandle());
     // Include parent headers when children match filter
     filteredTodos = this.includeParentHeaders(filteredTodos, allTodos);
     filteredTodones = this.includeParentHeaders(filteredTodones, allTodones);
@@ -1098,8 +1106,8 @@ export class EmbedRenderer {
     // Keep unfiltered list for child lookup
     const unfiltered = [...allTodos, ...allTodones];
     // Apply filters
-    let filteredTodos = FilterParser.applyFilters(allTodos, filters);
-    let filteredTodones = FilterParser.applyFilters(allTodones, filters);
+    let filteredTodos = FilterParser.applyFilters(allTodos, filters, this.getMeHandle());
+    let filteredTodones = FilterParser.applyFilters(allTodones, filters, this.getMeHandle());
     // Include parent headers when children match filter
     filteredTodos = this.includeParentHeaders(filteredTodos, allTodos);
     filteredTodones = this.includeParentHeaders(filteredTodones, allTodones);
@@ -1135,7 +1143,7 @@ export class EmbedRenderer {
     this.invalidateColourMapCache();
     const filters = FilterParser.parse(filterString);
     const allIdeas = this.scanner.getIdeas();
-    const filteredIdeas = FilterParser.applyFilters(allIdeas, filters);
+    const filteredIdeas = FilterParser.applyFilters(allIdeas, filters, this.getMeHandle());
     this.renderIdeaList(container, filteredIdeas, filterString, allIdeas);
   }
 
@@ -1167,7 +1175,7 @@ export class EmbedRenderer {
     this.invalidateColourMapCache();
     const filters = FilterParser.parse(filterString);
     const allPrinciples = this.scanner.getPrinciples();
-    const filteredPrinciples = FilterParser.applyFilters(allPrinciples, filters);
+    const filteredPrinciples = FilterParser.applyFilters(allPrinciples, filters, this.getMeHandle());
     this.renderPrincipleList(container, filteredPrinciples, filterString, allPrinciples);
   }
 

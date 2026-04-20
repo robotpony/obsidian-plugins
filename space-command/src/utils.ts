@@ -281,6 +281,28 @@ export function extractTags(text: string): string[] {
   return textWithoutCode.match(tagRegex) || [];
 }
 
+import { TodoItem } from "./types";
+
+const DATE_KEYWORDS = new Set(["date", "today", "tomorrow", "yesterday"]);
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+export function resolveMentions(item: TodoItem, meHandle: string | null): string[] {
+  return item.mentions.map(m => m === "me" && meHandle ? meHandle : m);
+}
+
+export function extractMentions(text: string): string[] {
+  const textWithoutCode = text.replace(/`[^`]*`/g, "");
+  const mentionRegex = /@([\w][\w.-]*)/g;
+  const mentions: string[] = [];
+  let match;
+  while ((match = mentionRegex.exec(textWithoutCode)) !== null) {
+    const token = match[1];
+    if (DATE_KEYWORDS.has(token.toLowerCase()) || DATE_PATTERN.test(token)) continue;
+    mentions.push(token);
+  }
+  return mentions;
+}
+
 /**
  * Convert a filename (without extension) to a tag format.
  * "API Tasks" → "#api-tasks"

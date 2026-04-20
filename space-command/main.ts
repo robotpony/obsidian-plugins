@@ -5,6 +5,7 @@ import {
   Plugin,
   PluginSettingTab,
   Setting,
+  TFile,
 } from "obsidian";
 import { TodoScanner } from "./src/TodoScanner";
 import { TodoProcessor } from "./src/TodoProcessor";
@@ -12,7 +13,8 @@ import { ProjectManager } from "./src/ProjectManager";
 import { EmbedRenderer } from "./src/EmbedRenderer";
 import { CodeBlockProcessor } from "./src/CodeBlockProcessor";
 import { SlashCommandSuggest } from "./src/SlashCommandSuggest";
-import { DateSuggest } from "./src/DateSuggest";
+import { AtSuggest } from "./src/AtSuggest";
+import { TeamManager } from "./src/TeamManager";
 import {
   TodoSidebarView,
   VIEW_TYPE_TODO_SIDEBAR,
@@ -38,6 +40,7 @@ export default class SpaceCommandPlugin extends Plugin {
   projectManager: ProjectManager;
   embedRenderer: EmbedRenderer;
   tabLockManager: TabLockManager;
+  teamManager: TeamManager;
   private sidebarManager: SidebarManager;
 
   async onload() {
@@ -45,6 +48,10 @@ export default class SpaceCommandPlugin extends Plugin {
 
     // Initialize sidebar manager
     this.sidebarManager = new SidebarManager(this.app, VIEW_TYPE_TODO_SIDEBAR);
+
+    // Initialize team manager
+    this.teamManager = new TeamManager(this.app, this.settings.teamFilePath);
+    this.teamManager.watchFile();
 
     // Initialize core components
     this.scanner = new TodoScanner(this.app);
@@ -66,7 +73,8 @@ export default class SpaceCommandPlugin extends Plugin {
       this.settings.focusListLimit,
       this.settings.priorityTags,
       this.settings.makeLinksClickable,
-      () => this.settings.moveHistory
+      () => this.settings.moveHistory,
+      this.teamManager
     );
 
     // Initialize tab lock manager
@@ -110,6 +118,7 @@ export default class SpaceCommandPlugin extends Plugin {
     // initial indexing pass, ensuring getFileCache() returns accurate results
     // for the pre-filter check introduced in phase 3.
     this.app.workspace.onLayoutReady(async () => {
+      await this.teamManager.load();
       await this.scanner.scanVault();
 
       // Activate the sidebar after the scan so it has data to show on first render.
@@ -196,7 +205,8 @@ export default class SpaceCommandPlugin extends Plugin {
           () => this.showAboutModal(),
           () => this.showStatsModal(),
           () => this.showTriageModal(),
-          () => this.settings.moveHistory
+          () => this.settings.moveHistory,
+          this.teamManager
         )
     );
 
@@ -225,9 +235,9 @@ export default class SpaceCommandPlugin extends Plugin {
     );
     codeBlockProcessor.registerProcessors(this);
 
-    // Register editor suggesters for slash commands and @date
+    // Register editor suggesters for slash commands and @date/@user
     this.registerEditorSuggest(new SlashCommandSuggest(this.app, this.settings));
-    this.registerEditorSuggest(new DateSuggest(this.app, this.settings));
+    this.registerEditorSuggest(new AtSuggest(this.app, this.settings, this.teamManager));
 
     // Commands
     this.addCommand({
@@ -1127,6 +1137,61 @@ class SpaceCommandSettingTab extends PluginSettingTab {
             }
           })
       );
+
+    // Team section
+    containerEl.createEl("h3", { text: "Team" });
+
+    new Setting(containerEl)
+      .setName("Team file path")
+      .setDesc("Path to the team definition file in your vault")
+      .addText((text) =>
+        text
+          .setPlaceholder("team.md")
+          .setValue(this.plugin.settings.teamFilePath)
+          .onChange(async (value) => {
+            this.plugin.settings.teamFilePath = value;
+            this.plugin.teamManager.setFilePath(value);
+            await this.plugin.saveSettings();
+            this.display();
+          })
+      );
+
+    const teamFile = this.app.vault.getAbstractFileByPath(this.plugin.settings.teamFilePath);
+    const teamButtonSetting = new Setting(containerEl);
+
+    if (teamFile instanceof TFile) {
+      teamButtonSetting
+        .setName("Manage team file")
+        .addButton((btn) =>
+          btn.setButtonText("Open team file").onClick(async () => {
+            await this.app.workspace.getLeaf(false).openFile(teamFile);
+          })
+        );
+    } else {
+      teamButtonSetting
+        .setName("No team file found")
+        .setDesc("Create a starter team file with your username")
+        .addButton((btn) =>
+          btn.setButtonText("Create team file").setCta().onClick(async () => {
+            const file = await this.plugin.teamManager.createTeamFile();
+            await this.app.workspace.getLeaf(false).openFile(file);
+            this.display();
+          })
+        );
+    }
+
+    const team = this.plugin.teamManager.getTeam();
+    if (team.length > 0) {
+      const teamList = containerEl.createEl("div", { cls: "sc-team-list" });
+      for (const member of team) {
+        const entry = teamList.createEl("div", { cls: "sc-team-entry" });
+        entry.createEl("span", { cls: "sc-team-handle", text: `@${member.handle}` });
+        entry.createEl("span", { cls: "sc-team-name", text: member.name });
+        if (member.isMe) {
+          entry.createEl("span", { cls: "sc-team-me-badge", text: "(me)" });
+        }
+      }
+    }
 
   }
 }

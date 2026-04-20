@@ -61,6 +61,41 @@ Use "Move to..." (right-click menu or command palette) to relocate a TODO to ano
 
 Moved lines are dimmed in both Reading mode and Live Preview, so they stay visible as an audit trail without cluttering your active view. You can also type `#moved` manually—the plugin auto-stamps the date.
 
+## Mentions and Delegation
+
+Assign TODOs to people with `@handle`:
+
+```markdown
+- [ ] Review the API spec #todo @eric.m
+- [ ] Update onboarding docs #todo @me
+```
+
+Mentions appear as subdued badges next to topic tags. `@me` resolves to your handle from the team file.
+
+### Team file
+
+Create `team.md` in your vault root (or configure the path in Settings):
+
+```markdown
+- @bruce — Bruce Alderson (me)
+- @eric.m — Eric Mitchell
+- @dana — Dana Park
+```
+
+Mark yourself with `(me)`. The plugin auto-creates this file from Settings if it doesn't exist and auto-adds unknown handles encountered in TODOs.
+
+### Filtering by assignee
+
+In the sidebar, use the assignee dropdown to filter by person. In embeds:
+
+````markdown
+```focus-todos
+assignee:@me
+```
+````
+
+Available filters: `assignee:@me`, `assignee:@handle`, or combine with other filters (`path:`, `tags:`, `limit:`).
+
 ## Ideas and Principles
 
 Capture ideas separately from actionable TODOs. The sidebar has two tabs—TODOs and Ideas.
@@ -137,9 +172,18 @@ Type `/` at the start of a line:
 | `/today` | Today's date |
 | `/tomorrow` | Tomorrow's date |
 
-### Date suggestions
+### @ suggestions
 
-Type `@` anywhere to insert dates: `@today`, `@tomorrow`, `@yesterday`. Format is configurable (default: `YYYY-MM-DD`).
+Type `@` anywhere to get a combined suggestion popup:
+
+| Suggestion | Inserts |
+|------------|---------|
+| `@today` / `@date` | Today's formatted date |
+| `@tomorrow` | Tomorrow's date |
+| `@yesterday` | Yesterday's date |
+| `@me` / `@handle` | Attribution mention (from team file) |
+
+Date keywords take priority over user handles. Unknown handles are auto-added to your team file.
 
 ### Copy for other tools
 

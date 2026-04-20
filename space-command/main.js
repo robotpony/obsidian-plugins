@@ -27,7 +27,7 @@ __export(main_exports, {
   default: () => SpaceCommandPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian12 = require("obsidian");
+var import_obsidian13 = require("obsidian");
 
 // src/TodoScanner.ts
 var import_obsidian4 = require("obsidian");
@@ -282,6 +282,24 @@ function extractTags(text) {
   const textWithoutCode = text.replace(/`[^`]*`/g, "");
   const tagRegex = /#[\w-]+/g;
   return textWithoutCode.match(tagRegex) || [];
+}
+var DATE_KEYWORDS = /* @__PURE__ */ new Set(["date", "today", "tomorrow", "yesterday"]);
+var DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+function resolveMentions(item, meHandle) {
+  return item.mentions.map((m) => m === "me" && meHandle ? meHandle : m);
+}
+function extractMentions(text) {
+  const textWithoutCode = text.replace(/`[^`]*`/g, "");
+  const mentionRegex = /@([\w][\w.-]*)/g;
+  const mentions = [];
+  let match;
+  while ((match = mentionRegex.exec(textWithoutCode)) !== null) {
+    const token = match[1];
+    if (DATE_KEYWORDS.has(token.toLowerCase()) || DATE_PATTERN.test(token))
+      continue;
+    mentions.push(token);
+  }
+  return mentions;
 }
 function filenameToTag(basename) {
   return "#" + basename.toLowerCase().replace(/\s+/g, "-").replace(/[^\w-]/g, "").replace(/-+/g, "-").replace(/^-|-$/g, "");
@@ -684,8 +702,20 @@ var TodoScanner = class extends import_obsidian4.Events {
         }
       }
       await this.applyLineMutations(file, lines, linesToCleanup, linesToSyncTodone, linesToRemoveIdea, linesToStampMoved);
-      if (todos.length > 0) {
-        this.todosCache.set(file.path, todos);
+      const activeTodos = todos.filter((todo) => {
+        if (!todo.isHeader || !todo.childLineNumbers)
+          return true;
+        if (todo.childLineNumbers.length === 0)
+          return false;
+        return todo.childLineNumbers.some((childLine) => {
+          const child = todos.find((t) => t.lineNumber === childLine);
+          if (!child)
+            return false;
+          return !child.tags.includes("#future") && !child.tags.includes("#snooze") && !child.tags.includes("#snoozed");
+        });
+      });
+      if (activeTodos.length > 0) {
+        this.todosCache.set(file.path, activeTodos);
       } else {
         this.todosCache.delete(file.path);
       }
@@ -734,7 +764,8 @@ var TodoScanner = class extends import_obsidian4.Events {
       tags,
       dateCreated: file.stat.mtime,
       itemType,
-      inferredFileTag: filenameToTag(file.basename)
+      inferredFileTag: filenameToTag(file.basename),
+      mentions: extractMentions(text)
     };
   }
   /**
@@ -1871,11 +1902,14 @@ var FilterParser = class {
         if (value === "show" || value === "hide") {
           filters.todone = value;
         }
+      } else if (part.startsWith("assignee:")) {
+        const value = part.substring(9).trim();
+        filters.assignee = value.startsWith("@") ? value.substring(1) : value;
       }
     }
     return filters;
   }
-  static applyFilters(todos, filters) {
+  static applyFilters(todos, filters, meHandle) {
     let filtered = [...todos];
     if (filters.path) {
       const pathPrefix = filters.path.toLowerCase();
@@ -1896,6 +1930,20 @@ var FilterParser = class {
       filtered = filtered.filter((todo) => todo.itemType !== "todone");
     } else if (filters.todone === "show") {
       filtered = filtered.filter((todo) => todo.itemType === "todone");
+    }
+    if (filters.assignee) {
+      let handle = filters.assignee;
+      if (handle === "me" && meHandle) {
+        handle = meHandle;
+      }
+      filtered = filtered.filter((todo) => {
+        var _a;
+        const mentions = (_a = todo.mentions) != null ? _a : [];
+        return mentions.some((m) => {
+          const resolved = m === "me" && meHandle ? meHandle : m;
+          return resolved === handle;
+        });
+      });
     }
     if (filters.limit) {
       filtered = filtered.slice(0, filters.limit);
@@ -2231,7 +2279,7 @@ var ContextMenuHandler = class {
 
 // src/EmbedRenderer.ts
 var EmbedRenderer = class {
-  constructor(app, scanner, processor, projectManager, defaultTodoneFile = "todos/done.md", focusListLimit = 5, priorityTags = ["#p0", "#p1", "#p2", "#p3", "#p4"], makeLinksClickable = true, getMoveHistory = () => []) {
+  constructor(app, scanner, processor, projectManager, defaultTodoneFile = "todos/done.md", focusListLimit = 5, priorityTags = ["#p0", "#p1", "#p2", "#p3", "#p4"], makeLinksClickable = true, getMoveHistory = () => [], teamManager) {
     // Track active renders for event cleanup
     this.activeRenders = /* @__PURE__ */ new Map();
     // Track TODONE visibility state per container
@@ -2246,7 +2294,12 @@ var EmbedRenderer = class {
     this.focusListLimit = focusListLimit;
     this.priorityTags = priorityTags;
     this.makeLinksClickable = makeLinksClickable;
+    this.teamManager = teamManager;
     this.contextMenuHandler = new ContextMenuHandler(app, processor, priorityTags, getMoveHistory);
+  }
+  getMeHandle() {
+    var _a, _b;
+    return (_b = (_a = this.teamManager) == null ? void 0 : _a.resolveMe()) != null ? _b : null;
   }
   // Get project colour map for tag colouring (cached per render cycle)
   getProjectColourMap() {
@@ -2288,8 +2341,8 @@ var EmbedRenderer = class {
     );
     const allTodones = this.scanner.getTodones();
     const unfiltered = [...allTodos, ...allTodones];
-    let filteredTodos = FilterParser.applyFilters(allTodos, filters);
-    let filteredTodones = FilterParser.applyFilters(allTodones, filters);
+    let filteredTodos = FilterParser.applyFilters(allTodos, filters, this.getMeHandle());
+    let filteredTodones = FilterParser.applyFilters(allTodones, filters, this.getMeHandle());
     filteredTodos = this.includeParentHeaders(filteredTodos, allTodos);
     filteredTodones = this.includeParentHeaders(filteredTodones, allTodones);
     const combined = [...filteredTodos, ...filteredTodones];
@@ -2303,14 +2356,14 @@ var EmbedRenderer = class {
   renderIdeas(container, filterString) {
     const filters = FilterParser.parse(filterString);
     const allIdeas = this.scanner.getIdeas();
-    const filteredIdeas = FilterParser.applyFilters(allIdeas, filters);
+    const filteredIdeas = FilterParser.applyFilters(allIdeas, filters, this.getMeHandle());
     this.renderIdeaList(container, filteredIdeas, filterString, allIdeas);
   }
   // Public helper method for focus-principles code blocks
   renderPrinciples(container, filterString) {
     const filters = FilterParser.parse(filterString);
     const allPrinciples = this.scanner.getPrinciples();
-    const filteredPrinciples = FilterParser.applyFilters(allPrinciples, filters);
+    const filteredPrinciples = FilterParser.applyFilters(allPrinciples, filters, this.getMeHandle());
     this.renderPrincipleList(container, filteredPrinciples, filterString, allPrinciples);
   }
   async render(source, el) {
@@ -2356,8 +2409,8 @@ var EmbedRenderer = class {
     );
     const allTodones = this.scanner.getTodones();
     const unfiltered = [...allTodos, ...allTodones];
-    let filteredTodos = FilterParser.applyFilters(allTodos, filters);
-    let filteredTodones = FilterParser.applyFilters(allTodones, filters);
+    let filteredTodos = FilterParser.applyFilters(allTodos, filters, this.getMeHandle());
+    let filteredTodones = FilterParser.applyFilters(allTodones, filters, this.getMeHandle());
     filteredTodos = this.includeParentHeaders(filteredTodos, allTodos);
     filteredTodones = this.includeParentHeaders(filteredTodones, allTodones);
     const combined = [...filteredTodos, ...filteredTodones];
@@ -2925,8 +2978,8 @@ var EmbedRenderer = class {
     );
     const allTodones = this.scanner.getTodones();
     const unfiltered = [...allTodos, ...allTodones];
-    let filteredTodos = FilterParser.applyFilters(allTodos, filters);
-    let filteredTodones = FilterParser.applyFilters(allTodones, filters);
+    let filteredTodos = FilterParser.applyFilters(allTodos, filters, this.getMeHandle());
+    let filteredTodones = FilterParser.applyFilters(allTodones, filters, this.getMeHandle());
     filteredTodos = this.includeParentHeaders(filteredTodos, allTodos);
     filteredTodones = this.includeParentHeaders(filteredTodones, allTodones);
     const combined = [...filteredTodos, ...filteredTodones];
@@ -2950,7 +3003,7 @@ var EmbedRenderer = class {
     this.invalidateColourMapCache();
     const filters = FilterParser.parse(filterString);
     const allIdeas = this.scanner.getIdeas();
-    const filteredIdeas = FilterParser.applyFilters(allIdeas, filters);
+    const filteredIdeas = FilterParser.applyFilters(allIdeas, filters, this.getMeHandle());
     this.renderIdeaList(container, filteredIdeas, filterString, allIdeas);
   }
   // Setup auto-refresh for principle embeds
@@ -2971,7 +3024,7 @@ var EmbedRenderer = class {
     this.invalidateColourMapCache();
     const filters = FilterParser.parse(filterString);
     const allPrinciples = this.scanner.getPrinciples();
-    const filteredPrinciples = FilterParser.applyFilters(allPrinciples, filters);
+    const filteredPrinciples = FilterParser.applyFilters(allPrinciples, filters, this.getMeHandle());
     this.renderPrincipleList(container, filteredPrinciples, filterString, allPrinciples);
   }
 };
@@ -3232,32 +3285,36 @@ var SlashCommandSuggest = class extends import_obsidian9.EditorSuggest {
   }
 };
 
-// src/DateSuggest.ts
+// src/AtSuggest.ts
 var import_obsidian10 = require("obsidian");
-var DateSuggest = class extends import_obsidian10.EditorSuggest {
-  constructor(app, settings) {
+var AtSuggest = class extends import_obsidian10.EditorSuggest {
+  constructor(app, settings, teamManager) {
     super(app);
     this.settings = settings;
+    this.teamManager = teamManager;
   }
   getDateOptions() {
     return [
       {
+        kind: "date",
         id: "date",
-        name: "@date",
+        label: "@date",
         description: "Today's date",
         icon: "\u{1F4C5}",
         getDate: () => /* @__PURE__ */ new Date()
       },
       {
+        kind: "date",
         id: "today",
-        name: "@today",
+        label: "@today",
         description: "Today's date",
         icon: "\u{1F4C5}",
         getDate: () => /* @__PURE__ */ new Date()
       },
       {
+        kind: "date",
         id: "tomorrow",
-        name: "@tomorrow",
+        label: "@tomorrow",
         description: "Tomorrow's date",
         icon: "\u{1F4C6}",
         getDate: () => {
@@ -3267,8 +3324,9 @@ var DateSuggest = class extends import_obsidian10.EditorSuggest {
         }
       },
       {
+        kind: "date",
         id: "yesterday",
-        name: "@yesterday",
+        label: "@yesterday",
         description: "Yesterday's date",
         icon: "\u{1F4C6}",
         getDate: () => {
@@ -3279,19 +3337,45 @@ var DateSuggest = class extends import_obsidian10.EditorSuggest {
       }
     ];
   }
+  getUserOptions() {
+    var _a;
+    const team = this.teamManager.getTeam();
+    const options = [];
+    const meHandle = this.teamManager.resolveMe();
+    if (meHandle) {
+      const meMember = team.find((m) => m.isMe);
+      options.push({
+        kind: "user",
+        id: "me",
+        label: "@me",
+        description: (_a = meMember == null ? void 0 : meMember.name) != null ? _a : meHandle,
+        icon: "\u{1F464}",
+        handle: "me"
+      });
+    }
+    for (const member of team) {
+      options.push({
+        kind: "user",
+        id: member.handle,
+        label: `@${member.handle}`,
+        description: member.name,
+        icon: "\u{1F464}",
+        handle: member.handle
+      });
+    }
+    return options;
+  }
   onTrigger(cursor, editor, file) {
     const line = editor.getLine(cursor.line);
     const beforeCursor = line.substring(0, cursor.ch);
-    const match = beforeCursor.match(/@(\w*)$/);
-    if (!match) {
+    const match = beforeCursor.match(/@([\w.]*)$/);
+    if (!match)
       return null;
-    }
     const atIndex = beforeCursor.lastIndexOf("@");
     if (atIndex > 0) {
       const charBefore = beforeCursor[atIndex - 1];
-      if (/[a-zA-Z0-9]/.test(charBefore)) {
+      if (/[a-zA-Z0-9]/.test(charBefore))
         return null;
-      }
     }
     return {
       start: { line: cursor.line, ch: atIndex },
@@ -3301,11 +3385,12 @@ var DateSuggest = class extends import_obsidian10.EditorSuggest {
   }
   getSuggestions(context) {
     const query = context.query.toLowerCase();
-    const options = this.getDateOptions();
-    if (!query) {
-      return options;
-    }
-    return options.filter((opt) => {
+    const dateOptions = this.getDateOptions();
+    const userOptions = this.getUserOptions();
+    const all = [...dateOptions, ...userOptions];
+    if (!query)
+      return all;
+    return all.filter((opt) => {
       const id = opt.id.toLowerCase();
       return id.startsWith(query) || id.includes(query);
     });
@@ -3315,15 +3400,13 @@ var DateSuggest = class extends import_obsidian10.EditorSuggest {
     const iconSpan = el.createEl("span", { cls: "suggestion-icon" });
     iconSpan.textContent = item.icon;
     const textContainer = el.createEl("div", { cls: "suggestion-content" });
-    const nameSpan = textContainer.createEl("span", {
-      cls: "suggestion-name",
-      text: item.name
-    });
-    const date = formatDate(item.getDate(), this.settings.dateFormat);
-    textContainer.createEl("span", {
-      cls: "suggestion-description",
-      text: date
-    });
+    textContainer.createEl("span", { cls: "suggestion-name", text: item.label });
+    if (item.kind === "date" && item.getDate) {
+      const date = formatDate(item.getDate(), this.settings.dateFormat);
+      textContainer.createEl("span", { cls: "suggestion-description", text: date });
+    } else {
+      textContainer.createEl("span", { cls: "suggestion-description", text: item.description });
+    }
   }
   selectSuggestion(item, evt) {
     var _a;
@@ -3332,21 +3415,151 @@ var DateSuggest = class extends import_obsidian10.EditorSuggest {
       return;
     const start = this.context.start;
     const end = this.context.end;
-    const date = formatDate(item.getDate(), this.settings.dateFormat);
-    editor.replaceRange(date, start, end);
-    editor.setCursor({ line: start.line, ch: start.ch + date.length });
+    if (item.kind === "date" && item.getDate) {
+      const date = formatDate(item.getDate(), this.settings.dateFormat);
+      editor.replaceRange(date, start, end);
+      editor.setCursor({ line: start.line, ch: start.ch + date.length });
+    } else if (item.handle) {
+      const text = `@${item.handle} `;
+      editor.replaceRange(text, start, end);
+      editor.setCursor({ line: start.line, ch: start.ch + text.length });
+    }
+  }
+};
+
+// src/TeamManager.ts
+var import_obsidian11 = require("obsidian");
+var TEAM_LINE_REGEX = /^-\s+@([\w][\w.-]*)\s*(?:—|-)\s*(.+)$/;
+var ME_SUFFIX = /\s*\(me\)\s*$/i;
+var TeamManager = class extends import_obsidian11.Events {
+  constructor(app, filePath) {
+    super();
+    this.members = [];
+    this.pendingAdds = /* @__PURE__ */ new Set();
+    this.debouncedFlushAdds = (0, import_obsidian11.debounce)(() => this.flushPendingAdds(), 500, true);
+    this.app = app;
+    this.filePath = filePath;
+  }
+  async load() {
+    await this.parse();
+  }
+  setFilePath(filePath) {
+    this.filePath = filePath;
+    this.parse();
+  }
+  getTeam() {
+    return this.members;
+  }
+  resolveMe() {
+    var _a;
+    const me = this.members.find((m) => m.isMe);
+    return (_a = me == null ? void 0 : me.handle) != null ? _a : null;
+  }
+  resolveHandle(raw) {
+    var _a, _b;
+    if (raw === "me") {
+      const meHandle = this.resolveMe();
+      if (!meHandle)
+        return null;
+      return (_a = this.members.find((m) => m.handle === meHandle)) != null ? _a : null;
+    }
+    return (_b = this.members.find((m) => m.handle === raw)) != null ? _b : null;
+  }
+  isKnownHandle(handle) {
+    if (handle === "me")
+      return true;
+    return this.members.some((m) => m.handle === handle);
+  }
+  addMember(handle) {
+    if (this.isKnownHandle(handle))
+      return;
+    this.pendingAdds.add(handle);
+    this.debouncedFlushAdds();
+  }
+  async flushPendingAdds() {
+    if (this.pendingAdds.size === 0)
+      return;
+    const handles = [...this.pendingAdds];
+    this.pendingAdds.clear();
+    const file = this.app.vault.getAbstractFileByPath(this.filePath);
+    if (!(file instanceof import_obsidian11.TFile))
+      return;
+    const content = await this.app.vault.read(file);
+    const newLines = handles.filter((h) => !this.members.some((m) => m.handle === h)).map((h) => `- @${h} \u2014 ${h}`);
+    if (newLines.length === 0)
+      return;
+    const updated = content.trimEnd() + "\n" + newLines.join("\n") + "\n";
+    await this.app.vault.modify(file, updated);
+  }
+  async createTeamFile() {
+    let username = "me";
+    try {
+      username = require("os").userInfo().username || "me";
+    } catch (e) {
+    }
+    const content = `# Team
+
+- @${username} \u2014 ${username} (me)
+`;
+    const file = await this.app.vault.create(this.filePath, content);
+    await this.parse();
+    return file;
+  }
+  watchFile() {
+    this.app.vault.on("modify", (file) => {
+      if (file instanceof import_obsidian11.TFile && file.path === this.filePath) {
+        this.parse();
+      }
+    });
+    this.app.vault.on("create", (file) => {
+      if (file instanceof import_obsidian11.TFile && file.path === this.filePath) {
+        this.parse();
+      }
+    });
+    this.app.vault.on("delete", (file) => {
+      if (file instanceof import_obsidian11.TFile && file.path === this.filePath) {
+        this.members = [];
+        this.trigger("team-updated");
+      }
+    });
+  }
+  async parse() {
+    const file = this.app.vault.getAbstractFileByPath(this.filePath);
+    if (!(file instanceof import_obsidian11.TFile)) {
+      this.members = [];
+      this.trigger("team-updated");
+      return;
+    }
+    const content = await this.app.vault.read(file);
+    const lines = content.split("\n");
+    const members = [];
+    for (const line of lines) {
+      const match = line.match(TEAM_LINE_REGEX);
+      if (!match)
+        continue;
+      const handle = match[1];
+      let name = match[2].trim();
+      const isMe = ME_SUFFIX.test(name);
+      if (isMe) {
+        name = name.replace(ME_SUFFIX, "").trim();
+      }
+      members.push({ handle, name, isMe });
+    }
+    this.members = members;
+    this.trigger("team-updated");
   }
 };
 
 // src/SidebarView.ts
-var import_obsidian11 = require("obsidian");
+var import_obsidian12 = require("obsidian");
 var VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
-var TodoSidebarView = class extends import_obsidian11.ItemView {
-  constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, activeTodosLimit, focusListLimit, focusModeIncludeProjects, makeLinksClickable, triageSnoozedThreshold, triageActiveThreshold, onShowAbout, onShowStats, onShowTriage, getMoveHistory = () => []) {
+var TodoSidebarView = class extends import_obsidian12.ItemView {
+  constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, activeTodosLimit, focusListLimit, focusModeIncludeProjects, makeLinksClickable, triageSnoozedThreshold, triageActiveThreshold, onShowAbout, onShowStats, onShowTriage, getMoveHistory = () => [], teamManager) {
     super(leaf);
     this.updateListener = null;
     this.activeTab = "todos";
     this.activeTagFilter = null;
+    this.activeAssigneeFilter = null;
     this.focusModeEnabled = false;
     this.openDropdown = null;
     this.openDropdownTrigger = null;
@@ -3388,6 +3601,7 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
     this.onShowAbout = onShowAbout;
     this.onShowStats = onShowStats;
     this.onShowTriage = onShowTriage;
+    this.teamManager = teamManager != null ? teamManager : new TeamManager(this.app, "team.md");
     this.contextMenuHandler = new ContextMenuHandler(
       this.app,
       processor,
@@ -3586,6 +3800,9 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
     const mergedTags = [.../* @__PURE__ */ new Set([...parentTags, ...itemTags])];
     if (mergedTags.length > 0) {
       this.renderTagDropdown(mergedTags, rowContainer, item);
+    }
+    if (item.mentions.length > 0) {
+      this.renderMentionBadges(item.mentions, rowContainer);
     }
     const link = rowContainer.createEl("a", {
       text: "\u2192",
@@ -3847,7 +4064,7 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
     });
     menuBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>';
     menuBtn.addEventListener("click", (evt) => {
-      const menu = new import_obsidian11.Menu();
+      const menu = new import_obsidian12.Menu();
       menu.addItem((item) => {
         item.setTitle("Refresh").setIcon("refresh-cw").onClick(async () => {
           menuBtn.addClass("rotating");
@@ -4010,12 +4227,110 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
   }
   sortTodosByPriority(todos, allTodosForChildLookup) {
     const lookupList = allTodosForChildLookup || todos;
-    return [...todos].sort((a, b) => compareWithEffectivePriority(a, b, lookupList));
+    const meHandle = this.teamManager.resolveMe();
+    return [...todos].sort((a, b) => {
+      const base = compareWithEffectivePriority(a, b, lookupList);
+      if (base !== 0)
+        return base;
+      if (meHandle) {
+        const aIsMe = resolveMentions(a, meHandle).includes(meHandle);
+        const bIsMe = resolveMentions(b, meHandle).includes(meHandle);
+        if (aIsMe && !bIsMe)
+          return -1;
+        if (!aIsMe && bIsMe)
+          return 1;
+      }
+      return 0;
+    });
   }
   /**
    * Render filter indicator button after section title if a filter is active.
    * Clicking the button clears the filter.
    */
+  renderMentionBadges(mentions, container) {
+    const meHandle = this.teamManager.resolveMe();
+    for (const mention of mentions) {
+      const isMe = mention === "me" || meHandle && mention === meHandle;
+      const badge = container.createEl("span", {
+        cls: `sc-mention${isMe ? " sc-mention-me" : ""}`,
+        text: `@${mention}`
+      });
+      const member = this.teamManager.resolveHandle(mention);
+      if (member) {
+        badge.setAttribute("title", member.name);
+      }
+    }
+  }
+  renderAssigneeFilter(header) {
+    const team = this.teamManager.getTeam();
+    if (team.length === 0)
+      return;
+    const label = this.activeAssigneeFilter ? this.activeAssigneeFilter === "__unassigned__" ? "?" : `@${this.activeAssigneeFilter}` : "@";
+    const trigger = header.createEl("span", {
+      cls: `sc-assignee-filter${this.activeAssigneeFilter ? " active" : ""}`,
+      text: label,
+      attr: { "aria-label": "Filter by assignee" }
+    });
+    trigger.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.closeDropdown();
+      const dropdown = document.createElement("div");
+      dropdown.className = "tag-dropdown-menu";
+      const rect = trigger.getBoundingClientRect();
+      dropdown.style.position = "fixed";
+      dropdown.style.top = `${rect.bottom + 4}px`;
+      const sidebarRoot = this.leaf.getRoot();
+      const isRightSidebar = sidebarRoot === this.app.workspace.rightSplit;
+      if (isRightSidebar) {
+        dropdown.style.right = `${window.innerWidth - rect.right}px`;
+        dropdown.classList.add("dropdown-left");
+      } else {
+        dropdown.style.left = `${rect.left}px`;
+      }
+      const everyoneItem = dropdown.createEl("div", { cls: "tag-dropdown-item" });
+      everyoneItem.createEl("span", { cls: "tag-dropdown-item-label", text: "Everyone" });
+      everyoneItem.addEventListener("click", () => {
+        this.activeAssigneeFilter = null;
+        this.closeDropdown();
+        this.render();
+      });
+      const meHandle = this.teamManager.resolveMe();
+      if (meHandle) {
+        const meItem = dropdown.createEl("div", { cls: "tag-dropdown-item" });
+        const meMember = team.find((m) => m.isMe);
+        meItem.createEl("span", { cls: "tag-dropdown-item-label sc-mention sc-mention-me", text: `@me` });
+        if (meMember)
+          meItem.createEl("span", { cls: "sc-assignee-filter-name", text: meMember.name });
+        meItem.addEventListener("click", () => {
+          this.activeAssigneeFilter = "me";
+          this.closeDropdown();
+          this.render();
+        });
+      }
+      for (const member of team) {
+        if (member.isMe)
+          continue;
+        const item = dropdown.createEl("div", { cls: "tag-dropdown-item" });
+        item.createEl("span", { cls: "tag-dropdown-item-label sc-mention", text: `@${member.handle}` });
+        item.createEl("span", { cls: "sc-assignee-filter-name", text: member.name });
+        item.addEventListener("click", () => {
+          this.activeAssigneeFilter = member.handle;
+          this.closeDropdown();
+          this.render();
+        });
+      }
+      const unassignedItem = dropdown.createEl("div", { cls: "tag-dropdown-item" });
+      unassignedItem.createEl("span", { cls: "tag-dropdown-item-label", text: "Unassigned" });
+      unassignedItem.addEventListener("click", () => {
+        this.activeAssigneeFilter = "__unassigned__";
+        this.closeDropdown();
+        this.render();
+      });
+      document.body.appendChild(dropdown);
+      this.openDropdown = dropdown;
+      this.openDropdownTrigger = trigger;
+    });
+  }
   renderFilterIndicator(header) {
     if (!this.activeTagFilter)
       return;
@@ -4158,9 +4473,9 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
       title.appendText(project.tag);
       if (info.description) {
         const desc = popup.createEl("div", { cls: "project-info-description" });
-        const component = new import_obsidian11.Component();
+        const component = new import_obsidian12.Component();
         component.load();
-        await import_obsidian11.MarkdownRenderer.render(this.app, info.description, desc, info.filepath, component);
+        await import_obsidian12.MarkdownRenderer.render(this.app, info.description, desc, info.filepath, component);
       } else {
         const desc = popup.createEl("div", { cls: "project-info-description project-info-empty" });
         desc.appendText("No description available.");
@@ -4177,9 +4492,9 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
           const li = principlesList.createEl("li", { cls: "project-info-principle-item" });
           let displayText = principle.text.replace(/#principles?\b/gi, "").replace(new RegExp(project.tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "gi"), "").replace(/\s+/g, " ").trim();
           displayText = displayText.replace(/^[-*+]\s*/, "");
-          const principleComponent = new import_obsidian11.Component();
+          const principleComponent = new import_obsidian12.Component();
           principleComponent.load();
-          await import_obsidian11.MarkdownRenderer.render(this.app, displayText, li, (info == null ? void 0 : info.filepath) || "", principleComponent);
+          await import_obsidian12.MarkdownRenderer.render(this.app, displayText, li, (info == null ? void 0 : info.filepath) || "", principleComponent);
         }
       }
       if (info.principles.length > 0) {
@@ -4204,7 +4519,7 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
         this.closeInfoPopup();
         const filepath = this.projectManager.getProjectFilePath(project.tag);
         const file = this.app.vault.getAbstractFileByPath(filepath);
-        if (file instanceof import_obsidian11.TFile) {
+        if (file instanceof import_obsidian12.TFile) {
           const leaf = this.app.workspace.getLeaf("tab");
           await leaf.openFile(file);
         }
@@ -4290,6 +4605,18 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
     if (this.activeTagFilter) {
       todos = todos.filter((todo) => todo.tags.includes(this.activeTagFilter));
     }
+    if (this.activeAssigneeFilter) {
+      const meHandle = this.teamManager.resolveMe();
+      if (this.activeAssigneeFilter === "__unassigned__") {
+        todos = todos.filter((todo) => todo.mentions.length === 0);
+      } else {
+        const filterHandle = this.activeAssigneeFilter === "me" && meHandle ? meHandle : this.activeAssigneeFilter;
+        todos = todos.filter((todo) => {
+          const resolved = resolveMentions(todo, meHandle);
+          return resolved.includes(filterHandle);
+        });
+      }
+    }
     if (this.focusModeEnabled) {
       if (this.focusModeIncludeProjects) {
         const focusedProjects = this.projectManager.getProjects().filter((p) => p.hasFocusItems).map((p) => p.tag);
@@ -4309,6 +4636,7 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
     const header = section.createEl("div", { cls: "todo-section-header" });
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
     titleSpan.textContent = "TODO";
+    this.renderAssigneeFilter(header);
     this.renderFilterIndicator(header);
     if (totalCount === 0) {
       let emptyText = "No TODOs";
@@ -4342,6 +4670,7 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
     const section = container.createEl("div", { cls: "summary-section" });
     this.renderSummaryHeader(section);
     this.renderPriorityCounts(section);
+    this.renderAssigneeStats(section);
     this.renderCompletionVelocity(section);
     this.renderTopBacklogs(section);
   }
@@ -4359,7 +4688,7 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
     fileLink.addEventListener("click", async (e) => {
       e.preventDefault();
       const file = this.app.vault.getAbstractFileByPath(this.defaultTodoneFile);
-      if (file instanceof import_obsidian11.TFile) {
+      if (file instanceof import_obsidian12.TFile) {
         await this.app.workspace.getLeaf(false).openFile(file);
       }
     });
@@ -4411,9 +4740,41 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
     if (value === 0)
       valEl.addClass("zero");
   }
+  renderAssigneeStats(section) {
+    const todos = this.scanner.getTodos();
+    const meHandle = this.teamManager.resolveMe();
+    const counts = /* @__PURE__ */ new Map();
+    let unassigned = 0;
+    let hasMentions = false;
+    for (const t of todos) {
+      if (t.mentions.length === 0) {
+        unassigned++;
+        continue;
+      }
+      hasMentions = true;
+      const resolved = resolveMentions(t, meHandle);
+      for (const handle of resolved) {
+        counts.set(handle, (counts.get(handle) || 0) + 1);
+      }
+    }
+    if (!hasMentions)
+      return;
+    const row = section.createEl("div", { cls: "sc-assignee-stats" });
+    const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+    for (const [handle, count] of sorted) {
+      const cell = row.createEl("span", { cls: "sc-assignee-stat" });
+      cell.createEl("span", { cls: "sc-mention", text: `@${handle}` });
+      cell.createEl("span", { cls: "summary-count-value", text: String(count) });
+    }
+    if (unassigned > 0) {
+      const cell = row.createEl("span", { cls: "sc-assignee-stat" });
+      cell.createEl("span", { text: "none" });
+      cell.createEl("span", { cls: "summary-count-value", text: String(unassigned) });
+    }
+  }
   renderCompletionVelocity(section) {
     const todones = this.scanner.getTodones();
-    const m = import_obsidian11.moment;
+    const m = import_obsidian12.moment;
     const todayStr = m().format("YYYY-MM-DD");
     const weekStart = m().startOf("isoWeek").format("YYYY-MM-DD");
     const monthStart = m().startOf("month").format("YYYY-MM-DD");
@@ -4549,7 +4910,7 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
   }
   async confirmCompleteProject(project) {
     return new Promise((resolve) => {
-      const modal = new import_obsidian11.Modal(this.app);
+      const modal = new import_obsidian12.Modal(this.app);
       modal.titleEl.setText("Complete All Project TODOs?");
       modal.contentEl.createEl("p", {
         text: `This will mark all ${project.count} TODO(s) for project ${project.tag} as complete. This action cannot be undone.`
@@ -4623,7 +4984,9 @@ var DEFAULT_SETTINGS = {
   triageSnoozedThreshold: 10,
   triageActiveThreshold: 20,
   // Move history
-  moveHistory: []
+  moveHistory: [],
+  // Team file
+  teamFilePath: "team.md"
 };
 
 // src/SlackConverter.ts
@@ -5147,10 +5510,12 @@ function createHeaderChecklistExtension() {
 }
 
 // main.ts
-var SpaceCommandPlugin = class extends import_obsidian12.Plugin {
+var SpaceCommandPlugin = class extends import_obsidian13.Plugin {
   async onload() {
     await this.loadSettings();
     this.sidebarManager = new SidebarManager(this.app, VIEW_TYPE_TODO_SIDEBAR);
+    this.teamManager = new TeamManager(this.app, this.settings.teamFilePath);
+    this.teamManager.watchFile();
     this.scanner = new TodoScanner(this.app);
     this.processor = new TodoProcessor(this.app, this.settings.dateFormat);
     this.processor.setScanner(this.scanner);
@@ -5170,7 +5535,8 @@ var SpaceCommandPlugin = class extends import_obsidian12.Plugin {
       this.settings.focusListLimit,
       this.settings.priorityTags,
       this.settings.makeLinksClickable,
-      () => this.settings.moveHistory
+      () => this.settings.moveHistory,
+      this.teamManager
     );
     this.tabLockManager = new TabLockManager(this.app);
     if (this.settings.showTabLockButton) {
@@ -5192,6 +5558,7 @@ var SpaceCommandPlugin = class extends import_obsidian12.Plugin {
     });
     this.scanner.watchFiles();
     this.app.workspace.onLayoutReady(async () => {
+      await this.teamManager.load();
       await this.scanner.scanVault();
       if (this.settings.showSidebarByDefault) {
         this.sidebarManager.activate();
@@ -5250,7 +5617,8 @@ var SpaceCommandPlugin = class extends import_obsidian12.Plugin {
         () => this.showAboutModal(),
         () => this.showStatsModal(),
         () => this.showTriageModal(),
-        () => this.settings.moveHistory
+        () => this.settings.moveHistory,
+        this.teamManager
       )
     );
     this.registerMarkdownPostProcessor((el, ctx) => {
@@ -5272,7 +5640,7 @@ var SpaceCommandPlugin = class extends import_obsidian12.Plugin {
     );
     codeBlockProcessor.registerProcessors(this);
     this.registerEditorSuggest(new SlashCommandSuggest(this.app, this.settings));
-    this.registerEditorSuggest(new DateSuggest(this.app, this.settings));
+    this.registerEditorSuggest(new AtSuggest(this.app, this.settings, this.teamManager));
     this.addCommand({
       id: "toggle-todo-sidebar",
       name: "Toggle TODO Sidebar",
@@ -5327,7 +5695,7 @@ var SpaceCommandPlugin = class extends import_obsidian12.Plugin {
           showNotice2("Cursor is not on a #todo line");
           return;
         }
-        const file = (_a = this.app.workspace.getActiveViewOfType(import_obsidian12.MarkdownView)) == null ? void 0 : _a.file;
+        const file = (_a = this.app.workspace.getActiveViewOfType(import_obsidian13.MarkdownView)) == null ? void 0 : _a.file;
         if (!file)
           return;
         const todos = this.scanner.getTodos();
@@ -5438,7 +5806,7 @@ var SpaceCommandPlugin = class extends import_obsidian12.Plugin {
     new TriageModal(this.app, this.scanner, this.processor, this.embedRenderer, this.settings.defaultTodoneFile).open();
   }
 };
-var AboutModal = class extends import_obsidian12.Modal {
+var AboutModal = class extends import_obsidian13.Modal {
   constructor(app, version) {
     super(app);
     this.version = version;
@@ -5469,7 +5837,7 @@ var AboutModal = class extends import_obsidian12.Modal {
     this.contentEl.empty();
   }
 };
-var StatsModal = class extends import_obsidian12.Modal {
+var StatsModal = class extends import_obsidian13.Modal {
   constructor(app, scanner) {
     super(app);
     this.scanner = scanner;
@@ -5518,7 +5886,7 @@ var StatsModal = class extends import_obsidian12.Modal {
     this.contentEl.empty();
   }
 };
-var TriageModal = class extends import_obsidian12.Modal {
+var TriageModal = class extends import_obsidian13.Modal {
   constructor(app, scanner, processor, embedRenderer, defaultTodoneFile) {
     super(app);
     this.items = [];
@@ -5735,7 +6103,7 @@ var TriageModal = class extends import_obsidian12.Modal {
     this.contentEl.empty();
   }
 };
-var SpaceCommandSettingTab = class extends import_obsidian12.PluginSettingTab {
+var SpaceCommandSettingTab = class extends import_obsidian13.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -5761,13 +6129,13 @@ var SpaceCommandSettingTab = class extends import_obsidian12.PluginSettingTab {
       href: "https://github.com/robotpony/obsidian-plugins"
     });
     containerEl.createEl("h3", { text: "Sidebar" });
-    new import_obsidian12.Setting(containerEl).setName("Show sidebar by default").setDesc("Show the TODO sidebar when Obsidian starts").addToggle(
+    new import_obsidian13.Setting(containerEl).setName("Show sidebar by default").setDesc("Show the TODO sidebar when Obsidian starts").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.showSidebarByDefault).onChange(async (value) => {
         this.plugin.settings.showSidebarByDefault = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian12.Setting(containerEl).setName("Show tab lock buttons").setDesc("Add lock buttons to tab headers. Locked tabs force links to open in new tabs.").addToggle(
+    new import_obsidian13.Setting(containerEl).setName("Show tab lock buttons").setDesc("Add lock buttons to tab headers. Locked tabs force links to open in new tabs.").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.showTabLockButton).onChange(async (value) => {
         this.plugin.settings.showTabLockButton = value;
         if (value) {
@@ -5778,7 +6146,7 @@ var SpaceCommandSettingTab = class extends import_obsidian12.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian12.Setting(containerEl).setName("Make links clickable in lists").setDesc("Render wiki links and markdown links as clickable in sidebar and embeds. When disabled, links display as plain text without markdown syntax.").addToggle(
+    new import_obsidian13.Setting(containerEl).setName("Make links clickable in lists").setDesc("Render wiki links and markdown links as clickable in sidebar and embeds. When disabled, links display as plain text without markdown syntax.").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.makeLinksClickable).onChange(async (value) => {
         this.plugin.settings.makeLinksClickable = value;
         await this.plugin.saveSettings();
@@ -5786,13 +6154,13 @@ var SpaceCommandSettingTab = class extends import_obsidian12.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: "TODOs" });
-    new import_obsidian12.Setting(containerEl).setName("Default TODONE file").setDesc("Default file path for logging completed TODOs").addText(
+    new import_obsidian13.Setting(containerEl).setName("Default TODONE file").setDesc("Default file path for logging completed TODOs").addText(
       (text) => text.setPlaceholder("todos/done.md").setValue(this.plugin.settings.defaultTodoneFile).onChange(async (value) => {
         this.plugin.settings.defaultTodoneFile = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian12.Setting(containerEl).setName("Date format").setDesc("Format for completion dates (using moment.js format)").addText(
+    new import_obsidian13.Setting(containerEl).setName("Date format").setDesc("Format for completion dates (using moment.js format)").addText(
       (text) => text.setPlaceholder("YYYY-MM-DD").setValue(this.plugin.settings.dateFormat).onChange(async (value) => {
         this.plugin.settings.dateFormat = value;
         this.plugin.processor = new TodoProcessor(
@@ -5803,13 +6171,13 @@ var SpaceCommandSettingTab = class extends import_obsidian12.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: "Projects" });
-    new import_obsidian12.Setting(containerEl).setName("Default projects folder").setDesc("Folder where project files are created (e.g., projects/)").addText(
+    new import_obsidian13.Setting(containerEl).setName("Default projects folder").setDesc("Folder where project files are created (e.g., projects/)").addText(
       (text) => text.setPlaceholder("projects/").setValue(this.plugin.settings.defaultProjectsFolder).onChange(async (value) => {
         this.plugin.settings.defaultProjectsFolder = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian12.Setting(containerEl).setName("Focus list limit").setDesc("Maximum number of projects to show in sidebar and {{focus-list}}").addText(
+    new import_obsidian13.Setting(containerEl).setName("Focus list limit").setDesc("Maximum number of projects to show in sidebar and {{focus-list}}").addText(
       (text) => text.setPlaceholder("5").setValue(String(this.plugin.settings.focusListLimit)).onChange(async (value) => {
         const num = parseInt(value);
         if (!isNaN(num) && num > 0) {
@@ -5818,7 +6186,7 @@ var SpaceCommandSettingTab = class extends import_obsidian12.PluginSettingTab {
         }
       })
     );
-    new import_obsidian12.Setting(containerEl).setName("Active TODOs limit").setDesc("Maximum number of TODOs to show in sidebar (0 for unlimited)").addText(
+    new import_obsidian13.Setting(containerEl).setName("Active TODOs limit").setDesc("Maximum number of TODOs to show in sidebar (0 for unlimited)").addText(
       (text) => text.setPlaceholder("5").setValue(String(this.plugin.settings.activeTodosLimit)).onChange(async (value) => {
         const num = parseInt(value);
         if (!isNaN(num) && num >= 0) {
@@ -5827,13 +6195,13 @@ var SpaceCommandSettingTab = class extends import_obsidian12.PluginSettingTab {
         }
       })
     );
-    new import_obsidian12.Setting(containerEl).setName("Focus mode includes project TODOs").setDesc("When enabled, focus mode shows all TODOs from focused projects (not just #focus items)").addToggle(
+    new import_obsidian13.Setting(containerEl).setName("Focus mode includes project TODOs").setDesc("When enabled, focus mode shows all TODOs from focused projects (not just #focus items)").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.focusModeIncludeProjects).onChange(async (value) => {
         this.plugin.settings.focusModeIncludeProjects = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian12.Setting(containerEl).setName("Exclude folders from projects").setDesc("Comma-separated folders to exclude from inferred project tags (e.g., log, archive)").addText(
+    new import_obsidian13.Setting(containerEl).setName("Exclude folders from projects").setDesc("Comma-separated folders to exclude from inferred project tags (e.g., log, archive)").addText(
       (text) => text.setPlaceholder("log").setValue(this.plugin.settings.excludeFoldersFromProjects.join(", ")).onChange(async (value) => {
         const folders = value.split(",").map((f) => f.trim()).filter((f) => f.length > 0);
         this.plugin.settings.excludeFoldersFromProjects = folders;
@@ -5848,7 +6216,7 @@ var SpaceCommandSettingTab = class extends import_obsidian12.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: "Priority Settings" });
-    new import_obsidian12.Setting(containerEl).setName("Priority tags").setDesc("Comma-separated list of priority tags (e.g., #p0, #p1, #p2, #p3, #p4). These tags won't appear in the Projects list.").addText(
+    new import_obsidian13.Setting(containerEl).setName("Priority tags").setDesc("Comma-separated list of priority tags (e.g., #p0, #p1, #p2, #p3, #p4). These tags won't appear in the Projects list.").addText(
       (text) => text.setPlaceholder("#p0, #p1, #p2, #p3, #p4").setValue(this.plugin.settings.priorityTags.join(", ")).onChange(async (value) => {
         const tags = value.split(",").map((tag) => tag.trim()).filter((tag) => tag.length > 0).map((tag) => tag.startsWith("#") ? tag : `#${tag}`);
         this.plugin.settings.priorityTags = tags;
@@ -5863,7 +6231,7 @@ var SpaceCommandSettingTab = class extends import_obsidian12.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: "Triage" });
-    new import_obsidian12.Setting(containerEl).setName("Snoozed items threshold").setDesc("Show triage alert when snoozed items exceed this count").addText(
+    new import_obsidian13.Setting(containerEl).setName("Snoozed items threshold").setDesc("Show triage alert when snoozed items exceed this count").addText(
       (text) => text.setPlaceholder("10").setValue(String(this.plugin.settings.triageSnoozedThreshold)).onChange(async (value) => {
         const num = parseInt(value);
         if (!isNaN(num) && num >= 0) {
@@ -5872,7 +6240,7 @@ var SpaceCommandSettingTab = class extends import_obsidian12.PluginSettingTab {
         }
       })
     );
-    new import_obsidian12.Setting(containerEl).setName("Active items threshold").setDesc("Show triage alert when active TODOs + Ideas exceed this count").addText(
+    new import_obsidian13.Setting(containerEl).setName("Active items threshold").setDesc("Show triage alert when active TODOs + Ideas exceed this count").addText(
       (text) => text.setPlaceholder("20").setValue(String(this.plugin.settings.triageActiveThreshold)).onChange(async (value) => {
         const num = parseInt(value);
         if (!isNaN(num) && num >= 0) {
@@ -5881,5 +6249,43 @@ var SpaceCommandSettingTab = class extends import_obsidian12.PluginSettingTab {
         }
       })
     );
+    containerEl.createEl("h3", { text: "Team" });
+    new import_obsidian13.Setting(containerEl).setName("Team file path").setDesc("Path to the team definition file in your vault").addText(
+      (text) => text.setPlaceholder("team.md").setValue(this.plugin.settings.teamFilePath).onChange(async (value) => {
+        this.plugin.settings.teamFilePath = value;
+        this.plugin.teamManager.setFilePath(value);
+        await this.plugin.saveSettings();
+        this.display();
+      })
+    );
+    const teamFile = this.app.vault.getAbstractFileByPath(this.plugin.settings.teamFilePath);
+    const teamButtonSetting = new import_obsidian13.Setting(containerEl);
+    if (teamFile instanceof import_obsidian13.TFile) {
+      teamButtonSetting.setName("Manage team file").addButton(
+        (btn) => btn.setButtonText("Open team file").onClick(async () => {
+          await this.app.workspace.getLeaf(false).openFile(teamFile);
+        })
+      );
+    } else {
+      teamButtonSetting.setName("No team file found").setDesc("Create a starter team file with your username").addButton(
+        (btn) => btn.setButtonText("Create team file").setCta().onClick(async () => {
+          const file = await this.plugin.teamManager.createTeamFile();
+          await this.app.workspace.getLeaf(false).openFile(file);
+          this.display();
+        })
+      );
+    }
+    const team = this.plugin.teamManager.getTeam();
+    if (team.length > 0) {
+      const teamList = containerEl.createEl("div", { cls: "sc-team-list" });
+      for (const member of team) {
+        const entry = teamList.createEl("div", { cls: "sc-team-entry" });
+        entry.createEl("span", { cls: "sc-team-handle", text: `@${member.handle}` });
+        entry.createEl("span", { cls: "sc-team-name", text: member.name });
+        if (member.isMe) {
+          entry.createEl("span", { cls: "sc-team-me-badge", text: "(me)" });
+        }
+      }
+    }
   }
 };
