@@ -1,0 +1,531 @@
+/* ============================================================
+   Eat Well — Plugin Styles
+   Brand colour: #c0392b (tomato red)
+   Follows plugin-conventions.md
+   ============================================================ */
+
+/* Logo badge */
+.eat-well-logo {
+  display: inline-block;
+  color: white;
+  background-color: #c0392b;
+  border-radius: 4px;
+  padding: 3px 3px 2px;
+  font-weight: 600;
+  font-size: 0.9em;
+  line-height: 1.2;
+  vertical-align: middle;
+}
+
+.eat-well-logo.clickable-logo {
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+.eat-well-logo.clickable-logo:hover {
+  opacity: 0.85;
+  transform: scale(1.05);
+}
+
+/* Sidebar layout */
+.eat-well-sidebar {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.eat-well-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 4px;
+  background-color: var(--background-secondary);
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+.eat-well-header-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.eat-well-header-title h4 {
+  margin: 0;
+  font-size: 0.95em;
+}
+
+.eat-well-button-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.eat-well-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 8px 0 4px;
+}
+
+/* Scrollbar */
+.eat-well-sidebar ::-webkit-scrollbar { width: 8px; }
+.eat-well-sidebar ::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--text-muted) 65%, transparent);
+  border-radius: 4px;
+}
+
+/* Buttons */
+.eat-well-btn {
+  padding: 4px;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  cursor: pointer;
+  opacity: 0.6;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: opacity 0.2s, background-color 0.15s;
+}
+
+.eat-well-btn:hover {
+  opacity: 1;
+  background-color: var(--background-modifier-hover) !important;
+}
+
+/* Empty / error states */
+.eat-well-empty,
+.eat-well-db-error {
+  padding: 16px 8px;
+  color: var(--text-muted);
+  font-size: 0.9em;
+  line-height: 1.5;
+}
+
+.eat-well-db-error {
+  color: var(--text-error);
+}
+
+/* About section in settings */
+.eat-well-about-section {
+  margin-bottom: 20px;
+}
+
+.eat-well-about-section .about-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.eat-well-about-section .about-title {
+  font-size: 1.1em;
+  font-weight: 600;
+}
+
+.eat-well-about-section .about-version {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.85em;
+}
+
+/* Search area */
+.eat-well-search-wrap {
+  padding: 6px 8px 4px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  flex-shrink: 0;
+}
+
+.eat-well-search-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.eat-well-search-input {
+  flex: 1;
+  font-size: 0.9em;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-normal);
+}
+
+.eat-well-search-input:focus {
+  outline: none;
+  border-color: #c0392b;
+  box-shadow: 0 0 0 2px rgba(192, 57, 43, 0.15);
+}
+
+.eat-well-search-btn {
+  font-size: 0.85em;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.eat-well-search-btn:hover {
+  background: var(--background-modifier-hover);
+}
+
+.eat-well-per-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.eat-well-per-label,
+.eat-well-per-unit {
+  font-size: 0.8em;
+  color: var(--text-muted);
+}
+
+.eat-well-per-input {
+  width: 56px;
+  font-size: 0.85em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  text-align: right;
+}
+
+.eat-well-per-input:focus {
+  outline: none;
+  border-color: #c0392b;
+}
+
+/* Results list */
+.eat-well-results {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.eat-well-result-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+}
+
+.eat-well-result-row:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.eat-well-result-row.selected {
+  background-color: var(--background-modifier-hover);
+  border-left-color: #c0392b;
+}
+
+.eat-well-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-selected { background: #c0392b; }
+.status-neutral  { background: var(--background-modifier-border); }
+
+.eat-well-result-content {
+  display: flex;
+  flex: 1;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.eat-well-result-name {
+  font-size: 0.85em;
+  color: var(--text-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.eat-well-result-source {
+  font-size: 0.75em;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Food header in label area */
+.eat-well-label-wrap {
+  padding: 8px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.eat-well-food-header {
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.eat-well-food-name {
+  font-weight: 600;
+  font-size: 0.9em;
+  color: var(--text-normal);
+  line-height: 1.3;
+}
+
+.eat-well-food-source {
+  font-size: 0.78em;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.eat-well-food-per {
+  font-size: 0.78em;
+  color: var(--text-faint);
+  margin-top: 2px;
+}
+
+/* Tab bar */
+.eat-well-tab-bar {
+  display: flex;
+  border-bottom: 1px solid var(--background-modifier-border);
+  flex-shrink: 0;
+}
+
+.eat-well-tab {
+  flex: 1;
+  padding: 6px 12px;
+  font-size: 0.85em;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.eat-well-tab:hover {
+  color: var(--text-normal);
+}
+
+.eat-well-tab.active {
+  color: var(--text-normal);
+  border-bottom-color: #c0392b;
+  font-weight: 500;
+}
+
+/* Lookup and Recipe panels — fill available space as flex columns */
+.eat-well-lookup-panel,
+.eat-well-recipe-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* Recipe controls */
+.eat-well-recipe-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  flex-shrink: 0;
+}
+
+.eat-well-servings-label {
+  font-size: 0.8em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.eat-well-servings-input {
+  width: 44px;
+  font-size: 0.85em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  text-align: right;
+}
+
+.eat-well-servings-input:focus {
+  outline: none;
+  border-color: #c0392b;
+}
+
+.eat-well-eval-btn {
+  flex: 1;
+  font-size: 0.85em;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid #a93226;
+  background: #c0392b;
+  color: white;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.eat-well-eval-btn:hover {
+  background: #a93226;
+}
+
+.eat-well-eval-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Recipe status message */
+.eat-well-recipe-status {
+  padding: 6px 8px;
+  font-size: 0.82em;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* Recipe scrollable content area */
+.eat-well-recipe-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+}
+
+/* Ingredient list */
+.eat-well-ingredients {
+  padding-bottom: 4px;
+}
+
+.eat-well-ing-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 5px 8px;
+  cursor: pointer;
+  border-top: 1px solid var(--background-modifier-border);
+  border-left: 2px solid transparent;
+}
+
+.eat-well-ing-row:first-child {
+  border-top: none;
+}
+
+.eat-well-ing-row:hover {
+  background: var(--background-modifier-hover);
+}
+
+.eat-well-ing-row.expanded {
+  background: var(--background-modifier-hover);
+  border-left-color: #c0392b;
+}
+
+/* Status icons */
+.eat-well-ing-status {
+  font-size: 0.85em;
+  width: 14px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  text-align: center;
+}
+
+.status-ok   { color: #27ae60; }
+.status-warn { color: #f39c12; }
+.status-fail { color: var(--text-error); }
+.status-est  { color: var(--text-muted); }
+
+.eat-well-ing-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.eat-well-ing-raw {
+  font-size: 0.82em;
+  color: var(--text-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.eat-well-ing-detail {
+  font-size: 0.75em;
+  color: var(--text-muted);
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.eat-well-ing-warn {
+  color: var(--text-error);
+}
+
+/* Expanded ingredient compact label */
+.eat-well-ing-label {
+  padding: 4px 8px 4px 28px;
+  border-top: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+}
+
+/* Aggregate section */
+.eat-well-agg-section {
+  border-top: 2px solid var(--background-modifier-border);
+}
+
+.eat-well-agg-header {
+  padding: 6px 8px 2px;
+  font-size: 0.78em;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.eat-well-agg-label {
+  padding: 0 8px 8px;
+}
+
+/* Nutrition label */
+.eat-well-label {
+  font-size: 0.85em;
+  line-height: 1.6;
+}
+
+.eat-well-label-section {
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-top: 8px;
+  margin-bottom: 2px;
+  font-size: 0.8em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.eat-well-label-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 1px 0;
+}
+
+.eat-well-label-row.indented {
+  padding-left: 12px;
+}
+
+.eat-well-label-name {
+  color: var(--text-normal);
+}
+
+.eat-well-label-value {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}

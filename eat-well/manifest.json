@@ -1,0 +1,10 @@
+{
+  "id": "eat-well",
+  "name": "Eat Well",
+  "version": "0.3.0",
+  "minAppVersion": "0.15.0",
+  "description": "Nutrition lookup and recipe evaluation using CNF and USDA FoodData Central.",
+  "author": "Bruce Alderson",
+  "authorUrl": "https://github.com/bruceal",
+  "isDesktopOnly": true
+}
