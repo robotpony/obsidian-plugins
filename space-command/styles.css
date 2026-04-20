@@ -940,11 +940,14 @@
   opacity: 1;
 }
 
-/* Focus tag highlighting in sidebar */
+/* Focus tag highlighting in sidebar — edge-to-edge background */
 .space-command-sidebar .todo-focus,
 .space-command-sidebar .project-focus {
   background-color: color-mix(in srgb, var(--interactive-accent) 15%, transparent);
-  border-radius: 4px;
+  margin-left: -16px;
+  margin-right: -16px;
+  padding-left: 16px;
+  padding-right: 16px;
 }
 
 .space-command-sidebar .todo-focus:hover,
@@ -1201,23 +1204,13 @@
   opacity: 0.9;
 }
 
-/* Header filename - descriptive names on their own line below the header */
+/* Header filename - folder/file.md below the header text */
 .header-filename {
   font-family: var(--font-monospace);
   font-size: 0.75em;
   color: var(--text-faint);
-  flex-basis: 100%;
-  margin-left: 24px;
-  order: 99;
-}
-
-/* Header filename (inline) - dates shown on the same line as the header */
-.header-filename-inline {
-  font-family: var(--font-monospace);
-  font-size: 0.75em;
-  color: var(--text-faint);
-  margin-left: 6px;
-  flex-shrink: 0;
+  display: block;
+  margin-top: 1px;
   align-self: center;
 }
 

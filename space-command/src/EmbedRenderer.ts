@@ -586,11 +586,13 @@ export class EmbedRenderer {
       });
     }
 
-    // Show filename for header items with children (before link)
+    // Show file path for header items with children (folder/filename format)
     if (hasChildren) {
+      const folder = todo.file.parent?.name || "";
+      const displayPath = folder ? `${folder}/${todo.file.name}` : todo.file.name;
       rowContainer.createEl("span", {
         cls: "header-filename",
-        text: todo.file.basename,
+        text: displayPath,
       });
     }
 
@@ -612,19 +614,26 @@ export class EmbedRenderer {
     // If this is a header with children, render children indented below
     if (isHeader && todo.childLineNumbers && todo.childLineNumbers.length > 0) {
       const childrenContainer = item.createEl("ul", { cls: "todo-children contains-task-list" });
-      // Extract parent header tags to pass to children (excluding #todo/#todone)
       const headerTags = extractTags(todo.text).filter(tag => !/#todos?\b/.test(tag) && !/#todones?\b/.test(tag));
-      for (const childLine of todo.childLineNumbers) {
-        const childTodo = allTodos.find(
-          t => t.filePath === todo.filePath && t.lineNumber === childLine
-        );
-        if (childTodo) {
-          // Skip completed children if showTodones is false
-          if (!showTodones && childTodo.itemType === 'todone') {
-            continue;
+      const lines = todo.childLineNumbers;
+      const childItems = lines.map(ln => allTodos.find(t => t.filePath === todo.filePath && t.lineNumber === ln) ?? null);
+      for (let idx = 0; idx < lines.length; idx++) {
+        const childTodo = childItems[idx];
+        if (!childTodo) continue;
+        if (!showTodones && childTodo.itemType === 'todone') continue;
+        // Skip subheadings with no task items before the next subheading/end
+        if (childTodo.isSubheading) {
+          let hasTasks = false;
+          for (let k = idx + 1; k < childItems.length; k++) {
+            const next = childItems[k];
+            if (!next) continue;
+            if (next.isSubheading) break;
+            hasTasks = true;
+            break;
           }
-          this.renderTodoItem(childrenContainer, childTodo, allTodos, showTodones, todoneFile, filterString, true, headerTags);
+          if (!hasTasks) continue;
         }
+        this.renderTodoItem(childrenContainer, childTodo, allTodos, showTodones, todoneFile, filterString, true, headerTags);
       }
     }
   }

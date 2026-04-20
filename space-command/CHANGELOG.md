@@ -2,6 +2,14 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.130] - 2026-04-20
+
+### Fixed
+
+- **Header block filename**: Shows as `folder/filename.md` in a consistent style, matching the summary block pattern.
+- **Focus background extends edge-to-edge**: Focus-highlighted items now fill the full sidebar width without rounded gaps.
+- **Empty subheading sections skipped**: Subheading labels with no task items beneath them are no longer rendered in the sidebar or embeds.
+
 ## [0.9.129] - 2026-04-20
 
 ### Added

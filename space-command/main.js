@@ -2612,6 +2612,7 @@ var EmbedRenderer = class {
   // Render a single todo item (and its children if it's a header)
   // parentTags: optional tags inherited from a parent header block (for child items)
   renderTodoItem(list, todo, allTodos, showTodones, todoneFile, filterString, isChild = false, parentTags = []) {
+    var _a;
     if (isChild && todo.isSubheading) {
       const subheadingItem = list.createEl("li", { cls: "task-list-item todo-child todo-subheading" });
       const cleanText2 = todo.text.replace(/^\s*(\*\*|__)(.*?)(\*\*|__)\s*/, "$2 ").replace(/#[\w-]+/g, "").replace(/@[\w][\w.-]*/g, "").replace(/\s+/g, " ").trim();
@@ -2687,9 +2688,11 @@ var EmbedRenderer = class {
       });
     }
     if (hasChildren) {
+      const folder = ((_a = todo.file.parent) == null ? void 0 : _a.name) || "";
+      const displayPath = folder ? `${folder}/${todo.file.name}` : todo.file.name;
       rowContainer.createEl("span", {
         cls: "header-filename",
-        text: todo.file.basename
+        text: displayPath
       });
     }
     const link = rowContainer.createEl("a", {
@@ -2698,24 +2701,40 @@ var EmbedRenderer = class {
       href: "#"
     });
     link.addEventListener("click", (e) => {
-      var _a;
+      var _a2;
       e.preventDefault();
-      const blockEnd = ((_a = todo.childLineNumbers) == null ? void 0 : _a.length) ? Math.max(...todo.childLineNumbers) : void 0;
+      const blockEnd = ((_a2 = todo.childLineNumbers) == null ? void 0 : _a2.length) ? Math.max(...todo.childLineNumbers) : void 0;
       openFileAtLine(this.app, todo.file, todo.lineNumber, blockEnd);
     });
     if (isHeader && todo.childLineNumbers && todo.childLineNumbers.length > 0) {
       const childrenContainer = item.createEl("ul", { cls: "todo-children contains-task-list" });
       const headerTags = extractTags(todo.text).filter((tag) => !/#todos?\b/.test(tag) && !/#todones?\b/.test(tag));
-      for (const childLine of todo.childLineNumbers) {
-        const childTodo = allTodos.find(
-          (t) => t.filePath === todo.filePath && t.lineNumber === childLine
-        );
-        if (childTodo) {
-          if (!showTodones && childTodo.itemType === "todone") {
-            continue;
+      const lines = todo.childLineNumbers;
+      const childItems = lines.map((ln) => {
+        var _a2;
+        return (_a2 = allTodos.find((t) => t.filePath === todo.filePath && t.lineNumber === ln)) != null ? _a2 : null;
+      });
+      for (let idx = 0; idx < lines.length; idx++) {
+        const childTodo = childItems[idx];
+        if (!childTodo)
+          continue;
+        if (!showTodones && childTodo.itemType === "todone")
+          continue;
+        if (childTodo.isSubheading) {
+          let hasTasks = false;
+          for (let k = idx + 1; k < childItems.length; k++) {
+            const next = childItems[k];
+            if (!next)
+              continue;
+            if (next.isSubheading)
+              break;
+            hasTasks = true;
+            break;
           }
-          this.renderTodoItem(childrenContainer, childTodo, allTodos, showTodones, todoneFile, filterString, true, headerTags);
+          if (!hasTasks)
+            continue;
         }
+        this.renderTodoItem(childrenContainer, childTodo, allTodos, showTodones, todoneFile, filterString, true, headerTags);
       }
     }
   }
@@ -3794,6 +3813,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
   // Unified list item renderer for todos, ideas, and principles
   // parentTags: optional tags inherited from a parent header block (for child items)
   renderListItem(list, item, config, isChild = false, parentTags = []) {
+    var _a;
     if (isChild && item.isSubheading) {
       const subheadingItem = list.createEl("li", { cls: `${config.classPrefix}-item ${config.classPrefix}-child todo-subheading` });
       const cleanText2 = item.text.replace(/^\s*(\*\*|__)(.*?)(\*\*|__)\s*/, "$2 ").replace(/#[\w-]+/g, "").replace(/@[\w][\w.-]*/g, "").replace(/\s+/g, " ").trim();
@@ -3845,11 +3865,11 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       textSpan.appendText(finalText);
     }
     if (hasChildren) {
-      const basename = item.file.basename;
-      const isDate = /^\d{4}-\d{2}-\d{2}$/.test(basename);
+      const folder = ((_a = item.file.parent) == null ? void 0 : _a.name) || "";
+      const displayPath = folder ? `${folder}/${item.file.name}` : item.file.name;
       rowContainer.createEl("span", {
-        cls: isDate ? "header-filename-inline" : "header-filename",
-        text: basename
+        cls: "header-filename",
+        text: displayPath
       });
     }
     if (item.mentions.length > 0) {
@@ -3866,22 +3886,39 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       href: "#"
     });
     link.addEventListener("click", (e) => {
-      var _a;
+      var _a2;
       e.preventDefault();
-      const blockEnd = ((_a = item.childLineNumbers) == null ? void 0 : _a.length) ? Math.max(...item.childLineNumbers) : void 0;
+      const blockEnd = ((_a2 = item.childLineNumbers) == null ? void 0 : _a2.length) ? Math.max(...item.childLineNumbers) : void 0;
       openFileAtLine(this.app, item.file, item.lineNumber, blockEnd);
     });
     if (hasChildren) {
       const childrenContainer = listItem.createEl("ul", { cls: `${config.classPrefix}-children` });
       const allItems = this.getItemsForType(config.type);
       const headerTags = extractTags(item.text).filter((tag) => !config.tagToStrip.test(tag));
-      for (const childLine of item.childLineNumbers) {
-        const childItem = allItems.find(
-          (t) => t.filePath === item.filePath && t.lineNumber === childLine
-        );
-        if (childItem) {
-          this.renderListItem(childrenContainer, childItem, config, true, headerTags);
+      const lines = item.childLineNumbers;
+      const childItems = lines.map((ln) => {
+        var _a2;
+        return (_a2 = allItems.find((t) => t.filePath === item.filePath && t.lineNumber === ln)) != null ? _a2 : null;
+      });
+      for (let idx = 0; idx < lines.length; idx++) {
+        const childItem = childItems[idx];
+        if (!childItem)
+          continue;
+        if (childItem.isSubheading) {
+          let hasTasks = false;
+          for (let k = idx + 1; k < childItems.length; k++) {
+            const next = childItems[k];
+            if (!next)
+              continue;
+            if (next.isSubheading)
+              break;
+            hasTasks = true;
+            break;
+          }
+          if (!hasTasks)
+            continue;
         }
+        this.renderListItem(childrenContainer, childItem, config, true, headerTags);
       }
     }
   }

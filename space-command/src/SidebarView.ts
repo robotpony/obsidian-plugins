@@ -398,14 +398,13 @@ export class TodoSidebarView extends ItemView {
       textSpan.appendText(finalText);
     }
 
-    // Show filename for header items with children
-    // Dates stay inline; descriptive names get their own line
+    // Show file path for header items with children (folder/filename format)
     if (hasChildren) {
-      const basename = item.file.basename;
-      const isDate = /^\d{4}-\d{2}-\d{2}$/.test(basename);
+      const folder = item.file.parent?.name || "";
+      const displayPath = folder ? `${folder}/${item.file.name}` : item.file.name;
       rowContainer.createEl("span", {
-        cls: isDate ? "header-filename-inline" : "header-filename",
-        text: basename,
+        cls: "header-filename",
+        text: displayPath,
       });
     }
 
@@ -441,15 +440,26 @@ export class TodoSidebarView extends ItemView {
     if (hasChildren) {
       const childrenContainer = listItem.createEl("ul", { cls: `${config.classPrefix}-children` });
       const allItems = this.getItemsForType(config.type);
-      // Get parent header's tags to pass to children (excluding the type tag)
       const headerTags = extractTags(item.text).filter(tag => !config.tagToStrip.test(tag));
-      for (const childLine of item.childLineNumbers!) {
-        const childItem = allItems.find(
-          t => t.filePath === item.filePath && t.lineNumber === childLine
-        );
-        if (childItem) {
-          this.renderListItem(childrenContainer, childItem, config, true, headerTags);
+      const lines = item.childLineNumbers!;
+      // Resolve child items once for peek-ahead
+      const childItems = lines.map(ln => allItems.find(t => t.filePath === item.filePath && t.lineNumber === ln) ?? null);
+      for (let idx = 0; idx < lines.length; idx++) {
+        const childItem = childItems[idx];
+        if (!childItem) continue;
+        // Skip subheadings with no task items before the next subheading/end
+        if (childItem.isSubheading) {
+          let hasTasks = false;
+          for (let k = idx + 1; k < childItems.length; k++) {
+            const next = childItems[k];
+            if (!next) continue;
+            if (next.isSubheading) break;
+            hasTasks = true;
+            break;
+          }
+          if (!hasTasks) continue;
         }
+        this.renderListItem(childrenContainer, childItem, config, true, headerTags);
       }
     }
   }
