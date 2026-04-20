@@ -288,6 +288,15 @@ var DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 function resolveMentions(item, meHandle) {
   return item.mentions.map((m) => m === "me" && meHandle ? meHandle : m);
 }
+function resolveEffectiveMentions(item, meHandle, defaultAssignee) {
+  if (item.mentions.length > 0) {
+    return resolveMentions(item, meHandle);
+  }
+  if (!defaultAssignee)
+    return [];
+  const resolved = defaultAssignee === "me" && meHandle ? meHandle : defaultAssignee;
+  return [resolved];
+}
 function extractMentions(text) {
   const textWithoutCode = text.replace(/`[^`]*`/g, "");
   const mentionRegex = /@([\w][\w.-]*)/g;
@@ -1932,7 +1941,7 @@ var FilterParser = class {
     }
     return filters;
   }
-  static applyFilters(todos, filters, meHandle) {
+  static applyFilters(todos, filters, meHandle, defaultAssignee = "") {
     let filtered = [...todos];
     if (filters.path) {
       const pathPrefix = filters.path.toLowerCase();
@@ -1962,10 +1971,17 @@ var FilterParser = class {
       filtered = filtered.filter((todo) => {
         var _a;
         const mentions = (_a = todo.mentions) != null ? _a : [];
-        return mentions.some((m) => {
-          const resolved = m === "me" && meHandle ? meHandle : m;
+        if (mentions.length > 0) {
+          return mentions.some((m) => {
+            const resolved = m === "me" && meHandle ? meHandle : m;
+            return resolved === handle;
+          });
+        }
+        if (defaultAssignee) {
+          const resolved = defaultAssignee === "me" && meHandle ? meHandle : defaultAssignee;
           return resolved === handle;
-        });
+        }
+        return false;
       });
     }
     if (filters.limit) {
@@ -2302,7 +2318,7 @@ var ContextMenuHandler = class {
 
 // src/EmbedRenderer.ts
 var EmbedRenderer = class {
-  constructor(app, scanner, processor, projectManager, defaultTodoneFile = "todos/done.md", focusListLimit = 5, priorityTags = ["#p0", "#p1", "#p2", "#p3", "#p4"], makeLinksClickable = true, getMoveHistory = () => [], teamManager) {
+  constructor(app, scanner, processor, projectManager, defaultTodoneFile = "todos/done.md", focusListLimit = 5, priorityTags = ["#p0", "#p1", "#p2", "#p3", "#p4"], makeLinksClickable = true, getMoveHistory = () => [], teamManager, defaultAssignee = "") {
     // Track active renders for event cleanup
     this.activeRenders = /* @__PURE__ */ new Map();
     // Track TODONE visibility state per container
@@ -2318,6 +2334,7 @@ var EmbedRenderer = class {
     this.priorityTags = priorityTags;
     this.makeLinksClickable = makeLinksClickable;
     this.teamManager = teamManager;
+    this.defaultAssignee = defaultAssignee;
     this.contextMenuHandler = new ContextMenuHandler(app, processor, priorityTags, getMoveHistory);
   }
   getMeHandle() {
@@ -2364,8 +2381,8 @@ var EmbedRenderer = class {
     );
     const allTodones = this.scanner.getTodones();
     const unfiltered = [...allTodos, ...allTodones];
-    let filteredTodos = FilterParser.applyFilters(allTodos, filters, this.getMeHandle());
-    let filteredTodones = FilterParser.applyFilters(allTodones, filters, this.getMeHandle());
+    let filteredTodos = FilterParser.applyFilters(allTodos, filters, this.getMeHandle(), this.defaultAssignee);
+    let filteredTodones = FilterParser.applyFilters(allTodones, filters, this.getMeHandle(), this.defaultAssignee);
     filteredTodos = this.includeParentHeaders(filteredTodos, allTodos);
     filteredTodones = this.includeParentHeaders(filteredTodones, allTodones);
     const combined = [...filteredTodos, ...filteredTodones];
@@ -2379,14 +2396,14 @@ var EmbedRenderer = class {
   renderIdeas(container, filterString) {
     const filters = FilterParser.parse(filterString);
     const allIdeas = this.scanner.getIdeas();
-    const filteredIdeas = FilterParser.applyFilters(allIdeas, filters, this.getMeHandle());
+    const filteredIdeas = FilterParser.applyFilters(allIdeas, filters, this.getMeHandle(), this.defaultAssignee);
     this.renderIdeaList(container, filteredIdeas, filterString, allIdeas);
   }
   // Public helper method for focus-principles code blocks
   renderPrinciples(container, filterString) {
     const filters = FilterParser.parse(filterString);
     const allPrinciples = this.scanner.getPrinciples();
-    const filteredPrinciples = FilterParser.applyFilters(allPrinciples, filters, this.getMeHandle());
+    const filteredPrinciples = FilterParser.applyFilters(allPrinciples, filters, this.getMeHandle(), this.defaultAssignee);
     this.renderPrincipleList(container, filteredPrinciples, filterString, allPrinciples);
   }
   async render(source, el) {
@@ -2432,8 +2449,8 @@ var EmbedRenderer = class {
     );
     const allTodones = this.scanner.getTodones();
     const unfiltered = [...allTodos, ...allTodones];
-    let filteredTodos = FilterParser.applyFilters(allTodos, filters, this.getMeHandle());
-    let filteredTodones = FilterParser.applyFilters(allTodones, filters, this.getMeHandle());
+    let filteredTodos = FilterParser.applyFilters(allTodos, filters, this.getMeHandle(), this.defaultAssignee);
+    let filteredTodones = FilterParser.applyFilters(allTodones, filters, this.getMeHandle(), this.defaultAssignee);
     filteredTodos = this.includeParentHeaders(filteredTodos, allTodos);
     filteredTodones = this.includeParentHeaders(filteredTodones, allTodones);
     const combined = [...filteredTodos, ...filteredTodones];
@@ -3007,8 +3024,8 @@ var EmbedRenderer = class {
     );
     const allTodones = this.scanner.getTodones();
     const unfiltered = [...allTodos, ...allTodones];
-    let filteredTodos = FilterParser.applyFilters(allTodos, filters, this.getMeHandle());
-    let filteredTodones = FilterParser.applyFilters(allTodones, filters, this.getMeHandle());
+    let filteredTodos = FilterParser.applyFilters(allTodos, filters, this.getMeHandle(), this.defaultAssignee);
+    let filteredTodones = FilterParser.applyFilters(allTodones, filters, this.getMeHandle(), this.defaultAssignee);
     filteredTodos = this.includeParentHeaders(filteredTodos, allTodos);
     filteredTodones = this.includeParentHeaders(filteredTodones, allTodones);
     const combined = [...filteredTodos, ...filteredTodones];
@@ -3032,7 +3049,7 @@ var EmbedRenderer = class {
     this.invalidateColourMapCache();
     const filters = FilterParser.parse(filterString);
     const allIdeas = this.scanner.getIdeas();
-    const filteredIdeas = FilterParser.applyFilters(allIdeas, filters, this.getMeHandle());
+    const filteredIdeas = FilterParser.applyFilters(allIdeas, filters, this.getMeHandle(), this.defaultAssignee);
     this.renderIdeaList(container, filteredIdeas, filterString, allIdeas);
   }
   // Setup auto-refresh for principle embeds
@@ -3053,7 +3070,7 @@ var EmbedRenderer = class {
     this.invalidateColourMapCache();
     const filters = FilterParser.parse(filterString);
     const allPrinciples = this.scanner.getPrinciples();
-    const filteredPrinciples = FilterParser.applyFilters(allPrinciples, filters, this.getMeHandle());
+    const filteredPrinciples = FilterParser.applyFilters(allPrinciples, filters, this.getMeHandle(), this.defaultAssignee);
     this.renderPrincipleList(container, filteredPrinciples, filterString, allPrinciples);
   }
 };
@@ -3583,7 +3600,7 @@ var TeamManager = class extends import_obsidian11.Events {
 var import_obsidian12 = require("obsidian");
 var VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 var TodoSidebarView = class extends import_obsidian12.ItemView {
-  constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, activeTodosLimit, focusListLimit, focusModeIncludeProjects, makeLinksClickable, triageSnoozedThreshold, triageActiveThreshold, onShowAbout, onShowStats, onShowTriage, getMoveHistory = () => [], teamManager) {
+  constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, activeTodosLimit, focusListLimit, focusModeIncludeProjects, makeLinksClickable, triageSnoozedThreshold, triageActiveThreshold, onShowAbout, onShowStats, onShowTriage, getMoveHistory = () => [], teamManager, defaultAssignee = "") {
     super(leaf);
     this.updateListener = null;
     this.activeTab = "todos";
@@ -3631,6 +3648,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     this.onShowStats = onShowStats;
     this.onShowTriage = onShowTriage;
     this.teamManager = teamManager != null ? teamManager : new TeamManager(this.app, "team.md");
+    this.defaultAssignee = defaultAssignee;
     this.contextMenuHandler = new ContextMenuHandler(
       this.app,
       processor,
@@ -4680,15 +4698,17 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     }
     if (this.activeAssigneeFilter) {
       const meHandle = this.teamManager.resolveMe();
+      const da = this.defaultAssignee;
       const allTodosForMentionLookup = this.scanner.getTodos();
       if (this.activeAssigneeFilter === "__unassigned__") {
         todos = todos.filter((todo) => {
           var _a;
-          if (todo.mentions.length === 0) {
+          const effective = resolveEffectiveMentions(todo, meHandle, da);
+          if (effective.length === 0) {
             if (todo.isHeader && ((_a = todo.childLineNumbers) == null ? void 0 : _a.length)) {
               return todo.childLineNumbers.some((childLine) => {
                 const child = allTodosForMentionLookup.find((t) => t.filePath === todo.filePath && t.lineNumber === childLine);
-                return !child || child.mentions.length === 0;
+                return !child || resolveEffectiveMentions(child, meHandle, da).length === 0;
               });
             }
             return true;
@@ -4699,7 +4719,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
         const filterHandle = this.activeAssigneeFilter === "me" && meHandle ? meHandle : this.activeAssigneeFilter;
         todos = todos.filter((todo) => {
           var _a;
-          const resolved = resolveMentions(todo, meHandle);
+          const resolved = resolveEffectiveMentions(todo, meHandle, da);
           if (resolved.includes(filterHandle))
             return true;
           if (todo.isHeader && ((_a = todo.childLineNumbers) == null ? void 0 : _a.length)) {
@@ -4707,7 +4727,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
               const child = allTodosForMentionLookup.find((t) => t.filePath === todo.filePath && t.lineNumber === childLine);
               if (!child)
                 return false;
-              return resolveMentions(child, meHandle).includes(filterHandle);
+              return resolveEffectiveMentions(child, meHandle, da).includes(filterHandle);
             });
           }
           return false;
@@ -5083,7 +5103,9 @@ var DEFAULT_SETTINGS = {
   // Move history
   moveHistory: [],
   // Team file
-  teamFilePath: "team.md"
+  teamFilePath: "team.md",
+  // Default assignee
+  defaultAssignee: ""
 };
 
 // src/SlackConverter.ts
@@ -5633,7 +5655,8 @@ var SpaceCommandPlugin = class extends import_obsidian13.Plugin {
       this.settings.priorityTags,
       this.settings.makeLinksClickable,
       () => this.settings.moveHistory,
-      this.teamManager
+      this.teamManager,
+      this.settings.defaultAssignee
     );
     this.tabLockManager = new TabLockManager(this.app);
     if (this.settings.showTabLockButton) {
@@ -5715,7 +5738,8 @@ var SpaceCommandPlugin = class extends import_obsidian13.Plugin {
         () => this.showStatsModal(),
         () => this.showTriageModal(),
         () => this.settings.moveHistory,
-        this.teamManager
+        this.teamManager,
+        this.settings.defaultAssignee
       )
     );
     this.registerMarkdownPostProcessor((el, ctx) => {
@@ -6383,6 +6407,20 @@ var SpaceCommandSettingTab = class extends import_obsidian13.PluginSettingTab {
           entry.createEl("span", { cls: "sc-team-me-badge", text: "(me)" });
         }
       }
+      new import_obsidian13.Setting(containerEl).setName("Default assignee").setDesc("Unattributed tasks are treated as belonging to this person when filtering").addDropdown((dropdown) => {
+        dropdown.addOption("", "None");
+        dropdown.addOption("me", "@me");
+        for (const member of team) {
+          if (!member.isMe) {
+            dropdown.addOption(member.handle, `@${member.handle}`);
+          }
+        }
+        dropdown.setValue(this.plugin.settings.defaultAssignee);
+        dropdown.onChange(async (value) => {
+          this.plugin.settings.defaultAssignee = value;
+          await this.plugin.saveSettings();
+        });
+      });
     }
   }
 };

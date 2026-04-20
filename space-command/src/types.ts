@@ -81,6 +81,8 @@ export interface SpaceCommandSettings {
   moveHistory: string[];
   // Team file path
   teamFilePath: string;
+  // Default assignee for unattributed tasks ("" = none, "me" = @me, or a handle)
+  defaultAssignee: string;
 }
 
 export const DEFAULT_SETTINGS: SpaceCommandSettings = {
@@ -106,4 +108,6 @@ export const DEFAULT_SETTINGS: SpaceCommandSettings = {
   moveHistory: [],
   // Team file
   teamFilePath: "team.md",
+  // Default assignee
+  defaultAssignee: "",
 };

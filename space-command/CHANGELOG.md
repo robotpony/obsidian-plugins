@@ -2,10 +2,11 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
-## [0.9.128] - 2026-04-20
+## [0.9.129] - 2026-04-20
 
 ### Added
 
+- **Default assignee for unattributed tasks**: New "Default assignee" setting under Team. When set, tasks without explicit @mentions are treated as belonging to the selected person for filtering purposes. Options: None, @me, or any team member.
 - **Subheading labels in header block TODOs**: Bold-prefixed lines within a `#todo` header block (e.g., `**Diagnostics (P0)** @me`) now appear as section dividers in the sidebar and embeds, with clickable `@mention` badges.
 
 ## [0.9.127] - 2026-04-20

@@ -74,7 +74,8 @@ export default class SpaceCommandPlugin extends Plugin {
       this.settings.priorityTags,
       this.settings.makeLinksClickable,
       () => this.settings.moveHistory,
-      this.teamManager
+      this.teamManager,
+      this.settings.defaultAssignee
     );
 
     // Initialize tab lock manager
@@ -206,7 +207,8 @@ export default class SpaceCommandPlugin extends Plugin {
           () => this.showStatsModal(),
           () => this.showTriageModal(),
           () => this.settings.moveHistory,
-          this.teamManager
+          this.teamManager,
+          this.settings.defaultAssignee
         )
     );
 
@@ -1191,6 +1193,24 @@ class SpaceCommandSettingTab extends PluginSettingTab {
           entry.createEl("span", { cls: "sc-team-me-badge", text: "(me)" });
         }
       }
+
+      new Setting(containerEl)
+        .setName("Default assignee")
+        .setDesc("Unattributed tasks are treated as belonging to this person when filtering")
+        .addDropdown((dropdown) => {
+          dropdown.addOption("", "None");
+          dropdown.addOption("me", "@me");
+          for (const member of team) {
+            if (!member.isMe) {
+              dropdown.addOption(member.handle, `@${member.handle}`);
+            }
+          }
+          dropdown.setValue(this.plugin.settings.defaultAssignee);
+          dropdown.onChange(async (value) => {
+            this.plugin.settings.defaultAssignee = value;
+            await this.plugin.saveSettings();
+          });
+        });
     }
 
   }

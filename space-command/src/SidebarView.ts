@@ -5,7 +5,7 @@ import { ProjectManager } from "./ProjectManager";
 import { TeamManager } from "./TeamManager";
 import { TodoItem, ProjectInfo, ItemRenderConfig } from "./types";
 import { ContextMenuHandler } from "./ContextMenuHandler";
-import { getPriorityValue, compareTodoItems, compareWithEffectivePriority, hasTag, openFileAtLine, extractTags, extractMentions, resolveMentions, showNotice, getTagColourInfo, extractCompletionDate } from "./utils";
+import { getPriorityValue, compareTodoItems, compareWithEffectivePriority, hasTag, openFileAtLine, extractTags, extractMentions, resolveMentions, resolveEffectiveMentions, showNotice, getTagColourInfo, extractCompletionDate } from "./utils";
 
 export const VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 
@@ -26,6 +26,7 @@ export class TodoSidebarView extends ItemView {
   private activeTagFilter: string | null = null;
   private activeAssigneeFilter: string | null = null;
   private teamManager: TeamManager;
+  private defaultAssignee: string;
   private focusModeEnabled: boolean = false;
   private openDropdown: HTMLElement | null = null;
   private openDropdownTrigger: HTMLElement | null = null;
@@ -51,7 +52,8 @@ export class TodoSidebarView extends ItemView {
     onShowStats: () => void,
     onShowTriage: () => void,
     getMoveHistory: () => string[] = () => [],
-    teamManager?: TeamManager
+    teamManager?: TeamManager,
+    defaultAssignee: string = ""
   ) {
     super(leaf);
     this.scanner = scanner;
@@ -68,6 +70,7 @@ export class TodoSidebarView extends ItemView {
     this.onShowStats = onShowStats;
     this.onShowTriage = onShowTriage;
     this.teamManager = teamManager ?? new TeamManager(this.app, "team.md");
+    this.defaultAssignee = defaultAssignee;
 
     // Initialize context menu handler
     this.contextMenuHandler = new ContextMenuHandler(
@@ -1569,14 +1572,16 @@ export class TodoSidebarView extends ItemView {
     // Apply assignee filter if active
     if (this.activeAssigneeFilter) {
       const meHandle = this.teamManager.resolveMe();
+      const da = this.defaultAssignee;
       const allTodosForMentionLookup = this.scanner.getTodos();
       if (this.activeAssigneeFilter === "__unassigned__") {
         todos = todos.filter(todo => {
-          if (todo.mentions.length === 0) {
+          const effective = resolveEffectiveMentions(todo, meHandle, da);
+          if (effective.length === 0) {
             if (todo.isHeader && todo.childLineNumbers?.length) {
               return todo.childLineNumbers.some(childLine => {
                 const child = allTodosForMentionLookup.find(t => t.filePath === todo.filePath && t.lineNumber === childLine);
-                return !child || child.mentions.length === 0;
+                return !child || resolveEffectiveMentions(child, meHandle, da).length === 0;
               });
             }
             return true;
@@ -1586,14 +1591,14 @@ export class TodoSidebarView extends ItemView {
       } else {
         const filterHandle = this.activeAssigneeFilter === "me" && meHandle ? meHandle : this.activeAssigneeFilter;
         todos = todos.filter(todo => {
-          const resolved = resolveMentions(todo, meHandle);
+          const resolved = resolveEffectiveMentions(todo, meHandle, da);
           if (resolved.includes(filterHandle)) return true;
           // Keep headers if any child matches the filter
           if (todo.isHeader && todo.childLineNumbers?.length) {
             return todo.childLineNumbers.some(childLine => {
               const child = allTodosForMentionLookup.find(t => t.filePath === todo.filePath && t.lineNumber === childLine);
               if (!child) return false;
-              return resolveMentions(child, meHandle).includes(filterHandle);
+              return resolveEffectiveMentions(child, meHandle, da).includes(filterHandle);
             });
           }
           return false;

@@ -290,6 +290,23 @@ export function resolveMentions(item: TodoItem, meHandle: string | null): string
   return item.mentions.map(m => m === "me" && meHandle ? meHandle : m);
 }
 
+/**
+ * Resolve mentions with a fallback default for unattributed items.
+ * Returns the item's explicit mentions (resolved), or the default assignee if none.
+ */
+export function resolveEffectiveMentions(
+  item: TodoItem,
+  meHandle: string | null,
+  defaultAssignee: string
+): string[] {
+  if (item.mentions.length > 0) {
+    return resolveMentions(item, meHandle);
+  }
+  if (!defaultAssignee) return [];
+  const resolved = defaultAssignee === "me" && meHandle ? meHandle : defaultAssignee;
+  return [resolved];
+}
+
 export function extractMentions(text: string): string[] {
   const textWithoutCode = text.replace(/`[^`]*`/g, "");
   const mentionRegex = /@([\w][\w.-]*)/g;

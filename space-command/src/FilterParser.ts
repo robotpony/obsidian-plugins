@@ -49,7 +49,7 @@ export class FilterParser {
     return filters;
   }
 
-  static applyFilters(todos: TodoItem[], filters: TodoFilters, meHandle?: string | null): TodoItem[] {
+  static applyFilters(todos: TodoItem[], filters: TodoFilters, meHandle?: string | null, defaultAssignee: string = ""): TodoItem[] {
     let filtered = [...todos];
 
     // Apply path filter
@@ -93,10 +93,17 @@ export class FilterParser {
       }
       filtered = filtered.filter((todo) => {
         const mentions = todo.mentions ?? [];
-        return mentions.some(m => {
-          const resolved = m === "me" && meHandle ? meHandle : m;
+        if (mentions.length > 0) {
+          return mentions.some(m => {
+            const resolved = m === "me" && meHandle ? meHandle : m;
+            return resolved === handle;
+          });
+        }
+        if (defaultAssignee) {
+          const resolved = defaultAssignee === "me" && meHandle ? meHandle : defaultAssignee;
           return resolved === handle;
-        });
+        }
+        return false;
       });
     }
 
