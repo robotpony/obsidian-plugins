@@ -2,6 +2,14 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.126] - 2026-04-20
+
+### Improved
+
+- **Sidebar links reuse open tabs**: Clicking a → link now switches to an already-open tab showing that file instead of replacing the current tab's content. Falls back to the current tab if the file isn't open anywhere.
+
+---
+
 ## [0.9.125] - 2026-04-20
 
 ### Fixed

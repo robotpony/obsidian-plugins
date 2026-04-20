@@ -605,7 +605,16 @@ export function openFileAtLine(
   line: number,
   blockEndLine?: number
 ): void {
-  const leaf = app.workspace.getLeaf(false);
+  // Reuse an existing leaf that already has the file open
+  let leaf: WorkspaceLeaf | null = null;
+  app.workspace.iterateAllLeaves((l) => {
+    if (!leaf && l.view instanceof MarkdownView && l.view.file?.path === file.path) {
+      leaf = l;
+    }
+  });
+  if (!leaf) leaf = app.workspace.getLeaf(false);
+
+  app.workspace.setActiveLeaf(leaf, { focus: true });
   leaf.openFile(file, { active: true }).then(() => {
     const view = app.workspace.getActiveViewOfType(MarkdownView);
     if (view?.editor) {

@@ -458,7 +458,16 @@ async function modifyFileLine(vault, file, lineNumber, transform, validate, fing
   await vault.modify(file, lines.join("\n"));
 }
 function openFileAtLine(app, file, line, blockEndLine) {
-  const leaf = app.workspace.getLeaf(false);
+  let leaf = null;
+  app.workspace.iterateAllLeaves((l) => {
+    var _a;
+    if (!leaf && l.view instanceof import_obsidian3.MarkdownView && ((_a = l.view.file) == null ? void 0 : _a.path) === file.path) {
+      leaf = l;
+    }
+  });
+  if (!leaf)
+    leaf = app.workspace.getLeaf(false);
+  app.workspace.setActiveLeaf(leaf, { focus: true });
   leaf.openFile(file, { active: true }).then(() => {
     var _a;
     const view = app.workspace.getActiveViewOfType(import_obsidian3.MarkdownView);
