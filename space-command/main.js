@@ -3796,13 +3796,13 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
         text: basename
       });
     }
+    if (item.mentions.length > 0) {
+      this.renderMentionBadges(item.mentions, rowContainer);
+    }
     const itemTags = extractTags(cleanText).filter((tag) => !config.tagToStrip.test(tag));
     const mergedTags = [.../* @__PURE__ */ new Set([...parentTags, ...itemTags])];
     if (mergedTags.length > 0) {
       this.renderTagDropdown(mergedTags, rowContainer, item);
-    }
-    if (item.mentions.length > 0) {
-      this.renderMentionBadges(item.mentions, rowContainer);
     }
     const link = rowContainer.createEl("a", {
       text: "\u2192",
@@ -4329,6 +4329,13 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       document.body.appendChild(dropdown);
       this.openDropdown = dropdown;
       this.openDropdownTrigger = trigger;
+      const closeHandler = (e2) => {
+        if (!dropdown.contains(e2.target) && e2.target !== trigger) {
+          this.closeDropdown();
+          document.removeEventListener("click", closeHandler);
+        }
+      };
+      setTimeout(() => document.addEventListener("click", closeHandler), 0);
     });
   }
   renderFilterIndicator(header) {

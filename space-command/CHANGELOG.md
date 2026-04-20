@@ -2,6 +2,23 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.125] - 2026-04-20
+
+### Fixed
+
+- **Assignee dropdown dismisses on click outside**: The `@` filter menu now closes when clicking anywhere else, matching the tag dropdown behaviour.
+- **Assignee button styling matches eye icon**: The `@` button now uses the same opacity pattern as the focus mode toggle: subtle when inactive, accent-coloured when active.
+
+---
+
+## [0.9.124] - 2026-04-20
+
+### Improved
+
+- **Sidebar badge order**: @mention badges now render before tag indicators, so attributed people appear first in the item row.
+
+---
+
 ## [0.9.123] - 2026-04-20
 
 ### Fixed

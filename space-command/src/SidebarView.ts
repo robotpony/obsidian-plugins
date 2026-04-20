@@ -391,17 +391,17 @@ export class TodoSidebarView extends ItemView {
       });
     }
 
+    // Mention badges (before tags so @handles appear first)
+    if (item.mentions.length > 0) {
+      this.renderMentionBadges(item.mentions, rowContainer);
+    }
+
     // Get tags (excluding the type tag) and merge with parent header tags for child items
     const itemTags = extractTags(cleanText).filter(tag => !config.tagToStrip.test(tag));
     // Merge parent tags with item tags, avoiding duplicates
     const mergedTags = [...new Set([...parentTags, ...itemTags])];
     if (mergedTags.length > 0) {
       this.renderTagDropdown(mergedTags, rowContainer, item);
-    }
-
-    // Mention badges
-    if (item.mentions.length > 0) {
-      this.renderMentionBadges(item.mentions, rowContainer);
     }
 
     // Link to source
@@ -1128,6 +1128,15 @@ export class TodoSidebarView extends ItemView {
       document.body.appendChild(dropdown);
       this.openDropdown = dropdown;
       this.openDropdownTrigger = trigger;
+
+      // Close on click outside
+      const closeHandler = (e: MouseEvent) => {
+        if (!dropdown.contains(e.target as Node) && e.target !== trigger) {
+          this.closeDropdown();
+          document.removeEventListener("click", closeHandler);
+        }
+      };
+      setTimeout(() => document.addEventListener("click", closeHandler), 0);
     });
   }
 
