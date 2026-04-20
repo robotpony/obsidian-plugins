@@ -643,6 +643,16 @@ var TodoScanner = class extends import_obsidian4.Events {
             continue;
           }
         }
+        if (currentHeaderTodo && !this.isListItem(line) && this.isBoldSubheading(line)) {
+          if (this.hasContent(line)) {
+            const subheading = this.createTodoItem(file, i, line, tags, "todo");
+            subheading.isSubheading = true;
+            subheading.parentLineNumber = currentHeaderTodo.lineNumber;
+            currentHeaderTodo.todoItem.childLineNumbers.push(i);
+            todos.push(subheading);
+          }
+          continue;
+        }
         const hasTodo = tags.includes("#todo") || tags.includes("#todos");
         let hasTodone = tags.includes("#todone") || tags.includes("#todones");
         const hasIdea = tags.includes("#idea") || tags.includes("#ideas") || tags.includes("#ideation");
@@ -759,6 +769,10 @@ var TodoScanner = class extends import_obsidian4.Events {
   // Check if a line is a list item (bullet or numbered)
   isListItem(line) {
     return /^[\s]*[-*+]\s/.test(line) || /^[\s]*\d+\.\s/.test(line);
+  }
+  // Check if a line is a bold subheading (starts with **text** or __text__)
+  isBoldSubheading(line) {
+    return /^\s*(\*\*|__)\S/.test(line);
   }
   createTodoItem(file, lineNumber, text, tags, itemType) {
     var _a;
@@ -2581,6 +2595,12 @@ var EmbedRenderer = class {
   // Render a single todo item (and its children if it's a header)
   // parentTags: optional tags inherited from a parent header block (for child items)
   renderTodoItem(list, todo, allTodos, showTodones, todoneFile, filterString, isChild = false, parentTags = []) {
+    if (isChild && todo.isSubheading) {
+      const subheadingItem = list.createEl("li", { cls: "task-list-item todo-child todo-subheading" });
+      const cleanText2 = todo.text.replace(/^\s*(\*\*|__)(.*?)(\*\*|__)\s*/, "$2 ").replace(/#[\w-]+/g, "").replace(/@[\w][\w.-]*/g, "").replace(/\s+/g, " ").trim();
+      subheadingItem.createEl("span", { cls: "todo-subheading-text", text: cleanText2 });
+      return;
+    }
     const isCompleted = todo.itemType === "todone";
     const isHeader = todo.isHeader === true;
     const hasChildren = isHeader && todo.childLineNumbers && todo.childLineNumbers.length > 0;
@@ -3756,6 +3776,15 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
   // Unified list item renderer for todos, ideas, and principles
   // parentTags: optional tags inherited from a parent header block (for child items)
   renderListItem(list, item, config, isChild = false, parentTags = []) {
+    if (isChild && item.isSubheading) {
+      const subheadingItem = list.createEl("li", { cls: `${config.classPrefix}-item ${config.classPrefix}-child todo-subheading` });
+      const cleanText2 = item.text.replace(/^\s*(\*\*|__)(.*?)(\*\*|__)\s*/, "$2 ").replace(/#[\w-]+/g, "").replace(/@[\w][\w.-]*/g, "").replace(/\s+/g, " ").trim();
+      subheadingItem.createEl("span", { cls: "todo-subheading-text", text: cleanText2 });
+      if (item.mentions.length > 0) {
+        this.renderMentionBadges(item.mentions, subheadingItem);
+      }
+      return;
+    }
     const hasFocus = hasTag(item.tags, "#focus");
     const isHeader = item.isHeader === true;
     const hasChildren = isHeader && item.childLineNumbers && item.childLineNumbers.length > 0;
@@ -4261,13 +4290,19 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     for (const mention of mentions) {
       const isMe = mention === "me" || meHandle && mention === meHandle;
       const badge = container.createEl("span", {
-        cls: `sc-mention${isMe ? " sc-mention-me" : ""}`,
+        cls: `sc-mention sc-mention-clickable${isMe ? " sc-mention-me" : ""}`,
         text: `@${mention}`
       });
       const member = this.teamManager.resolveHandle(mention);
       if (member) {
-        badge.setAttribute("title", member.name);
+        badge.setAttribute("title", `Filter by ${member.name}`);
       }
+      badge.addEventListener("click", (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        this.activeAssigneeFilter = isMe ? "me" : mention;
+        this.render();
+      });
     }
   }
   renderAssigneeFilter(header) {
@@ -4324,6 +4359,25 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
         item.createEl("span", { cls: "sc-assignee-filter-name", text: member.name });
         item.addEventListener("click", () => {
           this.activeAssigneeFilter = member.handle;
+          this.closeDropdown();
+          this.render();
+        });
+      }
+      const teamHandles = new Set(team.map((m) => m.handle));
+      if (meHandle)
+        teamHandles.add("me");
+      const allMentions = /* @__PURE__ */ new Set();
+      for (const todo of this.scanner.getTodos()) {
+        for (const m of todo.mentions)
+          allMentions.add(m);
+      }
+      for (const handle of [...allMentions].sort()) {
+        if (handle === "me" || teamHandles.has(handle))
+          continue;
+        const item = dropdown.createEl("div", { cls: "tag-dropdown-item" });
+        item.createEl("span", { cls: "tag-dropdown-item-label sc-mention", text: `@${handle}` });
+        item.addEventListener("click", () => {
+          this.activeAssigneeFilter = handle;
           this.closeDropdown();
           this.render();
         });
@@ -4611,6 +4665,9 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
         if (!childItem) {
           return false;
         }
+        if (childItem.isSubheading) {
+          return false;
+        }
         const isSnoozed2 = childItem.tags.includes("#future") || childItem.tags.includes("#snooze") || childItem.tags.includes("#snoozed");
         if (isSnoozed2)
           return false;
@@ -4623,13 +4680,37 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     }
     if (this.activeAssigneeFilter) {
       const meHandle = this.teamManager.resolveMe();
+      const allTodosForMentionLookup = this.scanner.getTodos();
       if (this.activeAssigneeFilter === "__unassigned__") {
-        todos = todos.filter((todo) => todo.mentions.length === 0);
+        todos = todos.filter((todo) => {
+          var _a;
+          if (todo.mentions.length === 0) {
+            if (todo.isHeader && ((_a = todo.childLineNumbers) == null ? void 0 : _a.length)) {
+              return todo.childLineNumbers.some((childLine) => {
+                const child = allTodosForMentionLookup.find((t) => t.filePath === todo.filePath && t.lineNumber === childLine);
+                return !child || child.mentions.length === 0;
+              });
+            }
+            return true;
+          }
+          return false;
+        });
       } else {
         const filterHandle = this.activeAssigneeFilter === "me" && meHandle ? meHandle : this.activeAssigneeFilter;
         todos = todos.filter((todo) => {
+          var _a;
           const resolved = resolveMentions(todo, meHandle);
-          return resolved.includes(filterHandle);
+          if (resolved.includes(filterHandle))
+            return true;
+          if (todo.isHeader && ((_a = todo.childLineNumbers) == null ? void 0 : _a.length)) {
+            return todo.childLineNumbers.some((childLine) => {
+              const child = allTodosForMentionLookup.find((t) => t.filePath === todo.filePath && t.lineNumber === childLine);
+              if (!child)
+                return false;
+              return resolveMentions(child, meHandle).includes(filterHandle);
+            });
+          }
+          return false;
         });
       }
     }

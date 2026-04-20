@@ -474,6 +474,18 @@ export class EmbedRenderer {
     isChild: boolean = false,
     parentTags: string[] = []
   ): void {
+    // Subheading labels: render as subtle section divider
+    if (isChild && todo.isSubheading) {
+      const subheadingItem = list.createEl("li", { cls: "task-list-item todo-child todo-subheading" });
+      const cleanText = todo.text
+        .replace(/^\s*(\*\*|__)(.*?)(\*\*|__)\s*/, '$2 ')
+        .replace(/#[\w-]+/g, '')
+        .replace(/@[\w][\w.-]*/g, '')
+        .replace(/\s+/g, ' ').trim();
+      subheadingItem.createEl("span", { cls: "todo-subheading-text", text: cleanText });
+      return;
+    }
+
     const isCompleted = todo.itemType === 'todone';
     const isHeader = todo.isHeader === true;
     const hasChildren = isHeader && todo.childLineNumbers && todo.childLineNumbers.length > 0;

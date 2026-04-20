@@ -320,6 +320,21 @@ export class TodoSidebarView extends ItemView {
     isChild: boolean = false,
     parentTags: string[] = []
   ): void {
+    // Subheading labels: render as subtle section divider with mention badges
+    if (isChild && item.isSubheading) {
+      const subheadingItem = list.createEl("li", { cls: `${config.classPrefix}-item ${config.classPrefix}-child todo-subheading` });
+      const cleanText = item.text
+        .replace(/^\s*(\*\*|__)(.*?)(\*\*|__)\s*/, '$2 ')  // unwrap bold markers
+        .replace(/#[\w-]+/g, '')          // strip tags
+        .replace(/@[\w][\w.-]*/g, '')     // strip mentions (rendered as badges)
+        .replace(/\s+/g, ' ').trim();
+      subheadingItem.createEl("span", { cls: "todo-subheading-text", text: cleanText });
+      if (item.mentions.length > 0) {
+        this.renderMentionBadges(item.mentions, subheadingItem);
+      }
+      return;
+    }
+
     const hasFocus = hasTag(item.tags, "#focus");
     const isHeader = item.isHeader === true;
     const hasChildren = isHeader && item.childLineNumbers && item.childLineNumbers.length > 0;
@@ -1036,13 +1051,19 @@ export class TodoSidebarView extends ItemView {
     for (const mention of mentions) {
       const isMe = mention === "me" || (meHandle && mention === meHandle);
       const badge = container.createEl("span", {
-        cls: `sc-mention${isMe ? " sc-mention-me" : ""}`,
+        cls: `sc-mention sc-mention-clickable${isMe ? " sc-mention-me" : ""}`,
         text: `@${mention}`,
       });
       const member = this.teamManager.resolveHandle(mention);
       if (member) {
-        badge.setAttribute("title", member.name);
+        badge.setAttribute("title", `Filter by ${member.name}`);
       }
+      badge.addEventListener("click", (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        this.activeAssigneeFilter = isMe ? "me" : mention;
+        this.render();
+      });
     }
   }
 
@@ -1111,6 +1132,24 @@ export class TodoSidebarView extends ItemView {
         item.createEl("span", { cls: "sc-assignee-filter-name", text: member.name });
         item.addEventListener("click", () => {
           this.activeAssigneeFilter = member.handle;
+          this.closeDropdown();
+          this.render();
+        });
+      }
+
+      // Add handles found in TODOs but not in team.md
+      const teamHandles = new Set(team.map(m => m.handle));
+      if (meHandle) teamHandles.add("me");
+      const allMentions = new Set<string>();
+      for (const todo of this.scanner.getTodos()) {
+        for (const m of todo.mentions) allMentions.add(m);
+      }
+      for (const handle of [...allMentions].sort()) {
+        if (handle === "me" || teamHandles.has(handle)) continue;
+        const item = dropdown.createEl("div", { cls: "tag-dropdown-item" });
+        item.createEl("span", { cls: "tag-dropdown-item-label sc-mention", text: `@${handle}` });
+        item.addEventListener("click", () => {
+          this.activeAssigneeFilter = handle;
           this.closeDropdown();
           this.render();
         });
@@ -1506,7 +1545,10 @@ export class TodoSidebarView extends ItemView {
         // Check if child exists in todos
         const childItem = allTodosForChildLookup.find(t => t.filePath === todo.filePath && t.lineNumber === childLine);
         if (!childItem) {
-          // Child doesn't exist in cache (empty line, filtered out, etc.) - not active
+          return false;
+        }
+        // Subheading labels are not tasks — skip them
+        if (childItem.isSubheading) {
           return false;
         }
         // Check if child is snoozed
@@ -1527,13 +1569,34 @@ export class TodoSidebarView extends ItemView {
     // Apply assignee filter if active
     if (this.activeAssigneeFilter) {
       const meHandle = this.teamManager.resolveMe();
+      const allTodosForMentionLookup = this.scanner.getTodos();
       if (this.activeAssigneeFilter === "__unassigned__") {
-        todos = todos.filter(todo => todo.mentions.length === 0);
+        todos = todos.filter(todo => {
+          if (todo.mentions.length === 0) {
+            if (todo.isHeader && todo.childLineNumbers?.length) {
+              return todo.childLineNumbers.some(childLine => {
+                const child = allTodosForMentionLookup.find(t => t.filePath === todo.filePath && t.lineNumber === childLine);
+                return !child || child.mentions.length === 0;
+              });
+            }
+            return true;
+          }
+          return false;
+        });
       } else {
         const filterHandle = this.activeAssigneeFilter === "me" && meHandle ? meHandle : this.activeAssigneeFilter;
         todos = todos.filter(todo => {
           const resolved = resolveMentions(todo, meHandle);
-          return resolved.includes(filterHandle);
+          if (resolved.includes(filterHandle)) return true;
+          // Keep headers if any child matches the filter
+          if (todo.isHeader && todo.childLineNumbers?.length) {
+            return todo.childLineNumbers.some(childLine => {
+              const child = allTodosForMentionLookup.find(t => t.filePath === todo.filePath && t.lineNumber === childLine);
+              if (!child) return false;
+              return resolveMentions(child, meHandle).includes(filterHandle);
+            });
+          }
+          return false;
         });
       }
     }

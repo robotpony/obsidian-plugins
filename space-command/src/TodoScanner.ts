@@ -196,6 +196,18 @@ export class TodoScanner extends Events {
           }
         }
 
+        // Bold subheading labels within a header block (e.g., **Diagnostics (P0)** @me)
+        if (currentHeaderTodo && !this.isListItem(line) && this.isBoldSubheading(line)) {
+          if (this.hasContent(line)) {
+            const subheading = this.createTodoItem(file, i, line, tags, 'todo');
+            subheading.isSubheading = true;
+            subheading.parentLineNumber = currentHeaderTodo.lineNumber;
+            currentHeaderTodo.todoItem.childLineNumbers!.push(i);
+            todos.push(subheading);
+          }
+          continue;
+        }
+
         // Regular TODO/TODONE processing (non-header, non-child items)
         // If line has both #todo and #todone, #todone wins and we clean up the #todo
         // If line has #idea, it should not appear in todos (idea takes precedence)
@@ -350,6 +362,11 @@ export class TodoScanner extends Events {
   private isListItem(line: string): boolean {
     // Match: "- ", "* ", "+ ", "1. ", "  - " (indented), etc.
     return /^[\s]*[-*+]\s/.test(line) || /^[\s]*\d+\.\s/.test(line);
+  }
+
+  // Check if a line is a bold subheading (starts with **text** or __text__)
+  private isBoldSubheading(line: string): boolean {
+    return /^\s*(\*\*|__)\S/.test(line);
   }
 
   private createTodoItem(

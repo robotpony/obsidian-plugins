@@ -18,6 +18,7 @@ export interface TodoItem {
   dateCreated: number;
   // Header hierarchy fields
   isHeader?: boolean;           // True if this is a header line (##)
+  isSubheading?: boolean;       // True if this is a bold subheading label within a header block
   headerLevel?: number;         // 1-6 for header level
   parentLineNumber?: number;    // Line number of parent header (if child)
   childLineNumbers?: number[];  // Line numbers of child items

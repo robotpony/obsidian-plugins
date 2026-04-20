@@ -2,6 +2,25 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.128] - 2026-04-20
+
+### Added
+
+- **Subheading labels in header block TODOs**: Bold-prefixed lines within a `#todo` header block (e.g., `**Diagnostics (P0)** @me`) now appear as section dividers in the sidebar and embeds, with clickable `@mention` badges.
+
+## [0.9.127] - 2026-04-20
+
+### Fixed
+
+- **@me filter now works with child items**: The assignee filter was only checking top-level items and headers, missing `@me` on child TODOs nested under headers. Headers with matching children now pass the filter.
+- **Assignee dropdown shows all mentioned handles**: Handles found in TODOs but not in `team.md` now appear in the dropdown, so filtering works even without a complete team file.
+
+### Added
+
+- **Clickable @mention badges**: Clicking an `@handle` badge in the sidebar filters the list to that person. Hover states provide visual affordance.
+
+---
+
 ## [0.9.126] - 2026-04-20
 
 ### Improved
