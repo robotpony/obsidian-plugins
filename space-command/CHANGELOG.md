@@ -2,6 +2,12 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.9.131] - 2026-04-23
+
+### Fixed
+
+- **Header sort preserves subheading sections**: Sorting a header block with bold subheading dividers (e.g., `**Diagnostics (P0)**`) now sorts items within each section independently instead of treating everything as a flat list. Indented sub-items also stay attached to their parent.
+
 ## [0.9.130] - 2026-04-20
 
 ### Fixed

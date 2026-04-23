@@ -1552,7 +1552,8 @@ ${todoneText}` : todoneText;
   }
   /**
    * Sort children of a header TODO by status (open first) then completion date (newest first).
-   * Modifies the underlying markdown file to persist the sort order.
+   * Respects subheading sections: items are sorted within their section, not across sections.
+   * Indented sub-items stay attached to their parent item.
    */
   async sortHeaderChildren(headerTodo) {
     if (!headerTodo.isHeader || !headerTodo.childLineNumbers || headerTodo.childLineNumbers.length < 2) {
@@ -1566,16 +1567,49 @@ ${todoneText}` : todoneText;
         text: lines[lineNum],
         itemType: this.detectItemType(lines[lineNum])
       }));
-      const sortedChildren = [...childLines].sort(compareByStatusAndDate);
-      const orderChanged = sortedChildren.some(
+      const indentOf = (text) => {
+        const m = text.match(/^(\s*)/);
+        return m ? m[1].length : 0;
+      };
+      const isBoldSubheading = (text) => /^\s*(\*\*|__)\S/.test(text) && !/^\s*[-*+]\s/.test(text) && !/^\s*\d+\.\s/.test(text);
+      const sections = [];
+      let current = { subheading: null, units: [] };
+      sections.push(current);
+      for (const child of childLines) {
+        if (isBoldSubheading(child.text)) {
+          current = { subheading: child, units: [] };
+          sections.push(current);
+        } else {
+          const lastUnit = current.units[current.units.length - 1];
+          if (lastUnit && indentOf(child.text) > indentOf(lastUnit.primary.text)) {
+            lastUnit.subItems.push(child);
+          } else {
+            current.units.push({ primary: child, subItems: [] });
+          }
+        }
+      }
+      for (const section of sections) {
+        section.units.sort((a, b) => compareByStatusAndDate(a.primary, b.primary));
+      }
+      const sorted = [];
+      for (const section of sections) {
+        if (section.subheading)
+          sorted.push(section.subheading);
+        for (const unit of section.units) {
+          sorted.push(unit.primary);
+          for (const sub of unit.subItems)
+            sorted.push(sub);
+        }
+      }
+      const orderChanged = sorted.some(
         (child, idx) => child.lineNumber !== childLines[idx].lineNumber
       );
       if (!orderChanged) {
         showNotice2("Items already sorted");
         return true;
       }
-      const sortedLineContents = sortedChildren.map((c) => c.text);
       const sortedLineNumbers = [...headerTodo.childLineNumbers].sort((a, b) => a - b);
+      const sortedLineContents = sorted.map((c) => c.text);
       for (let i = 0; i < sortedLineNumbers.length; i++) {
         lines[sortedLineNumbers[i]] = sortedLineContents[i];
       }

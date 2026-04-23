@@ -738,7 +738,8 @@ export class TodoProcessor {
 
   /**
    * Sort children of a header TODO by status (open first) then completion date (newest first).
-   * Modifies the underlying markdown file to persist the sort order.
+   * Respects subheading sections: items are sorted within their section, not across sections.
+   * Indented sub-items stay attached to their parent item.
    */
   async sortHeaderChildren(headerTodo: TodoItem): Promise<boolean> {
     if (!headerTodo.isHeader || !headerTodo.childLineNumbers || headerTodo.childLineNumbers.length < 2) {
@@ -749,8 +750,9 @@ export class TodoProcessor {
       const content = await this.app.vault.read(headerTodo.file);
       const lines = content.split("\n");
 
-      // Get all child line numbers and their content
-      const childLines = headerTodo.childLineNumbers
+      type ChildLine = { lineNumber: number; text: string; itemType: 'todo' | 'todone' };
+
+      const childLines: ChildLine[] = headerTodo.childLineNumbers
         .filter(lineNum => lineNum >= 0 && lineNum < lines.length)
         .map(lineNum => ({
           lineNumber: lineNum,
@@ -758,11 +760,53 @@ export class TodoProcessor {
           itemType: this.detectItemType(lines[lineNum])
         }));
 
-      // Sort by status and date
-      const sortedChildren = [...childLines].sort(compareByStatusAndDate);
+      // A sort unit is a top-level item plus any indented sub-items beneath it
+      type SortUnit = { primary: ChildLine; subItems: ChildLine[] };
+      type Section = { subheading: ChildLine | null; units: SortUnit[] };
+
+      const indentOf = (text: string) => {
+        const m = text.match(/^(\s*)/);
+        return m ? m[1].length : 0;
+      };
+      const isBoldSubheading = (text: string) =>
+        /^\s*(\*\*|__)\S/.test(text) && !/^\s*[-*+]\s/.test(text) && !/^\s*\d+\.\s/.test(text);
+
+      // Split children into sections delimited by bold subheadings
+      const sections: Section[] = [];
+      let current: Section = { subheading: null, units: [] };
+      sections.push(current);
+
+      for (const child of childLines) {
+        if (isBoldSubheading(child.text)) {
+          current = { subheading: child, units: [] };
+          sections.push(current);
+        } else {
+          const lastUnit = current.units[current.units.length - 1];
+          if (lastUnit && indentOf(child.text) > indentOf(lastUnit.primary.text)) {
+            lastUnit.subItems.push(child);
+          } else {
+            current.units.push({ primary: child, subItems: [] });
+          }
+        }
+      }
+
+      // Sort units within each section (subheadings stay anchored)
+      for (const section of sections) {
+        section.units.sort((a, b) => compareByStatusAndDate(a.primary, b.primary));
+      }
+
+      // Flatten back to ordered list
+      const sorted: ChildLine[] = [];
+      for (const section of sections) {
+        if (section.subheading) sorted.push(section.subheading);
+        for (const unit of section.units) {
+          sorted.push(unit.primary);
+          for (const sub of unit.subItems) sorted.push(sub);
+        }
+      }
 
       // Check if order changed
-      const orderChanged = sortedChildren.some((child, idx) =>
+      const orderChanged = sorted.some((child, idx) =>
         child.lineNumber !== childLines[idx].lineNumber
       );
 
@@ -771,12 +815,9 @@ export class TodoProcessor {
         return true;
       }
 
-      // Extract the sorted line contents
-      const sortedLineContents = sortedChildren.map(c => c.text);
-
-      // Replace lines in the original array (in place, sorted order)
-      // We need to replace at the original positions with the sorted contents
+      // Write sorted contents back to the original line positions
       const sortedLineNumbers = [...headerTodo.childLineNumbers].sort((a, b) => a - b);
+      const sortedLineContents = sorted.map(c => c.text);
       for (let i = 0; i < sortedLineNumbers.length; i++) {
         lines[sortedLineNumbers[i]] = sortedLineContents[i];
       }
