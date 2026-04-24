@@ -850,8 +850,8 @@
 }
 
 .summary-counts-grid {
-  margin: 6px 0 8px;
-  padding: 0 4px;
+  margin: 6px 0 0;
+  padding: 0 8px;
 }
 
 .summary-count-row {
@@ -884,7 +884,7 @@
 }
 
 .summary-velocity {
-  padding: 4px 8px 8px;
+  padding: 2px 8px 6px;
   color: var(--text-muted);
   font-size: 12px;
   border-bottom: 1px solid var(--background-modifier-border);
@@ -896,7 +896,7 @@
 }
 
 .summary-backlogs-label {
-  padding: 6px 4px 4px;
+  padding: 6px 8px 2px;
   color: var(--text-muted);
   font-size: 12px;
 }
@@ -904,7 +904,7 @@
 .summary-backlog-row {
   display: flex;
   justify-content: space-between;
-  padding: 1px 8px 1px 20px;
+  padding: 1px 8px 1px 16px;
   font-size: 12px;
   color: var(--text-muted);
 }
@@ -2078,8 +2078,17 @@
 .sc-assignee-stats {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  padding: 4px 0;
+  gap: 10px;
+  padding: 6px 8px 2px;
+}
+
+.sc-assignee-stats .sc-mention,
+.sc-assignee-stats .sc-mention.sc-mention-me {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-family: inherit;
+  color: var(--text-muted);
 }
 
 .sc-assignee-stat {
