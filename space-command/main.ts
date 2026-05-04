@@ -208,7 +208,9 @@ export default class SpaceCommandPlugin extends Plugin {
           () => this.showTriageModal(),
           () => this.settings.moveHistory,
           this.teamManager,
-          this.settings.defaultAssignee
+          this.settings.defaultAssignee,
+          this.settings.focusQueueLimit,
+          this.settings.focusModeActive
         )
     );
 

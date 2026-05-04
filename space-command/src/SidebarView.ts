@@ -3,9 +3,9 @@ import { TodoScanner } from "./TodoScanner";
 import { TodoProcessor } from "./TodoProcessor";
 import { ProjectManager } from "./ProjectManager";
 import { TeamManager } from "./TeamManager";
-import { TodoItem, ProjectInfo, ItemRenderConfig } from "./types";
+import { TodoItem, ProjectInfo, ItemRenderConfig, FocusQueueState } from "./types";
 import { ContextMenuHandler } from "./ContextMenuHandler";
-import { getPriorityValue, compareTodoItems, compareWithEffectivePriority, hasTag, openFileAtLine, extractTags, extractMentions, resolveMentions, resolveEffectiveMentions, showNotice, getTagColourInfo, extractCompletionDate } from "./utils";
+import { getPriorityValue, compareTodoItems, compareWithEffectivePriority, hasTag, openFileAtLine, extractTags, extractMentions, resolveMentions, resolveEffectiveMentions, showNotice, getTagColourInfo, extractCompletionDate, buildFocusQueue, getItemDate, rotateQueue } from "./utils";
 
 export const VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 
@@ -28,6 +28,10 @@ export class TodoSidebarView extends ItemView {
   private teamManager: TeamManager;
   private defaultAssignee: string;
   private focusModeEnabled: boolean = false;
+  // Phase 2: immersive focus mode state. Distinct from focusModeEnabled (the legacy filter).
+  private focusQueueLimit: number;
+  private focusModeActive: boolean = false;
+  private focusQueue: FocusQueueState | null = null;
   private openDropdown: HTMLElement | null = null;
   private openDropdownTrigger: HTMLElement | null = null;
   private openInfoPopup: HTMLElement | null = null;
@@ -53,7 +57,9 @@ export class TodoSidebarView extends ItemView {
     onShowTriage: () => void,
     getMoveHistory: () => string[] = () => [],
     teamManager?: TeamManager,
-    defaultAssignee: string = ""
+    defaultAssignee: string = "",
+    focusQueueLimit: number = 1,
+    focusModeActive: boolean = false
   ) {
     super(leaf);
     this.scanner = scanner;
@@ -71,6 +77,8 @@ export class TodoSidebarView extends ItemView {
     this.onShowTriage = onShowTriage;
     this.teamManager = teamManager ?? new TeamManager(this.app, "team.md");
     this.defaultAssignee = defaultAssignee;
+    this.focusQueueLimit = focusQueueLimit;
+    this.focusModeActive = focusModeActive;
 
     // Initialize context menu handler
     this.contextMenuHandler = new ContextMenuHandler(
@@ -666,8 +674,12 @@ export class TodoSidebarView extends ItemView {
   }
 
   async onOpen(): Promise<void> {
-    // Set up auto-refresh listener
-    this.updateListener = () => this.render();
+    // Set up auto-refresh listener. When the underlying TODO data changes, drop
+    // any cached focus queue so it's rebuilt fresh on the next render.
+    this.updateListener = () => {
+      this.focusQueue = null;
+      this.render();
+    };
     this.scanner.on("todos-updated", this.updateListener);
 
     // Check if scanner has data; if not, wait for initial scan to complete
@@ -699,6 +711,16 @@ export class TodoSidebarView extends ItemView {
     const container = this.containerEl.children[1] as HTMLElement;
     container.empty();
     container.addClass("space-command-sidebar");
+
+    // Phase 2: when immersive Focus Mode is active, replace the entire sidebar
+    // content with the focus card. Tabs, summary, and project list are not
+    // rendered. Exit returns to normal rendering.
+    if (this.focusModeActive) {
+      container.addClass("sidebar-focus-mode-active");
+      this.renderFocusCard(container);
+      return;
+    }
+    container.removeClass("sidebar-focus-mode-active");
 
     // Header with buttons
     const headerDiv = container.createEl("div", { cls: "sidebar-header" });
@@ -831,6 +853,14 @@ export class TodoSidebarView extends ItemView {
           .setTitle("Triage")
           .setIcon("siren")
           .onClick(() => this.onShowTriage());
+      });
+
+      // Enter Focus Mode (Phase 2 entry point — eye icon takes over in Phase 3)
+      menu.addItem((item) => {
+        item
+          .setTitle("Enter focus mode")
+          .setIcon("target")
+          .onClick(() => this.handleFocusEnter());
       });
 
       // Stats
@@ -2057,6 +2087,292 @@ export class TodoSidebarView extends ItemView {
       showNotice(`Completed all ${completed} TODO(s) for ${project.tag}!`);
     }
     // Note: sidebar will auto-refresh via todos-updated event after scanner rescans
+  }
+
+  // -----------------------------------------------------------------------
+  // Phase 2: Immersive Focus Mode
+  // -----------------------------------------------------------------------
+
+  /**
+   * Active TODOs eligible for the focus queue: not snoozed, not ideas, not
+   * todones. Children are kept in the input so `buildFocusQueue` can use them
+   * for effective-focus detection on header items, but only top-level items
+   * become queue entries.
+   */
+  private getActiveTodosForFocus(): TodoItem[] {
+    return this.scanner.getTodos().filter(t =>
+      !t.tags.includes("#future") &&
+      !t.tags.includes("#snooze") &&
+      !t.tags.includes("#snoozed") &&
+      !t.tags.includes("#idea") &&
+      !t.tags.includes("#ideas") &&
+      !t.tags.includes("#ideation")
+    );
+  }
+
+  /** Build the focus queue from current scanner data; respects continue-mode. */
+  private rebuildFocusQueue(): void {
+    const active = this.getActiveTodosForFocus();
+    const inContinueMode = this.focusQueue?.inContinueMode === true;
+    const result = buildFocusQueue(active, this.focusQueueLimit, {
+      forceFallback: inContinueMode,
+    });
+    this.focusQueue = {
+      items: result.items,
+      source: result.source,
+      inContinueMode,
+    };
+  }
+
+  private renderFocusCard(container: HTMLElement): void {
+    if (!this.focusQueue) {
+      this.rebuildFocusQueue();
+    }
+    const state = this.focusQueue!;
+
+    if (state.items.length === 0) {
+      if (state.source === "empty" || state.inContinueMode) {
+        this.renderFocusEmpty(container);
+      } else {
+        this.renderFocusCompletion(container);
+      }
+      return;
+    }
+
+    this.renderFocusItem(container, state);
+  }
+
+  private renderFocusItem(container: HTMLElement, state: FocusQueueState): void {
+    const card = container.createEl("div", { cls: "focus-card" });
+
+    // Priority-fallback hint
+    if (state.source === "priority-fallback") {
+      card.createEl("div", {
+        cls: "focus-card-hint",
+        text: "No focus items — showing top priority.",
+      });
+    }
+
+    // Counter
+    const counter = card.createEl("div", { cls: "focus-card-counter" });
+    counter.appendText(`FOCUS  (1 of ${state.items.length})`);
+
+    const item = state.items[0];
+
+    // Title
+    const titleEl = card.createEl("div", { cls: "focus-card-title" });
+    const titleConfig = this.todoConfig;
+    const cleanTitle = item.text.replace(titleConfig.tagToStrip, "").trim();
+    const titleNoTags = this.stripTagsPreservingCode(cleanTitle);
+    if (this.makeLinksClickable) {
+      this.renderTextWithLinks(titleNoTags, titleEl);
+    } else {
+      titleEl.appendText(this.stripMarkdownSyntax(titleNoTags).replace(/\s+/g, " ").trim());
+    }
+
+    // Tags as visible badges (drop system tags; keep project, priority, custom)
+    const visibleTags = this.getFocusVisibleTags(item);
+    if (visibleTags.length > 0) {
+      const row = card.createEl("div", { cls: "focus-card-row focus-card-tags-row" });
+      row.createEl("div", { cls: "focus-card-row-label", text: "Tags" });
+      const tagsEl = row.createEl("div", { cls: "focus-card-tags" });
+      const projectColourMap = this.getProjectColourMap();
+      const MAX_VISIBLE = 6;
+      const shown = visibleTags.slice(0, MAX_VISIBLE);
+      const overflow = visibleTags.length - shown.length;
+      for (const tag of shown) {
+        const colourInfo = getTagColourInfo(tag, projectColourMap);
+        const tagEl = tagsEl.createEl("span", { cls: "tag focus-card-tag", text: tag });
+        tagEl.dataset.scTagType = colourInfo.type;
+        tagEl.dataset.scPriority = colourInfo.priority.toString();
+      }
+      if (overflow > 0) {
+        tagsEl.createEl("span", {
+          cls: "focus-card-tags-more",
+          text: `+${overflow} more`,
+        });
+      }
+    }
+
+    // Date
+    const date = getItemDate(item);
+    if (date.kind !== "none" && date.iso) {
+      const row = card.createEl("div", { cls: "focus-card-row focus-card-date-row" });
+      row.createEl("div", { cls: "focus-card-row-label", text: "Date" });
+      const dateEl = row.createEl("div", { cls: "focus-card-date" });
+      const text = date.kind === "modified" ? `${date.iso} (modified)` : `@${date.iso}`;
+      dateEl.appendText(text);
+    }
+
+    // Source link
+    const sourceRow = card.createEl("div", { cls: "focus-card-row focus-card-source-row" });
+    sourceRow.createEl("div", { cls: "focus-card-row-label", text: "Source" });
+    const sourceEl = sourceRow.createEl("div", { cls: "focus-card-source" });
+    const folder = item.file.parent?.name || "";
+    const displayPath = folder ? `${folder}/${item.file.name}` : item.file.name;
+    const sourceLink = sourceEl.createEl("a", {
+      cls: "focus-card-source-link",
+      text: displayPath,
+      href: "#",
+    });
+    sourceLink.addEventListener("click", (e) => {
+      e.preventDefault();
+      const blockEnd = item.childLineNumbers?.length
+        ? Math.max(...item.childLineNumbers)
+        : undefined;
+      openFileAtLine(this.app, item.file, item.lineNumber, blockEnd);
+    });
+
+    // Children (header TODOs render their child list inside the card)
+    const isHeader = item.isHeader === true;
+    const hasChildren = isHeader && item.childLineNumbers && item.childLineNumbers.length > 0;
+    if (hasChildren) {
+      const childContainer = card.createEl("div", { cls: "focus-card-children" });
+      const childList = childContainer.createEl("ul", { cls: "todo-children focus-card-child-list" });
+      const allItems = this.scanner.getTodos();
+      const headerTags = extractTags(item.text).filter(tag => !this.todoConfig.tagToStrip.test(tag));
+      const childItems = item.childLineNumbers!.map(ln =>
+        allItems.find(t => t.filePath === item.filePath && t.lineNumber === ln) ?? null
+      );
+      for (let idx = 0; idx < childItems.length; idx++) {
+        const child = childItems[idx];
+        if (!child) continue;
+        // Skip subheading dividers with no real items beneath them
+        if (child.isSubheading) {
+          let hasTasks = false;
+          for (let k = idx + 1; k < childItems.length; k++) {
+            const next = childItems[k];
+            if (!next) continue;
+            if (next.isSubheading) break;
+            hasTasks = true;
+            break;
+          }
+          if (!hasTasks) continue;
+        }
+        this.renderListItem(childList, child, this.todoConfig, true, headerTags);
+      }
+    }
+
+    // Actions: Done + Skip
+    const actions = card.createEl("div", { cls: "focus-card-actions" });
+    const doneBtn = actions.createEl("button", { cls: "focus-card-btn focus-card-btn-done", text: "Done" });
+    doneBtn.addEventListener("click", () => this.handleFocusDone(item));
+
+    const skipBtn = actions.createEl("button", { cls: "focus-card-btn focus-card-btn-skip", text: "Skip" });
+    if (state.items.length < 2) {
+      skipBtn.disabled = true;
+    }
+    skipBtn.addEventListener("click", () => this.handleFocusSkip());
+
+    // Exit link below the actions
+    const exitRow = card.createEl("div", { cls: "focus-card-exit-row" });
+    const exitLink = exitRow.createEl("a", {
+      cls: "focus-card-exit",
+      text: "Exit focus mode",
+      href: "#",
+    });
+    exitLink.addEventListener("click", (e) => {
+      e.preventDefault();
+      this.handleFocusExit();
+    });
+  }
+
+  private renderFocusCompletion(container: HTMLElement): void {
+    const card = container.createEl("div", { cls: "focus-card focus-card-complete" });
+    card.createEl("div", { cls: "focus-card-complete-title", text: "All focus tasks done." });
+    card.createEl("div", { cls: "focus-card-complete-subtitle", text: "Nice work." });
+
+    const actions = card.createEl("div", { cls: "focus-card-actions focus-card-actions-stack" });
+    const exitBtn = actions.createEl("button", {
+      cls: "focus-card-btn focus-card-btn-exit",
+      text: "Exit focus mode",
+    });
+    exitBtn.addEventListener("click", () => this.handleFocusExit());
+
+    const continueBtn = actions.createEl("button", {
+      cls: "focus-card-btn focus-card-btn-continue",
+      text: "Continue with next priority task",
+    });
+    continueBtn.addEventListener("click", () => this.handleFocusContinue());
+  }
+
+  private renderFocusEmpty(container: HTMLElement): void {
+    const card = container.createEl("div", { cls: "focus-card focus-card-empty" });
+    const inContinue = this.focusQueue?.inContinueMode === true;
+    const title = inContinue ? "All caught up." : "No focus items.";
+    const subtitle = inContinue
+      ? "No more priority tasks to surface."
+      : "Tag a TODO with #focus to get started.";
+    card.createEl("div", { cls: "focus-card-empty-title", text: title });
+    card.createEl("div", { cls: "focus-card-empty-subtitle", text: subtitle });
+
+    const actions = card.createEl("div", { cls: "focus-card-actions focus-card-actions-stack" });
+    const exitBtn = actions.createEl("button", {
+      cls: "focus-card-btn focus-card-btn-exit",
+      text: "Exit focus mode",
+    });
+    exitBtn.addEventListener("click", () => this.handleFocusExit());
+  }
+
+  /**
+   * Tags shown as badges on the focus card. Strip plugin/system tags and
+   * snooze markers; keep project, priority, and custom tags.
+   */
+  private getFocusVisibleTags(item: TodoItem): string[] {
+    const HIDDEN = new Set([
+      "#todo", "#todos", "#todone", "#todones",
+      "#idea", "#ideas", "#ideation",
+      "#principle", "#principles",
+      "#moved",
+      "#future", "#snooze", "#snoozed",
+    ]);
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const tag of item.tags) {
+      const lower = tag.toLowerCase();
+      if (HIDDEN.has(lower)) continue;
+      if (seen.has(lower)) continue;
+      seen.add(lower);
+      result.push(tag);
+    }
+    return result;
+  }
+
+  private handleFocusEnter(): void {
+    this.focusModeActive = true;
+    this.focusQueue = null; // build fresh on render
+    this.render();
+  }
+
+  private async handleFocusDone(item: TodoItem): Promise<void> {
+    // The scanner will re-emit todos-updated after the file write; the
+    // listener invalidates focusQueue and re-renders.
+    await this.processor.completeTodo(item, this.defaultTodoneFile);
+  }
+
+  private handleFocusSkip(): void {
+    if (!this.focusQueue || this.focusQueue.items.length < 2) return;
+    this.focusQueue = {
+      ...this.focusQueue,
+      items: rotateQueue(this.focusQueue.items),
+    };
+    this.render();
+  }
+
+  private handleFocusExit(): void {
+    this.focusModeActive = false;
+    this.focusQueue = null;
+    this.render();
+  }
+
+  private handleFocusContinue(): void {
+    this.focusQueue = {
+      items: [],
+      source: "priority-fallback",
+      inContinueMode: true,
+    };
+    this.rebuildFocusQueue();
+    this.render();
   }
 
 }

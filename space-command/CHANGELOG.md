@@ -2,6 +2,30 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.11.0] - 2026-05-04
+
+### Added — Focus Mode redesign, Phase 2 (view layer)
+
+The immersive Focus Mode view is now reachable. Toggle is not yet wired to the eye icon (Phase 3); for now, enter via the sidebar's hamburger menu → "Enter focus mode". The legacy filter behaviour is unchanged.
+
+- **Focus card**: replaces sidebar content with a single TODO at a time. Shows title (~1.4× scale), tag badges (project / priority / custom; capped at 6 with `+N more` overflow), date (`@YYYY-MM-DD` annotation when present, else file-modified time), and a click-to-open source link. Header TODOs render with their child list inside the card.
+- **Done / Skip / Exit**: Done completes the current item via the existing `completeTodo` flow; Skip rotates the active item to the back of the queue (in-memory); the in-card "Exit focus mode" link returns to the normal sidebar.
+- **Completion state**: when the curated `#focus` queue empties, the card shows a friendly message and two buttons — "Exit focus mode" or "Continue with next priority task". Continue switches to priority-fallback mode and surfaces the next-highest-priority item with a hint.
+- **Priority-fallback hint**: when no `#focus` items exist on entry (or while in continue mode), the card shows "No focus items — showing top priority" above the title.
+- **Empty state**: distinct UI when nothing is left to focus on.
+- **`buildFocusQueue` options arg**: `forceFallback: true` skips the curated `#focus` filter and returns top-priority items instead — used by the Continue button.
+- **`comparePriorityOnly`**: a focus-tier-agnostic comparator used by the priority-fallback path so `#focus`-tagged items don't dominate when continuing.
+- **`rotateQueue<T>()`**: small helper that rotates the head of an array to the tail (used by Skip).
+- **`FocusQueueState`**: new exported type tracking the active queue, its source, and continue-mode state.
+- **Tests**: 7 new unit tests covering `forceFallback`, `rotateQueue`, and the priority-only comparator path. 106 tests total, all passing.
+
+### Pending in Phase 3
+
+- Wire the existing eye-icon toggle to flip `focusModeActive` (currently still toggles the legacy filter).
+- Persist `focusModeActive` across sessions; honour `focusModePersist`.
+- Remove the legacy filter logic and the `focusModeIncludeProjects` setting.
+- Restore prior tab and scroll position on exit.
+
 ## [0.10.0] - 2026-05-04
 
 ### Added — Focus Mode redesign, Phase 1 (data layer)

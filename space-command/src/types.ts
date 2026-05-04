@@ -66,6 +66,22 @@ export interface FocusQueueResult {
 }
 
 /**
+ * Runtime state of the focus card view. Survives Skip-only mutations and is rebuilt
+ * on any underlying data change (todos-updated, mode toggle, continue-mode flip).
+ *
+ * - `items`: the current queue. Head is the active card; rest are upcoming.
+ * - `source`: classification used to decide whether to show the priority-fallback hint.
+ * - `inContinueMode`: true after the user presses "Continue with next priority task" at
+ *   the end of the curated #focus queue. While true, the queue is built from
+ *   top-priority items regardless of #focus tags, and the hint is shown.
+ */
+export interface FocusQueueState {
+  items: TodoItem[];
+  source: FocusQueueSource;
+  inContinueMode: boolean;
+}
+
+/**
  * Resolved date for a focus card.
  * - 'tag': came from an explicit @YYYY-MM-DD on the TODO line
  * - 'modified': came from the source file's last modified time (mtime fallback)

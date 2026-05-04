@@ -2149,3 +2149,180 @@
   opacity: 0.8;
 }
 
+/* ==========================================================================
+   Focus Mode (Phase 2): immersive single-task surface
+   ========================================================================== */
+
+.sidebar-focus-mode-active {
+  font-size: 1.4em;
+}
+
+.focus-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-3);
+  padding: var(--size-4-4) var(--size-4-3);
+}
+
+.focus-card-hint {
+  font-size: 0.75em;
+  color: var(--text-muted);
+  font-style: italic;
+  padding-bottom: var(--size-2-2);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.focus-card-counter {
+  font-size: 0.7em;
+  color: var(--text-faint);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.focus-card-title {
+  font-size: 1.15em;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text-normal);
+  word-break: break-word;
+}
+
+.focus-card-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-2-1);
+}
+
+.focus-card-row-label {
+  font-size: 0.6em;
+  color: var(--text-faint);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.focus-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-2-2);
+  align-items: center;
+}
+
+.focus-card-tag {
+  font-size: 0.75em;
+}
+
+.focus-card-tags-more {
+  font-size: 0.7em;
+  color: var(--text-faint);
+}
+
+.focus-card-date {
+  font-size: 0.85em;
+  color: var(--text-muted);
+}
+
+.focus-card-source {
+  font-size: 0.85em;
+}
+
+.focus-card-source-link {
+  color: var(--text-accent);
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.focus-card-source-link:hover {
+  text-decoration: underline;
+}
+
+.focus-card-children {
+  margin-top: var(--size-2-2);
+  padding-top: var(--size-2-2);
+  border-top: 1px solid var(--background-modifier-border);
+  font-size: 0.85em;
+}
+
+.focus-card-child-list {
+  margin: 0;
+  padding-left: var(--size-4-3);
+}
+
+.focus-card-actions {
+  display: flex;
+  gap: var(--size-4-2);
+  margin-top: var(--size-4-2);
+}
+
+.focus-card-actions-stack {
+  flex-direction: column;
+}
+
+.focus-card-btn {
+  flex: 1;
+  padding: var(--size-4-2) var(--size-4-3);
+  font-size: 0.85em;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--interactive-normal);
+  color: var(--text-normal);
+}
+
+.focus-card-btn:hover:not(:disabled) {
+  background: var(--interactive-hover);
+}
+
+.focus-card-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.focus-card-btn-done {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+.focus-card-btn-done:hover:not(:disabled) {
+  background: var(--interactive-accent-hover);
+}
+
+.focus-card-exit-row {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--size-2-2);
+}
+
+.focus-card-exit {
+  font-size: 0.75em;
+  color: var(--text-faint);
+  text-decoration: none;
+}
+
+.focus-card-exit:hover {
+  color: var(--text-muted);
+  text-decoration: underline;
+}
+
+/* Empty and completion states share the same compositional spacing */
+.focus-card-empty,
+.focus-card-complete {
+  align-items: center;
+  text-align: center;
+  padding: var(--size-4-6) var(--size-4-3);
+  gap: var(--size-4-2);
+}
+
+.focus-card-empty-title,
+.focus-card-complete-title {
+  font-size: 1.1em;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.focus-card-empty-subtitle,
+.focus-card-complete-subtitle {
+  font-size: 0.8em;
+  color: var(--text-muted);
+}

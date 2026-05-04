@@ -278,6 +278,56 @@ function compareWithEffectivePriority(a, b, allItems) {
     return priorityDiff;
   return getTagCount(b.tags) - getTagCount(a.tags);
 }
+function comparePriorityOnly(a, b, allItems) {
+  const priorityDiff = getEffectivePriority(a, allItems) - getEffectivePriority(b, allItems);
+  if (priorityDiff !== 0)
+    return priorityDiff;
+  return getTagCount(b.tags) - getTagCount(a.tags);
+}
+function buildFocusQueue(activeTodos, limit, options = {}) {
+  const safeLimit = Math.max(1, Math.floor(limit));
+  const candidates = activeTodos.filter(
+    (t) => t.parentLineNumber === void 0 && !isSnoozed(t.tags)
+  );
+  if (candidates.length === 0) {
+    return { items: [], source: "empty" };
+  }
+  if (!options.forceFallback) {
+    const focused = candidates.filter(
+      (t) => isEffectivelyFocused(t, activeTodos)
+    );
+    if (focused.length > 0) {
+      const sorted2 = [...focused].sort(
+        (a, b) => compareWithEffectivePriority(a, b, activeTodos)
+      );
+      return { items: sorted2.slice(0, safeLimit), source: "focus-tagged" };
+    }
+  }
+  const sorted = [...candidates].sort(
+    (a, b) => comparePriorityOnly(a, b, activeTodos)
+  );
+  return { items: sorted.slice(0, safeLimit), source: "priority-fallback" };
+}
+function rotateQueue(items) {
+  if (items.length < 2)
+    return items;
+  const [head, ...rest] = items;
+  return [...rest, head];
+}
+function getItemDate(todo) {
+  var _a;
+  const match = todo.text.match(/@(\d{4}-\d{2}-\d{2})/);
+  if (match) {
+    return { kind: "tag", iso: match[1] };
+  }
+  const file = todo.file;
+  const mtime = (_a = file == null ? void 0 : file.stat) == null ? void 0 : _a.mtime;
+  if (typeof mtime === "number" && Number.isFinite(mtime)) {
+    const iso = new Date(mtime).toISOString().slice(0, 10);
+    return { kind: "modified", iso };
+  }
+  return { kind: "none", iso: null };
+}
 function extractTags(text) {
   const textWithoutCode = text.replace(/`[^`]*`/g, "");
   const tagRegex = /#[\w-]+/g;
@@ -3653,13 +3703,15 @@ var TeamManager = class extends import_obsidian11.Events {
 var import_obsidian12 = require("obsidian");
 var VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 var TodoSidebarView = class extends import_obsidian12.ItemView {
-  constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, activeTodosLimit, focusListLimit, focusModeIncludeProjects, makeLinksClickable, triageSnoozedThreshold, triageActiveThreshold, onShowAbout, onShowStats, onShowTriage, getMoveHistory = () => [], teamManager, defaultAssignee = "") {
+  constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, activeTodosLimit, focusListLimit, focusModeIncludeProjects, makeLinksClickable, triageSnoozedThreshold, triageActiveThreshold, onShowAbout, onShowStats, onShowTriage, getMoveHistory = () => [], teamManager, defaultAssignee = "", focusQueueLimit = 1, focusModeActive = false) {
     super(leaf);
     this.updateListener = null;
     this.activeTab = "todos";
     this.activeTagFilter = null;
     this.activeAssigneeFilter = null;
     this.focusModeEnabled = false;
+    this.focusModeActive = false;
+    this.focusQueue = null;
     this.openDropdown = null;
     this.openDropdownTrigger = null;
     this.openInfoPopup = null;
@@ -3702,6 +3754,8 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     this.onShowTriage = onShowTriage;
     this.teamManager = teamManager != null ? teamManager : new TeamManager(this.app, "team.md");
     this.defaultAssignee = defaultAssignee;
+    this.focusQueueLimit = focusQueueLimit;
+    this.focusModeActive = focusModeActive;
     this.contextMenuHandler = new ContextMenuHandler(
       this.app,
       processor,
@@ -4112,7 +4166,10 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     });
   }
   async onOpen() {
-    this.updateListener = () => this.render();
+    this.updateListener = () => {
+      this.focusQueue = null;
+      this.render();
+    };
     this.scanner.on("todos-updated", this.updateListener);
     const hasTodos = this.scanner.getTodos().length > 0;
     const hasTodones = this.scanner.getTodones().length > 0;
@@ -4134,6 +4191,12 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     const container = this.containerEl.children[1];
     container.empty();
     container.addClass("space-command-sidebar");
+    if (this.focusModeActive) {
+      container.addClass("sidebar-focus-mode-active");
+      this.renderFocusCard(container);
+      return;
+    }
+    container.removeClass("sidebar-focus-mode-active");
     const headerDiv = container.createEl("div", { cls: "sidebar-header" });
     const titleEl = headerDiv.createEl("h4", { cls: "sidebar-title" });
     const logoEl = titleEl.createEl("span", { cls: "space-command-logo clickable-logo", text: "\u2423\u2318" });
@@ -4230,6 +4293,9 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       });
       menu.addItem((item) => {
         item.setTitle("Triage").setIcon("siren").onClick(() => this.onShowTriage());
+      });
+      menu.addItem((item) => {
+        item.setTitle("Enter focus mode").setIcon("target").onClick(() => this.handleFocusEnter());
       });
       menu.addItem((item) => {
         item.setTitle("Stats").setIcon("bar-chart-2").onClick(() => this.onShowStats());
@@ -5149,6 +5215,264 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       showNotice2(`Completed all ${completed} TODO(s) for ${project.tag}!`);
     }
   }
+  // -----------------------------------------------------------------------
+  // Phase 2: Immersive Focus Mode
+  // -----------------------------------------------------------------------
+  /**
+   * Active TODOs eligible for the focus queue: not snoozed, not ideas, not
+   * todones. Children are kept in the input so `buildFocusQueue` can use them
+   * for effective-focus detection on header items, but only top-level items
+   * become queue entries.
+   */
+  getActiveTodosForFocus() {
+    return this.scanner.getTodos().filter(
+      (t) => !t.tags.includes("#future") && !t.tags.includes("#snooze") && !t.tags.includes("#snoozed") && !t.tags.includes("#idea") && !t.tags.includes("#ideas") && !t.tags.includes("#ideation")
+    );
+  }
+  /** Build the focus queue from current scanner data; respects continue-mode. */
+  rebuildFocusQueue() {
+    var _a;
+    const active = this.getActiveTodosForFocus();
+    const inContinueMode = ((_a = this.focusQueue) == null ? void 0 : _a.inContinueMode) === true;
+    const result = buildFocusQueue(active, this.focusQueueLimit, {
+      forceFallback: inContinueMode
+    });
+    this.focusQueue = {
+      items: result.items,
+      source: result.source,
+      inContinueMode
+    };
+  }
+  renderFocusCard(container) {
+    if (!this.focusQueue) {
+      this.rebuildFocusQueue();
+    }
+    const state = this.focusQueue;
+    if (state.items.length === 0) {
+      if (state.source === "empty" || state.inContinueMode) {
+        this.renderFocusEmpty(container);
+      } else {
+        this.renderFocusCompletion(container);
+      }
+      return;
+    }
+    this.renderFocusItem(container, state);
+  }
+  renderFocusItem(container, state) {
+    var _a;
+    const card = container.createEl("div", { cls: "focus-card" });
+    if (state.source === "priority-fallback") {
+      card.createEl("div", {
+        cls: "focus-card-hint",
+        text: "No focus items \u2014 showing top priority."
+      });
+    }
+    const counter = card.createEl("div", { cls: "focus-card-counter" });
+    counter.appendText(`FOCUS  (1 of ${state.items.length})`);
+    const item = state.items[0];
+    const titleEl = card.createEl("div", { cls: "focus-card-title" });
+    const titleConfig = this.todoConfig;
+    const cleanTitle = item.text.replace(titleConfig.tagToStrip, "").trim();
+    const titleNoTags = this.stripTagsPreservingCode(cleanTitle);
+    if (this.makeLinksClickable) {
+      this.renderTextWithLinks(titleNoTags, titleEl);
+    } else {
+      titleEl.appendText(this.stripMarkdownSyntax(titleNoTags).replace(/\s+/g, " ").trim());
+    }
+    const visibleTags = this.getFocusVisibleTags(item);
+    if (visibleTags.length > 0) {
+      const row = card.createEl("div", { cls: "focus-card-row focus-card-tags-row" });
+      row.createEl("div", { cls: "focus-card-row-label", text: "Tags" });
+      const tagsEl = row.createEl("div", { cls: "focus-card-tags" });
+      const projectColourMap = this.getProjectColourMap();
+      const MAX_VISIBLE = 6;
+      const shown = visibleTags.slice(0, MAX_VISIBLE);
+      const overflow = visibleTags.length - shown.length;
+      for (const tag of shown) {
+        const colourInfo = getTagColourInfo(tag, projectColourMap);
+        const tagEl = tagsEl.createEl("span", { cls: "tag focus-card-tag", text: tag });
+        tagEl.dataset.scTagType = colourInfo.type;
+        tagEl.dataset.scPriority = colourInfo.priority.toString();
+      }
+      if (overflow > 0) {
+        tagsEl.createEl("span", {
+          cls: "focus-card-tags-more",
+          text: `+${overflow} more`
+        });
+      }
+    }
+    const date = getItemDate(item);
+    if (date.kind !== "none" && date.iso) {
+      const row = card.createEl("div", { cls: "focus-card-row focus-card-date-row" });
+      row.createEl("div", { cls: "focus-card-row-label", text: "Date" });
+      const dateEl = row.createEl("div", { cls: "focus-card-date" });
+      const text = date.kind === "modified" ? `${date.iso} (modified)` : `@${date.iso}`;
+      dateEl.appendText(text);
+    }
+    const sourceRow = card.createEl("div", { cls: "focus-card-row focus-card-source-row" });
+    sourceRow.createEl("div", { cls: "focus-card-row-label", text: "Source" });
+    const sourceEl = sourceRow.createEl("div", { cls: "focus-card-source" });
+    const folder = ((_a = item.file.parent) == null ? void 0 : _a.name) || "";
+    const displayPath = folder ? `${folder}/${item.file.name}` : item.file.name;
+    const sourceLink = sourceEl.createEl("a", {
+      cls: "focus-card-source-link",
+      text: displayPath,
+      href: "#"
+    });
+    sourceLink.addEventListener("click", (e) => {
+      var _a2;
+      e.preventDefault();
+      const blockEnd = ((_a2 = item.childLineNumbers) == null ? void 0 : _a2.length) ? Math.max(...item.childLineNumbers) : void 0;
+      openFileAtLine(this.app, item.file, item.lineNumber, blockEnd);
+    });
+    const isHeader = item.isHeader === true;
+    const hasChildren = isHeader && item.childLineNumbers && item.childLineNumbers.length > 0;
+    if (hasChildren) {
+      const childContainer = card.createEl("div", { cls: "focus-card-children" });
+      const childList = childContainer.createEl("ul", { cls: "todo-children focus-card-child-list" });
+      const allItems = this.scanner.getTodos();
+      const headerTags = extractTags(item.text).filter((tag) => !this.todoConfig.tagToStrip.test(tag));
+      const childItems = item.childLineNumbers.map(
+        (ln) => {
+          var _a2;
+          return (_a2 = allItems.find((t) => t.filePath === item.filePath && t.lineNumber === ln)) != null ? _a2 : null;
+        }
+      );
+      for (let idx = 0; idx < childItems.length; idx++) {
+        const child = childItems[idx];
+        if (!child)
+          continue;
+        if (child.isSubheading) {
+          let hasTasks = false;
+          for (let k = idx + 1; k < childItems.length; k++) {
+            const next = childItems[k];
+            if (!next)
+              continue;
+            if (next.isSubheading)
+              break;
+            hasTasks = true;
+            break;
+          }
+          if (!hasTasks)
+            continue;
+        }
+        this.renderListItem(childList, child, this.todoConfig, true, headerTags);
+      }
+    }
+    const actions = card.createEl("div", { cls: "focus-card-actions" });
+    const doneBtn = actions.createEl("button", { cls: "focus-card-btn focus-card-btn-done", text: "Done" });
+    doneBtn.addEventListener("click", () => this.handleFocusDone(item));
+    const skipBtn = actions.createEl("button", { cls: "focus-card-btn focus-card-btn-skip", text: "Skip" });
+    if (state.items.length < 2) {
+      skipBtn.disabled = true;
+    }
+    skipBtn.addEventListener("click", () => this.handleFocusSkip());
+    const exitRow = card.createEl("div", { cls: "focus-card-exit-row" });
+    const exitLink = exitRow.createEl("a", {
+      cls: "focus-card-exit",
+      text: "Exit focus mode",
+      href: "#"
+    });
+    exitLink.addEventListener("click", (e) => {
+      e.preventDefault();
+      this.handleFocusExit();
+    });
+  }
+  renderFocusCompletion(container) {
+    const card = container.createEl("div", { cls: "focus-card focus-card-complete" });
+    card.createEl("div", { cls: "focus-card-complete-title", text: "All focus tasks done." });
+    card.createEl("div", { cls: "focus-card-complete-subtitle", text: "Nice work." });
+    const actions = card.createEl("div", { cls: "focus-card-actions focus-card-actions-stack" });
+    const exitBtn = actions.createEl("button", {
+      cls: "focus-card-btn focus-card-btn-exit",
+      text: "Exit focus mode"
+    });
+    exitBtn.addEventListener("click", () => this.handleFocusExit());
+    const continueBtn = actions.createEl("button", {
+      cls: "focus-card-btn focus-card-btn-continue",
+      text: "Continue with next priority task"
+    });
+    continueBtn.addEventListener("click", () => this.handleFocusContinue());
+  }
+  renderFocusEmpty(container) {
+    var _a;
+    const card = container.createEl("div", { cls: "focus-card focus-card-empty" });
+    const inContinue = ((_a = this.focusQueue) == null ? void 0 : _a.inContinueMode) === true;
+    const title = inContinue ? "All caught up." : "No focus items.";
+    const subtitle = inContinue ? "No more priority tasks to surface." : "Tag a TODO with #focus to get started.";
+    card.createEl("div", { cls: "focus-card-empty-title", text: title });
+    card.createEl("div", { cls: "focus-card-empty-subtitle", text: subtitle });
+    const actions = card.createEl("div", { cls: "focus-card-actions focus-card-actions-stack" });
+    const exitBtn = actions.createEl("button", {
+      cls: "focus-card-btn focus-card-btn-exit",
+      text: "Exit focus mode"
+    });
+    exitBtn.addEventListener("click", () => this.handleFocusExit());
+  }
+  /**
+   * Tags shown as badges on the focus card. Strip plugin/system tags and
+   * snooze markers; keep project, priority, and custom tags.
+   */
+  getFocusVisibleTags(item) {
+    const HIDDEN = /* @__PURE__ */ new Set([
+      "#todo",
+      "#todos",
+      "#todone",
+      "#todones",
+      "#idea",
+      "#ideas",
+      "#ideation",
+      "#principle",
+      "#principles",
+      "#moved",
+      "#future",
+      "#snooze",
+      "#snoozed"
+    ]);
+    const seen = /* @__PURE__ */ new Set();
+    const result = [];
+    for (const tag of item.tags) {
+      const lower = tag.toLowerCase();
+      if (HIDDEN.has(lower))
+        continue;
+      if (seen.has(lower))
+        continue;
+      seen.add(lower);
+      result.push(tag);
+    }
+    return result;
+  }
+  handleFocusEnter() {
+    this.focusModeActive = true;
+    this.focusQueue = null;
+    this.render();
+  }
+  async handleFocusDone(item) {
+    await this.processor.completeTodo(item, this.defaultTodoneFile);
+  }
+  handleFocusSkip() {
+    if (!this.focusQueue || this.focusQueue.items.length < 2)
+      return;
+    this.focusQueue = {
+      ...this.focusQueue,
+      items: rotateQueue(this.focusQueue.items)
+    };
+    this.render();
+  }
+  handleFocusExit() {
+    this.focusModeActive = false;
+    this.focusQueue = null;
+    this.render();
+  }
+  handleFocusContinue() {
+    this.focusQueue = {
+      items: [],
+      source: "priority-fallback",
+      inContinueMode: true
+    };
+    this.rebuildFocusQueue();
+    this.render();
+  }
 };
 
 // src/types.ts
@@ -5813,7 +6137,9 @@ var SpaceCommandPlugin = class extends import_obsidian13.Plugin {
         () => this.showTriageModal(),
         () => this.settings.moveHistory,
         this.teamManager,
-        this.settings.defaultAssignee
+        this.settings.defaultAssignee,
+        this.settings.focusQueueLimit,
+        this.settings.focusModeActive
       )
     );
     this.registerMarkdownPostProcessor((el, ctx) => {

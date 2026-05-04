@@ -275,15 +275,44 @@ export function compareWithEffectivePriority(
 }
 
 /**
+ * Compare two items by effective priority and tag count only — without the #focus
+ * tier preference used by `compareWithEffectivePriority`. This is used by the
+ * "Continue with next priority task" path in immersive Focus Mode, where we
+ * deliberately want to surface the next-highest-priority item regardless of
+ * whether it carries `#focus`.
+ */
+export function comparePriorityOnly(
+  a: PrioritySortableItem,
+  b: PrioritySortableItem,
+  allItems: PrioritySortableItem[]
+): number {
+  const priorityDiff = getEffectivePriority(a, allItems) - getEffectivePriority(b, allItems);
+  if (priorityDiff !== 0) return priorityDiff;
+  return getTagCount(b.tags) - getTagCount(a.tags);
+}
+
+/**
+ * Options for `buildFocusQueue`.
+ *
+ * - `forceFallback`: skip the curated #focus filter and build the queue directly
+ *   from top-priority active items. Used for the "Continue with next priority task"
+ *   path when the curated #focus queue has been exhausted; the resulting source
+ *   will be `priority-fallback` so the card shows the priority hint.
+ */
+export interface BuildFocusQueueOptions {
+  forceFallback?: boolean;
+}
+
+/**
  * Build the queue of items to show in immersive Focus Mode.
  *
  * Behaviour:
  * 1. Curated queue: top-level items that are effectively focused (#focus on the
  *    item, or on any active child of a header item). Children of headers are
  *    never independent queue entries — the header is rendered with its children.
- * 2. Priority fallback: when no effectively-focused items exist, pick the
- *    highest-priority top-level items instead. The card surfaces a hint when
- *    this happens.
+ * 2. Priority fallback: when no effectively-focused items exist (or when the
+ *    caller passes `forceFallback: true`), pick the highest-priority top-level
+ *    items instead. The card surfaces a hint when this happens.
  * 3. Empty: no active items at all.
  *
  * Items are sorted using `compareWithEffectivePriority` and truncated to `limit`.
@@ -293,7 +322,8 @@ export function compareWithEffectivePriority(
  */
 export function buildFocusQueue(
   activeTodos: TodoItem[],
-  limit: number
+  limit: number,
+  options: BuildFocusQueueOptions = {}
 ): FocusQueueResult {
   const safeLimit = Math.max(1, Math.floor(limit));
 
@@ -306,19 +336,35 @@ export function buildFocusQueue(
     return { items: [], source: "empty" };
   }
 
-  const focused = candidates.filter((t) => isEffectivelyFocused(t, activeTodos));
-
-  if (focused.length > 0) {
-    const sorted = [...focused].sort((a, b) =>
-      compareWithEffectivePriority(a, b, activeTodos)
+  if (!options.forceFallback) {
+    const focused = candidates.filter((t) =>
+      isEffectivelyFocused(t, activeTodos)
     );
-    return { items: sorted.slice(0, safeLimit), source: "focus-tagged" };
+    if (focused.length > 0) {
+      const sorted = [...focused].sort((a, b) =>
+        compareWithEffectivePriority(a, b, activeTodos)
+      );
+      return { items: sorted.slice(0, safeLimit), source: "focus-tagged" };
+    }
   }
 
   const sorted = [...candidates].sort((a, b) =>
-    compareWithEffectivePriority(a, b, activeTodos)
+    comparePriorityOnly(a, b, activeTodos)
   );
   return { items: sorted.slice(0, safeLimit), source: "priority-fallback" };
+}
+
+/**
+ * Rotate the head of an array to the tail and return a new array.
+ *
+ * Used by Focus Mode's Skip action: the current item moves to the back of the
+ * queue without modifying the underlying TODO. Returns the input unchanged when
+ * the array has fewer than two elements.
+ */
+export function rotateQueue<T>(items: T[]): T[] {
+  if (items.length < 2) return items;
+  const [head, ...rest] = items;
+  return [...rest, head];
 }
 
 /**

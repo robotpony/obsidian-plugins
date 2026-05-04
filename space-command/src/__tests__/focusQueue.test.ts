@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildFocusQueue, getItemDate } from "../utils";
+import { buildFocusQueue, getItemDate, rotateQueue } from "../utils";
 import type { TodoItem } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -181,6 +181,52 @@ describe("buildFocusQueue", () => {
     const result = buildFocusQueue(items, 1);
     expect(result.source).toBe("priority-fallback");
     expect(result.items[0].text).toBe("Active priority");
+  });
+
+  it("forceFallback: ignores #focus and returns top-priority with priority-fallback source", () => {
+    const items = [
+      makeTodo({ text: "Focused low", tags: ["#todo", "#focus", "#p4"], lineNumber: 0 }),
+      makeTodo({ text: "Plain top", tags: ["#todo", "#today"], lineNumber: 1 }),
+      makeTodo({ text: "Plain mid", tags: ["#todo", "#p1"], lineNumber: 2 }),
+    ];
+    const result = buildFocusQueue(items, 2, { forceFallback: true });
+    expect(result.source).toBe("priority-fallback");
+    expect(result.items.map(i => i.text)).toEqual(["Plain top", "Plain mid"]);
+  });
+
+  it("forceFallback on empty candidates returns empty source", () => {
+    const result = buildFocusQueue([], 1, { forceFallback: true });
+    expect(result).toEqual({ items: [], source: "empty" });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// rotateQueue
+// ---------------------------------------------------------------------------
+
+describe("rotateQueue", () => {
+  it("rotates the head to the tail", () => {
+    expect(rotateQueue(["a", "b", "c"])).toEqual(["b", "c", "a"]);
+  });
+
+  it("returns the same array for a single item", () => {
+    expect(rotateQueue(["only"])).toEqual(["only"]);
+  });
+
+  it("returns the same array for an empty input", () => {
+    expect(rotateQueue([])).toEqual([]);
+  });
+
+  it("does not mutate the input array", () => {
+    const input = [1, 2, 3];
+    rotateQueue(input);
+    expect(input).toEqual([1, 2, 3]);
+  });
+
+  it("rotates twice to put the original head at index N-2", () => {
+    const once = rotateQueue([1, 2, 3, 4]);
+    const twice = rotateQueue(once);
+    expect(twice).toEqual([3, 4, 1, 2]);
   });
 });
 

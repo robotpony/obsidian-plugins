@@ -87,9 +87,11 @@ This is rendered later by the card with format hints (e.g. trailing "(modified)"
 
 ---
 
-## Phase 2: View layer (focus card, states, CSS)
+## Phase 2: View layer (focus card, states, CSS) ✓ done
 
 Render the focus card and its three states. No persistence wiring yet — toggle is still runtime-only at the end of this phase.
+
+**Status:** Completed in v0.11.0. Focus card reachable via the sidebar's hamburger menu → "Enter focus mode" entry (Phase 3 will repurpose the eye icon). All three states render: active item, completion (Exit / Continue), empty (with separate copy for in-continue-mode exhaustion). Skip rotates in memory; Done uses the existing completeTodo path; the `todos-updated` listener now invalidates the cached focus queue so it's rebuilt fresh on data change. CSS lives at the end of styles.css under the new `.sidebar-focus-mode-active` and `.focus-card-*` classes.
 
 ### 2a. `renderFocusCard()` in `SidebarView.ts`
 
