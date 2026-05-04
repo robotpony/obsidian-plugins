@@ -1,5 +1,6 @@
 import { App, MarkdownView, TFile, Vault, WorkspaceLeaf, moment } from "obsidian";
 import { createNoticeFactory } from "../../shared";
+import type { FocusQueueResult, ItemDate, TodoItem } from "./types";
 
 /** Logo prefix for Notice messages */
 export const LOGO_PREFIX = "␣⌘";
@@ -188,7 +189,7 @@ function isSnoozed(tags: string[]): boolean {
  * Check if an item is effectively focused, considering children for headers.
  * A header is focused if it has #focus or any active child has #focus.
  */
-function isEffectivelyFocused(
+export function isEffectivelyFocused(
   item: PrioritySortableItem,
   allItems: PrioritySortableItem[]
 ): boolean {
@@ -273,6 +274,80 @@ export function compareWithEffectivePriority(
   return getTagCount(b.tags) - getTagCount(a.tags);
 }
 
+/**
+ * Build the queue of items to show in immersive Focus Mode.
+ *
+ * Behaviour:
+ * 1. Curated queue: top-level items that are effectively focused (#focus on the
+ *    item, or on any active child of a header item). Children of headers are
+ *    never independent queue entries — the header is rendered with its children.
+ * 2. Priority fallback: when no effectively-focused items exist, pick the
+ *    highest-priority top-level items instead. The card surfaces a hint when
+ *    this happens.
+ * 3. Empty: no active items at all.
+ *
+ * Items are sorted using `compareWithEffectivePriority` and truncated to `limit`.
+ *
+ * The caller is responsible for filtering out completed items (#todone) before
+ * passing them in. Snoozed items (#future / #snooze / #snoozed) are filtered here.
+ */
+export function buildFocusQueue(
+  activeTodos: TodoItem[],
+  limit: number
+): FocusQueueResult {
+  const safeLimit = Math.max(1, Math.floor(limit));
+
+  // Drop snoozed items entirely; only top-level items are queue candidates.
+  const candidates = activeTodos.filter(
+    (t) => t.parentLineNumber === undefined && !isSnoozed(t.tags)
+  );
+
+  if (candidates.length === 0) {
+    return { items: [], source: "empty" };
+  }
+
+  const focused = candidates.filter((t) => isEffectivelyFocused(t, activeTodos));
+
+  if (focused.length > 0) {
+    const sorted = [...focused].sort((a, b) =>
+      compareWithEffectivePriority(a, b, activeTodos)
+    );
+    return { items: sorted.slice(0, safeLimit), source: "focus-tagged" };
+  }
+
+  const sorted = [...candidates].sort((a, b) =>
+    compareWithEffectivePriority(a, b, activeTodos)
+  );
+  return { items: sorted.slice(0, safeLimit), source: "priority-fallback" };
+}
+
+/**
+ * Resolve the date to display on the focus card for an item.
+ *
+ * Prefer an explicit `@YYYY-MM-DD` annotation on the TODO line. Fall back to the
+ * source file's last modified time. If neither is available (file missing),
+ * return `kind: 'none'`.
+ *
+ * The TFile parameter is the same `file` field on `TodoItem`. It's accepted as
+ * a separate argument to keep the helper testable without instantiating a full
+ * TodoItem.
+ */
+export function getItemDate(todo: TodoItem): ItemDate {
+  const match = todo.text.match(/@(\d{4}-\d{2}-\d{2})/);
+  if (match) {
+    return { kind: "tag", iso: match[1] };
+  }
+
+  const file = todo.file as { stat?: { mtime?: number } } | undefined;
+  const mtime = file?.stat?.mtime;
+  if (typeof mtime === "number" && Number.isFinite(mtime)) {
+    const iso = new Date(mtime).toISOString().slice(0, 10);
+    return { kind: "modified", iso };
+  }
+
+  return { kind: "none", iso: null };
+}
+
 export function extractTags(text: string): string[] {
   // Remove inline code spans before extracting tags
   // This prevents matching tags inside backticks like `#ideation` (documentation examples)
@@ -280,8 +355,6 @@ export function extractTags(text: string): string[] {
   const tagRegex = /#[\w-]+/g;
   return textWithoutCode.match(tagRegex) || [];
 }
-
-import { TodoItem } from "./types";
 
 const DATE_KEYWORDS = new Set(["date", "today", "tomorrow", "yesterday"]);
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;

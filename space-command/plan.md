@@ -1,215 +1,278 @@
-# Space Command: Block Tagging Fixes
+# Space Command: Focus Mode redesign
 
-## Context
+Replace the existing focus filter (eye-icon toggle that hides non-`#focus` items) with an immersive single-task Focus Mode. See `IDEAS.md` and `OUTLINE.md` for the design rationale and full spec. This plan maps the spec to implementation phases.
 
-The block tagging mechanism uses inline markdown tags (`#todo`, `#todone`, etc.) and identifies items by file path + line number. A review found several bugs and design weaknesses.
+## Summary of behavior change
 
-## Phase 1: Concurrent write and correctness bugs (this phase)
+- Toggling Focus Mode on **replaces sidebar content** with a single focus card showing the next task in detail.
+- Queue is built from `#focus`-tagged TODOs; falls back to top-priority TODOs if none exist (with a hint).
+- **Done** completes the TODO and advances. **Skip** rotates the current item to the back of the queue.
+- When the curated queue exhausts, a friendly completion state offers **Exit** or **Continue with next priority task**.
+- Mode state **persists across sessions**.
 
-Fix the immediate correctness problems in `TodoScanner` and `TodoProcessor`.
+## File touchpoints
 
-### 1a. Extract shared read-modify-write helper
-
-Create a `modifyFileLine(file, lineNumber, transform)` helper in `utils.ts` that:
-- Reads the file
-- Checks line number bounds
-- Applies a transform function to the line
-- Writes back in a single `vault.modify()` call
-
-Replaces the ~10 repeated read-split-modify-join-write patterns in `TodoProcessor`.
-
-### 1b. Fix missing `await` and multiple writes in `scanFile()`
-
-`scanFile()` calls `cleanupDuplicateTags`, `syncCheckedCheckboxes`, and `removeIdeaTags` without `await`. These fire three concurrent `vault.modify()` calls and emit `todos-updated` before any write completes.
-
-Fix: accumulate all line mutations from all three passes and write once, awaited, before emitting the event.
-
-### 1c. Fix `addTag()` substring deduplication check
-
-`line.includes(tag)` incorrectly matches `#todone` when checking for `#todo`. Replace with a word-boundary regex check.
-
-### 1d. Fix `getTodos()` missing `excludeFiles` guard
-
-`getTodones()`, `getIdeas()`, and `getPrinciples()` all skip excluded files (e.g. the archive). `getTodos()` does not. Add the same guard.
-
-### 1e. Fix `setPriorityTagSilent()` child item handling
-
-The batch-operation version of `setPriorityTag()` checks `!line.includes("#todo")` and silently returns false for child items (which inherit todo status from a parent header). Mirror the `isChildItem` logic from the public `setPriorityTag()`.
-
-### 1f. Fix `todone:show|hide` filter not being applied
-
-`FilterParser.parse()` stores `filters.todone` but `applyFilters()` never uses it. Add the filter logic to `applyFilters()`.
-
-### 1g. Fix `hasContent()` missing `+` list marker
-
-The method strips `[-*]` but not `+`, causing false positives for lines like `+ #todo`. Add `+` to the list marker strip.
-
-### 1h. Fix `#today` not removed by `setPriorityTag()`
-
-When setting a new priority, `#today` is not removed along with `#p0-#p4` and `#future`. Add `#today` to the cleanup pattern.
+| File | Changes |
+|---|---|
+| `src/types.ts` | Settings additions/removals; new `FocusQueueState` type |
+| `main.ts` | Settings tab rows, default settings, persistence wiring |
+| `src/SidebarView.ts` | Replace filter logic with focus-mode rendering branch; new `renderFocusCard()` path |
+| `src/utils.ts` | New `buildFocusQueue()`, possibly `getItemDate()` helper |
+| `styles.css` | New `.sidebar-focus-mode-active` and `.focus-card-*` classes; hide chrome rules |
+| `DESIGN.md` | Soften "`#focus` is a visibility filter" language; document priority fallback |
+| `README.md` | Update Focus Mode section |
+| `CHANGELOG.md` | New version entry, behavior change note |
+| `manifest.json`, `package.json` | Version bump |
 
 ---
 
-## Phase 2: Content fingerprinting ✓ done
+## Phase 1: Data layer (settings, state, queue computation) ✓ done
 
-Add a `fingerprint` field to `TodoItem` (trimmed text minus dates and priority tags). Use line number as a fast-path hint at write time; fall back to nearby-line and full-file search if the hint is stale. Makes the plugin resilient to external file edits shifting line numbers.
+Establish the data foundation before touching the view.
 
-## Phase 3: Metadata cache integration ✓ done
+**Status:** Completed in v0.10.0. New settings and helpers landed; existing filter behaviour untouched. One scope deviation: `focusModeIncludeProjects` was kept (not removed) because `SidebarView` still references it for the legacy filter. It will be removed in Phase 3 alongside the filter logic to avoid a broken intermediate build.
 
-Use Obsidian's `metadataCache` to eliminate redundant work: double-scanning on every edit, and reading every file in the vault regardless of content. The scanner's line-by-line parser is kept intact — the cache is used as a filter and trigger mechanism, not a replacement.
+### 1a. Settings additions and removals
 
-### What the metadataCache provides (and doesn't)
+In `types.ts` `SpaceCommandSettings`:
 
-`app.metadataCache.getFileCache(file)` returns a `CachedMetadata` object with:
+- **Add** `focusQueueLimit: number` (default 1, range 1–5).
+- **Add** `focusModePersist: boolean` (default true).
+- **Add** `focusModeActive: boolean` (default false) — the persisted on/off state. Replaces the runtime-only `focusModeEnabled` field on `TodoSidebarView`.
+- **Remove** `focusModeIncludeProjects` (no longer meaningful — focus mode no longer filters).
 
-| Field | Content |
-|-------|---------|
-| `tags` | `{ tag: string, position: {start: {line, col, offset}} }[]` — tags with line positions, **excluding tags inside code fences** |
-| `headings` | `{ heading: string, level: number, position }[]` — heading text and positions |
-| `listItems` | `{ task?: string, parent: number, position }[]` — list item positions; `parent` is the containing item's line number |
+In `main.ts` settings tab:
 
-What it does NOT provide: full line text. The `tags` field gives tag strings and positions, headings give heading text, but the surrounding line content is absent. `vault.read()` is still required for display, fingerprinting, and write-back.
+- Remove the `focusModeIncludeProjects` row.
+- Add rows for `focusQueueLimit` (slider or number input, 1–5) and `focusModePersist`.
+- Keep `focusListLimit` and `activeTodosLimit` unchanged.
 
-**This rules out a full scanner replacement.** The current line parser is kept; the cache is used before reaching it.
+### 1b. Queue computation helper
+
+Add `buildFocusQueue(todos: TodoItem[], limit: number): { items: TodoItem[]; source: 'focus-tagged' | 'priority-fallback' | 'empty' }` to `utils.ts`.
+
+```
+1. Filter active TODOs (not #todone, not snoozed) by has_tag('#focus').
+2. Sort by existing priority rules (existing sortTodos logic).
+3. Take first `limit` items. If non-empty, return source='focus-tagged'.
+4. Otherwise, take top `limit` priority items from active TODOs.
+5. If still empty, return source='empty'. Else source='priority-fallback'.
+```
+
+For header TODOs with focused children: treat the header as a single queue entry (existing `effectiveFocus` semantics — header is "focused" if any active child has `#focus`). The header's child list is rendered inside the card later.
+
+### 1c. Queue runtime state
+
+Add a `FocusQueueState` to `SidebarView.ts`:
+
+```typescript
+interface FocusQueueState {
+  items: TodoItem[];           // current queue, head is active
+  source: 'focus-tagged' | 'priority-fallback' | 'empty';
+  inContinueMode: boolean;     // true after user pressed "Continue with next priority"
+}
+```
+
+Skip rotates `items` (head → tail, re-render). Done removes head, refreshes from scanner, re-renders. When `items` becomes empty: if `source === 'focus-tagged'`, transition to completion state; else (priority-fallback or continue) transition to empty/all-done state.
+
+### 1d. Date resolution helper
+
+Add `getItemDate(todo: TodoItem, app: App): { kind: 'tag' | 'modified' | 'none'; iso: string | null }` to `utils.ts`.
+
+- If the TODO line contains `@YYYY-MM-DD`, parse and return `kind='tag'`.
+- Else read source file via `vault.getAbstractFileByPath(todo.filePath)` and return its `stat.mtime` formatted as ISO date, `kind='modified'`.
+- If the file is missing, return `kind='none'`.
+
+This is rendered later by the card with format hints (e.g. trailing "(modified)" for the mtime fallback).
 
 ---
 
-### 3a: Remove the redundant `vault.on("modify")` watcher
+## Phase 2: View layer (focus card, states, CSS)
 
-**Problem.** `watchFiles()` currently registers both `vault.on("modify")` and `metadataCache.on("changed")`. Both trigger `debouncedScanFile()`. The 100ms debounce collapses most pairs, but the first scan (on `modify`) runs against the file before Obsidian has finished parsing it — meaning the cache is stale at scan time. The second scan (on `metadataCache.changed`) is correct. The first is pure overhead.
+Render the focus card and its three states. No persistence wiring yet — toggle is still runtime-only at the end of this phase.
 
-**Fix.** Remove the `vault.on("modify")` registration. Keep `metadataCache.on("changed")` as the sole incremental update trigger. This event fires exactly once per file change, after parsing is complete.
+### 2a. `renderFocusCard()` in `SidebarView.ts`
 
-`vault.on("create")` is kept: new files aren't in the cache yet and need a direct scan.
+New private method called from the existing `renderSidebar()` when `settings.focusModeActive === true`. Replaces the entire rendered content of the sidebar root:
 
-```typescript
-watchFiles(): void {
-  // Primary update trigger — fires after Obsidian finishes parsing the file
-  this.app.metadataCache.on("changed", (file) => {
-    if (file instanceof TFile && file.extension === "md") {
-      this.debouncedScanFile(file);
-    }
-  });
-
-  // New file creation — cache may not have indexed it yet
-  this.app.vault.on("create", (file) => {
-    if (file instanceof TFile && file.extension === "md") {
-      this.debouncedScanFile(file);
-    }
-  });
-
-  // Deletion and rename — same as current
-  // ...
-}
 ```
-
-**Risk.** Low. The `metadataCache.on("changed")` event already handled the majority of updates; the debounce handles any residual timing edge cases.
-
----
-
-### 3b: Pre-filter file reads during vault scan
-
-**Problem.** `scanVault()` calls `vault.getMarkdownFiles()` and reads every `.md` file, even files with no todo tags at all. For a large vault (500–2000 files), most files are irrelevant. Each `vault.read()` is an async I/O call; reading everything serially is the main cost of startup scan time.
-
-**Fix.** Before calling `vault.read(file)`, check `getFileCache().tags` for relevant tags. If absent, skip the file entirely. Also apply this check at the top of `scanFile()` to handle the case where all tags were removed from a file.
-
-```typescript
-private fileHasRelevantTags(file: TFile): boolean {
-  const cache = this.app.metadataCache.getFileCache(file);
-  if (!cache?.tags || cache.tags.length === 0) return false;
-  return cache.tags.some(t => PLUGIN_TAGS.has(t.tag.toLowerCase()));
-}
-```
-
-`PLUGIN_TAGS` is already defined in `utils.ts`. The method checks against it directly — no duplication.
-
-In `scanVault()`:
-```typescript
-for (const file of files) {
-  if (this.fileHasRelevantTags(file)) {
-    await this.scanFile(file);
-  } else {
-    // Ensure stale cache entries are cleared for this file
-    this.evictFile(file.path);
-  }
-}
-```
-
-In `scanFile()`, add an early exit at the top:
-```typescript
-async scanFile(file: TFile): Promise<void> {
-  if (!this.fileHasRelevantTags(file)) {
-    this.evictFile(file.path);
-    this.trigger("todos-updated");
+renderSidebar():
+  if (settings.focusModeActive) {
+    root.classList.add('sidebar-focus-mode-active');
+    renderFocusCard(root);
     return;
   }
-  // ... existing scan logic unchanged
-}
+  root.classList.remove('sidebar-focus-mode-active');
+  // existing tab/summary/list rendering
 ```
 
-Extract the four-cache delete into a private `evictFile(path: string)` helper to remove the repetition.
+`renderFocusCard()` handles three sub-states based on `FocusQueueState`:
 
-**Expected impact.** If 10% of files have relevant tags, vault scan I/O drops by ~90%. The speedup is proportional to vault size and tag density.
+1. **Active item** (queue non-empty): card with title, badges, date, source link, Done/Skip, Exit link. If `source === 'priority-fallback'`, render `.focus-card-hint` above the title.
+2. **Completion state** (focus-tagged queue just emptied): friendly message + Exit / Continue buttons.
+3. **Empty state** (no items at all in the vault, or priority-fallback queue exhausted in continue mode): friendly empty message + Exit button.
 
-**Risk.** Low-medium. One edge case: if the metadataCache hasn't indexed a file yet (very new file, or cache in a degraded state), `getFileCache()` returns null → `fileHasRelevantTags()` returns false → the file is skipped. Mitigation: the `vault.on("create")` watcher will trigger a `debouncedScanFile()` for new files regardless, and the `metadataCache.on("changed")` watcher will catch it once the cache catches up.
+### 2b. Focus card markup and classes
 
----
+Single container `.focus-card` with children:
 
-### 3c: Handle startup cache readiness
+- `.focus-card-counter` — "FOCUS (1 of N)" line.
+- `.focus-card-hint` — priority-fallback notice (only when source='priority-fallback').
+- `.focus-card-title` — TODO text rendered with existing inline markdown helpers.
+- `.focus-card-tags` — badge list (project, priority, custom tags). Cap at 6 visible badges with "+N more" if needed.
+- `.focus-card-date` — date row, formatted per `getItemDate()`.
+- `.focus-card-source` — file link; click opens via `app.workspace.openLinkText(filePath, '', false)` and scrolls to the line.
+- `.focus-card-actions` — Done and Skip buttons. Skip disabled when queue length is 1.
+- `.focus-card-exit` — "Exit focus mode" text link below the actions.
 
-**Problem.** `scanVault()` is called in `onload()`, which can execute before Obsidian's initial file indexing is complete. With Phase 3b, this race is more consequential: `getFileCache()` returns null for unindexed files, causing them to be skipped during the initial scan. The user opens the plugin to an empty sidebar.
+Header TODO entries render the parent line in `.focus-card-title` and a child list in a sub-block beneath it (reuse existing child rendering helpers).
 
-**Fix.** In `onload()`, check whether the cache has finished its initial pass before running the vault scan. Obsidian fires `metadataCache.on("resolved")` when initial indexing is complete.
+### 2c. CSS
 
-```typescript
-// In main.ts onload():
-const startScan = async () => { await this.scanner.scanVault(); };
+Add to `styles.css`:
 
-if ((this.app.metadataCache as any).initialized) {
-  // Cache already ready (plugin loaded after startup)
-  await startScan();
-} else {
-  // Wait for initial indexing to complete
-  this.registerEvent(
-    this.app.metadataCache.on("resolved", startScan)
-  );
+```css
+.sidebar-focus-mode-active .todo-tabs,
+.sidebar-focus-mode-active .summary-section,
+.sidebar-focus-mode-active .projects-section,
+.sidebar-focus-mode-active .focus-mode-toggle-btn {
+  display: none;
 }
+
+.sidebar-focus-mode-active {
+  font-size: 1.4em;
+}
+
+.focus-card { ... }
+.focus-card-counter { ... }
+.focus-card-hint { ... }
+.focus-card-title { ... }
+.focus-card-tags { ... }   /* badge styling */
+.focus-card-date { ... }
+.focus-card-source { ... }
+.focus-card-actions { ... }
+.focus-card-exit { ... }   /* small text-link styling */
+.focus-card-empty,
+.focus-card-complete { ... }
 ```
 
-The `initialized` field is not in Obsidian's public TypeScript types but is reliably present at runtime. An alternative (more conservative) approach is to always wait for `"resolved"` and trigger the scan from there, accepting that in the already-resolved case there's a small delay before the sidebar populates.
+Existing `.todo-focus` and `.project-focus` background tinting stays — those classes still indicate `#focus` items in *normal* mode.
 
-**Risk.** Low. This is strictly a startup improvement. The existing behaviour (scan immediately in onload) already has this race; the fix makes it explicit.
+### 2d. Done and Skip handlers
 
----
-
-### 3d: Code block exclusion cleanup (minor)
-
-**Side benefit.** The custom scanner tracks code block state with a boolean toggle on triple backtick (`inCodeBlock = !inCodeBlock`). Since the metadataCache already handles code block exclusion correctly for the pre-filter (3b), any file that appears relevant via the cache check is guaranteed to have at least one non-code-block tag. The existing inCodeBlock tracking in the line parser is still needed for the `text` field accuracy, but it no longer needs to be the primary guard against false positives.
-
-This doesn't require a code change — it's a clarification of the existing logic's role.
+- **Done** → call existing `TodoProcessor.completeTodo()` with the head item. The scanner will emit `todos-updated`; the sidebar listener rebuilds the queue and re-renders.
+- **Skip** → rotate `state.items` left in memory and re-render. No file I/O.
+- **Exit (link or button)** → set `settings.focusModeActive = false`, save, re-render normally.
+- **Continue with next priority task** → set `state.inContinueMode = true`, rebuild queue from priority fallback regardless of `#focus` tags, re-render.
 
 ---
 
-### What Phase 3 explicitly does NOT do
+## Phase 3: Wire up persistence and replace the old filter
 
-- **Replace the line-by-line parser**: The cache lacks line text. The parser is still needed for `text`, `fingerprint`, parent-child detection, and mutation cleanup.
-- **Use `listItems.parent` for parent-child detection**: Would add API coupling without eliminating the `vault.read()` call.
-- **Use `metadataCache` for write-back**: All mutations still go through `modifyFileLine()` with `vault.read()` + `vault.modify()`.
-- **Remove `vault.on("create")`**: New files may not be indexed yet; direct scanning is still needed.
+This phase makes the toggle live and removes the old filter UI/code paths.
+
+### 3a. Persistence
+
+- The eye-icon toggle button (now in the *normal* sidebar header) toggles `settings.focusModeActive` and calls `saveSettings()`.
+- On `onload()` and on settings reload, the sidebar reads `settings.focusModeActive` and renders accordingly.
+- On exit (in-card link or button), same toggle path: write to settings, re-render.
+
+If `settings.focusModePersist === false`, treat `focusModeActive` as transient — reset to `false` on `onload()`.
+
+### 3b. Remove old filter logic
+
+In `SidebarView.ts`, the existing `focusModeEnabled` runtime flag was used to filter `Active TODOs` and the project list. Remove all filter branches gated on it. The eye icon is repurposed (same visual, new semantic — the on-state now means "immersive mode" rather than "filter").
+
+In `ContextMenuHandler.ts`, the right-click "Focus" toggle on items still adds/removes `#focus` (unchanged — it's about the tag, not the mode).
+
+The `{{focus-list}}` embed (`CodeBlockProcessor.ts`, `EmbedRenderer.ts`) is unchanged.
+
+### 3c. State restore on toggle off
+
+When the user exits, restore the sidebar's previous tab and (where feasible) scroll position. Implementation:
+
+- Before activating focus mode, snapshot `activeTab` and the list scroll position into ephemeral fields on `TodoSidebarView`.
+- On exit, apply them after the normal render completes.
+
+If snapshotting proves messy, accept "always restore TODOs tab at top" as the v1 behavior.
 
 ---
 
-### Implementation order
+## Phase 4: Docs and version
 
-1. **3a** — remove `vault.on("modify")`, two-line change in `watchFiles()`
-2. **3c** — fix startup race, change to `onload()` in `main.ts`
-3. **3b** — add `fileHasRelevantTags()`, extract `evictFile()`, update `scanVault()` and `scanFile()`
+### 4a. DESIGN.md
 
-Start with 3a and 3c since they're low-risk and self-contained. Do 3b last since it's the one that has the pre-filter dependency on the cache being ready (which 3c solves first).
+Soften the "`#focus` is a visibility filter, not a priority level" language. Replace with: `#focus` is a preference for the focus queue; priority fallback fills in when no `#focus` items exist.
 
-### Testing approach
+Document the new mode: queue computation, state machine, settings.
 
-- **3a**: Manual test — edit a todo file, confirm sidebar updates once (not twice). Console log count of `scanFile` calls to verify.
-- **3b**: Manual test with a large vault — measure sidebar load time before and after. Add a counter to verify only tagged files are read.
-- **3c**: Test by disabling and re-enabling the plugin while the vault is open. Sidebar should populate immediately without a blank state.
-- Unit tests: `fileHasRelevantTags()` can be unit tested by mocking `getFileCache()` return values — covers null cache, empty tags, relevant tag present, only irrelevant tags.
+### 4b. README.md
+
+Update the Focus Mode section to describe the new behavior. Mention `focusQueueLimit` and `focusModePersist`.
+
+### 4c. CHANGELOG.md
+
+New version entry. Behavior change (not a breaking API change). Note removal of `focusModeIncludeProjects`.
+
+### 4d. Version bump
+
+Update `manifest.json`, `package.json`. Recommend a minor bump (e.g., 0.10.0) since this is a behavior change. CHANGELOG entry mirrors.
+
+---
+
+## Implementation order
+
+1. **Phase 1** — data plumbing first. No visible change yet, but `buildFocusQueue` and settings are testable in isolation.
+2. **Phase 2** — render the card. At this point you can manually flip `settings.focusModeActive` to test the view in all three sub-states.
+3. **Phase 3** — wire the persistent toggle and remove the old filter. This is when the feature becomes user-facing.
+4. **Phase 4** — docs and version. Last, after manual verification.
+
+Phases 1 and 2 can be developed in branches and merged independently if useful. Phase 3 is the cutover and should land as a single commit so the eye icon never has ambiguous semantics in `main`.
+
+---
+
+## Testing approach
+
+### Unit-testable (Phase 1)
+
+- `buildFocusQueue()` — covers: only `#focus` items, no `#focus` items but priority items exist, no items at all, header with focused children, queue limit truncation.
+- `getItemDate()` — covers: `@YYYY-MM-DD` tag present, no tag (mtime fallback), missing file.
+
+### Manual verification (Phases 2–3)
+
+- Toggle on with several `#focus` items — card shows highest-priority first; Done advances; Skip rotates.
+- Toggle on with zero `#focus` items but other TODOs present — fallback queue with hint visible.
+- Toggle on with zero TODOs at all — empty state visible.
+- Complete the last `#focus` item — completion state appears; Continue pulls priority queue with hint.
+- Exit via in-card link — sidebar restores normal view, prior tab.
+- Quit and reopen Obsidian with focus mode on — mode is still on; current item is the new top of the freshly computed queue (queue is not itself persisted; only the on/off bit).
+- Set `focusModePersist=false`, toggle on, restart — focus mode is off after restart.
+- Set `focusQueueLimit=3` — card shows active item plus two next-up previews.
+
+### Regression checks
+
+- Normal mode rendering unchanged when `focusModeActive=false`.
+- `{{focus-list}}` embed unchanged.
+- Right-click → Focus on a TODO still toggles the `#focus` tag.
+- `.todo-focus` / `.project-focus` tinting still appears in normal mode.
+
+---
+
+## Risks
+
+| Risk | Mitigation |
+|---|---|
+| Users with `focusModeIncludeProjects` set lose configuration silently | CHANGELOG note; setting was niche. Consider migration that logs a one-time notice if the value was previously `true`. |
+| Hidden sidebar chrome makes the exit link feel buried | In-card "Exit focus mode" link is always visible at card bottom; verify with manual test on narrow sidebar widths. |
+| Header TODOs with many children make the card scrollable | Acceptable in v1; the card should scroll within itself, not the sidebar. |
+| Persisted state stuck "on" after a crash with no items | Empty state is a recoverable surface; user can always press Exit. |
+
+---
+
+## Out of scope (v1)
+
+- Custom keyboard shortcuts for Done / Skip / Exit (deferred — standard tab+Enter/Space works).
+- Multi-entry mode for header TODOs (header + children = single entry).
+- Animations on advance.
+- Surrounding-context preview from the source file.
+- Configurable font scale.

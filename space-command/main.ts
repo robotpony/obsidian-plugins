@@ -1046,6 +1046,32 @@ class SpaceCommandSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName("Focus queue limit")
+      .setDesc("Number of items shown at once in immersive Focus Mode (1–5). Default 1 = single-task focus.")
+      .addSlider((slider) =>
+        slider
+          .setLimits(1, 5, 1)
+          .setValue(this.plugin.settings.focusQueueLimit)
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            this.plugin.settings.focusQueueLimit = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Persist focus mode across sessions")
+      .setDesc("When enabled, Focus Mode stays on after closing and reopening Obsidian.")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.focusModePersist)
+          .onChange(async (value) => {
+            this.plugin.settings.focusModePersist = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
       .setName("Exclude folders from projects")
       .setDesc("Comma-separated folders to exclude from inferred project tags (e.g., log, archive)")
       .addText((text) =>

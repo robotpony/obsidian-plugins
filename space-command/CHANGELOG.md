@@ -2,6 +2,21 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.10.0] - 2026-05-04
+
+### Added — Focus Mode redesign, Phase 1 (data layer)
+
+Foundational data layer for the new immersive Focus Mode. No user-visible behaviour change yet — the existing focus filter still runs. Subsequent phases will replace the filter with a single-task focus card.
+
+- **New settings**:
+  - `focusQueueLimit` (1–5, default 1): max items shown in the upcoming Focus Mode queue.
+  - `focusModePersist` (default true): whether Focus Mode state will persist across sessions.
+  - `focusModeActive` (internal, default false): persisted on/off for the new mode.
+- **`buildFocusQueue()`**: helper that builds the focus queue from active TODOs. Top-level items only; #focus-tagged items first, falling back to top-priority items when none exist; respects the queue limit. Snoozed items excluded.
+- **`getItemDate()`**: helper that resolves an item's display date — `@YYYY-MM-DD` annotation if present, else file mtime, else none.
+- **New types**: `FocusQueueResult`, `FocusQueueSource`, `ItemDate`, `ItemDateKind` exported from `types.ts`.
+- **Tests**: 16 new unit tests covering queue computation, header handling, snoozed filtering, priority fallback, and date resolution.
+
 ## [0.9.131] - 2026-04-23
 
 ### Fixed

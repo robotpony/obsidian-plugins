@@ -1,6 +1,6 @@
 {
   "name": "space-command",
-  "version": "0.9.131",
+  "version": "0.10.0",
   "description": "␣⌘ Space Command - Obsidian plugin for managing TODOs, TODONEs, and workflows",
   "main": "main.js",
   "scripts": {

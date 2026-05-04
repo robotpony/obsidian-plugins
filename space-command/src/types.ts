@@ -48,6 +48,36 @@ export interface ProjectInfo {
   colourIndex: number;
 }
 
+/**
+ * Source classification for a focus queue.
+ * - 'focus-tagged': queue items came from explicit #focus tags
+ * - 'priority-fallback': queue items came from highest-priority TODOs (no #focus items existed)
+ * - 'empty': no items available at all
+ */
+export type FocusQueueSource = 'focus-tagged' | 'priority-fallback' | 'empty';
+
+/**
+ * Result of building a focus queue: ordered queue items plus their source classification.
+ * Source is used to render the "No focus items — showing top priority" hint when fallback is in effect.
+ */
+export interface FocusQueueResult {
+  items: TodoItem[];
+  source: FocusQueueSource;
+}
+
+/**
+ * Resolved date for a focus card.
+ * - 'tag': came from an explicit @YYYY-MM-DD on the TODO line
+ * - 'modified': came from the source file's last modified time (mtime fallback)
+ * - 'none': no date available (file missing or empty)
+ */
+export type ItemDateKind = 'tag' | 'modified' | 'none';
+
+export interface ItemDate {
+  kind: ItemDateKind;
+  iso: string | null;
+}
+
 // Configuration for unified list item rendering in SidebarView
 export interface ItemRenderConfig {
   type: 'todo' | 'idea' | 'principle';
@@ -69,7 +99,13 @@ export interface SpaceCommandSettings {
   priorityTags: string[];
   excludeFoldersFromProjects: string[];
   // Focus mode settings
-  focusModeIncludeProjects: boolean;
+  focusModeIncludeProjects: boolean; // legacy filter setting; removed in Phase 3
+  /** Max items shown in the immersive focus queue at once (1–5). */
+  focusQueueLimit: number;
+  /** When true, focus mode on/off survives session restart. */
+  focusModePersist: boolean;
+  /** Persisted on/off state for immersive focus mode. */
+  focusModeActive: boolean;
   // Tab lock settings
   showTabLockButton: boolean;
   // Link rendering settings
@@ -97,6 +133,9 @@ export const DEFAULT_SETTINGS: SpaceCommandSettings = {
   excludeFoldersFromProjects: ["log"],
   // Focus mode settings
   focusModeIncludeProjects: false,
+  focusQueueLimit: 1,
+  focusModePersist: true,
+  focusModeActive: false,
   // Tab lock settings
   showTabLockButton: false,
   // Link rendering settings

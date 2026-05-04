@@ -5164,6 +5164,9 @@ var DEFAULT_SETTINGS = {
   excludeFoldersFromProjects: ["log"],
   // Focus mode settings
   focusModeIncludeProjects: false,
+  focusQueueLimit: 1,
+  focusModePersist: true,
+  focusModeActive: false,
   // Tab lock settings
   showTabLockButton: false,
   // Link rendering settings
@@ -6390,6 +6393,18 @@ var SpaceCommandSettingTab = class extends import_obsidian13.PluginSettingTab {
     new import_obsidian13.Setting(containerEl).setName("Focus mode includes project TODOs").setDesc("When enabled, focus mode shows all TODOs from focused projects (not just #focus items)").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.focusModeIncludeProjects).onChange(async (value) => {
         this.plugin.settings.focusModeIncludeProjects = value;
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian13.Setting(containerEl).setName("Focus queue limit").setDesc("Number of items shown at once in immersive Focus Mode (1\u20135). Default 1 = single-task focus.").addSlider(
+      (slider) => slider.setLimits(1, 5, 1).setValue(this.plugin.settings.focusQueueLimit).setDynamicTooltip().onChange(async (value) => {
+        this.plugin.settings.focusQueueLimit = value;
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian13.Setting(containerEl).setName("Persist focus mode across sessions").setDesc("When enabled, Focus Mode stays on after closing and reopening Obsidian.").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.focusModePersist).onChange(async (value) => {
+        this.plugin.settings.focusModePersist = value;
         await this.plugin.saveSettings();
       })
     );
