@@ -115,7 +115,6 @@ export interface SpaceCommandSettings {
   priorityTags: string[];
   excludeFoldersFromProjects: string[];
   // Focus mode settings
-  focusModeIncludeProjects: boolean; // legacy filter setting; removed in Phase 3
   /** Max items shown in the immersive focus queue at once (1–5). */
   focusQueueLimit: number;
   /** When true, focus mode on/off survives session restart. */
@@ -148,7 +147,6 @@ export const DEFAULT_SETTINGS: SpaceCommandSettings = {
   priorityTags: ["#p0", "#p1", "#p2", "#p3", "#p4"],
   excludeFoldersFromProjects: ["log"],
   // Focus mode settings
-  focusModeIncludeProjects: false,
   focusQueueLimit: 1,
   focusModePersist: true,
   focusModeActive: false,

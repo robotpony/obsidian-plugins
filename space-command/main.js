@@ -3703,15 +3703,18 @@ var TeamManager = class extends import_obsidian11.Events {
 var import_obsidian12 = require("obsidian");
 var VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 var TodoSidebarView = class extends import_obsidian12.ItemView {
-  constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, activeTodosLimit, focusListLimit, focusModeIncludeProjects, makeLinksClickable, triageSnoozedThreshold, triageActiveThreshold, onShowAbout, onShowStats, onShowTriage, getMoveHistory = () => [], teamManager, defaultAssignee = "", focusQueueLimit = 1, focusModeActive = false) {
+  constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, activeTodosLimit, focusListLimit, makeLinksClickable, triageSnoozedThreshold, triageActiveThreshold, onShowAbout, onShowStats, onShowTriage, getMoveHistory = () => [], teamManager, defaultAssignee = "", focusQueueLimit = 1, focusModeActive = false, setFocusModeActive = async () => {
+  }) {
     super(leaf);
     this.updateListener = null;
     this.activeTab = "todos";
     this.activeTagFilter = null;
     this.activeAssigneeFilter = null;
-    this.focusModeEnabled = false;
     this.focusModeActive = false;
     this.focusQueue = null;
+    // Snapshot for restoring sidebar position on Exit.
+    this.prevActiveTab = null;
+    this.prevScrollTop = 0;
     this.openDropdown = null;
     this.openDropdownTrigger = null;
     this.openInfoPopup = null;
@@ -3745,7 +3748,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     this.defaultTodoneFile = defaultTodoneFile;
     this.activeTodosLimit = activeTodosLimit;
     this.focusListLimit = focusListLimit;
-    this.focusModeIncludeProjects = focusModeIncludeProjects;
     this.makeLinksClickable = makeLinksClickable;
     this.triageSnoozedThreshold = triageSnoozedThreshold;
     this.triageActiveThreshold = triageActiveThreshold;
@@ -3756,6 +3758,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     this.defaultAssignee = defaultAssignee;
     this.focusQueueLimit = focusQueueLimit;
     this.focusModeActive = focusModeActive;
+    this.setFocusModeActive = setFocusModeActive;
     this.contextMenuHandler = new ContextMenuHandler(
       this.app,
       processor,
@@ -4295,9 +4298,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
         item.setTitle("Triage").setIcon("siren").onClick(() => this.onShowTriage());
       });
       menu.addItem((item) => {
-        item.setTitle("Enter focus mode").setIcon("target").onClick(() => this.handleFocusEnter());
-      });
-      menu.addItem((item) => {
         item.setTitle("Stats").setIcon("bar-chart-2").onClick(() => this.onShowStats());
       });
       menu.addSeparator();
@@ -4341,16 +4341,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     });
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
     titleSpan.textContent = "Focus";
-    const focusModeBtn = header.createEl("button", {
-      cls: `clickable-icon focus-mode-toggle-btn${this.focusModeEnabled ? " active" : ""}`,
-      attr: { "aria-label": this.focusModeEnabled ? "Show all items" : "Show only focused" }
-    });
-    focusModeBtn.innerHTML = this.focusModeEnabled ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
-    focusModeBtn.addEventListener("click", () => {
-      this.focusModeEnabled = !this.focusModeEnabled;
-      showNotice2(this.focusModeEnabled ? "Focus mode enabled" : "Focus mode disabled");
-      this.render();
-    });
     this.renderFilterIndicator(header);
   }
   renderSnoozedContent(container) {
@@ -4580,22 +4570,15 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
     titleSpan.textContent = "Focus";
     const focusModeBtn = header.createEl("button", {
-      cls: `clickable-icon focus-mode-toggle-btn${this.focusModeEnabled ? " active" : ""}`,
-      attr: { "aria-label": this.focusModeEnabled ? "Show all projects" : "Show only focused" }
+      cls: "clickable-icon focus-mode-toggle-btn",
+      attr: { "aria-label": "Enter focus mode" }
     });
-    focusModeBtn.innerHTML = this.focusModeEnabled ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
-    focusModeBtn.addEventListener("click", () => {
-      this.focusModeEnabled = !this.focusModeEnabled;
-      showNotice2(this.focusModeEnabled ? "Focus mode enabled" : "Focus mode disabled");
-      this.render();
-    });
+    focusModeBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+    focusModeBtn.addEventListener("click", () => this.handleFocusEnter());
     this.renderFilterIndicator(header);
-    if (this.focusModeEnabled) {
-      projects = projects.filter((p) => p.hasFocusItems);
-    }
     if (projects.length === 0) {
       section.createEl("div", {
-        text: this.focusModeEnabled ? "No focused projects" : "No focus projects yet",
+        text: "No focus projects yet",
         cls: "todo-empty"
       });
       return;
@@ -4784,22 +4767,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     todos = todos.filter(
       (todo) => !todo.tags.includes("#idea") && !todo.tags.includes("#ideas") && !todo.tags.includes("#ideation")
     );
-    if (this.focusModeEnabled) {
-      todos = todos.filter((todo) => {
-        if (todo.parentLineNumber === void 0) {
-          return true;
-        }
-        if (!hasTag(todo.tags, "#focus")) {
-          return false;
-        }
-        const parent = this.scanner.getTodos().find(
-          (t) => t.filePath === todo.filePath && t.lineNumber === todo.parentLineNumber
-        );
-        return !hasTag((parent == null ? void 0 : parent.tags) || [], "#focus");
-      });
-    } else {
-      todos = todos.filter((todo) => todo.parentLineNumber === void 0);
-    }
+    todos = todos.filter((todo) => todo.parentLineNumber === void 0);
     const allTodones = this.scanner.getTodones();
     const allTodosForChildLookup = this.scanner.getTodos();
     todos = todos.filter((todo) => {
@@ -4871,16 +4839,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
         });
       }
     }
-    if (this.focusModeEnabled) {
-      if (this.focusModeIncludeProjects) {
-        const focusedProjects = this.projectManager.getProjects().filter((p) => p.hasFocusItems).map((p) => p.tag);
-        todos = todos.filter(
-          (todo) => hasTag(todo.tags, "#focus") || todo.tags.some((tag) => focusedProjects.includes(tag))
-        );
-      } else {
-        todos = todos.filter((todo) => hasTag(todo.tags, "#focus"));
-      }
-    }
     todos = this.sortTodosByPriority(todos, allTodosForChildLookup);
     const totalCount = todos.length;
     if (this.activeTodosLimit > 0) {
@@ -4893,12 +4851,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     this.renderAssigneeFilter(header);
     this.renderFilterIndicator(header);
     if (totalCount === 0) {
-      let emptyText = "No TODOs";
-      if (this.focusModeEnabled) {
-        emptyText = "No focused TODOs";
-      } else if (this.activeTagFilter) {
-        emptyText = `No TODOs matching ${this.activeTagFilter}`;
-      }
+      const emptyText = this.activeTagFilter ? `No TODOs matching ${this.activeTagFilter}` : "No TODOs";
       section.createEl("div", {
         text: emptyText,
         cls: "todo-empty"
@@ -5084,16 +5037,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
   renderPrinciples(container) {
     let principles = this.scanner.getPrinciples();
     principles = principles.filter((p) => p.parentLineNumber === void 0);
-    if (this.focusModeEnabled) {
-      if (this.focusModeIncludeProjects) {
-        const focusedProjects = this.projectManager.getProjects().filter((p) => p.hasFocusItems).map((p) => p.tag);
-        principles = principles.filter(
-          (p) => hasTag(p.tags, "#focus") || p.tags.some((tag) => focusedProjects.includes(tag))
-        );
-      } else {
-        principles = principles.filter((p) => hasTag(p.tags, "#focus"));
-      }
-    }
     if (this.activeTagFilter) {
       principles = principles.filter((p) => p.tags.includes(this.activeTagFilter));
     }
@@ -5105,7 +5048,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     titleSpan.textContent = "Principles";
     this.renderFilterIndicator(header);
     if (principles.length === 0) {
-      const emptyText = this.focusModeEnabled ? this.focusModeIncludeProjects ? "No principles in focused projects" : "No focused principles" : this.activeTagFilter ? `No principles matching ${this.activeTagFilter}` : "No principles yet";
+      const emptyText = this.activeTagFilter ? `No principles matching ${this.activeTagFilter}` : "No principles yet";
       section.createEl("div", {
         text: emptyText,
         cls: "todo-empty"
@@ -5127,16 +5070,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     );
     const allIdeasForChildLookup = ideas;
     ideas = ideas.filter((idea) => idea.parentLineNumber === void 0);
-    if (this.focusModeEnabled) {
-      if (this.focusModeIncludeProjects) {
-        const focusedProjects = this.projectManager.getProjects().filter((p) => p.hasFocusItems).map((p) => p.tag);
-        ideas = ideas.filter(
-          (idea) => hasTag(idea.tags, "#focus") || idea.tags.some((tag) => focusedProjects.includes(tag))
-        );
-      } else {
-        ideas = ideas.filter((idea) => hasTag(idea.tags, "#focus"));
-      }
-    }
     if (this.activeTagFilter) {
       ideas = ideas.filter((idea) => idea.tags.includes(this.activeTagFilter));
     }
@@ -5147,7 +5080,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     titleSpan.textContent = "Ideas";
     this.renderFilterIndicator(header);
     if (ideas.length === 0) {
-      const emptyText = this.focusModeEnabled ? this.focusModeIncludeProjects ? "No ideas in focused projects" : "No focused ideas" : this.activeTagFilter ? `No ideas matching ${this.activeTagFilter}` : "No ideas yet";
+      const emptyText = this.activeTagFilter ? `No ideas matching ${this.activeTagFilter}` : "No ideas yet";
       section.createEl("div", {
         text: emptyText,
         cls: "todo-empty"
@@ -5443,8 +5376,13 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     return result;
   }
   handleFocusEnter() {
+    var _a;
+    this.prevActiveTab = this.activeTab;
+    const scrollEl = this.containerEl.children[1];
+    this.prevScrollTop = (_a = scrollEl == null ? void 0 : scrollEl.scrollTop) != null ? _a : 0;
     this.focusModeActive = true;
     this.focusQueue = null;
+    void this.setFocusModeActive(true);
     this.render();
   }
   async handleFocusDone(item) {
@@ -5460,9 +5398,19 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     this.render();
   }
   handleFocusExit() {
+    if (this.prevActiveTab) {
+      this.activeTab = this.prevActiveTab;
+      this.prevActiveTab = null;
+    }
     this.focusModeActive = false;
     this.focusQueue = null;
+    void this.setFocusModeActive(false);
     this.render();
+    const scrollEl = this.containerEl.children[1];
+    if (scrollEl) {
+      scrollEl.scrollTop = this.prevScrollTop;
+    }
+    this.prevScrollTop = 0;
   }
   handleFocusContinue() {
     this.focusQueue = {
@@ -5487,7 +5435,6 @@ var DEFAULT_SETTINGS = {
   priorityTags: ["#p0", "#p1", "#p2", "#p3", "#p4"],
   excludeFoldersFromProjects: ["log"],
   // Focus mode settings
-  focusModeIncludeProjects: false,
   focusQueueLimit: 1,
   focusModePersist: true,
   focusModeActive: false,
@@ -6030,6 +5977,10 @@ function createHeaderChecklistExtension() {
 var SpaceCommandPlugin = class extends import_obsidian13.Plugin {
   async onload() {
     await this.loadSettings();
+    if (!this.settings.focusModePersist && this.settings.focusModeActive) {
+      this.settings.focusModeActive = false;
+      await this.saveSettings();
+    }
     this.sidebarManager = new SidebarManager(this.app, VIEW_TYPE_TODO_SIDEBAR);
     this.teamManager = new TeamManager(this.app, this.settings.teamFilePath);
     this.teamManager.watchFile();
@@ -6128,7 +6079,6 @@ var SpaceCommandPlugin = class extends import_obsidian13.Plugin {
         this.settings.priorityTags,
         this.settings.activeTodosLimit,
         this.settings.focusListLimit,
-        this.settings.focusModeIncludeProjects,
         this.settings.makeLinksClickable,
         this.settings.triageSnoozedThreshold,
         this.settings.triageActiveThreshold,
@@ -6139,7 +6089,11 @@ var SpaceCommandPlugin = class extends import_obsidian13.Plugin {
         this.teamManager,
         this.settings.defaultAssignee,
         this.settings.focusQueueLimit,
-        this.settings.focusModeActive
+        this.settings.focusModeActive,
+        async (active) => {
+          this.settings.focusModeActive = active;
+          await this.saveSettings();
+        }
       )
     );
     this.registerMarkdownPostProcessor((el, ctx) => {
@@ -6714,12 +6668,6 @@ var SpaceCommandSettingTab = class extends import_obsidian13.PluginSettingTab {
           this.plugin.settings.activeTodosLimit = num;
           await this.plugin.saveSettings();
         }
-      })
-    );
-    new import_obsidian13.Setting(containerEl).setName("Focus mode includes project TODOs").setDesc("When enabled, focus mode shows all TODOs from focused projects (not just #focus items)").addToggle(
-      (toggle) => toggle.setValue(this.plugin.settings.focusModeIncludeProjects).onChange(async (value) => {
-        this.plugin.settings.focusModeIncludeProjects = value;
-        await this.plugin.saveSettings();
       })
     );
     new import_obsidian13.Setting(containerEl).setName("Focus queue limit").setDesc("Number of items shown at once in immersive Focus Mode (1\u20135). Default 1 = single-task focus.").addSlider(

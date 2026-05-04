@@ -2,6 +2,39 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.12.1] - 2026-05-04
+
+### Documentation — Focus Mode redesign, Phase 4
+
+Documentation pass closing out the Focus Mode redesign. No behaviour change.
+
+- **`DESIGN.md`** Focus Mode section expanded: queue computation pseudocode, full state machine, settings table, and class/file touchpoint listing. Cross-references the design archive in `docs/`.
+- **Design archive** moved to `docs/` matching the existing `mentions-*` and `moved-tag-*` convention:
+  - `IDEAS.md` → `docs/focus-mode-IDEAS.md`
+  - `OUTLINE.md` → `docs/focus-mode-OUTLINE.md`
+  - `plan.md` → `docs/focus-mode-PLAN.md`
+  Each gets a "shipped" status banner and updated cross-refs.
+
+## [0.12.0] - 2026-05-04
+
+### Changed — Focus Mode redesign, Phase 3 (cutover)
+
+The immersive Focus Mode is now the default. Eye-icon click in the Projects section header enters focus mode; the in-card "Exit focus mode" link returns to the normal sidebar.
+
+- **Eye icon repurposed**: Single click in the TODOs tab's Projects section header now enters immersive Focus Mode. No toggle/active state — the icon is only visible in normal mode (Focus Mode hides the entire sidebar chrome).
+- **Persistence**: Focus Mode on/off state now persists across Obsidian sessions by default. Disable via the new "Persist focus mode across sessions" setting (introduced in 0.10.0); when off, the mode resets to off on each plugin load.
+- **Tab and scroll restore**: Exiting focus mode returns the sidebar to the tab and scroll position you were on when you entered.
+- **Continue button** now advances through the priority queue: each Done after "Continue with next priority task" pulls in the next-highest-priority TODO; reaching the end shows a "All caught up." empty state.
+
+### Removed
+
+- **Legacy focus filter**: The old "filter to #focus items only" behaviour of the eye icon is gone. The Ideas tab no longer has a focus filter button.
+- **`focusModeIncludeProjects` setting**: Removed. Existing setting values are silently ignored on load. The behaviour (showing all TODOs from focused projects) doesn't apply to the immersive mode, which surfaces one TODO at a time.
+
+### Migration notes
+
+If you relied on the old filter to scan a list of focused items, the closest equivalent is the `{{focus-list}}` embed (unchanged). The right-click "Focus" action on items still toggles the `#focus` tag.
+
 ## [0.11.0] - 2026-05-04
 
 ### Added — Focus Mode redesign, Phase 2 (view layer)

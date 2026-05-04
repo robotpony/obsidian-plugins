@@ -167,11 +167,98 @@ Priority is encoded numerically for sorting (lower value = higher priority):
 
 ### Key behaviours
 
-**`#focus` is a visibility filter, not a priority level.** The `#focus` tag marks items for focus mode filtering—it shows what you want to work on now, not necessarily what's most important. If an item has both `#focus` and a priority tag (e.g., `#focus #p0`), the priority tag determines sort order.
+**`#focus` is a preference for the focus queue.** The `#focus` tag marks items as candidates for the immersive Focus Mode card — it's what you want to work on now. If no `#focus` items exist, focus mode falls back to the highest-priority active TODOs (with a hint shown on the card). If an item has both `#focus` and a priority tag (e.g., `#focus #p0`), the priority tag determines order within the focus queue.
 
 **Header TODOs sort by average child priority.** A header like `## Project #todo` with children sorts based on the average priority of its active child items, not the tags on the header line. This prevents high-priority standalone items from being buried below low-priority header blocks.
 
 **Unprioritized items sort low.** Items without any priority tag sort after `#p4` but before snoozed items. This encourages explicit prioritization.
+
+### Immersive Focus Mode
+
+A sidebar-replacing single-task surface. When toggled on, the sidebar's normal content (tabs, summary, project list, TODO list) is hidden and replaced by a focus card showing one TODO at a time. Done advances the queue; Skip rotates the active item to the back of the queue; the in-card **Exit focus mode** link restores the sidebar.
+
+Design archive: [`docs/focus-mode-IDEAS.md`](docs/focus-mode-IDEAS.md), [`docs/focus-mode-OUTLINE.md`](docs/focus-mode-OUTLINE.md), [`docs/focus-mode-PLAN.md`](docs/focus-mode-PLAN.md).
+
+#### Entry and exit
+
+- **Entry:** Eye icon in the TODOs tab's Projects section header. Single-click flips `focusModeActive` and re-renders.
+- **Exit:** "Exit focus mode" text link below the Done/Skip actions inside the focus card. Sets `focusModeActive` to `false`, restores the prior tab and scroll position.
+
+The eye icon never appears in active state — when focus mode is on, the entire sidebar chrome (including the icon) is hidden. The icon is only visible from the normal sidebar, where it always means "enter focus mode."
+
+#### Queue computation
+
+Queue construction lives in `buildFocusQueue` (`src/utils.ts`). Pseudocode:
+
+```
+queue = activeTodos
+  .filter(t => t.parentLineNumber === undefined && !isSnoozed(t.tags))
+
+if queue.empty:
+  return { items: [], source: 'empty' }
+
+if not options.forceFallback:
+  focused = queue.filter(t => isEffectivelyFocused(t, allTodos))
+  if focused.nonEmpty:
+    return {
+      items: focused.sort(compareWithEffectivePriority).slice(0, limit),
+      source: 'focus-tagged',
+    }
+
+return {
+  items: queue.sort(comparePriorityOnly).slice(0, limit),
+  source: 'priority-fallback',
+}
+```
+
+Notes:
+
+- Only top-level items are queue candidates — children of headers are never independent entries. A header TODO with focused children is one queue entry; the children render inline inside the card.
+- Snoozed items (`#future`, `#snooze`, `#snoozed`) are excluded.
+- `compareWithEffectivePriority` keeps `#focus` items above non-focused ones; `comparePriorityOnly` is focus-tier-agnostic and is used only by the priority-fallback path so `#focus`-tagged items don't dominate when continuing into priority.
+- `forceFallback: true` skips the curated `#focus` filter entirely. Used by the "Continue with next priority task" path.
+
+#### State machine
+
+```
+[off] -- toggle on, #focus items exist --> [active, focus-tagged queue]
+[off] -- toggle on, no #focus items, priority items exist --> [active, priority-fallback queue]
+[off] -- toggle on, no active TODOs at all --> [active, empty state]
+[active, focus-tagged] -- Done on last #focus item --> [active, completion state]
+[active, completion state] -- Exit --> [off]
+[active, completion state] -- Continue --> [active, priority queue (forceFallback)]
+[active, priority-fallback] -- Done on last item --> [active, empty state]
+[active, *] -- Exit --> [off]
+[active] -- Skip --> [active] (head rotates to tail; rotateQueue helper)
+```
+
+`FocusQueueState` (in `src/types.ts`) holds `{ items, source, inContinueMode }`. The state is rebuilt from scratch whenever the underlying TODO data changes (`todos-updated` event in the scanner invalidates `focusQueue` and re-renders). Skip is the only operation that mutates the in-memory queue without rebuilding.
+
+#### Settings
+
+| Setting | Default | Range | Purpose |
+|---|---|---|---|
+| `focusQueueLimit` | `1` | 1–5 | Max items shown at once. Slider in settings tab. |
+| `focusModePersist` | `true` | — | Whether `focusModeActive` survives session restart. When `false`, `focusModeActive` is reset to `false` on plugin load. |
+| `focusModeActive` | `false` | — | Persisted on/off state. Mutated by entry/exit handlers via the `setFocusModeActive` callback passed into the view. Not exposed as a user-facing setting. |
+
+Priority fallback is always on (no setting). The hint "No focus items — showing top priority" is rendered on the card whenever the queue source is `priority-fallback`.
+
+#### Class and file touchpoints
+
+- `src/utils.ts`: `buildFocusQueue`, `getItemDate`, `comparePriorityOnly`, `rotateQueue`, `isEffectivelyFocused`.
+- `src/types.ts`: `FocusQueueResult`, `FocusQueueSource`, `FocusQueueState`, `ItemDate`, `ItemDateKind`.
+- `src/SidebarView.ts`: `renderFocusCard`, `renderFocusItem`, `renderFocusCompletion`, `renderFocusEmpty`, `getActiveTodosForFocus`, `rebuildFocusQueue`, `getFocusVisibleTags`, plus `handleFocusEnter` / `handleFocusExit` / `handleFocusSkip` / `handleFocusContinue` / `handleFocusDone`.
+- `main.ts`: `setFocusModeActive` callback that writes to settings and saves; load-time reset for `focusModePersist=false`.
+- `styles.css`: `.sidebar-focus-mode-active` (font scale + chrome hidden via not-rendered, not via CSS) and `.focus-card-*` classes.
+
+#### Out of scope (v1)
+
+- Custom keyboard shortcuts for Done/Skip/Exit (standard tab+Enter/Space works).
+- Multi-entry mode for header TODOs (header + children = single entry).
+- Animations on advance.
+- Surrounding-context preview from the source file.
+- Configurable font scale.
 
 ### Priority in projects
 
@@ -179,7 +266,7 @@ Projects track two priority-related fields:
 - `highestPriority`: The best (lowest) priority value among all items in the project
 - `hasFocusItems`: Whether any item in the project has the `#focus` tag
 
-In focus mode, projects filter to show only those with `hasFocusItems = true`.
+`hasFocusItems` is used as a sort tier — projects with focus items sort first.
 
 ## Filter Syntax
 

@@ -1,5 +1,7 @@
 # Focus Mode redesign — OUTLINE
 
+> **Status:** Shipped in v0.10.0 – v0.12.1. Kept as a design archive. Cross-refs: [`focus-mode-IDEAS.md`](focus-mode-IDEAS.md), [`focus-mode-PLAN.md`](focus-mode-PLAN.md).
+
 ## Summary
 
 Replace the existing focus filter with an immersive single-task Focus Mode. When toggled on, the sidebar replaces its content with one focus card showing the next task in detail. Completing or skipping advances a queue. When the queue empties, a friendly completion state offers exit or continuation into the priority queue.

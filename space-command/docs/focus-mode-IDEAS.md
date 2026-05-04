@@ -1,10 +1,12 @@
 # Focus Mode redesign — IDEAS
 
+> **Status:** Shipped in v0.10.0 – v0.12.1. Kept as a design archive. Cross-refs: [`focus-mode-OUTLINE.md`](focus-mode-OUTLINE.md), [`focus-mode-PLAN.md`](focus-mode-PLAN.md).
+
 ## Summary
 
 Today's "Focus Mode" is a filter: toggle the eye icon and the sidebar hides everything except `#focus` items. The proposal is to replace this with an immersive single-task mode: one TODO at a time, large, with rich detail, and a sequential progression as items are completed.
 
-This document captures alternatives considered, tradeoffs, and the decisions that resulted from the ideation pass. The structured outcome lives in `OUTLINE.md`.
+This document captures alternatives considered, tradeoffs, and the decisions that resulted from the ideation pass. The structured outcome lives in `focus-mode-OUTLINE.md`.
 
 ## Problem
 

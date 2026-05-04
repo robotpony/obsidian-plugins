@@ -1,6 +1,8 @@
 # Space Command: Focus Mode redesign
 
-Replace the existing focus filter (eye-icon toggle that hides non-`#focus` items) with an immersive single-task Focus Mode. See `IDEAS.md` and `OUTLINE.md` for the design rationale and full spec. This plan maps the spec to implementation phases.
+> **Status:** All phases complete (v0.10.0 → v0.12.1). Kept as a delivery archive. The shipped behaviour is documented in [`../DESIGN.md`](../DESIGN.md) under "Immersive Focus Mode".
+
+Replace the existing focus filter (eye-icon toggle that hides non-`#focus` items) with an immersive single-task Focus Mode. See [`focus-mode-IDEAS.md`](focus-mode-IDEAS.md) and [`focus-mode-OUTLINE.md`](focus-mode-OUTLINE.md) for the design rationale and full spec. This plan maps the spec to implementation phases.
 
 ## Summary of behavior change
 
@@ -169,9 +171,11 @@ Existing `.todo-focus` and `.project-focus` background tinting stays — those c
 
 ---
 
-## Phase 3: Wire up persistence and replace the old filter
+## Phase 3: Wire up persistence and replace the old filter ✓ done
 
 This phase makes the toggle live and removes the old filter UI/code paths.
+
+**Status:** Completed in v0.12.0. The legacy `focusModeEnabled` runtime flag and `focusModeIncludeProjects` setting are gone, along with ~10 filter branches across `renderActiveTodos`, `renderProjects`, `renderPrinciples`, `renderActiveIdeas`, and the Ideas tab header. The eye-icon button on the Projects section now enters immersive Focus Mode directly via `handleFocusEnter` (no toggle state). The Phase 2 hamburger menu entry was removed as redundant. The Ideas-tab eye icon is gone (focus mode is now TODO-centric). Persistence is wired via a `setFocusModeActive` callback passed into the view; main.ts saves to settings on every change. `focusModePersist=false` resets `focusModeActive` to false on plugin load. Exit restores the prior tab and scroll position. DESIGN.md and README.md updated to describe the new behaviour.
 
 ### 3a. Persistence
 
@@ -200,7 +204,9 @@ If snapshotting proves messy, accept "always restore TODOs tab at top" as the v1
 
 ---
 
-## Phase 4: Docs and version
+## Phase 4: Docs and version ✓ done
+
+Per-phase docs and version bumps landed at 0.10.0 (Phase 1), 0.11.0 (Phase 2), and 0.12.0 (Phase 3). The dedicated docs pass landed at 0.12.1: DESIGN.md gained a full Focus Mode subsection (state machine, queue computation, settings table, class touchpoints), and the design artifacts (`IDEAS.md`, `OUTLINE.md`, `plan.md`) were moved to `docs/` as a delivery archive matching the existing `mentions-*` and `moved-tag-*` naming convention.
 
 ### 4a. DESIGN.md
 

@@ -18,7 +18,6 @@ export class TodoSidebarView extends ItemView {
   private contextMenuHandler: ContextMenuHandler;
   private activeTodosLimit: number;
   private focusListLimit: number;
-  private focusModeIncludeProjects: boolean;
   private makeLinksClickable: boolean;
   private triageSnoozedThreshold: number;
   private triageActiveThreshold: number;
@@ -27,11 +26,14 @@ export class TodoSidebarView extends ItemView {
   private activeAssigneeFilter: string | null = null;
   private teamManager: TeamManager;
   private defaultAssignee: string;
-  private focusModeEnabled: boolean = false;
-  // Phase 2: immersive focus mode state. Distinct from focusModeEnabled (the legacy filter).
+  // Immersive focus mode state.
   private focusQueueLimit: number;
   private focusModeActive: boolean = false;
   private focusQueue: FocusQueueState | null = null;
+  private setFocusModeActive: (active: boolean) => Promise<void>;
+  // Snapshot for restoring sidebar position on Exit.
+  private prevActiveTab: 'todos' | 'ideas' | 'snoozed' | null = null;
+  private prevScrollTop: number = 0;
   private openDropdown: HTMLElement | null = null;
   private openDropdownTrigger: HTMLElement | null = null;
   private openInfoPopup: HTMLElement | null = null;
@@ -48,7 +50,6 @@ export class TodoSidebarView extends ItemView {
     priorityTags: string[],
     activeTodosLimit: number,
     focusListLimit: number,
-    focusModeIncludeProjects: boolean,
     makeLinksClickable: boolean,
     triageSnoozedThreshold: number,
     triageActiveThreshold: number,
@@ -59,7 +60,8 @@ export class TodoSidebarView extends ItemView {
     teamManager?: TeamManager,
     defaultAssignee: string = "",
     focusQueueLimit: number = 1,
-    focusModeActive: boolean = false
+    focusModeActive: boolean = false,
+    setFocusModeActive: (active: boolean) => Promise<void> = async () => {}
   ) {
     super(leaf);
     this.scanner = scanner;
@@ -68,7 +70,6 @@ export class TodoSidebarView extends ItemView {
     this.defaultTodoneFile = defaultTodoneFile;
     this.activeTodosLimit = activeTodosLimit;
     this.focusListLimit = focusListLimit;
-    this.focusModeIncludeProjects = focusModeIncludeProjects;
     this.makeLinksClickable = makeLinksClickable;
     this.triageSnoozedThreshold = triageSnoozedThreshold;
     this.triageActiveThreshold = triageActiveThreshold;
@@ -79,6 +80,7 @@ export class TodoSidebarView extends ItemView {
     this.defaultAssignee = defaultAssignee;
     this.focusQueueLimit = focusQueueLimit;
     this.focusModeActive = focusModeActive;
+    this.setFocusModeActive = setFocusModeActive;
 
     // Initialize context menu handler
     this.contextMenuHandler = new ContextMenuHandler(
@@ -855,14 +857,6 @@ export class TodoSidebarView extends ItemView {
           .onClick(() => this.onShowTriage());
       });
 
-      // Enter Focus Mode (Phase 2 entry point — eye icon takes over in Phase 3)
-      menu.addItem((item) => {
-        item
-          .setTitle("Enter focus mode")
-          .setIcon("target")
-          .onClick(() => this.handleFocusEnter());
-      });
-
       // Stats
       menu.addItem((item) => {
         item
@@ -941,22 +935,6 @@ export class TodoSidebarView extends ItemView {
 
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
     titleSpan.textContent = "Focus";
-
-    // Focus mode toggle button (eye icon) - shared with TODOs tab
-    const focusModeBtn = header.createEl("button", {
-      cls: `clickable-icon focus-mode-toggle-btn${this.focusModeEnabled ? ' active' : ''}`,
-      attr: { "aria-label": this.focusModeEnabled ? "Show all items" : "Show only focused" },
-    });
-    // Eye-off icon when focus mode is ON (filtering), eye icon when OFF (showing all)
-    focusModeBtn.innerHTML = this.focusModeEnabled
-      ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>'
-      : '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
-
-    focusModeBtn.addEventListener("click", () => {
-      this.focusModeEnabled = !this.focusModeEnabled;
-      showNotice(this.focusModeEnabled ? "Focus mode enabled" : "Focus mode disabled");
-      this.render();
-    });
 
     this.renderFilterIndicator(header);
   }
@@ -1251,32 +1229,21 @@ export class TodoSidebarView extends ItemView {
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
     titleSpan.textContent = "Focus";
 
-    // Focus mode toggle button (eye icon)
+    // Eye icon — single click enters immersive Focus Mode. The icon is only
+    // ever visible in normal mode (Focus Mode hides the entire sidebar chrome),
+    // so there is no toggle/active state to render.
     const focusModeBtn = header.createEl("button", {
-      cls: `clickable-icon focus-mode-toggle-btn${this.focusModeEnabled ? ' active' : ''}`,
-      attr: { "aria-label": this.focusModeEnabled ? "Show all projects" : "Show only focused" },
+      cls: "clickable-icon focus-mode-toggle-btn",
+      attr: { "aria-label": "Enter focus mode" },
     });
-    // Eye-off icon when focus mode is ON (filtering), eye icon when OFF (showing all)
-    focusModeBtn.innerHTML = this.focusModeEnabled
-      ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>'
-      : '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
-
-    focusModeBtn.addEventListener("click", () => {
-      this.focusModeEnabled = !this.focusModeEnabled;
-      showNotice(this.focusModeEnabled ? "Focus mode enabled" : "Focus mode disabled");
-      this.render();
-    });
+    focusModeBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+    focusModeBtn.addEventListener("click", () => this.handleFocusEnter());
 
     this.renderFilterIndicator(header);
 
-    // Apply focus mode filter if enabled
-    if (this.focusModeEnabled) {
-      projects = projects.filter(p => p.hasFocusItems);
-    }
-
     if (projects.length === 0) {
       section.createEl("div", {
-        text: this.focusModeEnabled ? "No focused projects" : "No focus projects yet",
+        text: "No focus projects yet",
         cls: "todo-empty",
       });
       return;
@@ -1543,27 +1510,8 @@ export class TodoSidebarView extends ItemView {
       !todo.tags.includes("#ideation")
     );
 
-    // Filter out child items (they'll be rendered under their parent header)
-    // Exception: In focus mode, keep children with #focus so they appear standalone
-    // BUT only if their parent header doesn't also have #focus (to avoid duplicates)
-    if (this.focusModeEnabled) {
-      todos = todos.filter(todo => {
-        if (todo.parentLineNumber === undefined) {
-          return true; // Top-level items always kept
-        }
-        if (!hasTag(todo.tags, "#focus")) {
-          return false; // Child without focus, filter out
-        }
-        // Child with #focus - check if parent also has #focus
-        const parent = this.scanner.getTodos().find(
-          t => t.filePath === todo.filePath && t.lineNumber === todo.parentLineNumber
-        );
-        // If parent has #focus, child will be shown under it, so filter out standalone
-        return !hasTag(parent?.tags || [], "#focus");
-      });
-    } else {
-      todos = todos.filter(todo => todo.parentLineNumber === undefined);
-    }
+    // Filter out child items (they'll be rendered under their parent header).
+    todos = todos.filter(todo => todo.parentLineNumber === undefined);
 
     // Filter out header TODOs where all children are complete, snoozed, or non-existent
     // This prevents users from having to mark headers done redundantly
@@ -1646,24 +1594,6 @@ export class TodoSidebarView extends ItemView {
       }
     }
 
-    // Apply focus mode filter if enabled
-    if (this.focusModeEnabled) {
-      if (this.focusModeIncludeProjects) {
-        // Get project tags from focused projects (those with #focus items)
-        const focusedProjects = this.projectManager.getProjects()
-          .filter(p => p.hasFocusItems)
-          .map(p => p.tag);
-        // Show #focus items or items from focused projects
-        todos = todos.filter(todo =>
-          hasTag(todo.tags, "#focus") ||
-          todo.tags.some(tag => focusedProjects.includes(tag))
-        );
-      } else {
-        // Show only #focus items
-        todos = todos.filter(todo => hasTag(todo.tags, "#focus"));
-      }
-    }
-
     // Sort by focus, priority, then tag count
     // Pass the full todos list for accurate child priority lookup
     todos = this.sortTodosByPriority(todos, allTodosForChildLookup);
@@ -1685,12 +1615,9 @@ export class TodoSidebarView extends ItemView {
     this.renderFilterIndicator(header);
 
     if (totalCount === 0) {
-      let emptyText = "No TODOs";
-      if (this.focusModeEnabled) {
-        emptyText = "No focused TODOs";
-      } else if (this.activeTagFilter) {
-        emptyText = `No TODOs matching ${this.activeTagFilter}`;
-      }
+      const emptyText = this.activeTagFilter
+        ? `No TODOs matching ${this.activeTagFilter}`
+        : "No TODOs";
       section.createEl("div", {
         text: emptyText,
         cls: "todo-empty",
@@ -1899,24 +1826,6 @@ export class TodoSidebarView extends ItemView {
     // Filter out child items (they'll be rendered under their parent header)
     principles = principles.filter(p => p.parentLineNumber === undefined);
 
-    // Apply focus mode filter if enabled
-    if (this.focusModeEnabled) {
-      if (this.focusModeIncludeProjects) {
-        // Get project tags from focused projects (those with #focus items)
-        const focusedProjects = this.projectManager.getProjects()
-          .filter(p => p.hasFocusItems)
-          .map(p => p.tag);
-        // Show #focus items or items from focused projects
-        principles = principles.filter(p =>
-          hasTag(p.tags, "#focus") ||
-          p.tags.some(tag => focusedProjects.includes(tag))
-        );
-      } else {
-        // Show only #focus items
-        principles = principles.filter(p => hasTag(p.tags, "#focus"));
-      }
-    }
-
     // Apply tag filter if active
     if (this.activeTagFilter) {
       principles = principles.filter(p => p.tags.includes(this.activeTagFilter!));
@@ -1933,9 +1842,9 @@ export class TodoSidebarView extends ItemView {
     this.renderFilterIndicator(header);
 
     if (principles.length === 0) {
-      const emptyText = this.focusModeEnabled
-        ? (this.focusModeIncludeProjects ? "No principles in focused projects" : "No focused principles")
-        : (this.activeTagFilter ? `No principles matching ${this.activeTagFilter}` : "No principles yet");
+      const emptyText = this.activeTagFilter
+        ? `No principles matching ${this.activeTagFilter}`
+        : "No principles yet";
       section.createEl("div", {
         text: emptyText,
         cls: "todo-empty",
@@ -1970,24 +1879,6 @@ export class TodoSidebarView extends ItemView {
     // Filter out child items (they'll be rendered under their parent header)
     ideas = ideas.filter(idea => idea.parentLineNumber === undefined);
 
-    // Apply focus mode filter if enabled
-    if (this.focusModeEnabled) {
-      if (this.focusModeIncludeProjects) {
-        // Get project tags from focused projects (those with #focus items)
-        const focusedProjects = this.projectManager.getProjects()
-          .filter(p => p.hasFocusItems)
-          .map(p => p.tag);
-        // Show #focus items or items from focused projects
-        ideas = ideas.filter(idea =>
-          hasTag(idea.tags, "#focus") ||
-          idea.tags.some(tag => focusedProjects.includes(tag))
-        );
-      } else {
-        // Show only #focus items
-        ideas = ideas.filter(idea => hasTag(idea.tags, "#focus"));
-      }
-    }
-
     // Apply tag filter if active
     if (this.activeTagFilter) {
       ideas = ideas.filter(idea => idea.tags.includes(this.activeTagFilter!));
@@ -2005,9 +1896,9 @@ export class TodoSidebarView extends ItemView {
     this.renderFilterIndicator(header);
 
     if (ideas.length === 0) {
-      const emptyText = this.focusModeEnabled
-        ? (this.focusModeIncludeProjects ? "No ideas in focused projects" : "No focused ideas")
-        : (this.activeTagFilter ? `No ideas matching ${this.activeTagFilter}` : "No ideas yet");
+      const emptyText = this.activeTagFilter
+        ? `No ideas matching ${this.activeTagFilter}`
+        : "No ideas yet";
       section.createEl("div", {
         text: emptyText,
         cls: "todo-empty",
@@ -2339,8 +2230,14 @@ export class TodoSidebarView extends ItemView {
   }
 
   private handleFocusEnter(): void {
+    // Snapshot the user's place in the sidebar so Exit can restore it.
+    this.prevActiveTab = this.activeTab;
+    const scrollEl = this.containerEl.children[1] as HTMLElement | undefined;
+    this.prevScrollTop = scrollEl?.scrollTop ?? 0;
+
     this.focusModeActive = true;
     this.focusQueue = null; // build fresh on render
+    void this.setFocusModeActive(true);
     this.render();
   }
 
@@ -2360,9 +2257,21 @@ export class TodoSidebarView extends ItemView {
   }
 
   private handleFocusExit(): void {
+    if (this.prevActiveTab) {
+      this.activeTab = this.prevActiveTab;
+      this.prevActiveTab = null;
+    }
     this.focusModeActive = false;
     this.focusQueue = null;
+    void this.setFocusModeActive(false);
     this.render();
+
+    // Restore prior scroll position after the new render has committed.
+    const scrollEl = this.containerEl.children[1] as HTMLElement | undefined;
+    if (scrollEl) {
+      scrollEl.scrollTop = this.prevScrollTop;
+    }
+    this.prevScrollTop = 0;
   }
 
   private handleFocusContinue(): void {

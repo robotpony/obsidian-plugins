@@ -46,6 +46,13 @@ export default class SpaceCommandPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
 
+    // If the user has opted out of persisting Focus Mode across sessions, reset
+    // the persisted active flag at startup so the sidebar opens in normal mode.
+    if (!this.settings.focusModePersist && this.settings.focusModeActive) {
+      this.settings.focusModeActive = false;
+      await this.saveSettings();
+    }
+
     // Initialize sidebar manager
     this.sidebarManager = new SidebarManager(this.app, VIEW_TYPE_TODO_SIDEBAR);
 
@@ -199,7 +206,6 @@ export default class SpaceCommandPlugin extends Plugin {
           this.settings.priorityTags,
           this.settings.activeTodosLimit,
           this.settings.focusListLimit,
-          this.settings.focusModeIncludeProjects,
           this.settings.makeLinksClickable,
           this.settings.triageSnoozedThreshold,
           this.settings.triageActiveThreshold,
@@ -210,7 +216,11 @@ export default class SpaceCommandPlugin extends Plugin {
           this.teamManager,
           this.settings.defaultAssignee,
           this.settings.focusQueueLimit,
-          this.settings.focusModeActive
+          this.settings.focusModeActive,
+          async (active: boolean) => {
+            this.settings.focusModeActive = active;
+            await this.saveSettings();
+          }
         )
     );
 
@@ -1032,18 +1042,6 @@ class SpaceCommandSettingTab extends PluginSettingTab {
               this.plugin.settings.activeTodosLimit = num;
               await this.plugin.saveSettings();
             }
-          })
-      );
-
-    new Setting(containerEl)
-      .setName("Focus mode includes project TODOs")
-      .setDesc("When enabled, focus mode shows all TODOs from focused projects (not just #focus items)")
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.focusModeIncludeProjects)
-          .onChange(async (value) => {
-            this.plugin.settings.focusModeIncludeProjects = value;
-            await this.plugin.saveSettings();
           })
       );
 
