@@ -520,31 +520,34 @@ export class EmbedRenderer {
       });
     }
 
-    // Create checkbox
-    const checkbox = rowContainer.createEl("input", {
-      type: "checkbox",
-      cls: "task-list-item-checkbox",
-    });
+    // Create checkbox. Header items with children no longer get one — the
+    // cascade-complete behaviour was too easy to trigger by accident.
+    if (!hasChildren) {
+      const checkbox = rowContainer.createEl("input", {
+        type: "checkbox",
+        cls: "task-list-item-checkbox",
+      });
 
-    if (isCompleted) {
-      checkbox.checked = true;
-      checkbox.disabled = true;
-    }
-
-    checkbox.addEventListener("change", async () => {
-      if (isCompleted) return;
-      checkbox.disabled = true;
-      const success = await this.processor.completeTodo(todo, todoneFile);
-      if (success) {
-        // Refresh the entire embed
-        const container = list.closest('.space-command-embed') as HTMLElement;
-        if (container) {
-          this.refreshEmbed(container, todoneFile, filterString);
-        }
-      } else {
-        checkbox.disabled = false;
+      if (isCompleted) {
+        checkbox.checked = true;
+        checkbox.disabled = true;
       }
-    });
+
+      checkbox.addEventListener("change", async () => {
+        if (isCompleted) return;
+        checkbox.disabled = true;
+        const success = await this.processor.completeTodo(todo, todoneFile);
+        if (success) {
+          // Refresh the entire embed
+          const container = list.closest('.space-command-embed') as HTMLElement;
+          if (container) {
+            this.refreshEmbed(container, todoneFile, filterString);
+          }
+        } else {
+          checkbox.disabled = false;
+        }
+      });
+    }
 
     // Add todo text (without the #todo/#todone tag)
     const textSpan = rowContainer.createEl("span", { cls: "todo-text" });

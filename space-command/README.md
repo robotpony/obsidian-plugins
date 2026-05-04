@@ -119,7 +119,7 @@ Add `#todo` to a heading—all list items below become children:
 - Update docs
 ```
 
-Completing the header completes all children. Sort buttons appear inline to re-sort children by priority tag.
+Children are completed individually — header TODOs with children don't get a checkbox in the sidebar or in embeds, so you won't accidentally bulk-complete a whole block. Sort buttons appear inline to re-sort children by priority tag. ("Move to..." still relocates the entire block — header plus children — to another file.)
 
 ## Embed and Filter
 

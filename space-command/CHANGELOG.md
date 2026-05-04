@@ -2,18 +2,39 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.13.0] - 2026-05-04
+
+### Changed — Header TODO completion semantics
+
+Header TODOs that contain children no longer have a checkbox in the sidebar or in `{{focus-todos}}` embeds. Completing a header used to cascade-complete every child in the block, which was easy to trigger by accident from a single click.
+
+- **Sidebar**: Header items with children are rendered without their checkbox. Children are completed individually.
+- **Embeds**: Same — header items with children show no checkbox.
+- **Processor**: `completeTodo()` refuses to act on a header-with-children and shows a notice. The dead `completeChildrenLines` helper was removed. The "Move to..." action still bundles header + children (unchanged).
+
+### Changed — Focus Mode queue surfaces children directly
+
+Header TODOs with children no longer appear in the immersive Focus Mode queue. Their children are eligible queue entries instead, with the parent header text shown as a `From <header>` context line above the focus card title.
+
+- `buildFocusQueue` candidate filter updated: header-with-children entries dropped; bold subheading dividers dropped; children eligible.
+- `renderFocusItem` adds a `.focus-card-from` row when the active item has a `parentLineNumber`.
+- The dead "render children inside the focus card" block was removed (it's unreachable now that header-with-children entries don't reach the focus card).
+
+### Tests
+
+- Updated 2 tests to reflect the new "child stands in for header" semantics; added 2 new tests covering leaf-header inclusion and subheading-divider exclusion. 108 tests, all passing.
+
 ## [0.12.1] - 2026-05-04
 
-### Documentation — Focus Mode redesign, Phase 4
+### Documentation — Focus Mode redesign, Phase 4 + cleanup pass
 
-Documentation pass closing out the Focus Mode redesign. No behaviour change.
+Documentation pass closing out the Focus Mode redesign and tidying the project's docs tree. No behaviour change.
 
-- **`DESIGN.md`** Focus Mode section expanded: queue computation pseudocode, full state machine, settings table, and class/file touchpoint listing. Cross-references the design archive in `docs/`.
-- **Design archive** moved to `docs/` matching the existing `mentions-*` and `moved-tag-*` convention:
-  - `IDEAS.md` → `docs/focus-mode-IDEAS.md`
-  - `OUTLINE.md` → `docs/focus-mode-OUTLINE.md`
-  - `plan.md` → `docs/focus-mode-PLAN.md`
-  Each gets a "shipped" status banner and updated cross-refs.
+- **`DESIGN.md`** Focus Mode section expanded: queue computation pseudocode, full state machine, settings table, and class/file touchpoint listing.
+- **Top-level cleanup**: pre-implementation design artifacts (`IDEAS.md`, `OUTLINE.md`, `plan.md`) removed from the project root.
+- **`docs/` cleanup**: completed implementation plans removed now that their features are shipped and documented in `DESIGN.md` and the surviving feature reference docs:
+  - Deleted: `focus-mode-IDEAS.md`, `focus-mode-OUTLINE.md`, `focus-mode-PLAN.md`, `mentions-PLAN.md`, `moved-tag-PLAN.md`.
+  - Kept: `mentions-ARCHITECTURE.md`, `mentions-DESIGN.md`, `moved-tag-ARCHITECTURE.md` (feature reference, not plans).
 
 ## [0.12.0] - 2026-05-04
 

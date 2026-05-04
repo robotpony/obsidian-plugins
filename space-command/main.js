@@ -286,16 +286,21 @@ function comparePriorityOnly(a, b, allItems) {
 }
 function buildFocusQueue(activeTodos, limit, options = {}) {
   const safeLimit = Math.max(1, Math.floor(limit));
-  const candidates = activeTodos.filter(
-    (t) => t.parentLineNumber === void 0 && !isSnoozed(t.tags)
-  );
+  const candidates = activeTodos.filter((t) => {
+    if (isSnoozed(t.tags))
+      return false;
+    if (t.isSubheading)
+      return false;
+    if (t.isHeader && t.childLineNumbers && t.childLineNumbers.length > 0) {
+      return false;
+    }
+    return true;
+  });
   if (candidates.length === 0) {
     return { items: [], source: "empty" };
   }
   if (!options.forceFallback) {
-    const focused = candidates.filter(
-      (t) => isEffectivelyFocused(t, activeTodos)
-    );
+    const focused = candidates.filter((t) => hasTag(t.tags, "#focus"));
     if (focused.length > 0) {
       const sorted2 = [...focused].sort(
         (a, b) => compareWithEffectivePriority(a, b, activeTodos)
@@ -996,12 +1001,12 @@ var TodoProcessor = class {
     this.onMoveHistoryUpdate = callback;
   }
   async completeTodo(todo, todoneFilePath) {
-    var _a;
+    if (todo.isHeader && todo.childLineNumbers && todo.childLineNumbers.length > 0) {
+      showNotice2("Header TODOs with children can't be completed directly. Complete each child instead.");
+      return false;
+    }
     try {
       const today = formatDate(/* @__PURE__ */ new Date(), this.dateFormat);
-      if (todo.isHeader && todo.childLineNumbers && todo.childLineNumbers.length > 0) {
-        await this.completeChildrenLines(todo.file, todo.childLineNumbers, today);
-      }
       await this.updateSourceFile(todo, today);
       await this.appendToTodoneFile(todo, todoneFilePath, today);
       if (this.scanner) {
@@ -1010,37 +1015,13 @@ var TodoProcessor = class {
       if (this.onComplete) {
         this.onComplete();
       }
-      const childCount = ((_a = todo.childLineNumbers) == null ? void 0 : _a.length) || 0;
-      const message = childCount > 0 ? `TODO marked as complete! (including ${childCount} child item${childCount > 1 ? "s" : ""})` : "TODO marked as complete!";
-      showNotice2(message);
+      showNotice2("TODO marked as complete!");
       return true;
     } catch (error) {
       console.error("Error completing TODO:", error);
       showNotice2("Failed to complete TODO. See console for details.");
       return false;
     }
-  }
-  // Complete all child lines of a header TODO
-  async completeChildrenLines(file, lineNumbers, date) {
-    const content = await this.app.vault.read(file);
-    const lines = content.split("\n");
-    for (const lineNum of lineNumbers) {
-      if (lineNum >= lines.length)
-        continue;
-      let line = lines[lineNum];
-      if (!line.includes("#todone")) {
-        if (line.includes("#todo")) {
-          line = replaceTodoWithTodone(line, date);
-        } else {
-          line = line.trimEnd() + ` #todone @${date}`;
-        }
-      }
-      if (/\[\s*\]/.test(line)) {
-        line = markCheckboxComplete(line);
-      }
-      lines[lineNum] = line;
-    }
-    await this.app.vault.modify(file, lines.join("\n"));
   }
   async uncompleteTodo(todo) {
     try {
@@ -2723,28 +2704,30 @@ var EmbedRenderer = class {
         });
       });
     }
-    const checkbox = rowContainer.createEl("input", {
-      type: "checkbox",
-      cls: "task-list-item-checkbox"
-    });
-    if (isCompleted) {
-      checkbox.checked = true;
-      checkbox.disabled = true;
-    }
-    checkbox.addEventListener("change", async () => {
-      if (isCompleted)
-        return;
-      checkbox.disabled = true;
-      const success = await this.processor.completeTodo(todo, todoneFile);
-      if (success) {
-        const container = list.closest(".space-command-embed");
-        if (container) {
-          this.refreshEmbed(container, todoneFile, filterString);
-        }
-      } else {
-        checkbox.disabled = false;
+    if (!hasChildren) {
+      const checkbox = rowContainer.createEl("input", {
+        type: "checkbox",
+        cls: "task-list-item-checkbox"
+      });
+      if (isCompleted) {
+        checkbox.checked = true;
+        checkbox.disabled = true;
       }
-    });
+      checkbox.addEventListener("change", async () => {
+        if (isCompleted)
+          return;
+        checkbox.disabled = true;
+        const success = await this.processor.completeTodo(todo, todoneFile);
+        if (success) {
+          const container = list.closest(".space-command-embed");
+          if (container) {
+            this.refreshEmbed(container, todoneFile, filterString);
+          }
+        } else {
+          checkbox.disabled = false;
+        }
+      });
+    }
     const textSpan = rowContainer.createEl("span", { cls: "todo-text" });
     if (isCompleted) {
       textSpan.addClass("todone-text");
@@ -3932,7 +3915,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       });
     }
     const rowContainer = hasChildren ? listItem.createEl("div", { cls: `${config.classPrefix}-header-row` }) : listItem;
-    if (config.showCheckbox && config.onComplete) {
+    if (config.showCheckbox && config.onComplete && !hasChildren) {
       const checkbox = rowContainer.createEl("input", {
         type: "checkbox",
         cls: `${config.classPrefix}-checkbox`
@@ -5203,6 +5186,19 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     const counter = card.createEl("div", { cls: "focus-card-counter" });
     counter.appendText(`FOCUS  (1 of ${state.items.length})`);
     const item = state.items[0];
+    if (item.parentLineNumber !== void 0) {
+      const parent = this.scanner.getTodos().find(
+        (t) => t.filePath === item.filePath && t.lineNumber === item.parentLineNumber
+      );
+      if (parent) {
+        const parentClean = parent.text.replace(/^#{1,6}\s+/, "").replace(this.todoConfig.tagToStrip, "").replace(/#[\w-]+/g, "").replace(/@[\w][\w.-]*/g, "").replace(/\s+/g, " ").trim();
+        if (parentClean) {
+          const fromEl = card.createEl("div", { cls: "focus-card-from" });
+          fromEl.createEl("span", { cls: "focus-card-from-label", text: "From " });
+          fromEl.createEl("span", { cls: "focus-card-from-text", text: parentClean });
+        }
+      }
+    }
     const titleEl = card.createEl("div", { cls: "focus-card-title" });
     const titleConfig = this.todoConfig;
     const cleanTitle = item.text.replace(titleConfig.tagToStrip, "").trim();
@@ -5258,40 +5254,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       const blockEnd = ((_a2 = item.childLineNumbers) == null ? void 0 : _a2.length) ? Math.max(...item.childLineNumbers) : void 0;
       openFileAtLine(this.app, item.file, item.lineNumber, blockEnd);
     });
-    const isHeader = item.isHeader === true;
-    const hasChildren = isHeader && item.childLineNumbers && item.childLineNumbers.length > 0;
-    if (hasChildren) {
-      const childContainer = card.createEl("div", { cls: "focus-card-children" });
-      const childList = childContainer.createEl("ul", { cls: "todo-children focus-card-child-list" });
-      const allItems = this.scanner.getTodos();
-      const headerTags = extractTags(item.text).filter((tag) => !this.todoConfig.tagToStrip.test(tag));
-      const childItems = item.childLineNumbers.map(
-        (ln) => {
-          var _a2;
-          return (_a2 = allItems.find((t) => t.filePath === item.filePath && t.lineNumber === ln)) != null ? _a2 : null;
-        }
-      );
-      for (let idx = 0; idx < childItems.length; idx++) {
-        const child = childItems[idx];
-        if (!child)
-          continue;
-        if (child.isSubheading) {
-          let hasTasks = false;
-          for (let k = idx + 1; k < childItems.length; k++) {
-            const next = childItems[k];
-            if (!next)
-              continue;
-            if (next.isSubheading)
-              break;
-            hasTasks = true;
-            break;
-          }
-          if (!hasTasks)
-            continue;
-        }
-        this.renderListItem(childList, child, this.todoConfig, true, headerTags);
-      }
-    }
     const actions = card.createEl("div", { cls: "focus-card-actions" });
     const doneBtn = actions.createEl("button", { cls: "focus-card-btn focus-card-btn-done", text: "Done" });
     doneBtn.addEventListener("click", () => this.handleFocusDone(item));

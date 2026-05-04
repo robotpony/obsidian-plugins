@@ -118,7 +118,7 @@ describe("buildFocusQueue", () => {
     expect(result.items[0].text).toBe("A");
   });
 
-  it("treats a header as a single queue entry when its child has #focus", () => {
+  it("makes the focused child a queue entry, not its parent header", () => {
     const header = makeTodo({
       text: "Project header",
       tags: ["#todo"],
@@ -140,13 +140,13 @@ describe("buildFocusQueue", () => {
     });
     const result = buildFocusQueue([header, child1, child2], 5);
     expect(result.source).toBe("focus-tagged");
-    // Only the header should be a queue entry — children are not independent queue items.
+    // The focused child stands in for the header — header is excluded entirely.
     expect(result.items).toHaveLength(1);
-    expect(result.items[0].text).toBe("Project header");
-    expect(result.items[0].isHeader).toBe(true);
+    expect(result.items[0].text).toBe("Child A");
+    expect(result.items[0].parentLineNumber).toBe(0);
   });
 
-  it("excludes children of focused headers from the queue (no duplicates)", () => {
+  it("excludes header-with-children entries from the queue", () => {
     const header = makeTodo({
       text: "Header",
       tags: ["#todo", "#focus"],
@@ -161,7 +161,45 @@ describe("buildFocusQueue", () => {
       parentLineNumber: 0,
     });
     const result = buildFocusQueue([header, child], 5);
-    expect(result.items.map(i => i.text)).toEqual(["Header"]);
+    // Even though the header itself has #focus, header-with-children is not a queue entry.
+    expect(result.items.map(i => i.text)).toEqual(["Child"]);
+  });
+
+  it("includes a leaf header (no children) as a queue entry", () => {
+    const leafHeader = makeTodo({
+      text: "Standalone header",
+      tags: ["#todo", "#focus"],
+      isHeader: true,
+      lineNumber: 0,
+    });
+    const result = buildFocusQueue([leafHeader], 5);
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].text).toBe("Standalone header");
+  });
+
+  it("excludes bold-subheading dividers from the queue", () => {
+    const header = makeTodo({
+      text: "Header",
+      tags: ["#todo"],
+      isHeader: true,
+      lineNumber: 0,
+      childLineNumbers: [1, 2],
+    });
+    const subheading = makeTodo({
+      text: "**Section** #focus",
+      tags: ["#focus"],
+      lineNumber: 1,
+      parentLineNumber: 0,
+    });
+    (subheading as TodoItem).isSubheading = true;
+    const child = makeTodo({
+      text: "Real task",
+      tags: ["#todo", "#focus"],
+      lineNumber: 2,
+      parentLineNumber: 0,
+    });
+    const result = buildFocusQueue([header, subheading, child], 5);
+    expect(result.items.map(i => i.text)).toEqual(["Real task"]);
   });
 
   it("filters out snoozed items from the focus queue", () => {

@@ -177,8 +177,6 @@ Priority is encoded numerically for sorting (lower value = higher priority):
 
 A sidebar-replacing single-task surface. When toggled on, the sidebar's normal content (tabs, summary, project list, TODO list) is hidden and replaced by a focus card showing one TODO at a time. Done advances the queue; Skip rotates the active item to the back of the queue; the in-card **Exit focus mode** link restores the sidebar.
 
-Design archive: [`docs/focus-mode-IDEAS.md`](docs/focus-mode-IDEAS.md), [`docs/focus-mode-OUTLINE.md`](docs/focus-mode-OUTLINE.md), [`docs/focus-mode-PLAN.md`](docs/focus-mode-PLAN.md).
-
 #### Entry and exit
 
 - **Entry:** Eye icon in the TODOs tab's Projects section header. Single-click flips `focusModeActive` and re-renders.

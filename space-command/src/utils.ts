@@ -307,18 +307,20 @@ export interface BuildFocusQueueOptions {
  * Build the queue of items to show in immersive Focus Mode.
  *
  * Behaviour:
- * 1. Curated queue: top-level items that are effectively focused (#focus on the
- *    item, or on any active child of a header item). Children of headers are
- *    never independent queue entries — the header is rendered with its children.
- * 2. Priority fallback: when no effectively-focused items exist (or when the
- *    caller passes `forceFallback: true`), pick the highest-priority top-level
- *    items instead. The card surfaces a hint when this happens.
+ * 1. Curated queue: items tagged `#focus` directly. Children of headers are
+ *    eligible as standalone queue entries (the focus card shows their parent
+ *    header text as context). Header items that have children are never
+ *    queue entries — the children represent them.
+ * 2. Priority fallback: when no #focus items exist (or when the caller passes
+ *    `forceFallback: true`), pick the highest-priority candidates instead.
+ *    The card surfaces a hint when this happens.
  * 3. Empty: no active items at all.
  *
  * Items are sorted using `compareWithEffectivePriority` and truncated to `limit`.
  *
  * The caller is responsible for filtering out completed items (#todone) before
- * passing them in. Snoozed items (#future / #snooze / #snoozed) are filtered here.
+ * passing them in. Snoozed items (#future / #snooze / #snoozed), header items
+ * with children, and bold subheading dividers are filtered here.
  */
 export function buildFocusQueue(
   activeTodos: TodoItem[],
@@ -327,19 +329,24 @@ export function buildFocusQueue(
 ): FocusQueueResult {
   const safeLimit = Math.max(1, Math.floor(limit));
 
-  // Drop snoozed items entirely; only top-level items are queue candidates.
-  const candidates = activeTodos.filter(
-    (t) => t.parentLineNumber === undefined && !isSnoozed(t.tags)
-  );
+  // Eligible candidates: standalone items, leaf headers, and children. Drop
+  // header-with-children entries (their children stand in for them) and
+  // bold-subheading dividers. Drop snoozed items.
+  const candidates = activeTodos.filter((t) => {
+    if (isSnoozed(t.tags)) return false;
+    if (t.isSubheading) return false;
+    if (t.isHeader && t.childLineNumbers && t.childLineNumbers.length > 0) {
+      return false;
+    }
+    return true;
+  });
 
   if (candidates.length === 0) {
     return { items: [], source: "empty" };
   }
 
   if (!options.forceFallback) {
-    const focused = candidates.filter((t) =>
-      isEffectivelyFocused(t, activeTodos)
-    );
+    const focused = candidates.filter((t) => hasTag(t.tags, "#focus"));
     if (focused.length > 0) {
       const sorted = [...focused].sort((a, b) =>
         compareWithEffectivePriority(a, b, activeTodos)

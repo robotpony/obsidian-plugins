@@ -376,8 +376,10 @@ export class TodoSidebarView extends ItemView {
       ? listItem.createEl("div", { cls: `${config.classPrefix}-header-row` })
       : listItem;
 
-    // Checkbox (if configured)
-    if (config.showCheckbox && config.onComplete) {
+    // Checkbox (if configured). Header items with children no longer get a
+    // checkbox — completing a header used to cascade-complete its children,
+    // which was easy to do accidentally. Children are completed individually.
+    if (config.showCheckbox && config.onComplete && !hasChildren) {
       const checkbox = rowContainer.createEl("input", {
         type: "checkbox",
         cls: `${config.classPrefix}-checkbox`,
@@ -2050,6 +2052,28 @@ export class TodoSidebarView extends ItemView {
 
     const item = state.items[0];
 
+    // Parent header context: when the item is a child of a header block, show
+    // the parent header's text above the title so the user has the framing.
+    if (item.parentLineNumber !== undefined) {
+      const parent = this.scanner.getTodos().find(
+        t => t.filePath === item.filePath && t.lineNumber === item.parentLineNumber
+      );
+      if (parent) {
+        const parentClean = parent.text
+          .replace(/^#{1,6}\s+/, "")                    // strip header markers
+          .replace(this.todoConfig.tagToStrip, "")      // strip #todo
+          .replace(/#[\w-]+/g, "")                      // strip remaining tags
+          .replace(/@[\w][\w.-]*/g, "")                 // strip mentions
+          .replace(/\s+/g, " ")
+          .trim();
+        if (parentClean) {
+          const fromEl = card.createEl("div", { cls: "focus-card-from" });
+          fromEl.createEl("span", { cls: "focus-card-from-label", text: "From " });
+          fromEl.createEl("span", { cls: "focus-card-from-text", text: parentClean });
+        }
+      }
+    }
+
     // Title
     const titleEl = card.createEl("div", { cls: "focus-card-title" });
     const titleConfig = this.todoConfig;
@@ -2113,36 +2137,6 @@ export class TodoSidebarView extends ItemView {
         : undefined;
       openFileAtLine(this.app, item.file, item.lineNumber, blockEnd);
     });
-
-    // Children (header TODOs render their child list inside the card)
-    const isHeader = item.isHeader === true;
-    const hasChildren = isHeader && item.childLineNumbers && item.childLineNumbers.length > 0;
-    if (hasChildren) {
-      const childContainer = card.createEl("div", { cls: "focus-card-children" });
-      const childList = childContainer.createEl("ul", { cls: "todo-children focus-card-child-list" });
-      const allItems = this.scanner.getTodos();
-      const headerTags = extractTags(item.text).filter(tag => !this.todoConfig.tagToStrip.test(tag));
-      const childItems = item.childLineNumbers!.map(ln =>
-        allItems.find(t => t.filePath === item.filePath && t.lineNumber === ln) ?? null
-      );
-      for (let idx = 0; idx < childItems.length; idx++) {
-        const child = childItems[idx];
-        if (!child) continue;
-        // Skip subheading dividers with no real items beneath them
-        if (child.isSubheading) {
-          let hasTasks = false;
-          for (let k = idx + 1; k < childItems.length; k++) {
-            const next = childItems[k];
-            if (!next) continue;
-            if (next.isSubheading) break;
-            hasTasks = true;
-            break;
-          }
-          if (!hasTasks) continue;
-        }
-        this.renderListItem(childList, child, this.todoConfig, true, headerTags);
-      }
-    }
 
     // Actions: Done + Skip
     const actions = card.createEl("div", { cls: "focus-card-actions" });
