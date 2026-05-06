@@ -2157,11 +2157,21 @@
   font-size: 1.4em;
 }
 
+/* The focus-mode header keeps the plugin's branding anchor visible without the
+   tabs/menu so the focus card has minimal distraction above it. The font-size
+   reset cancels the .sidebar-focus-mode-active font scale so the header reads
+   at normal sidebar size. */
+.sidebar-header-focus {
+  font-size: 0.71em;
+  padding: 4px 6px;
+}
+
 .focus-card {
   display: flex;
   flex-direction: column;
   gap: var(--size-4-3);
   padding: var(--size-4-4) var(--size-4-3);
+  margin-top: 2em;
 }
 
 .focus-card-from {

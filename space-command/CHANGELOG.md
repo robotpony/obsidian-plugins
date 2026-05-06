@@ -2,6 +2,15 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.14.2] - 2026-05-06
+
+### Changed — Focus Mode keeps the sidebar header
+
+The slim sidebar header (logo + `Focus` label) is now rendered above the focus card. It anchors the user in the plugin without bringing back the tab nav or menu. The focus card sits ~2em below it for breathing room.
+
+- The logo retains its click-for-About affordance.
+- No tabs, no menu button — exit is still via the link below the actions.
+
 ## [0.14.1] - 2026-05-06
 
 ### Changed — Focus Mode card polish

@@ -5160,6 +5160,11 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     };
   }
   renderFocusCard(container) {
+    const header = container.createEl("div", { cls: "sidebar-header sidebar-header-focus" });
+    const titleEl = header.createEl("h4", { cls: "sidebar-title" });
+    const logoEl = titleEl.createEl("span", { cls: "space-command-logo clickable-logo", text: "\u2423\u2318" });
+    logoEl.addEventListener("click", () => this.onShowAbout());
+    titleEl.appendText(" Focus");
     if (!this.focusQueue) {
       this.rebuildFocusQueue();
     }

@@ -2018,6 +2018,14 @@ export class TodoSidebarView extends ItemView {
   }
 
   private renderFocusCard(container: HTMLElement): void {
+    // Slim sidebar header — anchors the user in the plugin without the tab
+    // chrome. The "About" affordance on the logo still works.
+    const header = container.createEl("div", { cls: "sidebar-header sidebar-header-focus" });
+    const titleEl = header.createEl("h4", { cls: "sidebar-title" });
+    const logoEl = titleEl.createEl("span", { cls: "space-command-logo clickable-logo", text: "␣⌘" });
+    logoEl.addEventListener("click", () => this.onShowAbout());
+    titleEl.appendText(" Focus");
+
     if (!this.focusQueue) {
       this.rebuildFocusQueue();
     }
