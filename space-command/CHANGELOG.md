@@ -2,6 +2,12 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.14.9] - 2026-05-06
+
+### Changed — Focus card "open source" arrow
+
+The link to the source file moved from a chain icon hugging the source heading text to a `→` arrow on the far right of the `Focus:` row — same affordance the regular sidebar uses on every TODO row. One symbol now means the same thing in both views, so getting from the focus card back to document context doesn't require a recall.
+
 ## [0.14.8] - 2026-05-06
 
 ### Changed — Focus Mode header title

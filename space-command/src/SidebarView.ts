@@ -1945,7 +1945,9 @@ export class TodoSidebarView extends ItemView {
     const item = state.items[0];
 
     // Source heading: parent header text when available, otherwise file name.
-    // A small link icon follows the heading and opens the source on click.
+    // An arrow on the far right opens the source — same affordance as the
+    // arrows on each row in the regular sidebar, so the action reads the same
+    // in both views.
     const sourceHeadingText = this.getFocusSourceHeading(item);
     if (sourceHeadingText) {
       const fromEl = card.createEl("div", { cls: "focus-card-from" });
@@ -1953,10 +1955,10 @@ export class TodoSidebarView extends ItemView {
       fromEl.createEl("span", { cls: "focus-card-from-text", text: sourceHeadingText });
       const linkBtn = fromEl.createEl("a", {
         cls: "focus-card-from-link",
+        text: "→",
         href: "#",
         attr: { "aria-label": "Open source", title: "Open source" },
       });
-      linkBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>';
       linkBtn.addEventListener("click", (e) => {
         e.preventDefault();
         const blockEnd = item.childLineNumbers?.length
