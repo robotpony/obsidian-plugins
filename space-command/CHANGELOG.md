@@ -2,6 +2,20 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.14.10] - 2026-05-06
+
+### Fixed — Focus Mode Skip works with `focusQueueLimit: 1`
+
+Skip used to be disabled whenever the focus queue had a single item, because the rotate-the-head implementation was a no-op on a one-item array. With the default `focusQueueLimit: 1`, that meant the button was effectively always disabled.
+
+Skip now does what users expect:
+
+- Multi-item queue: rotates the head to the back (existing behaviour).
+- Single-item queue with more candidates available: rebuilds from the wider pool, drops the skipped item, and pins the next-best candidate to the front.
+- Single-item queue with no other candidates: button stays disabled (no work to skip to).
+
+The `Skip` button is enabled whenever there's at least one other candidate, regardless of queue limit.
+
 ## [0.14.9] - 2026-05-06
 
 ### Changed — Focus card "open source" arrow

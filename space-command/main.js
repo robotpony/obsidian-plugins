@@ -5223,7 +5223,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       cls: "focus-card-btn focus-card-btn-skip",
       text: "Skip"
     });
-    if (state.items.length < 2) {
+    if (state.items.length < 2 && !this.hasMoreFocusCandidates(state.items[0])) {
       skipBtn.disabled = true;
     }
     skipBtn.addEventListener("click", () => this.handleFocusSkip());
@@ -5407,13 +5407,49 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     await this.processor.completeTodo(item, this.defaultTodoneFile);
   }
   handleFocusSkip() {
-    if (!this.focusQueue || this.focusQueue.items.length < 2)
+    if (!this.focusQueue || this.focusQueue.items.length === 0)
+      return;
+    if (this.focusQueue.items.length >= 2) {
+      this.focusQueue = {
+        ...this.focusQueue,
+        items: rotateQueue(this.focusQueue.items)
+      };
+      this.render();
+      return;
+    }
+    const skipped = this.focusQueue.items[0];
+    const active = this.getActiveTodosForFocus();
+    const result = buildFocusQueue(active, Math.max(2, this.focusQueueLimit), {
+      forceFallback: this.focusQueue.inContinueMode
+    });
+    const remaining = result.items.filter(
+      (t) => !(t.filePath === skipped.filePath && t.lineNumber === skipped.lineNumber)
+    );
+    if (remaining.length === 0)
       return;
     this.focusQueue = {
-      ...this.focusQueue,
-      items: rotateQueue(this.focusQueue.items)
+      items: [remaining[0]],
+      source: result.source,
+      inContinueMode: this.focusQueue.inContinueMode
     };
     this.render();
+  }
+  /**
+   * True when there's at least one focus candidate other than `current` —
+   * used to keep Skip enabled even with a single-item queue when more work
+   * is waiting in the wider pool.
+   */
+  hasMoreFocusCandidates(current) {
+    var _a;
+    if (!current)
+      return false;
+    const active = this.getActiveTodosForFocus();
+    const result = buildFocusQueue(active, Math.max(2, this.focusQueueLimit), {
+      forceFallback: ((_a = this.focusQueue) == null ? void 0 : _a.inContinueMode) === true
+    });
+    return result.items.some(
+      (t) => !(t.filePath === current.filePath && t.lineNumber === current.lineNumber)
+    );
   }
   handleFocusExit() {
     if (this.prevActiveTab) {

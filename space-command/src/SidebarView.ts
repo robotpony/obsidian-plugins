@@ -2039,7 +2039,10 @@ export class TodoSidebarView extends ItemView {
       cls: "focus-card-btn focus-card-btn-skip",
       text: "Skip",
     });
-    if (state.items.length < 2) {
+    // Disable Skip only when there's truly nothing else to show. With a queue
+    // size of 1, we still allow Skip if other candidates exist outside the
+    // current queue — Skip will pull the next-best item from the wider pool.
+    if (state.items.length < 2 && !this.hasMoreFocusCandidates(state.items[0])) {
       skipBtn.disabled = true;
     }
     skipBtn.addEventListener("click", () => this.handleFocusSkip());
@@ -2277,12 +2280,53 @@ export class TodoSidebarView extends ItemView {
   }
 
   private handleFocusSkip(): void {
-    if (!this.focusQueue || this.focusQueue.items.length < 2) return;
+    if (!this.focusQueue || this.focusQueue.items.length === 0) return;
+
+    // Multi-item queue: rotate the head to the back so the next item surfaces.
+    if (this.focusQueue.items.length >= 2) {
+      this.focusQueue = {
+        ...this.focusQueue,
+        items: rotateQueue(this.focusQueue.items),
+      };
+      this.render();
+      return;
+    }
+
+    // Single-item queue: rebuild from the wider candidate pool, drop the
+    // skipped item, and pin the next-best to the front so Skip still does
+    // something useful when `focusQueueLimit` is 1.
+    const skipped = this.focusQueue.items[0];
+    const active = this.getActiveTodosForFocus();
+    const result = buildFocusQueue(active, Math.max(2, this.focusQueueLimit), {
+      forceFallback: this.focusQueue.inContinueMode,
+    });
+    const remaining = result.items.filter(
+      t => !(t.filePath === skipped.filePath && t.lineNumber === skipped.lineNumber)
+    );
+    if (remaining.length === 0) return;
+
     this.focusQueue = {
-      ...this.focusQueue,
-      items: rotateQueue(this.focusQueue.items),
+      items: [remaining[0]],
+      source: result.source,
+      inContinueMode: this.focusQueue.inContinueMode,
     };
     this.render();
+  }
+
+  /**
+   * True when there's at least one focus candidate other than `current` —
+   * used to keep Skip enabled even with a single-item queue when more work
+   * is waiting in the wider pool.
+   */
+  private hasMoreFocusCandidates(current: TodoItem | undefined): boolean {
+    if (!current) return false;
+    const active = this.getActiveTodosForFocus();
+    const result = buildFocusQueue(active, Math.max(2, this.focusQueueLimit), {
+      forceFallback: this.focusQueue?.inContinueMode === true,
+    });
+    return result.items.some(
+      t => !(t.filePath === current.filePath && t.lineNumber === current.lineNumber)
+    );
   }
 
   private handleFocusExit(): void {
