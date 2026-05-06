@@ -783,113 +783,7 @@ export class TodoSidebarView extends ItemView {
     });
 
     // Hamburger menu button (kebab style - vertical dots)
-    const menuBtn = headerDiv.createEl("button", {
-      cls: "clickable-icon sidebar-menu-btn",
-      attr: { "aria-label": "Menu" },
-    });
-    menuBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>';
-
-    menuBtn.addEventListener("click", (evt) => {
-      const menu = new Menu();
-
-      // Refresh
-      menu.addItem((item) => {
-        item
-          .setTitle("Refresh")
-          .setIcon("refresh-cw")
-          .onClick(async () => {
-            menuBtn.addClass("rotating");
-            await this.scanner.scanVault();
-            setTimeout(() => menuBtn.removeClass("rotating"), 500);
-          });
-      });
-
-      menu.addSeparator();
-
-      // Embed Syntax submenu
-      menu.addItem((item) => {
-        item
-          .setTitle("Embed Syntax")
-          .setIcon("copy");
-
-        const submenu = (item as any).setSubmenu();
-        submenu.addItem((subItem: any) => {
-          subItem
-            .setTitle("IDEA code block")
-            .setIcon("code")
-            .onClick(() => {
-              navigator.clipboard.writeText("```focus-ideas\n```");
-              showNotice("Copied IDEA code block syntax");
-            });
-        });
-        submenu.addItem((subItem: any) => {
-          subItem
-            .setTitle("IDEA inline")
-            .setIcon("brackets")
-            .onClick(() => {
-              navigator.clipboard.writeText("{{focus-ideas}}");
-              showNotice("Copied IDEA inline syntax");
-            });
-        });
-        submenu.addItem((subItem: any) => {
-          subItem
-            .setTitle("TODO code block")
-            .setIcon("code")
-            .onClick(() => {
-              navigator.clipboard.writeText("```focus-todos\n```");
-              showNotice("Copied TODO code block syntax");
-            });
-        });
-        submenu.addItem((subItem: any) => {
-          subItem
-            .setTitle("TODO inline")
-            .setIcon("brackets")
-            .onClick(() => {
-              navigator.clipboard.writeText("{{focus-todos}}");
-              showNotice("Copied TODO inline syntax");
-            });
-        });
-      });
-
-      // Triage
-      menu.addItem((item) => {
-        item
-          .setTitle("Triage")
-          .setIcon("siren")
-          .onClick(() => this.onShowTriage());
-      });
-
-      // Stats
-      menu.addItem((item) => {
-        item
-          .setTitle("Stats")
-          .setIcon("bar-chart-2")
-          .onClick(() => this.onShowStats());
-      });
-
-      menu.addSeparator();
-
-      // About
-      menu.addItem((item) => {
-        item
-          .setTitle("About")
-          .setIcon("info")
-          .onClick(() => this.onShowAbout());
-      });
-
-      // Settings
-      menu.addItem((item) => {
-        item
-          .setTitle("Settings")
-          .setIcon("settings")
-          .onClick(() => {
-            (this.app as any).setting.open();
-            (this.app as any).setting.openTabById("space-command");
-          });
-      });
-
-      menu.showAtMouseEvent(evt);
-    });
+    this.createSidebarMenuButton(headerDiv);
 
     // Content wrapper for scrolling
     const content = container.createEl("div", { cls: "sidebar-content" });
@@ -2019,12 +1913,14 @@ export class TodoSidebarView extends ItemView {
 
   private renderFocusCard(container: HTMLElement): void {
     // Slim sidebar header — anchors the user in the plugin without the tab
-    // chrome. The "About" affordance on the logo still works.
+    // chrome. Logo still opens About; the kebab menu carries the same actions
+    // as the regular sidebar.
     const header = container.createEl("div", { cls: "sidebar-header sidebar-header-focus" });
     const titleEl = header.createEl("h4", { cls: "sidebar-title" });
     const logoEl = titleEl.createEl("span", { cls: "space-command-logo clickable-logo", text: "␣⌘" });
     logoEl.addEventListener("click", () => this.onShowAbout());
     titleEl.appendText(" Focus");
+    this.createSidebarMenuButton(header);
 
     if (!this.focusQueue) {
       this.rebuildFocusQueue();
@@ -2182,6 +2078,117 @@ export class TodoSidebarView extends ItemView {
   /** Format an ISO date as `D/M/YYYY` (e.g. `5/5/2026`). */
   private formatFocusDate(iso: string): string {
     return (moment as any)(iso).format("D/M/YYYY");
+  }
+
+  /**
+   * Build the sidebar's kebab (vertical-dots) menu button and append it to
+   * the given parent. Used by both the regular sidebar header and the slim
+   * Focus Mode header so they share one menu definition.
+   */
+  private createSidebarMenuButton(parent: HTMLElement): HTMLButtonElement {
+    const menuBtn = parent.createEl("button", {
+      cls: "clickable-icon sidebar-menu-btn",
+      attr: { "aria-label": "Menu" },
+    });
+    menuBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>';
+
+    menuBtn.addEventListener("click", (evt) => {
+      const menu = new Menu();
+
+      menu.addItem((item) => {
+        item
+          .setTitle("Refresh")
+          .setIcon("refresh-cw")
+          .onClick(async () => {
+            menuBtn.addClass("rotating");
+            await this.scanner.scanVault();
+            setTimeout(() => menuBtn.removeClass("rotating"), 500);
+          });
+      });
+
+      menu.addSeparator();
+
+      menu.addItem((item) => {
+        item
+          .setTitle("Embed Syntax")
+          .setIcon("copy");
+
+        const submenu = (item as any).setSubmenu();
+        submenu.addItem((subItem: any) => {
+          subItem
+            .setTitle("IDEA code block")
+            .setIcon("code")
+            .onClick(() => {
+              navigator.clipboard.writeText("```focus-ideas\n```");
+              showNotice("Copied IDEA code block syntax");
+            });
+        });
+        submenu.addItem((subItem: any) => {
+          subItem
+            .setTitle("IDEA inline")
+            .setIcon("brackets")
+            .onClick(() => {
+              navigator.clipboard.writeText("{{focus-ideas}}");
+              showNotice("Copied IDEA inline syntax");
+            });
+        });
+        submenu.addItem((subItem: any) => {
+          subItem
+            .setTitle("TODO code block")
+            .setIcon("code")
+            .onClick(() => {
+              navigator.clipboard.writeText("```focus-todos\n```");
+              showNotice("Copied TODO code block syntax");
+            });
+        });
+        submenu.addItem((subItem: any) => {
+          subItem
+            .setTitle("TODO inline")
+            .setIcon("brackets")
+            .onClick(() => {
+              navigator.clipboard.writeText("{{focus-todos}}");
+              showNotice("Copied TODO inline syntax");
+            });
+        });
+      });
+
+      menu.addItem((item) => {
+        item
+          .setTitle("Triage")
+          .setIcon("siren")
+          .onClick(() => this.onShowTriage());
+      });
+
+      menu.addItem((item) => {
+        item
+          .setTitle("Stats")
+          .setIcon("bar-chart-2")
+          .onClick(() => this.onShowStats());
+      });
+
+      menu.addSeparator();
+
+      menu.addItem((item) => {
+        item
+          .setTitle("About")
+          .setIcon("info")
+          .onClick(() => this.onShowAbout());
+      });
+
+      menu.addItem((item) => {
+        item
+          .setTitle("Settings")
+          .setIcon("settings")
+          .onClick(() => {
+            (this.app as any).setting.open();
+            (this.app as any).setting.openTabById("space-command");
+          });
+      });
+
+      menu.showAtMouseEvent(evt);
+    });
+
+    return menuBtn;
   }
 
   private renderFocusCompletion(container: HTMLElement): void {

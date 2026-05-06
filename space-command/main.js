@@ -4234,67 +4234,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       this.activeTab = "snoozed";
       this.render();
     });
-    const menuBtn = headerDiv.createEl("button", {
-      cls: "clickable-icon sidebar-menu-btn",
-      attr: { "aria-label": "Menu" }
-    });
-    menuBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>';
-    menuBtn.addEventListener("click", (evt) => {
-      const menu = new import_obsidian12.Menu();
-      menu.addItem((item) => {
-        item.setTitle("Refresh").setIcon("refresh-cw").onClick(async () => {
-          menuBtn.addClass("rotating");
-          await this.scanner.scanVault();
-          setTimeout(() => menuBtn.removeClass("rotating"), 500);
-        });
-      });
-      menu.addSeparator();
-      menu.addItem((item) => {
-        item.setTitle("Embed Syntax").setIcon("copy");
-        const submenu = item.setSubmenu();
-        submenu.addItem((subItem) => {
-          subItem.setTitle("IDEA code block").setIcon("code").onClick(() => {
-            navigator.clipboard.writeText("```focus-ideas\n```");
-            showNotice2("Copied IDEA code block syntax");
-          });
-        });
-        submenu.addItem((subItem) => {
-          subItem.setTitle("IDEA inline").setIcon("brackets").onClick(() => {
-            navigator.clipboard.writeText("{{focus-ideas}}");
-            showNotice2("Copied IDEA inline syntax");
-          });
-        });
-        submenu.addItem((subItem) => {
-          subItem.setTitle("TODO code block").setIcon("code").onClick(() => {
-            navigator.clipboard.writeText("```focus-todos\n```");
-            showNotice2("Copied TODO code block syntax");
-          });
-        });
-        submenu.addItem((subItem) => {
-          subItem.setTitle("TODO inline").setIcon("brackets").onClick(() => {
-            navigator.clipboard.writeText("{{focus-todos}}");
-            showNotice2("Copied TODO inline syntax");
-          });
-        });
-      });
-      menu.addItem((item) => {
-        item.setTitle("Triage").setIcon("siren").onClick(() => this.onShowTriage());
-      });
-      menu.addItem((item) => {
-        item.setTitle("Stats").setIcon("bar-chart-2").onClick(() => this.onShowStats());
-      });
-      menu.addSeparator();
-      menu.addItem((item) => {
-        item.setTitle("About").setIcon("info").onClick(() => this.onShowAbout());
-      });
-      menu.addItem((item) => {
-        item.setTitle("Settings").setIcon("settings").onClick(() => {
-          this.app.setting.open();
-          this.app.setting.openTabById("space-command");
-        });
-      });
-      menu.showAtMouseEvent(evt);
-    });
+    this.createSidebarMenuButton(headerDiv);
     const content = container.createEl("div", { cls: "sidebar-content" });
     switch (this.activeTab) {
       case "todos":
@@ -5165,6 +5105,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     const logoEl = titleEl.createEl("span", { cls: "space-command-logo clickable-logo", text: "\u2423\u2318" });
     logoEl.addEventListener("click", () => this.onShowAbout());
     titleEl.appendText(" Focus");
+    this.createSidebarMenuButton(header);
     if (!this.focusQueue) {
       this.rebuildFocusQueue();
     }
@@ -5295,6 +5236,75 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
   /** Format an ISO date as `D/M/YYYY` (e.g. `5/5/2026`). */
   formatFocusDate(iso) {
     return (0, import_obsidian12.moment)(iso).format("D/M/YYYY");
+  }
+  /**
+   * Build the sidebar's kebab (vertical-dots) menu button and append it to
+   * the given parent. Used by both the regular sidebar header and the slim
+   * Focus Mode header so they share one menu definition.
+   */
+  createSidebarMenuButton(parent) {
+    const menuBtn = parent.createEl("button", {
+      cls: "clickable-icon sidebar-menu-btn",
+      attr: { "aria-label": "Menu" }
+    });
+    menuBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>';
+    menuBtn.addEventListener("click", (evt) => {
+      const menu = new import_obsidian12.Menu();
+      menu.addItem((item) => {
+        item.setTitle("Refresh").setIcon("refresh-cw").onClick(async () => {
+          menuBtn.addClass("rotating");
+          await this.scanner.scanVault();
+          setTimeout(() => menuBtn.removeClass("rotating"), 500);
+        });
+      });
+      menu.addSeparator();
+      menu.addItem((item) => {
+        item.setTitle("Embed Syntax").setIcon("copy");
+        const submenu = item.setSubmenu();
+        submenu.addItem((subItem) => {
+          subItem.setTitle("IDEA code block").setIcon("code").onClick(() => {
+            navigator.clipboard.writeText("```focus-ideas\n```");
+            showNotice2("Copied IDEA code block syntax");
+          });
+        });
+        submenu.addItem((subItem) => {
+          subItem.setTitle("IDEA inline").setIcon("brackets").onClick(() => {
+            navigator.clipboard.writeText("{{focus-ideas}}");
+            showNotice2("Copied IDEA inline syntax");
+          });
+        });
+        submenu.addItem((subItem) => {
+          subItem.setTitle("TODO code block").setIcon("code").onClick(() => {
+            navigator.clipboard.writeText("```focus-todos\n```");
+            showNotice2("Copied TODO code block syntax");
+          });
+        });
+        submenu.addItem((subItem) => {
+          subItem.setTitle("TODO inline").setIcon("brackets").onClick(() => {
+            navigator.clipboard.writeText("{{focus-todos}}");
+            showNotice2("Copied TODO inline syntax");
+          });
+        });
+      });
+      menu.addItem((item) => {
+        item.setTitle("Triage").setIcon("siren").onClick(() => this.onShowTriage());
+      });
+      menu.addItem((item) => {
+        item.setTitle("Stats").setIcon("bar-chart-2").onClick(() => this.onShowStats());
+      });
+      menu.addSeparator();
+      menu.addItem((item) => {
+        item.setTitle("About").setIcon("info").onClick(() => this.onShowAbout());
+      });
+      menu.addItem((item) => {
+        item.setTitle("Settings").setIcon("settings").onClick(() => {
+          this.app.setting.open();
+          this.app.setting.openTabById("space-command");
+        });
+      });
+      menu.showAtMouseEvent(evt);
+    });
+    return menuBtn;
   }
   renderFocusCompletion(container) {
     const card = container.createEl("div", { cls: "focus-card focus-card-complete" });

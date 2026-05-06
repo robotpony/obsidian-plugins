@@ -2,6 +2,12 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.14.3] - 2026-05-06
+
+### Changed — Focus Mode header gets the kebab menu
+
+The slim Focus Mode header now includes the kebab (vertical-dots) menu so all the standard sidebar actions — Refresh, Embed Syntax, Triage, Stats, About, Settings — are reachable without leaving focus mode. The menu is built from a single shared helper used by both the regular and focus headers.
+
 ## [0.14.2] - 2026-05-06
 
 ### Changed — Focus Mode keeps the sidebar header
