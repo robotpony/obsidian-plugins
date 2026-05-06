@@ -2,6 +2,12 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.15.1] - 2026-05-06
+
+### Fixed — Focus row text alignment
+
+The 0.15.0 row-padding change (`.project-item { padding: 4px 6px }`) introduced a 6px misalignment between green-highlighted `#focus` rows and plain rows. The edge-to-edge focus highlight rule was compensating for its own `-16px` margin only, ignoring the new inline padding. Bumped its left/right padding to 22px so highlighted-row text lines up with plain-row text.
+
 ## [0.15.0] - 2026-05-06
 
 ### Changed — Project rows are filter buttons

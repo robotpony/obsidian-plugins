@@ -951,14 +951,16 @@
   opacity: 1;
 }
 
-/* Focus tag highlighting in sidebar — edge-to-edge background */
+/* Focus tag highlighting in sidebar — edge-to-edge background. The +6px on
+   each side keeps text aligned with non-focus rows, which carry a 6px inline
+   padding from .project-item. */
 .space-command-sidebar .todo-focus,
 .space-command-sidebar .project-focus {
   background-color: color-mix(in srgb, var(--interactive-accent) 15%, transparent);
   margin-left: -16px;
   margin-right: -16px;
-  padding-left: 16px;
-  padding-right: 16px;
+  padding-left: 22px;
+  padding-right: 22px;
 }
 
 .space-command-sidebar .todo-focus:hover,
