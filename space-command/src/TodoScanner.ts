@@ -83,6 +83,11 @@ export class TodoScanner extends Events {
       let currentHeaderIdea: { lineNumber: number; level: number; todoItem: TodoItem } | null = null;
       let currentHeaderPrinciple: { lineNumber: number; level: number; todoItem: TodoItem } | null = null;
 
+      // Track the nearest preceding section label (markdown heading or bold
+      // subheading line). Attached to orphan TODO items so the sidebar can
+      // render them under a heading rather than a bare filename.
+      let currentSection: { label: string; lineNumber: number } | null = null;
+
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
 
@@ -120,6 +125,24 @@ export class TodoScanner extends Events {
           currentHeaderTodo = null;
           currentHeaderIdea = null;
           currentHeaderPrinciple = null;
+          // Capture this heading as the section label for any orphan items
+          // that follow until the next heading/bold-subheading.
+          currentSection = {
+            label: this.extractSectionLabel(line),
+            lineNumber: i,
+          };
+        } else if (
+          !currentHeaderTodo &&
+          !this.isListItem(line) &&
+          this.isBoldSubheading(line)
+        ) {
+          // Bold-subheading line OUTSIDE a #todo block also acts as a section
+          // anchor. Inside a #todo block, bold-subheadings are already handled
+          // separately as subheading children below.
+          currentSection = {
+            label: this.extractSectionLabel(line),
+            lineNumber: i,
+          };
         }
 
         // Process header with #todo or #todos tag
@@ -228,12 +251,24 @@ export class TodoScanner extends Events {
           // Queue this line for cleanup (remove #todo tag)
           linesToCleanup.push(i);
           // Treat as completed (only if has content)
-          if (lineHasContent) todones.push(this.createTodoItem(file, i, line, tags, 'todone'));
+          if (lineHasContent) {
+            const item = this.createTodoItem(file, i, line, tags, 'todone');
+            this.attachSectionLabel(item, currentSection);
+            todones.push(item);
+          }
         } else if (hasTodo && !hasIdea) {
           // Only add to todos if not tagged as idea and has content
-          if (lineHasContent) todos.push(this.createTodoItem(file, i, line, tags, 'todo'));
+          if (lineHasContent) {
+            const item = this.createTodoItem(file, i, line, tags, 'todo');
+            this.attachSectionLabel(item, currentSection);
+            todos.push(item);
+          }
         } else if (hasTodone) {
-          if (lineHasContent) todones.push(this.createTodoItem(file, i, line, tags, 'todone'));
+          if (lineHasContent) {
+            const item = this.createTodoItem(file, i, line, tags, 'todone');
+            this.attachSectionLabel(item, currentSection);
+            todones.push(item);
+          }
         }
 
         // Idea processing - handle headers with children
@@ -367,6 +402,36 @@ export class TodoScanner extends Events {
   // Check if a line is a bold subheading (starts with **text** or __text__)
   private isBoldSubheading(line: string): boolean {
     return /^\s*(\*\*|__)\S/.test(line);
+  }
+
+  /**
+   * Pull a clean, display-ready label from a heading or bold-subheading line.
+   * Strips the markdown markers, plugin tags, and @mentions; collapses
+   * whitespace.
+   */
+  private extractSectionLabel(line: string): string {
+    return line
+      .replace(/^\s*#{1,6}\s+/, "")              // leading ###
+      .replace(/^\s*(\*\*|__)\s*/, "")           // leading **
+      .replace(/\s*(\*\*|__)\s*$/, "")           // trailing **
+      .replace(/#[\w-]+/g, "")                    // any tags
+      .replace(/@[\w][\w.-]*/g, "")               // any mentions
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  /**
+   * Copy `currentSection` onto an orphan TODO item. No-op when the section is
+   * empty (we leave the field undefined and let the renderer fall back to the
+   * file basename).
+   */
+  private attachSectionLabel(
+    item: TodoItem,
+    section: { label: string; lineNumber: number } | null
+  ): void {
+    if (!section || !section.label) return;
+    item.sectionLabel = section.label;
+    item.sectionLineNumber = section.lineNumber;
   }
 
   private createTodoItem(

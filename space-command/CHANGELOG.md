@@ -2,6 +2,45 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.15.3] - 2026-05-06
+
+### Changed — Polish: Summary collapses by default
+
+The Summary section had grown into a long block of stats that pushed everything else off-screen. It's now a single header line by default, with the most useful numbers inline:
+
+```
+▸ SUMMARY  45 open · Done: 3 today · 12 week · 45 month  →
+```
+
+- **Click the row** (or press `Enter` / `Space` when focused) to expand. Chevron rotates from `▸` to `▾`. Body slides in over 160ms (skipped under `prefers-reduced-motion`).
+- **Default is always collapsed** at plugin load — the open state is session-only, not persisted. Keeps every session's resting state minimal.
+- **`→` on the right** opens the done file. `aria-label` carries the file path; the inline filename text was removed.
+- **Inline preview** shows total open count + Done velocity (today / week / month). The standalone Done velocity row inside the expanded body was removed; the header is now the single source for that number.
+
+### Internals
+
+- New `summaryExpanded` instance field on `SidebarView` (in-memory only, not persisted).
+- `renderSummaryHeader` produces a `role="button"` row with chevron, title, preview, and `→` link.
+- `renderCompletionVelocity` deleted — its work moved into `renderSummaryPreview`.
+- Removed unused `.done-file-link`, `.summary-velocity`, `.summary-velocity-num` CSS rules.
+
+## [0.15.2] - 2026-05-06
+
+### Changed — Polish: sidebar cleanup pass
+
+A round of "remove what we don't use, anchor what we do" on the TODOs sidebar.
+
+- **Project rows (Focus section)** drop the ⓘ info icon and the → open-file arrow. The row is a pure filter toggle now; right-click still opens the project menu with both actions.
+- **Child rows** lose their per-row → arrow. The parent header's arrow is the single source-of-truth affordance for getting to the file.
+- **Header filenames** drop the folder prefix — `2026/May 4, 2026.md` becomes `May 4, 2026.md`. The folder was rarely informative and made the row wrap mid-word in narrow sidebars. The full path is in the row's tooltip. The filename also gets `text-overflow: ellipsis` so very long names truncate cleanly instead of wrapping.
+- **Orphan rows** (TODOs not under a `#todo`-tagged header) now show a clickable section label in the same right-side slot as the header filename. The scanner walks back to the nearest preceding markdown heading or bold-subheading line and attaches it as `sectionLabel` on the item; the renderer uses it as the row's source link, opening the file at that section's line. Falls back to the filename when no preceding heading exists. This replaces the per-row → and gives every row context at a glance.
+
+### Internals
+
+- New `TodoItem.sectionLabel` and `TodoItem.sectionLineNumber` fields.
+- `TodoScanner` tracks `currentSection` across the file walk; `extractSectionLabel` strips heading/bold markers, tags, and mentions for display.
+- Removed `.project-link` / `.project-info-icon` CSS (no longer rendered). `showProjectInfoPopup` is currently unreferenced from the inline UI; left in place for the right-click menu path.
+
 ## [0.15.1] - 2026-05-06
 
 ### Fixed — Focus row text alignment

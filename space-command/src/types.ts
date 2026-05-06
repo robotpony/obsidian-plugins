@@ -22,6 +22,11 @@ export interface TodoItem {
   headerLevel?: number;         // 1-6 for header level
   parentLineNumber?: number;    // Line number of parent header (if child)
   childLineNumbers?: number[];  // Line numbers of child items
+  // Section context for orphan items (not children of a #todo header). Set to
+  // the nearest preceding markdown heading or bold-subheading line. Used in
+  // the sidebar to anchor every row under a heading rather than a bare arrow.
+  sectionLabel?: string;
+  sectionLineNumber?: number;
   // Item type discriminator
   itemType?: 'todo' | 'todone' | 'idea' | 'principle';
   // Inferred file-level tag derived from filename (e.g., "api-tasks.md" → "#api-tasks")

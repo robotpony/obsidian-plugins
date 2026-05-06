@@ -658,6 +658,7 @@ var TodoScanner = class extends import_obsidian4.Events {
       let currentHeaderTodo = null;
       let currentHeaderIdea = null;
       let currentHeaderPrinciple = null;
+      let currentSection = null;
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         if (line.trim().startsWith("```")) {
@@ -679,6 +680,15 @@ var TodoScanner = class extends import_obsidian4.Events {
           currentHeaderTodo = null;
           currentHeaderIdea = null;
           currentHeaderPrinciple = null;
+          currentSection = {
+            label: this.extractSectionLabel(line),
+            lineNumber: i
+          };
+        } else if (!currentHeaderTodo && !this.isListItem(line) && this.isBoldSubheading(line)) {
+          currentSection = {
+            label: this.extractSectionLabel(line),
+            lineNumber: i
+          };
         }
         if (headerInfo && (tags.includes("#todo") || tags.includes("#todos")) && !tags.includes("#todone") && !tags.includes("#todones")) {
           if (!this.hasContent(line))
@@ -750,14 +760,23 @@ var TodoScanner = class extends import_obsidian4.Events {
         }
         if (hasTodone && hasTodo) {
           linesToCleanup.push(i);
-          if (lineHasContent)
-            todones.push(this.createTodoItem(file, i, line, tags, "todone"));
+          if (lineHasContent) {
+            const item = this.createTodoItem(file, i, line, tags, "todone");
+            this.attachSectionLabel(item, currentSection);
+            todones.push(item);
+          }
         } else if (hasTodo && !hasIdea) {
-          if (lineHasContent)
-            todos.push(this.createTodoItem(file, i, line, tags, "todo"));
+          if (lineHasContent) {
+            const item = this.createTodoItem(file, i, line, tags, "todo");
+            this.attachSectionLabel(item, currentSection);
+            todos.push(item);
+          }
         } else if (hasTodone) {
-          if (lineHasContent)
-            todones.push(this.createTodoItem(file, i, line, tags, "todone"));
+          if (lineHasContent) {
+            const item = this.createTodoItem(file, i, line, tags, "todone");
+            this.attachSectionLabel(item, currentSection);
+            todones.push(item);
+          }
         }
         if (tags.includes("#idea") || tags.includes("#ideas") || tags.includes("#ideation")) {
           if (!lineHasContent)
@@ -859,6 +878,25 @@ var TodoScanner = class extends import_obsidian4.Events {
   // Check if a line is a bold subheading (starts with **text** or __text__)
   isBoldSubheading(line) {
     return /^\s*(\*\*|__)\S/.test(line);
+  }
+  /**
+   * Pull a clean, display-ready label from a heading or bold-subheading line.
+   * Strips the markdown markers, plugin tags, and @mentions; collapses
+   * whitespace.
+   */
+  extractSectionLabel(line) {
+    return line.replace(/^\s*#{1,6}\s+/, "").replace(/^\s*(\*\*|__)\s*/, "").replace(/\s*(\*\*|__)\s*$/, "").replace(/#[\w-]+/g, "").replace(/@[\w][\w.-]*/g, "").replace(/\s+/g, " ").trim();
+  }
+  /**
+   * Copy `currentSection` onto an orphan TODO item. No-op when the section is
+   * empty (we leave the field undefined and let the renderer fall back to the
+   * file basename).
+   */
+  attachSectionLabel(item, section) {
+    if (!section || !section.label)
+      return;
+    item.sectionLabel = section.label;
+    item.sectionLineNumber = section.lineNumber;
   }
   createTodoItem(file, lineNumber, text, tags, itemType) {
     var _a;
@@ -3718,6 +3756,9 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     // Class applied to the next mounted focus card so its entrance matches the
     // action that produced it (Complete fades up, Skip slides in from the right).
     this.pendingFocusEnter = null;
+    // Summary section starts collapsed every session; the user can expand it
+    // for the current session but the default never sticks as expanded.
+    this.summaryExpanded = false;
     this.activeTab = "todos";
     this.activeTagFilter = null;
     this.activeAssigneeFilter = null;
@@ -3915,7 +3956,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
   // Unified list item renderer for todos, ideas, and principles
   // parentTags: optional tags inherited from a parent header block (for child items)
   renderListItem(list, item, config, isChild = false, parentTags = []) {
-    var _a;
+    var _a, _b;
     if (isChild && item.isSubheading) {
       const subheadingItem = list.createEl("li", { cls: `${config.classPrefix}-item ${config.classPrefix}-child todo-subheading` });
       const cleanText2 = item.text.replace(/^\s*(\*\*|__)(.*?)(\*\*|__)\s*/, "$2 ").replace(/#[\w-]+/g, "").replace(/@[\w][\w.-]*/g, "").replace(/\s+/g, " ").trim();
@@ -3967,11 +4008,10 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       textSpan.appendText(finalText);
     }
     if (hasChildren) {
-      const folder = ((_a = item.file.parent) == null ? void 0 : _a.name) || "";
-      const displayPath = folder ? `${folder}/${item.file.name}` : item.file.name;
       rowContainer.createEl("span", {
         cls: "header-filename",
-        text: displayPath
+        text: item.file.name,
+        attr: { title: item.file.path }
       });
     }
     if (item.mentions.length > 0) {
@@ -3982,17 +4022,33 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     if (mergedTags.length > 0) {
       this.renderTagDropdown(mergedTags, rowContainer, item);
     }
-    const link = rowContainer.createEl("a", {
-      text: "\u2192",
-      cls: `${config.classPrefix}-link`,
-      href: "#"
-    });
-    link.addEventListener("click", (e) => {
-      var _a2;
-      e.preventDefault();
-      const blockEnd = ((_a2 = item.childLineNumbers) == null ? void 0 : _a2.length) ? Math.max(...item.childLineNumbers) : void 0;
-      openFileAtLine(this.app, item.file, item.lineNumber, blockEnd);
-    });
+    if (isChild) {
+    } else if (isHeader) {
+      const link = rowContainer.createEl("a", {
+        text: "\u2192",
+        cls: `${config.classPrefix}-link`,
+        href: "#"
+      });
+      link.addEventListener("click", (e) => {
+        var _a2;
+        e.preventDefault();
+        const blockEnd = ((_a2 = item.childLineNumbers) == null ? void 0 : _a2.length) ? Math.max(...item.childLineNumbers) : void 0;
+        openFileAtLine(this.app, item.file, item.lineNumber, blockEnd);
+      });
+    } else {
+      const sectionText = ((_a = item.sectionLabel) == null ? void 0 : _a.trim()) || item.file.name;
+      const sectionLine = (_b = item.sectionLineNumber) != null ? _b : item.lineNumber;
+      const sectionLink = rowContainer.createEl("a", {
+        cls: `${config.classPrefix}-section-link`,
+        text: sectionText,
+        href: "#",
+        attr: { title: `Open ${item.file.path}` }
+      });
+      sectionLink.addEventListener("click", (e) => {
+        e.preventDefault();
+        openFileAtLine(this.app, item.file, sectionLine);
+      });
+    }
     if (hasChildren) {
       const childrenContainer = listItem.createEl("ul", { cls: `${config.classPrefix}-children` });
       const allItems = this.getItemsForType(config.type);
@@ -4593,26 +4649,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       }
     });
     const textSpan = item.createEl("span", { cls: "project-text" });
-    textSpan.appendText(project.tag + " ");
-    const infoIcon = item.createEl("span", {
-      cls: "project-info-icon",
-      text: "\u24D8",
-      attr: { "aria-label": "Project info" }
-    });
-    infoIcon.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      await this.showProjectInfoPopup(project, infoIcon);
-    });
-    const link = item.createEl("a", {
-      text: "\u2192",
-      cls: "project-link",
-      href: "#"
-    });
-    link.addEventListener("click", async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      await this.projectManager.openProjectFile(project.tag);
-    });
+    textSpan.appendText(project.tag);
   }
   async showProjectInfoPopup(project, trigger) {
     this.closeInfoPopup();
@@ -4834,29 +4871,83 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
   renderSummary(container) {
     const section = container.createEl("div", { cls: "summary-section" });
     this.renderSummaryHeader(section);
+    if (!this.summaryExpanded)
+      return;
     this.renderPriorityCounts(section);
     this.renderAssigneeStats(section);
-    this.renderCompletionVelocity(section);
     this.renderTopBacklogs(section);
   }
   renderSummaryHeader(section) {
+    const expanded = this.summaryExpanded;
     const header = section.createEl("div", {
-      cls: "todo-section-header todone-header"
+      cls: `todo-section-header todone-header summary-header${expanded ? " summary-header-expanded" : ""}`,
+      attr: { role: "button", tabindex: "0", "aria-expanded": expanded ? "true" : "false" }
     });
-    const titleSpan = header.createEl("span", { cls: "todo-section-title" });
+    const chevron = header.createEl("span", {
+      cls: "summary-chevron",
+      text: "\u25B8",
+      attr: { "aria-hidden": "true" }
+    });
+    const titleSpan = header.createEl("span", { cls: "todo-section-title summary-title" });
     titleSpan.textContent = "SUMMARY";
+    const preview = header.createEl("span", { cls: "summary-preview" });
+    this.renderSummaryPreview(preview);
     const fileLink = header.createEl("a", {
-      text: this.defaultTodoneFile,
-      cls: "done-file-link",
-      href: "#"
+      cls: "summary-done-link",
+      text: "\u2192",
+      href: "#",
+      attr: { "aria-label": `Open ${this.defaultTodoneFile}`, title: this.defaultTodoneFile }
     });
     fileLink.addEventListener("click", async (e) => {
       e.preventDefault();
+      e.stopPropagation();
       const file = this.app.vault.getAbstractFileByPath(this.defaultTodoneFile);
       if (file instanceof import_obsidian12.TFile) {
         await this.app.workspace.getLeaf(false).openFile(file);
       }
     });
+    const toggle = () => {
+      this.summaryExpanded = !this.summaryExpanded;
+      this.render();
+    };
+    header.addEventListener("click", toggle);
+    header.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        toggle();
+      }
+    });
+  }
+  renderSummaryPreview(parent) {
+    const todos = this.scanner.getTodos();
+    const openCount = todos.filter((t) => t.parentLineNumber === void 0).length;
+    const todones = this.scanner.getTodones();
+    const m = import_obsidian12.moment;
+    const todayStr = m().format("YYYY-MM-DD");
+    const weekStart = m().startOf("isoWeek").format("YYYY-MM-DD");
+    const monthStart = m().startOf("month").format("YYYY-MM-DD");
+    let doneToday = 0, doneWeek = 0, doneMonth = 0;
+    for (const t of todones) {
+      const date = extractCompletionDate(t.text);
+      if (!date)
+        continue;
+      if (date >= monthStart) {
+        doneMonth++;
+        if (date >= weekStart) {
+          doneWeek++;
+          if (date === todayStr)
+            doneToday++;
+        }
+      }
+    }
+    parent.createEl("span", { cls: "summary-preview-num", text: String(openCount) });
+    parent.createEl("span", { cls: "summary-preview-label", text: " open \xB7 Done: " });
+    parent.createEl("span", { cls: "summary-preview-num", text: String(doneToday) });
+    parent.createEl("span", { cls: "summary-preview-label", text: " today \xB7 " });
+    parent.createEl("span", { cls: "summary-preview-num", text: String(doneWeek) });
+    parent.createEl("span", { cls: "summary-preview-label", text: " week \xB7 " });
+    parent.createEl("span", { cls: "summary-preview-num", text: String(doneMonth) });
+    parent.createEl("span", { cls: "summary-preview-label", text: " month" });
   }
   renderPriorityCounts(section) {
     const todos = this.scanner.getTodos();
@@ -4936,36 +5027,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       cell.createEl("span", { text: "none" });
       cell.createEl("span", { cls: "summary-count-value", text: String(unassigned) });
     }
-  }
-  renderCompletionVelocity(section) {
-    const todones = this.scanner.getTodones();
-    const m = import_obsidian12.moment;
-    const todayStr = m().format("YYYY-MM-DD");
-    const weekStart = m().startOf("isoWeek").format("YYYY-MM-DD");
-    const monthStart = m().startOf("month").format("YYYY-MM-DD");
-    let doneToday = 0, doneWeek = 0, doneMonth = 0;
-    for (const t of todones) {
-      const date = extractCompletionDate(t.text);
-      if (!date)
-        continue;
-      if (date >= monthStart) {
-        doneMonth++;
-        if (date >= weekStart) {
-          doneWeek++;
-          if (date === todayStr) {
-            doneToday++;
-          }
-        }
-      }
-    }
-    const vel = section.createEl("div", { cls: "summary-velocity" });
-    vel.createEl("span", { text: "Done: " });
-    vel.createEl("span", { cls: "summary-velocity-num", text: String(doneToday) });
-    vel.createEl("span", { text: " today \xB7 " });
-    vel.createEl("span", { cls: "summary-velocity-num", text: String(doneWeek) });
-    vel.createEl("span", { text: " week \xB7 " });
-    vel.createEl("span", { cls: "summary-velocity-num", text: String(doneMonth) });
-    vel.createEl("span", { text: " month" });
   }
   renderTopBacklogs(section) {
     const projects = this.projectManager.getProjects();

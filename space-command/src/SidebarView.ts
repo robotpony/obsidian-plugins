@@ -23,6 +23,9 @@ export class TodoSidebarView extends ItemView {
   // Class applied to the next mounted focus card so its entrance matches the
   // action that produced it (Complete fades up, Skip slides in from the right).
   private pendingFocusEnter: "complete" | "skip" | null = null;
+  // Summary section starts collapsed every session; the user can expand it
+  // for the current session but the default never sticks as expanded.
+  private summaryExpanded: boolean = false;
   private focusListLimit: number;
   private makeLinksClickable: boolean;
   private triageSnoozedThreshold: number;
@@ -416,13 +419,14 @@ export class TodoSidebarView extends ItemView {
       textSpan.appendText(finalText);
     }
 
-    // Show file path for header items with children (folder/filename format)
+    // Show filename only (no folder) for header items with children — the folder
+    // path was wrapping awkwardly in narrow sidebars and rarely told the user
+    // anything they didn't already know.
     if (hasChildren) {
-      const folder = item.file.parent?.name || "";
-      const displayPath = folder ? `${folder}/${item.file.name}` : item.file.name;
       rowContainer.createEl("span", {
         cls: "header-filename",
-        text: displayPath,
+        text: item.file.name,
+        attr: { title: item.file.path },
       });
     }
 
@@ -439,20 +443,42 @@ export class TodoSidebarView extends ItemView {
       this.renderTagDropdown(mergedTags, rowContainer, item);
     }
 
-    // Link to source
-    const link = rowContainer.createEl("a", {
-      text: "→",
-      cls: `${config.classPrefix}-link`,
-      href: "#",
-    });
-
-    link.addEventListener("click", (e) => {
-      e.preventDefault();
-      const blockEnd = item.childLineNumbers?.length
-        ? Math.max(...item.childLineNumbers)
-        : undefined;
-      openFileAtLine(this.app, item.file, item.lineNumber, blockEnd);
-    });
+    // Source affordance — varies by row type:
+    //   - Children: nothing. The header row above already has its arrow.
+    //   - Orphan items (no parent header): a clickable section label on the
+    //     right (heading text or filename fallback). Doubles as the link to
+    //     source, replacing the per-row arrow.
+    //   - Headers (with or without children): keep the arrow.
+    if (isChild) {
+      // children render no inline link; the parent header's link gets you there
+    } else if (isHeader) {
+      const link = rowContainer.createEl("a", {
+        text: "→",
+        cls: `${config.classPrefix}-link`,
+        href: "#",
+      });
+      link.addEventListener("click", (e) => {
+        e.preventDefault();
+        const blockEnd = item.childLineNumbers?.length
+          ? Math.max(...item.childLineNumbers)
+          : undefined;
+        openFileAtLine(this.app, item.file, item.lineNumber, blockEnd);
+      });
+    } else {
+      // Orphan item — surface its section context as the source link.
+      const sectionText = item.sectionLabel?.trim() || item.file.name;
+      const sectionLine = item.sectionLineNumber ?? item.lineNumber;
+      const sectionLink = rowContainer.createEl("a", {
+        cls: `${config.classPrefix}-section-link`,
+        text: sectionText,
+        href: "#",
+        attr: { title: `Open ${item.file.path}` },
+      });
+      sectionLink.addEventListener("click", (e) => {
+        e.preventDefault();
+        openFileAtLine(this.app, item.file, sectionLine);
+      });
+    }
 
     // If this is a header with children, render children indented below
     if (hasChildren) {
@@ -1229,32 +1255,11 @@ export class TodoSidebarView extends ItemView {
 
     // Project name (using safe DOM methods)
     const textSpan = item.createEl("span", { cls: "project-text" });
-    textSpan.appendText(project.tag + " ");
+    textSpan.appendText(project.tag);
 
-    // Info icon for project details popup
-    const infoIcon = item.createEl("span", {
-      cls: "project-info-icon",
-      text: "ⓘ",
-      attr: { "aria-label": "Project info" },
-    });
-
-    infoIcon.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      await this.showProjectInfoPopup(project, infoIcon);
-    });
-
-    // Link to project file
-    const link = item.createEl("a", {
-      text: "→",
-      cls: "project-link",
-      href: "#",
-    });
-
-    link.addEventListener("click", async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      await this.projectManager.openProjectFile(project.tag);
-    });
+    // The info icon and the open-file arrow were removed in 0.15.2 — the row
+    // is now a pure filter toggle. Right-click still opens the project menu
+    // with both actions available.
   }
 
   private async showProjectInfoPopup(project: ProjectInfo, trigger: HTMLElement): Promise<void> {
@@ -1559,33 +1564,98 @@ export class TodoSidebarView extends ItemView {
   private renderSummary(container: HTMLElement): void {
     const section = container.createEl("div", { cls: "summary-section" });
     this.renderSummaryHeader(section);
+    if (!this.summaryExpanded) return;
     this.renderPriorityCounts(section);
     this.renderAssigneeStats(section);
-    this.renderCompletionVelocity(section);
     this.renderTopBacklogs(section);
   }
 
   private renderSummaryHeader(section: HTMLElement): void {
+    const expanded = this.summaryExpanded;
     const header = section.createEl("div", {
-      cls: "todo-section-header todone-header",
+      cls: `todo-section-header todone-header summary-header${expanded ? " summary-header-expanded" : ""}`,
+      attr: { role: "button", tabindex: "0", "aria-expanded": expanded ? "true" : "false" },
     });
 
-    const titleSpan = header.createEl("span", { cls: "todo-section-title" });
+    // Chevron + title — chevron rotates on expand to signal state.
+    const chevron = header.createEl("span", {
+      cls: "summary-chevron",
+      text: "▸",
+      attr: { "aria-hidden": "true" },
+    });
+    void chevron;
+
+    const titleSpan = header.createEl("span", { cls: "todo-section-title summary-title" });
     titleSpan.textContent = "SUMMARY";
 
-    // Link to done file (preserved from old Done section)
+    // Inline preview: total open count + Done velocity. Visible in both states
+    // so the most useful at-a-glance number stays close to the title even when
+    // the section is expanded.
+    const preview = header.createEl("span", { cls: "summary-preview" });
+    this.renderSummaryPreview(preview);
+
+    // Right-side arrow opens the done file. Stops propagation so it doesn't
+    // also toggle the section.
     const fileLink = header.createEl("a", {
-      text: this.defaultTodoneFile,
-      cls: "done-file-link",
+      cls: "summary-done-link",
+      text: "→",
       href: "#",
+      attr: { "aria-label": `Open ${this.defaultTodoneFile}`, title: this.defaultTodoneFile },
     });
     fileLink.addEventListener("click", async (e) => {
       e.preventDefault();
+      e.stopPropagation();
       const file = this.app.vault.getAbstractFileByPath(this.defaultTodoneFile);
       if (file instanceof TFile) {
         await this.app.workspace.getLeaf(false).openFile(file);
       }
     });
+
+    // Toggle expand/collapse on header click and on Enter / Space when focused.
+    const toggle = () => {
+      this.summaryExpanded = !this.summaryExpanded;
+      this.render();
+    };
+    header.addEventListener("click", toggle);
+    header.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        toggle();
+      }
+    });
+  }
+
+  private renderSummaryPreview(parent: HTMLElement): void {
+    const todos = this.scanner.getTodos();
+    const openCount = todos.filter(t => t.parentLineNumber === undefined).length;
+
+    // Compute Done velocity inline so the collapsed header is self-contained.
+    const todones = this.scanner.getTodones();
+    const m = (moment as any);
+    const todayStr = m().format("YYYY-MM-DD");
+    const weekStart = m().startOf("isoWeek").format("YYYY-MM-DD");
+    const monthStart = m().startOf("month").format("YYYY-MM-DD");
+    let doneToday = 0, doneWeek = 0, doneMonth = 0;
+    for (const t of todones) {
+      const date = extractCompletionDate(t.text);
+      if (!date) continue;
+      if (date >= monthStart) {
+        doneMonth++;
+        if (date >= weekStart) {
+          doneWeek++;
+          if (date === todayStr) doneToday++;
+        }
+      }
+    }
+
+    parent.createEl("span", { cls: "summary-preview-num", text: String(openCount) });
+    parent.createEl("span", { cls: "summary-preview-label", text: " open · Done: " });
+    parent.createEl("span", { cls: "summary-preview-num", text: String(doneToday) });
+    parent.createEl("span", { cls: "summary-preview-label", text: " today · " });
+    parent.createEl("span", { cls: "summary-preview-num", text: String(doneWeek) });
+    parent.createEl("span", { cls: "summary-preview-label", text: " week · " });
+    parent.createEl("span", { cls: "summary-preview-num", text: String(doneMonth) });
+    parent.createEl("span", { cls: "summary-preview-label", text: " month" });
   }
 
   private renderPriorityCounts(section: HTMLElement): void {
@@ -1665,38 +1735,6 @@ export class TodoSidebarView extends ItemView {
     }
   }
 
-  private renderCompletionVelocity(section: HTMLElement): void {
-    const todones = this.scanner.getTodones();
-
-    const m = (moment as any);
-    const todayStr = m().format("YYYY-MM-DD");
-    const weekStart = m().startOf("isoWeek").format("YYYY-MM-DD");
-    const monthStart = m().startOf("month").format("YYYY-MM-DD");
-
-    let doneToday = 0, doneWeek = 0, doneMonth = 0;
-    for (const t of todones) {
-      const date = extractCompletionDate(t.text);
-      if (!date) continue;
-      if (date >= monthStart) {
-        doneMonth++;
-        if (date >= weekStart) {
-          doneWeek++;
-          if (date === todayStr) {
-            doneToday++;
-          }
-        }
-      }
-    }
-
-    const vel = section.createEl("div", { cls: "summary-velocity" });
-    vel.createEl("span", { text: "Done: " });
-    vel.createEl("span", { cls: "summary-velocity-num", text: String(doneToday) });
-    vel.createEl("span", { text: " today · " });
-    vel.createEl("span", { cls: "summary-velocity-num", text: String(doneWeek) });
-    vel.createEl("span", { text: " week · " });
-    vel.createEl("span", { cls: "summary-velocity-num", text: String(doneMonth) });
-    vel.createEl("span", { text: " month" });
-  }
 
   private renderTopBacklogs(section: HTMLElement): void {
     const projects = this.projectManager.getProjects();
