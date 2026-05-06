@@ -2,6 +2,33 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.14.1] - 2026-05-06
+
+### Changed — Focus Mode card polish
+
+Follow-up tuning pass on the 0.14.0 card refresh based on side-by-side review.
+
+- **Heading** now reads `FOCUS: <source>` — the prefix sits in small-caps faint text so the source name still leads visually.
+- **Checkbox** vertical alignment nudged down so it centres on the first line of the title.
+- **Date** reverts to `D/M/YYYY` and matches the tag font size. The `(modified)` suffix is gone — it added noise without helping the user act on the task.
+- **Tags + date** share a single row: tags left-aligned, date pushed to the right when both fit, wrapping cleanly otherwise.
+- **Buttons** dialled back to a quiet treatment — no shadow, lower contrast, and a hover-only emphasis. The Complete/Skip pair reads as a soft pair rather than a primary/secondary call-out.
+
+## [0.14.0] - 2026-05-06
+
+### Changed — Focus Mode card refresh
+
+Quality-of-life pass on the immersive Focus Mode card to keep the eye on the task itself, not the chrome around it.
+
+- **Removed** the priority-fallback hint, the `FOCUS (1 of N)` counter, the `From` label, and the explicit `Tags`, `Date`, and `Source` row labels.
+- **Source heading** now sits above the title as plain italic text at 0.85 opacity. A small link-icon affordance opens the source file at the task's line.
+- **Source row removed**: the file path is no longer shown as a separate row; the link icon next to the heading replaces it.
+- **Tags** render as faded pill chiclets — visible, but de-emphasized so the task title leads.
+- **Date** is shown without a label and reformatted as `Tuesday May the 5th`. Modified-date items still get a small `(modified)` suffix.
+- **Checkbox** added to the left of the title, mirroring the in-doc affordance. Checking it completes the task.
+- **Buttons** relabeled `Complete` / `Skip` and given a more polished primary/secondary treatment with a subtle press effect.
+- **Exit link** now reads `Exit focus mode →` and the arrow nudges right on hover.
+
 ## [0.13.0] - 2026-05-04
 
 ### Changed — Header TODO completion semantics

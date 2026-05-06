@@ -58,7 +58,7 @@ export type FocusQueueSource = 'focus-tagged' | 'priority-fallback' | 'empty';
 
 /**
  * Result of building a focus queue: ordered queue items plus their source classification.
- * Source is used to render the "No focus items — showing top priority" hint when fallback is in effect.
+ * Source is used to differentiate `#focus`-tagged queues from priority-fallback queues for downstream logic.
  */
 export interface FocusQueueResult {
   items: TodoItem[];

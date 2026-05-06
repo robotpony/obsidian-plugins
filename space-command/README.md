@@ -42,9 +42,9 @@ That's it. Everything else is optional.
 
 Items sort by: focus → priority → tag count (more tags = more context = higher).
 
-**Focus mode**: Click the eye icon in the Projects section header to enter immersive Focus Mode. The sidebar replaces its content with a single focus card — one TODO at a time, with title, tag badges, date, and a source-file link. **Done** completes the task and advances; **Skip** rotates the current item to the back of the queue; the in-card **Exit focus mode** link returns to the normal sidebar.
+**Focus mode**: Click the eye icon in the Projects section header to enter immersive Focus Mode. The sidebar replaces its content with a single focus card — the source heading with a link icon, a checkbox beside the task, faded tag chiclets, and a friendly date. **Complete** finishes the task (or just check the box); **Skip** rotates the current item to the back of the queue; **Exit focus mode →** returns to the normal sidebar.
 
-The queue is built from `#focus`-tagged TODOs first; if none exist, it falls back to your top-priority items (with a hint shown on the card). When the curated queue empties, you can choose **Continue with next priority task** to keep going, or **Exit focus mode**. Mode state persists across sessions by default; configure via the `focusQueueLimit` (1–5, default 1) and `focusModePersist` settings.
+The queue is built from `#focus`-tagged TODOs first; if none exist, it falls back to your top-priority items. When the curated queue empties, you can choose **Continue with next priority task** to keep going, or **Exit focus mode**. Mode state persists across sessions by default; configure via the `focusQueueLimit` (1–5, default 1) and `focusModePersist` settings.
 
 **Project tags** group TODOs in the sidebar's Focus section. Any tag that isn't a priority or type tag becomes a project:
 

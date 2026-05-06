@@ -240,7 +240,7 @@ Notes:
 | `focusModePersist` | `true` | — | Whether `focusModeActive` survives session restart. When `false`, `focusModeActive` is reset to `false` on plugin load. |
 | `focusModeActive` | `false` | — | Persisted on/off state. Mutated by entry/exit handlers via the `setFocusModeActive` callback passed into the view. Not exposed as a user-facing setting. |
 
-Priority fallback is always on (no setting). The hint "No focus items — showing top priority" is rendered on the card whenever the queue source is `priority-fallback`.
+Priority fallback is always on (no setting). When the queue source is `priority-fallback`, the card renders the same as a `#focus` queue — the surface is intentionally identical so the user stays focused on the task, not the queue's provenance.
 
 #### Class and file touchpoints
 

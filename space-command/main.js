@@ -5175,31 +5175,38 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     this.renderFocusItem(container, state);
   }
   renderFocusItem(container, state) {
-    var _a;
     const card = container.createEl("div", { cls: "focus-card" });
-    if (state.source === "priority-fallback") {
-      card.createEl("div", {
-        cls: "focus-card-hint",
-        text: "No focus items \u2014 showing top priority."
+    const item = state.items[0];
+    const sourceHeadingText = this.getFocusSourceHeading(item);
+    if (sourceHeadingText) {
+      const fromEl = card.createEl("div", { cls: "focus-card-from" });
+      fromEl.createEl("span", { cls: "focus-card-from-prefix", text: "Focus: " });
+      fromEl.createEl("span", { cls: "focus-card-from-text", text: sourceHeadingText });
+      const linkBtn = fromEl.createEl("a", {
+        cls: "focus-card-from-link",
+        href: "#",
+        attr: { "aria-label": "Open source", title: "Open source" }
+      });
+      linkBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>';
+      linkBtn.addEventListener("click", (e) => {
+        var _a;
+        e.preventDefault();
+        const blockEnd = ((_a = item.childLineNumbers) == null ? void 0 : _a.length) ? Math.max(...item.childLineNumbers) : void 0;
+        openFileAtLine(this.app, item.file, item.lineNumber, blockEnd);
       });
     }
-    const counter = card.createEl("div", { cls: "focus-card-counter" });
-    counter.appendText(`FOCUS  (1 of ${state.items.length})`);
-    const item = state.items[0];
-    if (item.parentLineNumber !== void 0) {
-      const parent = this.scanner.getTodos().find(
-        (t) => t.filePath === item.filePath && t.lineNumber === item.parentLineNumber
-      );
-      if (parent) {
-        const parentClean = parent.text.replace(/^#{1,6}\s+/, "").replace(this.todoConfig.tagToStrip, "").replace(/#[\w-]+/g, "").replace(/@[\w][\w.-]*/g, "").replace(/\s+/g, " ").trim();
-        if (parentClean) {
-          const fromEl = card.createEl("div", { cls: "focus-card-from" });
-          fromEl.createEl("span", { cls: "focus-card-from-label", text: "From " });
-          fromEl.createEl("span", { cls: "focus-card-from-text", text: parentClean });
-        }
-      }
-    }
-    const titleEl = card.createEl("div", { cls: "focus-card-title" });
+    const taskRow = card.createEl("div", { cls: "focus-card-task" });
+    const checkbox = taskRow.createEl("input", {
+      type: "checkbox",
+      cls: "focus-card-checkbox"
+    });
+    checkbox.addEventListener("change", async () => {
+      if (!checkbox.checked)
+        return;
+      checkbox.disabled = true;
+      await this.handleFocusDone(item);
+    });
+    const titleEl = taskRow.createEl("div", { cls: "focus-card-title" });
     const titleConfig = this.todoConfig;
     const cleanTitle = item.text.replace(titleConfig.tagToStrip, "").trim();
     const titleNoTags = this.stripTagsPreservingCode(cleanTitle);
@@ -5209,10 +5216,11 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       titleEl.appendText(this.stripMarkdownSyntax(titleNoTags).replace(/\s+/g, " ").trim());
     }
     const visibleTags = this.getFocusVisibleTags(item);
-    if (visibleTags.length > 0) {
-      const row = card.createEl("div", { cls: "focus-card-row focus-card-tags-row" });
-      row.createEl("div", { cls: "focus-card-row-label", text: "Tags" });
-      const tagsEl = row.createEl("div", { cls: "focus-card-tags" });
+    const date = getItemDate(item);
+    const hasDate = date.kind !== "none" && !!date.iso;
+    if (visibleTags.length > 0 || hasDate) {
+      const metaRow = card.createEl("div", { cls: "focus-card-meta" });
+      const tagsEl = metaRow.createEl("div", { cls: "focus-card-tags" });
       const projectColourMap = this.getProjectColourMap();
       const MAX_VISIBLE = 6;
       const shown = visibleTags.slice(0, MAX_VISIBLE);
@@ -5229,35 +5237,23 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
           text: `+${overflow} more`
         });
       }
+      if (hasDate) {
+        metaRow.createEl("span", {
+          cls: "focus-card-date",
+          text: this.formatFocusDate(date.iso)
+        });
+      }
     }
-    const date = getItemDate(item);
-    if (date.kind !== "none" && date.iso) {
-      const row = card.createEl("div", { cls: "focus-card-row focus-card-date-row" });
-      row.createEl("div", { cls: "focus-card-row-label", text: "Date" });
-      const dateEl = row.createEl("div", { cls: "focus-card-date" });
-      const text = date.kind === "modified" ? `${date.iso} (modified)` : `@${date.iso}`;
-      dateEl.appendText(text);
-    }
-    const sourceRow = card.createEl("div", { cls: "focus-card-row focus-card-source-row" });
-    sourceRow.createEl("div", { cls: "focus-card-row-label", text: "Source" });
-    const sourceEl = sourceRow.createEl("div", { cls: "focus-card-source" });
-    const folder = ((_a = item.file.parent) == null ? void 0 : _a.name) || "";
-    const displayPath = folder ? `${folder}/${item.file.name}` : item.file.name;
-    const sourceLink = sourceEl.createEl("a", {
-      cls: "focus-card-source-link",
-      text: displayPath,
-      href: "#"
-    });
-    sourceLink.addEventListener("click", (e) => {
-      var _a2;
-      e.preventDefault();
-      const blockEnd = ((_a2 = item.childLineNumbers) == null ? void 0 : _a2.length) ? Math.max(...item.childLineNumbers) : void 0;
-      openFileAtLine(this.app, item.file, item.lineNumber, blockEnd);
-    });
     const actions = card.createEl("div", { cls: "focus-card-actions" });
-    const doneBtn = actions.createEl("button", { cls: "focus-card-btn focus-card-btn-done", text: "Done" });
+    const doneBtn = actions.createEl("button", {
+      cls: "focus-card-btn focus-card-btn-done",
+      text: "Complete"
+    });
     doneBtn.addEventListener("click", () => this.handleFocusDone(item));
-    const skipBtn = actions.createEl("button", { cls: "focus-card-btn focus-card-btn-skip", text: "Skip" });
+    const skipBtn = actions.createEl("button", {
+      cls: "focus-card-btn focus-card-btn-skip",
+      text: "Skip"
+    });
     if (state.items.length < 2) {
       skipBtn.disabled = true;
     }
@@ -5265,13 +5261,35 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     const exitRow = card.createEl("div", { cls: "focus-card-exit-row" });
     const exitLink = exitRow.createEl("a", {
       cls: "focus-card-exit",
-      text: "Exit focus mode",
       href: "#"
     });
+    exitLink.appendText("Exit focus mode ");
+    exitLink.createEl("span", { cls: "focus-card-exit-arrow", text: "\u2192" });
     exitLink.addEventListener("click", (e) => {
       e.preventDefault();
       this.handleFocusExit();
     });
+  }
+  /**
+   * Build the heading shown above the focus title: the parent header text when
+   * the item is a child of a header block, otherwise the file's display name.
+   */
+  getFocusSourceHeading(item) {
+    if (item.parentLineNumber !== void 0) {
+      const parent = this.scanner.getTodos().find(
+        (t) => t.filePath === item.filePath && t.lineNumber === item.parentLineNumber
+      );
+      if (parent) {
+        const parentClean = parent.text.replace(/^#{1,6}\s+/, "").replace(this.todoConfig.tagToStrip, "").replace(/#[\w-]+/g, "").replace(/@[\w][\w.-]*/g, "").replace(/\s+/g, " ").trim();
+        if (parentClean)
+          return parentClean;
+      }
+    }
+    return item.file.basename || item.file.name;
+  }
+  /** Format an ISO date as `D/M/YYYY` (e.g. `5/5/2026`). */
+  formatFocusDate(iso) {
+    return (0, import_obsidian12.moment)(iso).format("D/M/YYYY");
   }
   renderFocusCompletion(container) {
     const card = container.createEl("div", { cls: "focus-card focus-card-complete" });
