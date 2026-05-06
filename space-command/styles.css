@@ -2218,12 +2218,19 @@
   gap: var(--size-4-2);
 }
 
-.focus-card-checkbox {
-  margin-top: 0.45em;
-  cursor: pointer;
+/* The wrapper's height is locked to the title's first-line box
+   (font-size × line-height) so flex centring lands the checkbox
+   exactly on the first-line midpoint, no matter the theme. */
+.focus-card-checkbox-wrap {
+  display: flex;
+  align-items: center;
   flex-shrink: 0;
-  width: 1.05em;
-  height: 1.05em;
+  height: calc(1.15em * 1.35);
+}
+
+.focus-card-checkbox {
+  margin: 0;
+  cursor: pointer;
 }
 
 .focus-card-title {
@@ -2268,7 +2275,7 @@
 }
 
 .focus-card-date {
-  font-size: 0.7em;
+  font-size: 0.6em;
   color: var(--text-faint);
   white-space: nowrap;
   margin-left: auto;
@@ -2277,7 +2284,9 @@
 .focus-card-actions {
   display: flex;
   gap: var(--size-4-2);
-  margin-top: var(--size-4-3);
+  /* Matches the focus-card top margin so the gap above the buttons mirrors
+     the gap between the sidebar header and the card content (2:2). */
+  margin-top: 2em;
 }
 
 .focus-card-actions-stack {
@@ -2287,14 +2296,14 @@
 .focus-card-btn {
   flex: 1;
   padding: var(--size-4-2) var(--size-4-3);
-  font-size: 0.85em;
-  font-weight: 500;
+  font-size: 0.78em;
+  font-weight: 700;
   cursor: pointer;
   border-radius: var(--radius-s);
-  border: 1px solid transparent;
+  border: none;
   background: var(--background-modifier-hover);
   color: var(--text-muted);
-  transition: background 120ms ease, color 120ms ease;
+  transition: background-color 120ms ease, color 120ms ease;
   box-shadow: none;
 }
 
@@ -2308,16 +2317,18 @@
   cursor: not-allowed;
 }
 
-.focus-card-btn-done {
-  color: var(--text-normal);
-  background: var(--background-modifier-hover);
-  border-color: var(--background-modifier-border);
+/* Compound-class selector (specificity 0,2,0) beats theme rules like
+   `.workspace-leaf-content button` that set background-color on plain buttons. */
+.focus-card-btn.focus-card-btn-done {
+  color: #ffffff;
+  background-color: rgba(var(--color-green-rgb, 76, 175, 80), 0.7);
+  border: none;
 }
 
-.focus-card-btn-done:hover:not(:disabled) {
-  background: var(--background-modifier-active-hover);
-  border-color: var(--background-modifier-border-hover);
-  color: var(--text-normal);
+.focus-card-btn.focus-card-btn-done:hover:not(:disabled),
+.focus-card-btn.focus-card-btn-done:active:not(:disabled) {
+  background-color: rgba(var(--color-green-rgb, 76, 175, 80), 0.45);
+  color: #ffffff;
 }
 
 .focus-card-btn-skip {

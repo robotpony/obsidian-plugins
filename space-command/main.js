@@ -5142,7 +5142,8 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       });
     }
     const taskRow = card.createEl("div", { cls: "focus-card-task" });
-    const checkbox = taskRow.createEl("input", {
+    const checkboxWrap = taskRow.createEl("div", { cls: "focus-card-checkbox-wrap" });
+    const checkbox = checkboxWrap.createEl("input", {
       type: "checkbox",
       cls: "focus-card-checkbox"
     });

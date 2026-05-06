@@ -2,6 +2,32 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.14.6] - 2026-05-06
+
+### Changed — Focus card checkbox centring (real fix)
+
+Stopped trying to position the checkbox with `margin-top` on the `<input>` element. Themes that style `input[type="checkbox"]` were winning the cascade for sizing, and `em` units on form controls don't always resolve against the inherited font-size — so each margin bump moved less than expected.
+
+The checkbox now lives inside a `.focus-card-checkbox-wrap` whose height is locked to `calc(1.15em * 1.35)` — exactly the title's first-line box. Flex `align-items: center` on the wrapper places the checkbox at the first-line midpoint, regardless of theme overrides.
+
+## [0.14.5] - 2026-05-06
+
+### Changed — More focus card polish
+
+- **Checkbox** dropped further still so its centre lands on the title's first-line midpoint.
+- **Buttons** lose their borders, get a smaller bold font, and the Complete button takes white text on a stronger green fill.
+- **Spacing** above the buttons now matches the gap between the sidebar header and the card content (2:2 instead of 2:1).
+
+## [0.14.4] - 2026-05-06
+
+### Changed — Focus card visual nits
+
+Three small adjustments after a side-by-side review.
+
+- **Checkbox** dropped further so its centre sits near the midpoint of the title's first line.
+- **Date** shrunk to 0.6em so it sits visibly smaller than the tag chiclets and reads as secondary metadata.
+- **Buttons** get a noticeably larger gap above them. The Complete button picks up a muted green tint sourced from the theme's `--color-green` (with a sensible fallback when the theme doesn't define one).
+
 ## [0.14.3] - 2026-05-06
 
 ### Changed — Focus Mode header gets the kebab menu

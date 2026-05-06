@@ -1967,9 +1967,13 @@ export class TodoSidebarView extends ItemView {
     }
 
     // Title row: checkbox + task text. Checking the box completes the task,
-    // matching the in-doc affordance.
+    // matching the in-doc affordance. The checkbox lives inside a wrapper
+    // whose height matches the title's first-line height — this gives us
+    // reliable first-line vertical centring regardless of theme overrides
+    // on `<input type="checkbox">` or em-unit edge cases.
     const taskRow = card.createEl("div", { cls: "focus-card-task" });
-    const checkbox = taskRow.createEl("input", {
+    const checkboxWrap = taskRow.createEl("div", { cls: "focus-card-checkbox-wrap" });
+    const checkbox = checkboxWrap.createEl("input", {
       type: "checkbox",
       cls: "focus-card-checkbox",
     });
