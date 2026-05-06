@@ -2,6 +2,23 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.14.12] - 2026-05-06
+
+### Changed — Polish: focus card transitions
+
+The focus card now reinforces what just happened with motion.
+
+- **Complete**: the title gets a green strikethrough and dims to muted (~180ms), the card washes a soft green at ~18% then ~12% opacity, and fades up-and-out (~480ms). The next card mounts with a calm fade-up (200ms). Total ~580ms — brisk, but enough to land the success.
+- **Skip**: current card slides left and fades out (180ms); next card slides in from the right (220ms). Reads as "this one's done with for now, next up".
+- **Reduced-motion**: `@media (prefers-reduced-motion: reduce)` strips the slide and the strikethrough but keeps a quick opacity fade on Complete so the success signal stays legible.
+- **Internals**: `animatingFocusTransition` flag suppresses the auto-rerender from the scanner's `todos-updated` event so the leaving card can finish its exit before the entering card mounts. The file write runs in parallel with the leave animation so total click-to-next time stays close to the animation budget.
+
+## [0.14.11] - 2026-05-06
+
+### Changed — Focus card primary/secondary button balance
+
+The Complete button now takes twice the width of Skip (`flex: 2` vs `flex: 1`), and Skip's text drops to `--text-faint` (with a hover bump back to `--text-muted`). The two actions read as a clear primary/secondary pair instead of an even pair, which matches their actual weight in the focus loop.
+
 ## [0.14.10] - 2026-05-06
 
 ### Fixed — Focus Mode Skip works with `focusQueueLimit: 1`

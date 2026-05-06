@@ -17,6 +17,12 @@ export class TodoSidebarView extends ItemView {
   private updateListener: (() => void) | null = null;
   private contextMenuHandler: ContextMenuHandler;
   private activeTodosLimit: number;
+  // True while a Complete/Skip transition animation is in flight; suppresses
+  // mid-animation re-renders that would otherwise tear the card off-screen.
+  private animatingFocusTransition: boolean = false;
+  // Class applied to the next mounted focus card so its entrance matches the
+  // action that produced it (Complete fades up, Skip slides in from the right).
+  private pendingFocusEnter: "complete" | "skip" | null = null;
   private focusListLimit: number;
   private makeLinksClickable: boolean;
   private triageSnoozedThreshold: number;
@@ -682,6 +688,9 @@ export class TodoSidebarView extends ItemView {
     // any cached focus queue so it's rebuilt fresh on the next render.
     this.updateListener = () => {
       this.focusQueue = null;
+      // Skip the auto-rerender while a focus-card animation is playing —
+      // handleFocusDone will trigger the render itself once the animation ends.
+      if (this.animatingFocusTransition) return;
       this.render();
     };
     this.scanner.on("todos-updated", this.updateListener);
@@ -1940,7 +1949,12 @@ export class TodoSidebarView extends ItemView {
   }
 
   private renderFocusItem(container: HTMLElement, state: FocusQueueState): void {
-    const card = container.createEl("div", { cls: "focus-card" });
+    const enterClass =
+      this.pendingFocusEnter === "skip" ? " focus-card--entering-skip" :
+      this.pendingFocusEnter === "complete" ? " focus-card--entering-complete" :
+      "";
+    this.pendingFocusEnter = null;
+    const card = container.createEl("div", { cls: `focus-card${enterClass}` });
 
     const item = state.items[0];
 
@@ -2274,43 +2288,90 @@ export class TodoSidebarView extends ItemView {
   }
 
   private async handleFocusDone(item: TodoItem): Promise<void> {
-    // The scanner will re-emit todos-updated after the file write; the
-    // listener invalidates focusQueue and re-renders.
-    await this.processor.completeTodo(item, this.defaultTodoneFile);
-  }
-
-  private handleFocusSkip(): void {
-    if (!this.focusQueue || this.focusQueue.items.length === 0) return;
-
-    // Multi-item queue: rotate the head to the back so the next item surfaces.
-    if (this.focusQueue.items.length >= 2) {
-      this.focusQueue = {
-        ...this.focusQueue,
-        items: rotateQueue(this.focusQueue.items),
-      };
-      this.render();
+    const card = this.containerEl.querySelector(".focus-card") as HTMLElement | null;
+    // No card in the DOM (edge case): just write and let the normal render flow run.
+    if (!card) {
+      await this.processor.completeTodo(item, this.defaultTodoneFile);
       return;
     }
 
-    // Single-item queue: rebuild from the wider candidate pool, drop the
-    // skipped item, and pin the next-best to the front so Skip still does
-    // something useful when `focusQueueLimit` is 1.
-    const skipped = this.focusQueue.items[0];
-    const active = this.getActiveTodosForFocus();
-    const result = buildFocusQueue(active, Math.max(2, this.focusQueueLimit), {
-      forceFallback: this.focusQueue.inContinueMode,
-    });
-    const remaining = result.items.filter(
-      t => !(t.filePath === skipped.filePath && t.lineNumber === skipped.lineNumber)
-    );
-    if (remaining.length === 0) return;
+    // Run the strikethrough → flash → fade animation in parallel with the file
+    // write. The auto-rerender listener is suppressed for the duration; we kick
+    // off the render ourselves once both finish so the next card mounts with a
+    // matching entrance.
+    this.animatingFocusTransition = true;
+    this.pendingFocusEnter = "complete";
+    card.classList.add("focus-card--leaving-complete");
 
-    this.focusQueue = {
-      items: [remaining[0]],
-      source: result.source,
-      inContinueMode: this.focusQueue.inContinueMode,
-    };
+    const writePromise = this.processor.completeTodo(item, this.defaultTodoneFile);
+    await Promise.all([
+      writePromise,
+      this.waitForAnimationEnd(card, 700),
+    ]);
+
+    this.animatingFocusTransition = false;
+    this.focusQueue = null;
     this.render();
+  }
+
+  private async handleFocusSkip(): Promise<void> {
+    if (!this.focusQueue || this.focusQueue.items.length === 0) return;
+
+    // Compute the next queue state up front so we know whether Skip has
+    // anything to do — bail before animating if not.
+    let nextQueue: FocusQueueState | null = null;
+    if (this.focusQueue.items.length >= 2) {
+      nextQueue = {
+        ...this.focusQueue,
+        items: rotateQueue(this.focusQueue.items),
+      };
+    } else {
+      const skipped = this.focusQueue.items[0];
+      const active = this.getActiveTodosForFocus();
+      const result = buildFocusQueue(active, Math.max(2, this.focusQueueLimit), {
+        forceFallback: this.focusQueue.inContinueMode,
+      });
+      const remaining = result.items.filter(
+        t => !(t.filePath === skipped.filePath && t.lineNumber === skipped.lineNumber)
+      );
+      if (remaining.length === 0) return;
+      nextQueue = {
+        items: [remaining[0]],
+        source: result.source,
+        inContinueMode: this.focusQueue.inContinueMode,
+      };
+    }
+
+    // Slide the current card out to the left, then mount the next one with the
+    // matching slide-in-from-right entrance.
+    const card = this.containerEl.querySelector(".focus-card") as HTMLElement | null;
+    if (card) {
+      this.pendingFocusEnter = "skip";
+      card.classList.add("focus-card--leaving-skip");
+      await this.waitForAnimationEnd(card, 240);
+    }
+
+    this.focusQueue = nextQueue;
+    this.render();
+  }
+
+  /**
+   * Resolve when the element's CSS animation ends — or after `fallbackMs` if
+   * no `animationend` event fires (defensive: stale element, reduced-motion,
+   * or no animation actually applied).
+   */
+  private waitForAnimationEnd(el: HTMLElement, fallbackMs: number): Promise<void> {
+    return new Promise(resolve => {
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        el.removeEventListener("animationend", finish);
+        resolve();
+      };
+      el.addEventListener("animationend", finish, { once: true });
+      setTimeout(finish, fallbackMs);
+    });
   }
 
   /**

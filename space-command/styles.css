@@ -2294,6 +2294,7 @@
 }
 
 .focus-card-btn {
+  /* Complete (primary) gets twice the width of Skip (secondary). */
   flex: 1;
   padding: var(--size-4-2) var(--size-4-3);
   font-size: 0.78em;
@@ -2305,6 +2306,10 @@
   color: var(--text-muted);
   transition: background-color 120ms ease, color 120ms ease;
   box-shadow: none;
+}
+
+.focus-card-btn-done {
+  flex: 2;
 }
 
 .focus-card-btn:hover:not(:disabled) {
@@ -2331,12 +2336,14 @@
   color: #ffffff;
 }
 
-.focus-card-btn-skip {
+.focus-card-btn.focus-card-btn-skip {
   background: transparent;
+  color: var(--text-faint);
 }
 
-.focus-card-btn-skip:hover:not(:disabled) {
+.focus-card-btn.focus-card-btn-skip:hover:not(:disabled) {
   background: var(--background-modifier-hover);
+  color: var(--text-muted);
 }
 
 .focus-card-exit-row {
@@ -2362,6 +2369,95 @@
 
 .focus-card-exit-arrow {
   display: inline-block;
+}
+
+/* ---------------------------------------------------------------------------
+   Focus card transitions
+   --------------------------------------------------------------------------- */
+
+/* Complete: the title gets a green strikethrough and dims to muted, then the
+   whole card washes faint green and fades up-and-out. The strike happens
+   first (~180ms), then the card-level animation overlaps and finishes. */
+.focus-card-title {
+  text-decoration: line-through transparent;
+  text-decoration-thickness: 2px;
+  transition: color 180ms ease, text-decoration-color 180ms ease;
+}
+
+.focus-card--leaving-complete .focus-card-title {
+  color: var(--text-muted);
+  text-decoration-color: var(--color-green, currentColor);
+}
+
+@keyframes focus-card-leave-complete {
+  0% {
+    background-color: transparent;
+    opacity: 1;
+    transform: translateY(0);
+  }
+  35% {
+    background-color: rgba(var(--color-green-rgb, 76, 175, 80), 0.18);
+    opacity: 1;
+  }
+  60% {
+    background-color: rgba(var(--color-green-rgb, 76, 175, 80), 0.12);
+    opacity: 1;
+  }
+  100% {
+    background-color: transparent;
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.focus-card--leaving-complete {
+  border-radius: var(--radius-m);
+  animation: focus-card-leave-complete 480ms cubic-bezier(0.4, 0, 0.2, 1) 100ms forwards;
+}
+
+/* Complete entrance: gentle fade-up so the next task arrives calmly, not jarring. */
+@keyframes focus-card-enter-complete {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.focus-card--entering-complete {
+  animation: focus-card-enter-complete 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Skip: the current card slides left out of view; the next slides in from the
+   right. Reads as "this one's done with for now, next up". */
+@keyframes focus-card-leave-skip {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(-32px); }
+}
+
+.focus-card--leaving-skip {
+  animation: focus-card-leave-skip 180ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+@keyframes focus-card-enter-skip {
+  from { opacity: 0; transform: translateX(32px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.focus-card--entering-skip {
+  animation: focus-card-enter-skip 220ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+/* Respect reduced-motion: skip the visual choreography but keep the colour
+   change on Complete so the success signal is still legible. */
+@media (prefers-reduced-motion: reduce) {
+  .focus-card--leaving-complete,
+  .focus-card--leaving-skip,
+  .focus-card--entering-complete,
+  .focus-card--entering-skip {
+    animation: none;
+  }
+  .focus-card--leaving-complete {
+    opacity: 0;
+    transition: opacity 120ms linear;
+  }
 }
 
 /* Empty and completion states share the same compositional spacing */

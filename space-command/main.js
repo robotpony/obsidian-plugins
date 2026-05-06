@@ -3712,6 +3712,12 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
   }) {
     super(leaf);
     this.updateListener = null;
+    // True while a Complete/Skip transition animation is in flight; suppresses
+    // mid-animation re-renders that would otherwise tear the card off-screen.
+    this.animatingFocusTransition = false;
+    // Class applied to the next mounted focus card so its entrance matches the
+    // action that produced it (Complete fades up, Skip slides in from the right).
+    this.pendingFocusEnter = null;
     this.activeTab = "todos";
     this.activeTagFilter = null;
     this.activeAssigneeFilter = null;
@@ -4176,6 +4182,8 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
   async onOpen() {
     this.updateListener = () => {
       this.focusQueue = null;
+      if (this.animatingFocusTransition)
+        return;
       this.render();
     };
     this.scanner.on("todos-updated", this.updateListener);
@@ -5143,7 +5151,9 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     this.renderFocusItem(container, state);
   }
   renderFocusItem(container, state) {
-    const card = container.createEl("div", { cls: "focus-card" });
+    const enterClass = this.pendingFocusEnter === "skip" ? " focus-card--entering-skip" : this.pendingFocusEnter === "complete" ? " focus-card--entering-complete" : "";
+    this.pendingFocusEnter = null;
+    const card = container.createEl("div", { cls: `focus-card${enterClass}` });
     const item = state.items[0];
     const sourceHeadingText = this.getFocusSourceHeading(item);
     if (sourceHeadingText) {
@@ -5404,35 +5414,76 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     this.render();
   }
   async handleFocusDone(item) {
-    await this.processor.completeTodo(item, this.defaultTodoneFile);
+    const card = this.containerEl.querySelector(".focus-card");
+    if (!card) {
+      await this.processor.completeTodo(item, this.defaultTodoneFile);
+      return;
+    }
+    this.animatingFocusTransition = true;
+    this.pendingFocusEnter = "complete";
+    card.classList.add("focus-card--leaving-complete");
+    const writePromise = this.processor.completeTodo(item, this.defaultTodoneFile);
+    await Promise.all([
+      writePromise,
+      this.waitForAnimationEnd(card, 700)
+    ]);
+    this.animatingFocusTransition = false;
+    this.focusQueue = null;
+    this.render();
   }
-  handleFocusSkip() {
+  async handleFocusSkip() {
     if (!this.focusQueue || this.focusQueue.items.length === 0)
       return;
+    let nextQueue = null;
     if (this.focusQueue.items.length >= 2) {
-      this.focusQueue = {
+      nextQueue = {
         ...this.focusQueue,
         items: rotateQueue(this.focusQueue.items)
       };
-      this.render();
-      return;
+    } else {
+      const skipped = this.focusQueue.items[0];
+      const active = this.getActiveTodosForFocus();
+      const result = buildFocusQueue(active, Math.max(2, this.focusQueueLimit), {
+        forceFallback: this.focusQueue.inContinueMode
+      });
+      const remaining = result.items.filter(
+        (t) => !(t.filePath === skipped.filePath && t.lineNumber === skipped.lineNumber)
+      );
+      if (remaining.length === 0)
+        return;
+      nextQueue = {
+        items: [remaining[0]],
+        source: result.source,
+        inContinueMode: this.focusQueue.inContinueMode
+      };
     }
-    const skipped = this.focusQueue.items[0];
-    const active = this.getActiveTodosForFocus();
-    const result = buildFocusQueue(active, Math.max(2, this.focusQueueLimit), {
-      forceFallback: this.focusQueue.inContinueMode
-    });
-    const remaining = result.items.filter(
-      (t) => !(t.filePath === skipped.filePath && t.lineNumber === skipped.lineNumber)
-    );
-    if (remaining.length === 0)
-      return;
-    this.focusQueue = {
-      items: [remaining[0]],
-      source: result.source,
-      inContinueMode: this.focusQueue.inContinueMode
-    };
+    const card = this.containerEl.querySelector(".focus-card");
+    if (card) {
+      this.pendingFocusEnter = "skip";
+      card.classList.add("focus-card--leaving-skip");
+      await this.waitForAnimationEnd(card, 240);
+    }
+    this.focusQueue = nextQueue;
     this.render();
+  }
+  /**
+   * Resolve when the element's CSS animation ends — or after `fallbackMs` if
+   * no `animationend` event fires (defensive: stale element, reduced-motion,
+   * or no animation actually applied).
+   */
+  waitForAnimationEnd(el, fallbackMs) {
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = () => {
+        if (done)
+          return;
+        done = true;
+        el.removeEventListener("animationend", finish);
+        resolve();
+      };
+      el.addEventListener("animationend", finish, { once: true });
+      setTimeout(finish, fallbackMs);
+    });
   }
   /**
    * True when there's at least one focus candidate other than `current` —
