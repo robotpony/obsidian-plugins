@@ -1191,7 +1191,11 @@ export class TodoSidebarView extends ItemView {
 
   private renderProjectItem(list: HTMLElement, project: ProjectInfo): void {
     // Check if this project has any #focus items
-    const item = list.createEl("li", { cls: `project-item${project.hasFocusItems ? ' project-focus' : ''}` });
+    const isActiveFilter = this.activeTagFilter === project.tag;
+    const item = list.createEl("li", {
+      cls: `project-item${project.hasFocusItems ? ' project-focus' : ''}${isActiveFilter ? ' project-item-active' : ''}`,
+      attr: { role: "button", tabindex: "0", "aria-pressed": isActiveFilter ? "true" : "false" },
+    });
 
     // Add context menu for project operations
     item.addEventListener("contextmenu", (e) => {
@@ -1208,17 +1212,18 @@ export class TodoSidebarView extends ItemView {
       );
     });
 
-    // Checkbox for completing all project TODOs
-    const checkbox = item.createEl("input", {
-      type: "checkbox",
-      cls: "project-checkbox",
-    });
-
-    checkbox.addEventListener("change", async () => {
-      checkbox.checked = false; // Uncheck immediately
-      const confirmed = await this.confirmCompleteProject(project);
-      if (confirmed) {
-        await this.completeAllProjectTodos(project);
+    // Clicking the row toggles the tag filter on the active TODO list below.
+    // The info icon and the open-file link stop propagation so they keep their
+    // own behaviour.
+    const toggleFilter = () => {
+      this.activeTagFilter = isActiveFilter ? null : project.tag;
+      this.render();
+    };
+    item.addEventListener("click", toggleFilter);
+    item.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        toggleFilter();
       }
     });
 
@@ -1247,6 +1252,7 @@ export class TodoSidebarView extends ItemView {
 
     link.addEventListener("click", async (e) => {
       e.preventDefault();
+      e.stopPropagation();
       await this.projectManager.openProjectFile(project.tag);
     });
   }
@@ -1820,69 +1826,6 @@ export class TodoSidebarView extends ItemView {
 
   private renderIdeaItem(list: HTMLElement, idea: TodoItem): void {
     this.renderListItem(list, idea, this.ideaConfig);
-  }
-
-  private async confirmCompleteProject(project: ProjectInfo): Promise<boolean> {
-    return new Promise((resolve) => {
-      const modal = new Modal(this.app);
-      modal.titleEl.setText("Complete All Project TODOs?");
-      modal.contentEl.createEl("p", {
-        text: `This will mark all ${project.count} TODO(s) for project ${project.tag} as complete. This action cannot be undone.`,
-      });
-
-      const buttonContainer = modal.contentEl.createEl("div", {
-        cls: "modal-button-container",
-      });
-      buttonContainer.style.display = "flex";
-      buttonContainer.style.justifyContent = "flex-end";
-      buttonContainer.style.gap = "8px";
-      buttonContainer.style.marginTop = "16px";
-
-      const cancelBtn = buttonContainer.createEl("button", { text: "Cancel" });
-      cancelBtn.addEventListener("click", () => {
-        modal.close();
-        resolve(false);
-      });
-
-      const confirmBtn = buttonContainer.createEl("button", {
-        text: "Complete All",
-        cls: "mod-cta",
-      });
-      confirmBtn.addEventListener("click", () => {
-        modal.close();
-        resolve(true);
-      });
-
-      modal.open();
-    });
-  }
-
-  private async completeAllProjectTodos(project: ProjectInfo): Promise<void> {
-    const todos = this.scanner.getTodos().filter((todo) =>
-      todo.tags.includes(project.tag)
-    );
-
-    let completed = 0;
-    let failed = 0;
-
-    for (const todo of todos) {
-      const success = await this.processor.completeTodo(
-        todo,
-        this.defaultTodoneFile
-      );
-      if (success) {
-        completed++;
-      } else {
-        failed++;
-      }
-    }
-
-    if (failed > 0) {
-      showNotice(`Completed ${completed} TODO(s), ${failed} failed. See console for details.`);
-    } else {
-      showNotice(`Completed all ${completed} TODO(s) for ${project.tag}!`);
-    }
-    // Note: sidebar will auto-refresh via todos-updated event after scanner rescans
   }
 
   // -----------------------------------------------------------------------

@@ -590,13 +590,24 @@
 .project-item {
   display: flex;
   align-items: center;
-  padding: 4px 0;
+  padding: 4px 6px;
   gap: 8px;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  transition: background-color 100ms ease;
 }
 
-.project-checkbox {
-  cursor: pointer;
-  flex-shrink: 0;
+.project-item:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.project-item-active {
+  background-color: var(--background-modifier-hover);
+}
+
+.project-item-active .project-text {
+  color: var(--text-accent);
+  font-weight: 600;
 }
 
 .project-text {

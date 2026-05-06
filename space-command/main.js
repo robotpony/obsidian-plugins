@@ -4563,7 +4563,11 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     }
   }
   renderProjectItem(list, project) {
-    const item = list.createEl("li", { cls: `project-item${project.hasFocusItems ? " project-focus" : ""}` });
+    const isActiveFilter = this.activeTagFilter === project.tag;
+    const item = list.createEl("li", {
+      cls: `project-item${project.hasFocusItems ? " project-focus" : ""}${isActiveFilter ? " project-item-active" : ""}`,
+      attr: { role: "button", tabindex: "0", "aria-pressed": isActiveFilter ? "true" : "false" }
+    });
     item.addEventListener("contextmenu", (e) => {
       e.preventDefault();
       this.contextMenuHandler.showProjectMenu(
@@ -4577,15 +4581,15 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
         }
       );
     });
-    const checkbox = item.createEl("input", {
-      type: "checkbox",
-      cls: "project-checkbox"
-    });
-    checkbox.addEventListener("change", async () => {
-      checkbox.checked = false;
-      const confirmed = await this.confirmCompleteProject(project);
-      if (confirmed) {
-        await this.completeAllProjectTodos(project);
+    const toggleFilter = () => {
+      this.activeTagFilter = isActiveFilter ? null : project.tag;
+      this.render();
+    };
+    item.addEventListener("click", toggleFilter);
+    item.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        toggleFilter();
       }
     });
     const textSpan = item.createEl("span", { cls: "project-text" });
@@ -4606,6 +4610,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     });
     link.addEventListener("click", async (e) => {
       e.preventDefault();
+      e.stopPropagation();
       await this.projectManager.openProjectFile(project.tag);
     });
   }
@@ -5047,59 +5052,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
   }
   renderIdeaItem(list, idea) {
     this.renderListItem(list, idea, this.ideaConfig);
-  }
-  async confirmCompleteProject(project) {
-    return new Promise((resolve) => {
-      const modal = new import_obsidian12.Modal(this.app);
-      modal.titleEl.setText("Complete All Project TODOs?");
-      modal.contentEl.createEl("p", {
-        text: `This will mark all ${project.count} TODO(s) for project ${project.tag} as complete. This action cannot be undone.`
-      });
-      const buttonContainer = modal.contentEl.createEl("div", {
-        cls: "modal-button-container"
-      });
-      buttonContainer.style.display = "flex";
-      buttonContainer.style.justifyContent = "flex-end";
-      buttonContainer.style.gap = "8px";
-      buttonContainer.style.marginTop = "16px";
-      const cancelBtn = buttonContainer.createEl("button", { text: "Cancel" });
-      cancelBtn.addEventListener("click", () => {
-        modal.close();
-        resolve(false);
-      });
-      const confirmBtn = buttonContainer.createEl("button", {
-        text: "Complete All",
-        cls: "mod-cta"
-      });
-      confirmBtn.addEventListener("click", () => {
-        modal.close();
-        resolve(true);
-      });
-      modal.open();
-    });
-  }
-  async completeAllProjectTodos(project) {
-    const todos = this.scanner.getTodos().filter(
-      (todo) => todo.tags.includes(project.tag)
-    );
-    let completed = 0;
-    let failed = 0;
-    for (const todo of todos) {
-      const success = await this.processor.completeTodo(
-        todo,
-        this.defaultTodoneFile
-      );
-      if (success) {
-        completed++;
-      } else {
-        failed++;
-      }
-    }
-    if (failed > 0) {
-      showNotice2(`Completed ${completed} TODO(s), ${failed} failed. See console for details.`);
-    } else {
-      showNotice2(`Completed all ${completed} TODO(s) for ${project.tag}!`);
-    }
   }
   // -----------------------------------------------------------------------
   // Phase 2: Immersive Focus Mode

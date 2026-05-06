@@ -2,6 +2,20 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.15.0] - 2026-05-06
+
+### Changed — Project rows are filter buttons
+
+The Focus section's project rows lose their checkboxes. The "complete all TODOs in this project at once" pattern was easy to trigger by accident and rarely the right move — a single missed item in the wrong project was a notably annoying recovery.
+
+Clicking a project row now toggles a tag filter on the active TODO list below — same affordance as clicking a tag elsewhere in the sidebar. The active row is highlighted (background tint + accent-coloured, semi-bold text) so the current filter is obvious. Click again to clear.
+
+- The info icon (ⓘ) and the open-file arrow (→) keep their existing behaviour and stop event propagation, so they don't trigger the filter.
+- Keyboard: rows are `role="button"` with `tabindex="0"` and respond to `Enter` / `Space`.
+- The dead `confirmCompleteProject` and `completeAllProjectTodos` helpers (and their modal) were removed.
+
+This is a minor version bump because the user-facing behaviour of the project row changes meaningfully.
+
 ## [0.14.12] - 2026-05-06
 
 ### Changed — Polish: focus card transitions
