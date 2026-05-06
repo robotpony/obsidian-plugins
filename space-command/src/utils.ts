@@ -176,6 +176,7 @@ interface PrioritySortableItem {
   lineNumber: number;
   isHeader?: boolean;
   childLineNumbers?: number[];
+  parentLineNumber?: number;
 }
 
 /**
@@ -292,6 +293,61 @@ export function comparePriorityOnly(
 }
 
 /**
+ * Resolve the top-level ancestor for an item — the parent header when the
+ * item is a child of a header block, otherwise the item itself.
+ */
+function resolveTopLevelAncestor(
+  item: PrioritySortableItem,
+  allItems: PrioritySortableItem[]
+): PrioritySortableItem {
+  if (item.parentLineNumber === undefined) return item;
+  const parent = allItems.find(
+    t => t.filePath === item.filePath && t.lineNumber === item.parentLineNumber
+  );
+  return parent ?? item;
+}
+
+/**
+ * Compare two items in the same order they would be encountered while walking
+ * the main TODO list: top-level parents sorted by `compareWithEffectivePriority`,
+ * with children appearing in document order beneath their parent.
+ *
+ * Used by `buildFocusQueue` so the immersive Focus Mode advances through items
+ * in the same order the user sees them in the sidebar.
+ *
+ * - `respectFocusTier`: when true, parent ordering uses `compareWithEffectivePriority`
+ *   (focus tier first). When false, falls back to `comparePriorityOnly` for the
+ *   "Continue with next priority task" path that explicitly ignores #focus.
+ */
+export function compareInMainListWalkOrder(
+  a: PrioritySortableItem,
+  b: PrioritySortableItem,
+  allItems: PrioritySortableItem[],
+  respectFocusTier: boolean = true
+): number {
+  const aParent = resolveTopLevelAncestor(a, allItems);
+  const bParent = resolveTopLevelAncestor(b, allItems);
+
+  // Different top-level ancestors: order by how the main list would order
+  // those ancestors.
+  if (aParent.filePath !== bParent.filePath || aParent.lineNumber !== bParent.lineNumber) {
+    const parentDiff = respectFocusTier
+      ? compareWithEffectivePriority(aParent, bParent, allItems)
+      : comparePriorityOnly(aParent, bParent, allItems);
+    if (parentDiff !== 0) return parentDiff;
+    // Tie-break across files/headers by file path so the order is stable.
+    if (aParent.filePath !== bParent.filePath) {
+      return aParent.filePath.localeCompare(bParent.filePath);
+    }
+    return aParent.lineNumber - bParent.lineNumber;
+  }
+
+  // Same top-level ancestor: walk in document order so the queue mirrors the
+  // way the user reads the source file.
+  return a.lineNumber - b.lineNumber;
+}
+
+/**
  * Options for `buildFocusQueue`.
  *
  * - `forceFallback`: skip the curated #focus filter and build the queue directly
@@ -349,14 +405,14 @@ export function buildFocusQueue(
     const focused = candidates.filter((t) => hasTag(t.tags, "#focus"));
     if (focused.length > 0) {
       const sorted = [...focused].sort((a, b) =>
-        compareWithEffectivePriority(a, b, activeTodos)
+        compareInMainListWalkOrder(a, b, activeTodos, true)
       );
       return { items: sorted.slice(0, safeLimit), source: "focus-tagged" };
     }
   }
 
   const sorted = [...candidates].sort((a, b) =>
-    comparePriorityOnly(a, b, activeTodos)
+    compareInMainListWalkOrder(a, b, activeTodos, !options.forceFallback)
   );
   return { items: sorted.slice(0, safeLimit), source: "priority-fallback" };
 }

@@ -284,6 +284,28 @@ function comparePriorityOnly(a, b, allItems) {
     return priorityDiff;
   return getTagCount(b.tags) - getTagCount(a.tags);
 }
+function resolveTopLevelAncestor(item, allItems) {
+  if (item.parentLineNumber === void 0)
+    return item;
+  const parent = allItems.find(
+    (t) => t.filePath === item.filePath && t.lineNumber === item.parentLineNumber
+  );
+  return parent != null ? parent : item;
+}
+function compareInMainListWalkOrder(a, b, allItems, respectFocusTier = true) {
+  const aParent = resolveTopLevelAncestor(a, allItems);
+  const bParent = resolveTopLevelAncestor(b, allItems);
+  if (aParent.filePath !== bParent.filePath || aParent.lineNumber !== bParent.lineNumber) {
+    const parentDiff = respectFocusTier ? compareWithEffectivePriority(aParent, bParent, allItems) : comparePriorityOnly(aParent, bParent, allItems);
+    if (parentDiff !== 0)
+      return parentDiff;
+    if (aParent.filePath !== bParent.filePath) {
+      return aParent.filePath.localeCompare(bParent.filePath);
+    }
+    return aParent.lineNumber - bParent.lineNumber;
+  }
+  return a.lineNumber - b.lineNumber;
+}
 function buildFocusQueue(activeTodos, limit, options = {}) {
   const safeLimit = Math.max(1, Math.floor(limit));
   const candidates = activeTodos.filter((t) => {
@@ -303,13 +325,13 @@ function buildFocusQueue(activeTodos, limit, options = {}) {
     const focused = candidates.filter((t) => hasTag(t.tags, "#focus"));
     if (focused.length > 0) {
       const sorted2 = [...focused].sort(
-        (a, b) => compareWithEffectivePriority(a, b, activeTodos)
+        (a, b) => compareInMainListWalkOrder(a, b, activeTodos, true)
       );
       return { items: sorted2.slice(0, safeLimit), source: "focus-tagged" };
     }
   }
   const sorted = [...candidates].sort(
-    (a, b) => comparePriorityOnly(a, b, activeTodos)
+    (a, b) => compareInMainListWalkOrder(a, b, activeTodos, !options.forceFallback)
   );
   return { items: sorted.slice(0, safeLimit), source: "priority-fallback" };
 }
@@ -5104,7 +5126,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     const titleEl = header.createEl("h4", { cls: "sidebar-title" });
     const logoEl = titleEl.createEl("span", { cls: "space-command-logo clickable-logo", text: "\u2423\u2318" });
     logoEl.addEventListener("click", () => this.onShowAbout());
-    titleEl.appendText(" Focus");
+    titleEl.appendText(" TODOs");
     this.createSidebarMenuButton(header);
     if (!this.focusQueue) {
       this.rebuildFocusQueue();

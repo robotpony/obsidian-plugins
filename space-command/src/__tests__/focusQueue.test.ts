@@ -236,6 +236,68 @@ describe("buildFocusQueue", () => {
     const result = buildFocusQueue([], 1, { forceFallback: true });
     expect(result).toEqual({ items: [], source: "empty" });
   });
+
+  it("walks priority-fallback children in main-list order, grouped under their parents", () => {
+    // Two header blocks. HeaderA (effective priority p1 from its child)
+    // sorts above HeaderB (effective priority p2 from its child) in the main
+    // list, so HeaderA's children should appear in the focus queue first —
+    // even when one of HeaderB's children carries the absolute-highest #p0.
+    const headerA = makeTodo({
+      text: "HeaderA",
+      tags: ["#todo"],
+      isHeader: true,
+      filePath: "a.md",
+      lineNumber: 0,
+      childLineNumbers: [1, 2],
+    });
+    const a1 = makeTodo({
+      text: "A1 plain",
+      tags: ["#todo"],
+      filePath: "a.md",
+      lineNumber: 1,
+      parentLineNumber: 0,
+    });
+    const a2 = makeTodo({
+      text: "A2 p1",
+      tags: ["#todo", "#p1"],
+      filePath: "a.md",
+      lineNumber: 2,
+      parentLineNumber: 0,
+    });
+    const headerB = makeTodo({
+      text: "HeaderB",
+      tags: ["#todo"],
+      isHeader: true,
+      filePath: "b.md",
+      lineNumber: 0,
+      childLineNumbers: [1, 2],
+    });
+    const b1 = makeTodo({
+      text: "B1 p0",
+      tags: ["#todo", "#p0"],
+      filePath: "b.md",
+      lineNumber: 1,
+      parentLineNumber: 0,
+    });
+    const b2 = makeTodo({
+      text: "B2 plain",
+      tags: ["#todo"],
+      filePath: "b.md",
+      lineNumber: 2,
+      parentLineNumber: 0,
+    });
+    // HeaderA average child priority = (7+3)/2 = 5
+    // HeaderB average child priority = (2+7)/2 = 4.5
+    // So HeaderB's effective priority is BETTER and HeaderB sorts first.
+    const result = buildFocusQueue([headerA, a1, a2, headerB, b1, b2], 10);
+    expect(result.source).toBe("priority-fallback");
+    expect(result.items.map(i => i.text)).toEqual([
+      "B1 p0",   // HeaderB's children in document order
+      "B2 plain",
+      "A1 plain", // HeaderA's children in document order
+      "A2 p1",
+    ]);
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -1919,7 +1919,7 @@ export class TodoSidebarView extends ItemView {
     const titleEl = header.createEl("h4", { cls: "sidebar-title" });
     const logoEl = titleEl.createEl("span", { cls: "space-command-logo clickable-logo", text: "␣⌘" });
     logoEl.addEventListener("click", () => this.onShowAbout());
-    titleEl.appendText(" Focus");
+    titleEl.appendText(" TODOs");
     this.createSidebarMenuButton(header);
 
     if (!this.focusQueue) {

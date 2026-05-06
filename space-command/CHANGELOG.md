@@ -2,6 +2,26 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.14.8] - 2026-05-06
+
+### Changed — Focus Mode header title
+
+The focus-mode sidebar header now reads `TODOs` instead of `Focus`, matching the title of the regular sidebar so the chrome stays consistent across modes. The `FOCUS:` prefix on the source heading inside the card already conveys what mode the user is in.
+
+## [0.14.7] - 2026-05-06
+
+### Fixed — Focus Mode walks items in main-list order
+
+The Focus Mode queue was sorting candidates with `comparePriorityOnly` (raw priority + tag count), which meant a deeply-nested `#p0` child could jump to the front of the queue while the main TODO list still showed an entirely different parent block first. Now both views agree on order.
+
+- New `compareInMainListWalkOrder` comparator in `utils.ts`: groups items by their top-level ancestor, sorts those ancestors with the same `compareWithEffectivePriority` the main list uses, and walks children in document order beneath their parent.
+- `buildFocusQueue` uses the new comparator for both the curated `#focus` queue and the priority-fallback queue.
+- The "Continue with next priority task" path still ignores the focus tier (its parent ordering goes through `comparePriorityOnly`), so its semantics are unchanged.
+
+### Tests
+
+- New regression test covering the multi-header case: a `#p0` child under a header with otherwise-low priorities does not jump ahead of an earlier header whose children sort higher in aggregate. 109 tests, all passing.
+
 ## [0.14.6] - 2026-05-06
 
 ### Changed — Focus card checkbox centring (real fix)
