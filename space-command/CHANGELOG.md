@@ -2,6 +2,15 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.18.0] - 2026-05-07
+
+### Changed — Polish: SUMMARY title sits flush left
+
+Even with horizontal padding removed, the chevron `▸` indicator at the start of the SUMMARY row pushed the title ~1.4em right of the project rows above it. The chevron rotated to signal expand/collapse state, but the section's content already reveals/hides on click — the chevron was redundant.
+
+- Removed the `.summary-chevron` element and its CSS. SUMMARY now sits flush against the left edge, aligned with project rows.
+- Expand/collapse is signalled by the content rows appearing below when the user clicks the header.
+
 ## [0.17.0] - 2026-05-07
 
 ### Changed — Polish: Summary header alignment and separator

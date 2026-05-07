@@ -4801,11 +4801,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       cls: `todo-section-header todone-header summary-header${expanded ? " summary-header-expanded" : ""}`,
       attr: { role: "button", tabindex: "0", "aria-expanded": expanded ? "true" : "false" }
     });
-    const chevron = header.createEl("span", {
-      cls: "summary-chevron",
-      text: "\u25B8",
-      attr: { "aria-hidden": "true" }
-    });
     const titleSpan = header.createEl("span", { cls: "todo-section-title summary-title" });
     titleSpan.textContent = "SUMMARY";
     const preview = header.createEl("span", { cls: "summary-preview" });

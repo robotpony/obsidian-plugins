@@ -1438,14 +1438,8 @@ export class TodoSidebarView extends ItemView {
       attr: { role: "button", tabindex: "0", "aria-expanded": expanded ? "true" : "false" },
     });
 
-    // Chevron + title — chevron rotates on expand to signal state.
-    const chevron = header.createEl("span", {
-      cls: "summary-chevron",
-      text: "▸",
-      attr: { "aria-hidden": "true" },
-    });
-    void chevron;
-
+    // Title sits flush left — no chevron. Expanded state is signalled by the
+    // content rows that appear below when the user clicks to expand.
     const titleSpan = header.createEl("span", { cls: "todo-section-title summary-title" });
     titleSpan.textContent = "SUMMARY";
 
