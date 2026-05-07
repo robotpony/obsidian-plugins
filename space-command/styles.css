@@ -442,6 +442,10 @@
   align-items: center;
   gap: 8px;
   padding: 6px 0 2px;
+  /* Match the .85em scale that .todo-children applies to in-block subheadings,
+     so orphan section headers render at the same effective size as their
+     natural-block counterparts. */
+  font-size: 0.85em;
 }
 
 .todo-orphan-section-text {
@@ -449,7 +453,6 @@
   min-width: 0;
   font-weight: 600;
   color: var(--text-muted);
-  font-size: 0.95em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -466,6 +469,13 @@
 
 .todo-orphan-section-link:hover {
   color: var(--text-accent);
+}
+
+/* Scale top-level orphan TODO items to the same .85em as in-block children so
+   the entire list reads at one rhythm. Header items (with or without children)
+   keep their natural 1em since they're the visual anchors. */
+.space-command-sidebar .todo-list > .todo-item:not(.todo-header) {
+  font-size: 0.85em;
 }
 
 .todo-empty {
@@ -611,44 +621,75 @@
   border-left: 3px solid var(--text-error);
 }
 
-/* Project list styles */
+/* Tag cloud (replaces the old vertical project list) */
 .projects-section {
   margin-bottom: 20px;
 }
 
-.project-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.project-item {
+.tag-cloud {
   display: flex;
+  flex-wrap: wrap;
+  gap: 4px 4px;
+  padding: 2px 0 4px;
+}
+
+.tag-cloud-pill {
+  display: inline-flex;
   align-items: center;
-  padding: 4px 6px;
-  gap: 8px;
-  border-radius: var(--radius-s);
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--tag-color, var(--text-muted));
+  background-color: var(--tag-background, var(--background-modifier-hover));
+  border: 1px solid transparent;
+  border-radius: var(--tag-radius, 999px);
+  padding: 2px 8px;
   cursor: pointer;
-  transition: background-color 100ms ease;
+  opacity: 0.85;
+  transition:
+    opacity 120ms ease,
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
 }
 
-.project-item:hover {
-  background-color: var(--background-modifier-hover);
+.tag-cloud-pill:hover {
+  opacity: 1;
+  background-color: var(--tag-background-hover, var(--background-modifier-hover));
+  color: var(--tag-color-hover, var(--text-normal));
 }
 
-.project-item-active {
-  background-color: var(--background-modifier-hover);
+.tag-cloud-pill:focus-visible {
+  outline: none;
+  border-color: var(--interactive-accent);
+  opacity: 1;
 }
 
-.project-item-active .project-text {
+/* Pinned tags (#focus, #p0): subtle accent so they read as “lead” items
+   without competing with the active filter state. */
+.tag-cloud-pill-pinned {
   color: var(--text-accent);
-  font-weight: 600;
+  opacity: 1;
 }
 
-.project-text {
-  flex: 1;
+/* Project tags that contain a #focus item — slightly stronger than default. */
+.tag-cloud-pill-focus {
   color: var(--text-normal);
-  line-height: 1.4;
+  opacity: 1;
+}
+
+/* Active filter: clear, high-contrast — this is the “you are filtering by X”
+   signal, so it should beat both pinned and focus styling. */
+.tag-cloud-pill-active {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+  opacity: 1;
+}
+
+.tag-cloud-pill-active:hover {
+  background-color: var(--interactive-accent-hover);
+  color: var(--text-on-accent);
 }
 
 /* Ideas section styles */
@@ -1321,24 +1362,6 @@
 }
 
 /* Tag dropdown styles - styled to match Obsidian's tag appearance */
-.tag-dropdown-trigger {
-  cursor: pointer !important;
-  font-size: 9pt !important;
-  font-family: var(--font-monospace) !important;
-  opacity: 0.85 !important;
-  color: var(--tag-color) !important;
-  background-color: var(--tag-background) !important;
-  padding: var(--tag-padding-y) var(--tag-padding-x) !important;
-  border-radius: var(--tag-radius) !important;
-  transition: opacity 0.15s, background-color 0.15s !important;
-}
-
-.tag-dropdown-trigger:hover {
-  opacity: 1;
-  color: var(--tag-color-hover);
-  background-color: var(--tag-background-hover);
-}
-
 .tag-dropdown-menu {
   background-color: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
@@ -1363,100 +1386,9 @@
 }
 
 /* Tag dropdown item with submenu */
-.tag-dropdown-item-with-submenu {
-  position: relative;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding-right: 8px;
-}
-
 .tag-dropdown-item-label {
   flex: 0 0 auto;
   display: inline-block;
-}
-
-.tag-dropdown-item-arrow {
-  margin-left: 8px;
-  opacity: 0.5;
-  font-size: 1.1em;
-}
-
-.tag-dropdown-submenu {
-  display: none;
-  position: absolute;
-  left: 100%;
-  top: -4px;
-  background-color: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  padding: 4px 0;
-  min-width: 100px;
-  z-index: 1001;
-}
-
-.tag-dropdown-item-with-submenu:hover > .tag-dropdown-submenu {
-  display: block;
-}
-
-/* Submenu positioning for right sidebar (opens to the left) */
-.dropdown-left .tag-dropdown-submenu {
-  left: auto;
-  right: 100%;
-}
-
-.tag-dropdown-submenu-item {
-  padding: 6px 12px;
-  cursor: pointer;
-  font-size: 0.9em;
-  color: var(--text-normal);
-  white-space: nowrap;
-  transition: background-color 0.1s;
-}
-
-.tag-dropdown-submenu-item:hover {
-  background-color: var(--background-modifier-hover);
-}
-
-.tag-dropdown-separator {
-  height: 1px;
-  background-color: var(--background-modifier-border);
-  margin: 4px 0;
-}
-
-.tag-dropdown-clear {
-  padding: 6px 12px;
-  cursor: pointer;
-  font-size: 0.85em;
-  color: var(--text-muted);
-  transition: background-color 0.1s;
-}
-
-.tag-dropdown-clear:hover {
-  background-color: var(--background-modifier-hover);
-}
-
-.tag-dropdown-clear.disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.tag-dropdown-clear.disabled:hover {
-  background-color: transparent;
-}
-
-/* Snooze option in tag dropdown */
-.tag-dropdown-snooze {
-  padding: 6px 12px;
-  cursor: pointer;
-  font-size: 0.9em;
-  color: var(--text-normal);
-  transition: background-color 0.1s;
-}
-
-.tag-dropdown-snooze:hover {
-  background-color: var(--background-modifier-hover);
 }
 
 /* Project info popup styles (popup helper retained; the inline ⓘ trigger

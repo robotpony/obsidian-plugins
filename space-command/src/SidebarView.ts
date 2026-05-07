@@ -5,7 +5,7 @@ import { ProjectManager } from "./ProjectManager";
 import { TeamManager } from "./TeamManager";
 import { TodoItem, ProjectInfo, ItemRenderConfig, FocusQueueState } from "./types";
 import { ContextMenuHandler } from "./ContextMenuHandler";
-import { getPriorityValue, compareTodoItems, compareWithEffectivePriority, hasTag, openFileAtLine, extractTags, extractMentions, resolveMentions, resolveEffectiveMentions, showNotice, getTagColourInfo, extractCompletionDate, buildFocusQueue, getItemDate } from "./utils";
+import { getPriorityValue, compareTodoItems, compareWithEffectivePriority, hasTag, openFileAtLine, extractMentions, resolveMentions, resolveEffectiveMentions, showNotice, getTagColourInfo, extractCompletionDate, buildFocusQueue, getItemDate } from "./utils";
 
 export const VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 
@@ -334,13 +334,11 @@ export class TodoSidebarView extends ItemView {
 
 
   // Unified list item renderer for todos, ideas, and principles
-  // parentTags: optional tags inherited from a parent header block (for child items)
   private renderListItem(
     list: HTMLElement,
     item: TodoItem,
     config: ItemRenderConfig,
-    isChild: boolean = false,
-    parentTags: string[] = []
+    isChild: boolean = false
   ): void {
     // Subheading labels: render as subtle section divider with mention badges
     if (isChild && item.isSubheading) {
@@ -435,13 +433,9 @@ export class TodoSidebarView extends ItemView {
       this.renderMentionBadges(item.mentions, rowContainer);
     }
 
-    // Get tags (excluding the type tag) and merge with parent header tags for child items
-    const itemTags = extractTags(cleanText).filter(tag => !config.tagToStrip.test(tag));
-    // Merge parent tags with item tags, avoiding duplicates
-    const mergedTags = [...new Set([...parentTags, ...itemTags])];
-    if (mergedTags.length > 0) {
-      this.renderTagDropdown(mergedTags, rowContainer, item);
-    }
+    // Per-row tag pill removed in 0.x.x — tags are now filtered exclusively
+    // through the tag cloud at the top of the sidebar. The right-click context
+    // menu still surfaces snooze/filter/clear actions for individual items.
 
     // Source affordance — varies by row type:
     //   - Children: nothing. The header row above already has its arrow.
@@ -467,7 +461,6 @@ export class TodoSidebarView extends ItemView {
     if (hasChildren) {
       const childrenContainer = listItem.createEl("ul", { cls: `${config.classPrefix}-children` });
       const allItems = this.getItemsForType(config.type);
-      const headerTags = extractTags(item.text).filter(tag => !config.tagToStrip.test(tag));
       const lines = item.childLineNumbers!;
       // Resolve child items once for peek-ahead
       const childItems = lines.map(ln => allItems.find(t => t.filePath === item.filePath && t.lineNumber === ln) ?? null);
@@ -486,7 +479,7 @@ export class TodoSidebarView extends ItemView {
           }
           if (!hasTasks) continue;
         }
-        this.renderListItem(childrenContainer, childItem, config, true, headerTags);
+        this.renderListItem(childrenContainer, childItem, config, true);
       }
     }
   }
@@ -519,178 +512,6 @@ export class TodoSidebarView extends ItemView {
     return map;
   }
 
-  // Render collapsed tag indicator with dropdown
-  // If item is provided, "Clear tag" option will be available to remove tags from the item
-  private renderTagDropdown(tags: string[], container: HTMLElement, item?: TodoItem): void {
-    if (tags.length === 0) return;
-
-    // Get project colour map for tag colouring
-    const projectColourMap = this.getProjectColourMap();
-
-    const trigger = container.createEl("span", {
-      cls: "tag-dropdown-trigger",
-      text: "#",
-    });
-
-    trigger.addEventListener("click", (e) => {
-      e.stopPropagation();
-
-      // If clicking the same trigger that opened the current dropdown, just close it (toggle)
-      if (this.openDropdownTrigger === trigger) {
-        this.closeDropdown();
-        return;
-      }
-
-      // Close any existing dropdown or popup
-      this.closeDropdown();
-      this.closeInfoPopup();
-
-      // Create dropdown menu
-      const dropdown = document.createElement("div");
-      dropdown.className = "tag-dropdown-menu";
-
-      // Determine sidebar position (left or right)
-      const sidebarRoot = this.leaf.getRoot();
-      const isRightSidebar = sidebarRoot === this.app.workspace.rightSplit;
-
-      // Position dropdown below the trigger, adjusting for sidebar position
-      const rect = trigger.getBoundingClientRect();
-      dropdown.style.position = "fixed";
-      dropdown.style.top = `${rect.bottom + 4}px`;
-
-      if (isRightSidebar) {
-        // Menu opens to the left when in right sidebar
-        dropdown.style.right = `${window.innerWidth - rect.right}px`;
-        dropdown.classList.add("dropdown-left");
-      } else {
-        // Menu opens to the right when in left sidebar
-        dropdown.style.left = `${rect.left}px`;
-      }
-
-      // Add tags to dropdown with submenus (sorted alphabetically)
-      const sortedTags = [...tags].sort((a, b) => a.localeCompare(b));
-      for (const tag of sortedTags) {
-        const tagItem = dropdown.createEl("div", {
-          cls: "tag-dropdown-item tag-dropdown-item-with-submenu",
-        });
-
-        // Get colour info for this tag
-        const colourInfo = getTagColourInfo(tag, projectColourMap);
-
-        const tagLabel = tagItem.createEl("span", {
-          cls: "tag-dropdown-item-label tag",
-          text: tag,
-        });
-        // Add semantic colour data attributes
-        tagLabel.dataset.scTagType = colourInfo.type;
-        tagLabel.dataset.scPriority = colourInfo.priority.toString();
-
-        const arrow = tagItem.createEl("span", {
-          cls: "tag-dropdown-item-arrow",
-          text: "›",
-        });
-
-        // Create submenu
-        const submenu = tagItem.createEl("div", {
-          cls: "tag-dropdown-submenu",
-        });
-
-        // Clear tag option (only if item is provided) - alphabetically first
-        if (item) {
-          const clearTagOption = submenu.createEl("div", {
-            cls: "tag-dropdown-submenu-item",
-            text: "Clear tag",
-          });
-          clearTagOption.addEventListener("click", async (e) => {
-            e.stopPropagation();
-            this.closeDropdown();
-            const success = await this.processor.removeTag(item, tag);
-            if (success) {
-              this.render();
-            }
-          });
-        }
-
-        // Filter by option
-        const filterOption = submenu.createEl("div", {
-          cls: "tag-dropdown-submenu-item",
-          text: "Filter by",
-        });
-        filterOption.addEventListener("click", (e) => {
-          e.stopPropagation();
-          this.activeTagFilter = tag;
-          this.closeDropdown();
-          this.render();
-        });
-      }
-
-      // Add separator
-      dropdown.createEl("div", { cls: "tag-dropdown-separator" });
-
-      // Add snooze/unsnooze option (only if item is provided)
-      if (item) {
-        const isSnoozed = item.tags.includes("#future") ||
-                          item.tags.includes("#snooze") ||
-                          item.tags.includes("#snoozed");
-        const snoozeItem = dropdown.createEl("div", {
-          cls: "tag-dropdown-item tag-dropdown-snooze",
-          text: isSnoozed ? "Unsnooze this" : "Snooze this",
-        });
-        snoozeItem.addEventListener("click", async (e) => {
-          e.stopPropagation();
-          this.closeDropdown();
-          let success: boolean;
-          if (isSnoozed) {
-            // Remove all snooze tags
-            success = await this.processor.removeTag(item, "#future");
-            if (item.tags.includes("#snooze")) {
-              await this.processor.removeTag(item, "#snooze");
-            }
-            if (item.tags.includes("#snoozed")) {
-              await this.processor.removeTag(item, "#snoozed");
-            }
-          } else {
-            success = await this.processor.setPriorityTag(item, "#future");
-          }
-          if (success) {
-            this.render();
-          }
-        });
-
-        // Add another separator before clear filter
-        dropdown.createEl("div", { cls: "tag-dropdown-separator" });
-      }
-
-      // Add clear filter option
-      const clearItem = dropdown.createEl("div", {
-        cls: `tag-dropdown-clear${this.activeTagFilter ? "" : " disabled"}`,
-        text: "Clear filter",
-      });
-      if (this.activeTagFilter) {
-        clearItem.addEventListener("click", (e) => {
-          e.stopPropagation();
-          this.activeTagFilter = null;
-          this.closeDropdown();
-          this.render();
-        });
-      }
-
-      // Add to document and track
-      document.body.appendChild(dropdown);
-      this.openDropdown = dropdown;
-      this.openDropdownTrigger = trigger;
-
-      // Close on click outside
-      const closeHandler = (e: MouseEvent) => {
-        if (!dropdown.contains(e.target as Node) && e.target !== trigger) {
-          this.closeDropdown();
-          document.removeEventListener("click", closeHandler);
-        }
-      };
-      // Use setTimeout to avoid immediate trigger from current click
-      setTimeout(() => document.addEventListener("click", closeHandler), 0);
-    });
-  }
 
   async onOpen(): Promise<void> {
     // Set up auto-refresh listener. When the underlying TODO data changes, drop
@@ -1132,9 +953,9 @@ export class TodoSidebarView extends ItemView {
   }
 
   private renderProjects(container: HTMLElement): void {
-    let projects = this.projectManager.getProjects();
+    const projects = this.projectManager.getProjects();
 
-    const section = container.createEl("div", { cls: "projects-section" });
+    const section = container.createEl("div", { cls: "projects-section tag-cloud-section" });
 
     const header = section.createEl("div", {
       cls: "todo-section-header projects-header",
@@ -1143,9 +964,7 @@ export class TodoSidebarView extends ItemView {
     const titleSpan = header.createEl("span", { cls: "todo-section-title" });
     titleSpan.textContent = "Focus";
 
-    // Eye icon — single click enters immersive Focus Mode. The icon is only
-    // ever visible in normal mode (Focus Mode hides the entire sidebar chrome),
-    // so there is no toggle/active state to render.
+    // Eye icon — single click enters immersive Focus Mode.
     const focusModeBtn = header.createEl("button", {
       cls: "clickable-icon focus-mode-toggle-btn",
       attr: { "aria-label": "Enter focus mode" },
@@ -1155,94 +974,106 @@ export class TodoSidebarView extends ItemView {
 
     this.renderFilterIndicator(header);
 
-    if (projects.length === 0) {
+    // Build the cloud entries. #focus and #p0 are pinned first when in use;
+    // ProjectManager already filters those out of its results, so adding them
+    // here will not double-render.
+    type CloudEntry = { tag: string; project: ProjectInfo | null; pinned: boolean };
+    const entries: CloudEntry[] = [];
+
+    const todos = this.scanner.getTodos();
+    const hasAnyFocus = todos.some(t => hasTag(t.tags, "#focus"));
+    const hasAnyP0 = todos.some(t => hasTag(t.tags, "#p0"));
+    if (hasAnyFocus) entries.push({ tag: "#focus", project: null, pinned: true });
+    if (hasAnyP0) entries.push({ tag: "#p0", project: null, pinned: true });
+
+    // Project tags sorted: focus tier first, then highest priority, then count.
+    const sortedProjects = [...projects].sort((a, b) => {
+      if (a.hasFocusItems && !b.hasFocusItems) return -1;
+      if (!a.hasFocusItems && b.hasFocusItems) return 1;
+      const priorityDiff = a.highestPriority - b.highestPriority;
+      if (priorityDiff !== 0) return priorityDiff;
+      return b.count - a.count;
+    });
+    for (const p of sortedProjects) {
+      entries.push({ tag: p.tag, project: p, pinned: false });
+    }
+
+    if (entries.length === 0) {
       section.createEl("div", {
-        text: "No focus projects yet",
+        text: "No focus tags yet",
         cls: "todo-empty",
       });
       return;
     }
 
-    // Sort projects by: 1) focus tier (projects with focus items first), 2) priority, 3) count
-    projects.sort((a, b) => {
-      if (a.hasFocusItems && !b.hasFocusItems) return -1;
-      if (!a.hasFocusItems && b.hasFocusItems) return 1;
+    // Soft cap so the cloud stays around 4–5 lines in a typical sidebar width.
+    // Pinned tags are never trimmed.
+    const TAG_CLOUD_CAP = 15;
+    const totalCount = entries.length;
+    const visible = entries.slice(0, Math.max(TAG_CLOUD_CAP, entries.filter(e => e.pinned).length));
 
-      const priorityDiff = a.highestPriority - b.highestPriority;
-      if (priorityDiff !== 0) return priorityDiff;
-
-      return b.count - a.count;
-    });
-
-    // Track total count before limiting
-    const totalCount = projects.length;
-
-    // Apply limit
-    if (this.focusListLimit > 0) {
-      projects = projects.slice(0, this.focusListLimit);
+    const cloud = section.createEl("div", { cls: "tag-cloud" });
+    for (const entry of visible) {
+      this.renderTagCloudPill(cloud, entry.tag, entry.project, entry.pinned);
     }
 
-    const list = section.createEl("ul", { cls: "project-list" });
-
-    for (const project of projects) {
-      this.renderProjectItem(list, project);
-    }
-
-    // Show count indicator if there are more projects than displayed
-    if (totalCount > projects.length) {
-      const moreIndicator = section.createEl("div", {
+    if (totalCount > visible.length) {
+      const more = section.createEl("div", {
         cls: "todo-more-indicator",
-        text: `+${totalCount - projects.length} more`,
+        text: `+${totalCount - visible.length} more`,
       });
-      moreIndicator.setAttribute("title", `Showing ${projects.length} of ${totalCount} projects`);
+      more.setAttribute("title", `Showing ${visible.length} of ${totalCount} tags`);
     }
   }
 
-  private renderProjectItem(list: HTMLElement, project: ProjectInfo): void {
-    // Check if this project has any #focus items
-    const isActiveFilter = this.activeTagFilter === project.tag;
-    const item = list.createEl("li", {
-      cls: `project-item${project.hasFocusItems ? ' project-focus' : ''}${isActiveFilter ? ' project-item-active' : ''}`,
-      attr: { role: "button", tabindex: "0", "aria-pressed": isActiveFilter ? "true" : "false" },
-    });
+  private renderTagCloudPill(
+    container: HTMLElement,
+    tag: string,
+    project: ProjectInfo | null,
+    pinned: boolean
+  ): void {
+    const isActiveFilter = this.activeTagFilter === tag;
+    const hasFocusItems = project?.hasFocusItems === true;
 
-    // Add context menu for project operations
-    item.addEventListener("contextmenu", (e) => {
-      e.preventDefault();
-      this.contextMenuHandler.showProjectMenu(
-        e,
-        project,
-        this.scanner,
-        () => this.render(),
-        (tag) => {
-          this.activeTagFilter = tag;
-          this.render();
-        }
-      );
-    });
+    const classes = [
+      "tag-cloud-pill",
+      pinned ? "tag-cloud-pill-pinned" : "",
+      hasFocusItems ? "tag-cloud-pill-focus" : "",
+      isActiveFilter ? "tag-cloud-pill-active" : "",
+    ].filter(Boolean).join(" ");
 
-    // Clicking the row toggles the tag filter on the active TODO list below.
-    // The info icon and the open-file link stop propagation so they keep their
-    // own behaviour.
+    const pill = container.createEl("button", {
+      cls: classes,
+      attr: {
+        type: "button",
+        "aria-pressed": isActiveFilter ? "true" : "false",
+        title: project ? `${project.count} item${project.count === 1 ? "" : "s"}` : tag,
+      },
+    });
+    pill.appendText(tag);
+
     const toggleFilter = () => {
-      this.activeTagFilter = isActiveFilter ? null : project.tag;
+      this.activeTagFilter = isActiveFilter ? null : tag;
       this.render();
     };
-    item.addEventListener("click", toggleFilter);
-    item.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") {
+    pill.addEventListener("click", toggleFilter);
+
+    // Right-click context menu only makes sense for true project tags.
+    if (project) {
+      pill.addEventListener("contextmenu", (e) => {
         e.preventDefault();
-        toggleFilter();
-      }
-    });
-
-    // Project name (using safe DOM methods)
-    const textSpan = item.createEl("span", { cls: "project-text" });
-    textSpan.appendText(project.tag);
-
-    // The info icon and the open-file arrow were removed in 0.15.2 — the row
-    // is now a pure filter toggle. Right-click still opens the project menu
-    // with both actions available.
+        this.contextMenuHandler.showProjectMenu(
+          e,
+          project,
+          this.scanner,
+          () => this.render(),
+          (t) => {
+            this.activeTagFilter = t;
+            this.render();
+          }
+        );
+      });
+    }
   }
 
   private async showProjectInfoPopup(project: ProjectInfo, trigger: HTMLElement): Promise<void> {

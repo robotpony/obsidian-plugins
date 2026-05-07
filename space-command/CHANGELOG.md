@@ -2,6 +2,37 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.15.8] - 2026-05-07
+
+### Changed — Polish: tag cloud replaces vertical focus list
+
+The "Focus" section at the top of the sidebar used to be a vertical list of project rows. It worked, but it ate a lot of vertical space for what is essentially a row of filter buttons. It is now a compact tag cloud:
+
+- `#focus` and `#p0` are pinned to the front when any active TODO uses them, so the highest-leverage filters are always one click away.
+- Project tags follow, in the same sort order as before (focus tier → highest priority → count).
+- Each tag renders as a `(#tag)`-style pill button. Click to toggle the filter (same behaviour as the old rows). Right-click on project tags still opens the project context menu; pinned tags skip it since the actions don't apply.
+- Soft cap of ~15 pills (≈4-5 lines in a typical sidebar). Anything beyond the cap surfaces a `+N more` hint.
+- Active filter state uses the accent colour for unmistakable contrast against pinned and focus-tier styling. Hover and focus-visible states use 120ms transitions for steady, low-key feedback.
+
+### Changed — Polish: per-row tag indicator removed
+
+Each TODO row used to render a small `#` pill that opened a per-item dropdown for filter / clear-tag / snooze actions. With the tag cloud above the list, the inline pill duplicated work the cloud now does better, and it added visual noise to every row.
+
+- Removed the `#` trigger from TODO/idea/principle rows in the sidebar.
+- All filter / snooze / clear actions remain available through the row's right-click context menu, which already had them.
+- Dead CSS for the per-row submenu, separator, clear, and snooze styles is gone with it.
+
+## [0.15.7] - 2026-05-07
+
+### Fixed — Consistent font scale across natural and synthesised header blocks
+
+Header-block child items inherit a `.85em` scale from `.todo-children`, while orphan items rendered directly inside `.todo-list` were at full `1em`. Same gap on the headings: in-block bold subheadings inherit `.85em`, but the synthesised `.todo-orphan-section-text` was set to `0.95em`. Result was that the recently-added "hybrid" orphan blocks rendered slightly larger than their natural-block neighbours.
+
+Both ends now match:
+
+- `.todo-orphan-section` is set to `font-size: 0.85em` so its bold label renders at the same effective size as in-block subheadings.
+- Top-level orphan TODO items in the sidebar (`.space-command-sidebar .todo-list > .todo-item:not(.todo-header)`) drop to `0.85em` to match the `.todo-children` scale. Header rows keep their natural `1em` since they're the visual anchors.
+
 ## [0.15.6] - 2026-05-07
 
 ### Changed — Focus Mode Skip walks the full list

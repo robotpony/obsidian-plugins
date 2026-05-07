@@ -3968,8 +3968,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     }
   }
   // Unified list item renderer for todos, ideas, and principles
-  // parentTags: optional tags inherited from a parent header block (for child items)
-  renderListItem(list, item, config, isChild = false, parentTags = []) {
+  renderListItem(list, item, config, isChild = false) {
     if (isChild && item.isSubheading) {
       const subheadingItem = list.createEl("li", { cls: `${config.classPrefix}-item ${config.classPrefix}-child todo-subheading` });
       const cleanText2 = item.text.replace(/^\s*(\*\*|__)(.*?)(\*\*|__)\s*/, "$2 ").replace(/#[\w-]+/g, "").replace(/@[\w][\w.-]*/g, "").replace(/\s+/g, " ").trim();
@@ -4030,11 +4029,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     if (item.mentions.length > 0) {
       this.renderMentionBadges(item.mentions, rowContainer);
     }
-    const itemTags = extractTags(cleanText).filter((tag) => !config.tagToStrip.test(tag));
-    const mergedTags = [.../* @__PURE__ */ new Set([...parentTags, ...itemTags])];
-    if (mergedTags.length > 0) {
-      this.renderTagDropdown(mergedTags, rowContainer, item);
-    }
     if (isHeader) {
       const link = rowContainer.createEl("a", {
         text: "\u2192",
@@ -4051,7 +4045,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     if (hasChildren) {
       const childrenContainer = listItem.createEl("ul", { cls: `${config.classPrefix}-children` });
       const allItems = this.getItemsForType(config.type);
-      const headerTags = extractTags(item.text).filter((tag) => !config.tagToStrip.test(tag));
       const lines = item.childLineNumbers;
       const childItems = lines.map((ln) => {
         var _a;
@@ -4075,7 +4068,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
           if (!hasTasks)
             continue;
         }
-        this.renderListItem(childrenContainer, childItem, config, true, headerTags);
+        this.renderListItem(childrenContainer, childItem, config, true);
       }
     }
   }
@@ -4106,133 +4099,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       map2.set(project.tag.toLowerCase(), project.colourIndex);
     }
     return map2;
-  }
-  // Render collapsed tag indicator with dropdown
-  // If item is provided, "Clear tag" option will be available to remove tags from the item
-  renderTagDropdown(tags, container, item) {
-    if (tags.length === 0)
-      return;
-    const projectColourMap = this.getProjectColourMap();
-    const trigger = container.createEl("span", {
-      cls: "tag-dropdown-trigger",
-      text: "#"
-    });
-    trigger.addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (this.openDropdownTrigger === trigger) {
-        this.closeDropdown();
-        return;
-      }
-      this.closeDropdown();
-      this.closeInfoPopup();
-      const dropdown = document.createElement("div");
-      dropdown.className = "tag-dropdown-menu";
-      const sidebarRoot = this.leaf.getRoot();
-      const isRightSidebar = sidebarRoot === this.app.workspace.rightSplit;
-      const rect = trigger.getBoundingClientRect();
-      dropdown.style.position = "fixed";
-      dropdown.style.top = `${rect.bottom + 4}px`;
-      if (isRightSidebar) {
-        dropdown.style.right = `${window.innerWidth - rect.right}px`;
-        dropdown.classList.add("dropdown-left");
-      } else {
-        dropdown.style.left = `${rect.left}px`;
-      }
-      const sortedTags = [...tags].sort((a, b) => a.localeCompare(b));
-      for (const tag of sortedTags) {
-        const tagItem = dropdown.createEl("div", {
-          cls: "tag-dropdown-item tag-dropdown-item-with-submenu"
-        });
-        const colourInfo = getTagColourInfo(tag, projectColourMap);
-        const tagLabel = tagItem.createEl("span", {
-          cls: "tag-dropdown-item-label tag",
-          text: tag
-        });
-        tagLabel.dataset.scTagType = colourInfo.type;
-        tagLabel.dataset.scPriority = colourInfo.priority.toString();
-        const arrow = tagItem.createEl("span", {
-          cls: "tag-dropdown-item-arrow",
-          text: "\u203A"
-        });
-        const submenu = tagItem.createEl("div", {
-          cls: "tag-dropdown-submenu"
-        });
-        if (item) {
-          const clearTagOption = submenu.createEl("div", {
-            cls: "tag-dropdown-submenu-item",
-            text: "Clear tag"
-          });
-          clearTagOption.addEventListener("click", async (e2) => {
-            e2.stopPropagation();
-            this.closeDropdown();
-            const success = await this.processor.removeTag(item, tag);
-            if (success) {
-              this.render();
-            }
-          });
-        }
-        const filterOption = submenu.createEl("div", {
-          cls: "tag-dropdown-submenu-item",
-          text: "Filter by"
-        });
-        filterOption.addEventListener("click", (e2) => {
-          e2.stopPropagation();
-          this.activeTagFilter = tag;
-          this.closeDropdown();
-          this.render();
-        });
-      }
-      dropdown.createEl("div", { cls: "tag-dropdown-separator" });
-      if (item) {
-        const isSnoozed2 = item.tags.includes("#future") || item.tags.includes("#snooze") || item.tags.includes("#snoozed");
-        const snoozeItem = dropdown.createEl("div", {
-          cls: "tag-dropdown-item tag-dropdown-snooze",
-          text: isSnoozed2 ? "Unsnooze this" : "Snooze this"
-        });
-        snoozeItem.addEventListener("click", async (e2) => {
-          e2.stopPropagation();
-          this.closeDropdown();
-          let success;
-          if (isSnoozed2) {
-            success = await this.processor.removeTag(item, "#future");
-            if (item.tags.includes("#snooze")) {
-              await this.processor.removeTag(item, "#snooze");
-            }
-            if (item.tags.includes("#snoozed")) {
-              await this.processor.removeTag(item, "#snoozed");
-            }
-          } else {
-            success = await this.processor.setPriorityTag(item, "#future");
-          }
-          if (success) {
-            this.render();
-          }
-        });
-        dropdown.createEl("div", { cls: "tag-dropdown-separator" });
-      }
-      const clearItem = dropdown.createEl("div", {
-        cls: `tag-dropdown-clear${this.activeTagFilter ? "" : " disabled"}`,
-        text: "Clear filter"
-      });
-      if (this.activeTagFilter) {
-        clearItem.addEventListener("click", (e2) => {
-          e2.stopPropagation();
-          this.activeTagFilter = null;
-          this.closeDropdown();
-          this.render();
-        });
-      }
-      document.body.appendChild(dropdown);
-      this.openDropdown = dropdown;
-      this.openDropdownTrigger = trigger;
-      const closeHandler = (e2) => {
-        if (!dropdown.contains(e2.target) && e2.target !== trigger) {
-          this.closeDropdown();
-          document.removeEventListener("click", closeHandler);
-        }
-      };
-      setTimeout(() => document.addEventListener("click", closeHandler), 0);
-    });
   }
   async onOpen() {
     this.updateListener = () => {
@@ -4570,8 +4436,8 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     });
   }
   renderProjects(container) {
-    let projects = this.projectManager.getProjects();
-    const section = container.createEl("div", { cls: "projects-section" });
+    const projects = this.projectManager.getProjects();
+    const section = container.createEl("div", { cls: "projects-section tag-cloud-section" });
     const header = section.createEl("div", {
       cls: "todo-section-header projects-header"
     });
@@ -4584,14 +4450,15 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     focusModeBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
     focusModeBtn.addEventListener("click", () => this.handleFocusEnter());
     this.renderFilterIndicator(header);
-    if (projects.length === 0) {
-      section.createEl("div", {
-        text: "No focus projects yet",
-        cls: "todo-empty"
-      });
-      return;
-    }
-    projects.sort((a, b) => {
+    const entries = [];
+    const todos = this.scanner.getTodos();
+    const hasAnyFocus = todos.some((t) => hasTag(t.tags, "#focus"));
+    const hasAnyP0 = todos.some((t) => hasTag(t.tags, "#p0"));
+    if (hasAnyFocus)
+      entries.push({ tag: "#focus", project: null, pinned: true });
+    if (hasAnyP0)
+      entries.push({ tag: "#p0", project: null, pinned: true });
+    const sortedProjects = [...projects].sort((a, b) => {
       if (a.hasFocusItems && !b.hasFocusItems)
         return -1;
       if (!a.hasFocusItems && b.hasFocusItems)
@@ -4601,54 +4468,69 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
         return priorityDiff;
       return b.count - a.count;
     });
-    const totalCount = projects.length;
-    if (this.focusListLimit > 0) {
-      projects = projects.slice(0, this.focusListLimit);
+    for (const p of sortedProjects) {
+      entries.push({ tag: p.tag, project: p, pinned: false });
     }
-    const list = section.createEl("ul", { cls: "project-list" });
-    for (const project of projects) {
-      this.renderProjectItem(list, project);
-    }
-    if (totalCount > projects.length) {
-      const moreIndicator = section.createEl("div", {
-        cls: "todo-more-indicator",
-        text: `+${totalCount - projects.length} more`
+    if (entries.length === 0) {
+      section.createEl("div", {
+        text: "No focus tags yet",
+        cls: "todo-empty"
       });
-      moreIndicator.setAttribute("title", `Showing ${projects.length} of ${totalCount} projects`);
+      return;
+    }
+    const TAG_CLOUD_CAP = 15;
+    const totalCount = entries.length;
+    const visible = entries.slice(0, Math.max(TAG_CLOUD_CAP, entries.filter((e) => e.pinned).length));
+    const cloud = section.createEl("div", { cls: "tag-cloud" });
+    for (const entry of visible) {
+      this.renderTagCloudPill(cloud, entry.tag, entry.project, entry.pinned);
+    }
+    if (totalCount > visible.length) {
+      const more = section.createEl("div", {
+        cls: "todo-more-indicator",
+        text: `+${totalCount - visible.length} more`
+      });
+      more.setAttribute("title", `Showing ${visible.length} of ${totalCount} tags`);
     }
   }
-  renderProjectItem(list, project) {
-    const isActiveFilter = this.activeTagFilter === project.tag;
-    const item = list.createEl("li", {
-      cls: `project-item${project.hasFocusItems ? " project-focus" : ""}${isActiveFilter ? " project-item-active" : ""}`,
-      attr: { role: "button", tabindex: "0", "aria-pressed": isActiveFilter ? "true" : "false" }
-    });
-    item.addEventListener("contextmenu", (e) => {
-      e.preventDefault();
-      this.contextMenuHandler.showProjectMenu(
-        e,
-        project,
-        this.scanner,
-        () => this.render(),
-        (tag) => {
-          this.activeTagFilter = tag;
-          this.render();
-        }
-      );
-    });
-    const toggleFilter = () => {
-      this.activeTagFilter = isActiveFilter ? null : project.tag;
-      this.render();
-    };
-    item.addEventListener("click", toggleFilter);
-    item.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        toggleFilter();
+  renderTagCloudPill(container, tag, project, pinned) {
+    const isActiveFilter = this.activeTagFilter === tag;
+    const hasFocusItems = (project == null ? void 0 : project.hasFocusItems) === true;
+    const classes = [
+      "tag-cloud-pill",
+      pinned ? "tag-cloud-pill-pinned" : "",
+      hasFocusItems ? "tag-cloud-pill-focus" : "",
+      isActiveFilter ? "tag-cloud-pill-active" : ""
+    ].filter(Boolean).join(" ");
+    const pill = container.createEl("button", {
+      cls: classes,
+      attr: {
+        type: "button",
+        "aria-pressed": isActiveFilter ? "true" : "false",
+        title: project ? `${project.count} item${project.count === 1 ? "" : "s"}` : tag
       }
     });
-    const textSpan = item.createEl("span", { cls: "project-text" });
-    textSpan.appendText(project.tag);
+    pill.appendText(tag);
+    const toggleFilter = () => {
+      this.activeTagFilter = isActiveFilter ? null : tag;
+      this.render();
+    };
+    pill.addEventListener("click", toggleFilter);
+    if (project) {
+      pill.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        this.contextMenuHandler.showProjectMenu(
+          e,
+          project,
+          this.scanner,
+          () => this.render(),
+          (t) => {
+            this.activeTagFilter = t;
+            this.render();
+          }
+        );
+      });
+    }
   }
   async showProjectInfoPopup(project, trigger) {
     this.closeInfoPopup();
