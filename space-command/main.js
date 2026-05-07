@@ -4495,11 +4495,11 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
   }
   renderTagCloudPill(container, tag, project, pinned) {
     const isActiveFilter = this.activeTagFilter === tag;
-    const hasFocusItems = (project == null ? void 0 : project.hasFocusItems) === true;
+    const isFocusTag = tag === "#focus" || (project == null ? void 0 : project.hasFocusItems) === true;
     const classes = [
       "tag-cloud-pill",
       pinned ? "tag-cloud-pill-pinned" : "",
-      hasFocusItems ? "tag-cloud-pill-focus" : "",
+      isFocusTag ? "tag-cloud-pill-focus" : "",
       isActiveFilter ? "tag-cloud-pill-active" : ""
     ].filter(Boolean).join(" ");
     const pill = container.createEl("button", {

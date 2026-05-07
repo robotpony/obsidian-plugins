@@ -1033,12 +1033,14 @@ export class TodoSidebarView extends ItemView {
     pinned: boolean
   ): void {
     const isActiveFilter = this.activeTagFilter === tag;
-    const hasFocusItems = project?.hasFocusItems === true;
+    // The pinned #focus pill is itself a focus tag; project pills inherit focus
+    // styling whenever they contain at least one #focus item.
+    const isFocusTag = tag === "#focus" || project?.hasFocusItems === true;
 
     const classes = [
       "tag-cloud-pill",
       pinned ? "tag-cloud-pill-pinned" : "",
-      hasFocusItems ? "tag-cloud-pill-focus" : "",
+      isFocusTag ? "tag-cloud-pill-focus" : "",
       isActiveFilter ? "tag-cloud-pill-active" : "",
     ].filter(Boolean).join(" ");
 

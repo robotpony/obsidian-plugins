@@ -2,6 +2,17 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.16.0] - 2026-05-07
+
+### Changed — Polish: tag cloud pills match document tag rendering
+
+The tag cloud at the top of the sidebar used a custom monospace pill style with a faded `opacity: 0.85`. It read as "this is a filter button" instead of "this is the same kind of tag you see in your notes," which made the cloud feel disconnected from the document tags people are actually filtering on.
+
+- Pills now inherit Obsidian's `--tag-*` variables (font, size, weight, color, background, radius, padding) so they render the same as in-document tags. Theme overrides flow through automatically.
+- Removed the `0.85` opacity fade. Tags read at full contrast, like they do in the editor.
+- Focus tags — the pinned `#focus` pill and any project pill containing a `#focus` item — get the same accent-mix background as `.todo-focus` rows. The "where focus lives" signal is now consistent everywhere in the sidebar.
+- Hover and active-filter behaviour unchanged.
+
 ## [0.15.8] - 2026-05-07
 
 ### Changed — Polish: tag cloud replaces vertical focus list
