@@ -2,6 +2,17 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.19.1] - 2026-05-07
+
+### Changed — Polish: crossfade on tag-filter changes
+
+Clicking a tag pill (or clearing the filter chip) used to flash the list contents in and out as the sidebar re-rendered. The change was instant but felt jarring — items appeared and disappeared without warning.
+
+- Added a brisk crossfade on filter changes: the `.todo-list`, `.idea-list`, and `.principle-list` containers fade to opacity 0 (80ms), the sidebar re-renders, and the new content fades back to opacity 1 (100ms). 180ms total — fast enough to not feel laggy, slow enough to register.
+- Only the lists fade. The tag cloud, header, and summary stay put so the user's click target doesn't slide out from under their cursor.
+- Rapid pill clicks short-circuit any in-flight fade and snap to the latest selection (no stacking timers, no jank).
+- Respects `prefers-reduced-motion`: users with that setting see the same instant re-render as before.
+
 ## [0.19.0] - 2026-05-07
 
 ### Fixed — Tag cloud pills actually look like document tags now

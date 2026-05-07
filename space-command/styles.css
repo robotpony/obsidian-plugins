@@ -396,6 +396,35 @@
   margin: 0;
 }
 
+/* Crossfade for tag-filter changes. The tag cloud and chrome stay put; only
+   the lists fade so the user's click target (the pill) doesn't slide out
+   from under them. 80ms out / 100ms in — snappy, just takes the edge off
+   the otherwise hard re-render. */
+.space-command-sidebar .todo-list,
+.space-command-sidebar .idea-list,
+.space-command-sidebar .principle-list {
+  transition: opacity 100ms ease;
+}
+
+.space-command-sidebar.sc-filter-fading .todo-list,
+.space-command-sidebar.sc-filter-fading .idea-list,
+.space-command-sidebar.sc-filter-fading .principle-list {
+  opacity: 0;
+  transition-duration: 80ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .space-command-sidebar .todo-list,
+  .space-command-sidebar .idea-list,
+  .space-command-sidebar .principle-list,
+  .space-command-sidebar.sc-filter-fading .todo-list,
+  .space-command-sidebar.sc-filter-fading .idea-list,
+  .space-command-sidebar.sc-filter-fading .principle-list {
+    transition: none;
+    opacity: 1;
+  }
+}
+
 .todo-item {
   display: flex;
   align-items: flex-start;

@@ -3776,6 +3776,9 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     this.activeTab = "todos";
     this.activeTagFilter = null;
     this.activeAssigneeFilter = null;
+    // Crossfade transition for filter changes — guards against overlapping
+    // animations if the user clicks pills in quick succession.
+    this.filterFadeTimer = null;
     this.focusModeActive = false;
     this.focusQueue = null;
     // Snapshot for restoring sidebar position on Exit.
@@ -4124,6 +4127,41 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       this.updateListener = null;
     }
   }
+  /**
+   * Apply a tag filter change with a brisk crossfade (80ms out, 100ms in)
+   * so list items don't flash in and out. The fade class lives on the same
+   * sidebar container that survives `render()`, so the new content starts at
+   * opacity 0 and animates back to 1 once the class is removed on the next
+   * frame.
+   */
+  setTagFilterWithCrossfade(newFilter) {
+    var _a, _b;
+    const container = this.containerEl.children[1];
+    const reducedMotion = (_b = (_a = window.matchMedia) == null ? void 0 : _a.call(window, "(prefers-reduced-motion: reduce)").matches) != null ? _b : false;
+    if (!container || reducedMotion) {
+      this.activeTagFilter = newFilter;
+      this.render();
+      return;
+    }
+    if (this.filterFadeTimer !== null) {
+      window.clearTimeout(this.filterFadeTimer);
+      this.filterFadeTimer = null;
+      container.classList.remove("sc-filter-fading");
+      this.activeTagFilter = newFilter;
+      this.render();
+      return;
+    }
+    container.classList.add("sc-filter-fading");
+    this.filterFadeTimer = window.setTimeout(() => {
+      this.filterFadeTimer = null;
+      this.activeTagFilter = newFilter;
+      this.render();
+      const c = this.containerEl.children[1];
+      if (c) {
+        requestAnimationFrame(() => c.classList.remove("sc-filter-fading"));
+      }
+    }, 80);
+  }
   render() {
     const container = this.containerEl.children[1];
     container.empty();
@@ -4431,8 +4469,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     filterBtn.createEl("span", { cls: "filter-indicator-x", text: "\xD7" });
     filterBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      this.activeTagFilter = null;
-      this.render();
+      this.setTagFilterWithCrossfade(null);
     });
   }
   renderProjects(container) {
@@ -4512,8 +4549,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     });
     pill.appendText(tag);
     const toggleFilter = () => {
-      this.activeTagFilter = isActiveFilter ? null : tag;
-      this.render();
+      this.setTagFilterWithCrossfade(isActiveFilter ? null : tag);
     };
     pill.addEventListener("click", toggleFilter);
     if (project) {
@@ -4525,8 +4561,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
           this.scanner,
           () => this.render(),
           (t) => {
-            this.activeTagFilter = t;
-            this.render();
+            this.setTagFilterWithCrossfade(t);
           }
         );
       });

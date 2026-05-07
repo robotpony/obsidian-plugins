@@ -33,6 +33,9 @@ export class TodoSidebarView extends ItemView {
   private activeTab: 'todos' | 'ideas' | 'snoozed' = 'todos';
   private activeTagFilter: string | null = null;
   private activeAssigneeFilter: string | null = null;
+  // Crossfade transition for filter changes — guards against overlapping
+  // animations if the user clicks pills in quick succession.
+  private filterFadeTimer: number | null = null;
   private teamManager: TeamManager;
   private defaultAssignee: string;
   // Immersive focus mode state.
@@ -550,6 +553,48 @@ export class TodoSidebarView extends ItemView {
     }
   }
 
+  /**
+   * Apply a tag filter change with a brisk crossfade (80ms out, 100ms in)
+   * so list items don't flash in and out. The fade class lives on the same
+   * sidebar container that survives `render()`, so the new content starts at
+   * opacity 0 and animates back to 1 once the class is removed on the next
+   * frame.
+   */
+  private setTagFilterWithCrossfade(newFilter: string | null): void {
+    const container = this.containerEl.children[1] as HTMLElement | undefined;
+    // No container yet, or reduced motion preference: skip the animation.
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    if (!container || reducedMotion) {
+      this.activeTagFilter = newFilter;
+      this.render();
+      return;
+    }
+
+    // If a fade is already mid-flight, snap to the new filter rather than
+    // stacking timers (avoids visual jank from rapid pill clicking).
+    if (this.filterFadeTimer !== null) {
+      window.clearTimeout(this.filterFadeTimer);
+      this.filterFadeTimer = null;
+      container.classList.remove("sc-filter-fading");
+      this.activeTagFilter = newFilter;
+      this.render();
+      return;
+    }
+
+    container.classList.add("sc-filter-fading");
+    this.filterFadeTimer = window.setTimeout(() => {
+      this.filterFadeTimer = null;
+      this.activeTagFilter = newFilter;
+      this.render();
+      // Same container element, class still present after empty()+repopulate.
+      // Pull it on the next frame so the in-transition kicks in.
+      const c = this.containerEl.children[1] as HTMLElement | undefined;
+      if (c) {
+        requestAnimationFrame(() => c.classList.remove("sc-filter-fading"));
+      }
+    }, 80);
+  }
+
   render(): void {
     const container = this.containerEl.children[1] as HTMLElement;
     container.empty();
@@ -947,8 +992,7 @@ export class TodoSidebarView extends ItemView {
 
     filterBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      this.activeTagFilter = null;
-      this.render();
+      this.setTagFilterWithCrossfade(null);
     });
   }
 
@@ -1055,8 +1099,7 @@ export class TodoSidebarView extends ItemView {
     pill.appendText(tag);
 
     const toggleFilter = () => {
-      this.activeTagFilter = isActiveFilter ? null : tag;
-      this.render();
+      this.setTagFilterWithCrossfade(isActiveFilter ? null : tag);
     };
     pill.addEventListener("click", toggleFilter);
 
@@ -1070,8 +1113,7 @@ export class TodoSidebarView extends ItemView {
           this.scanner,
           () => this.render(),
           (t) => {
-            this.activeTagFilter = t;
-            this.render();
+            this.setTagFilterWithCrossfade(t);
           }
         );
       });
