@@ -2,6 +2,15 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.17.0] - 2026-05-07
+
+### Changed — Polish: Summary header alignment and separator
+
+The Summary header sat slightly indented relative to the project rows above it because of a 6px horizontal padding on the row. It also butted up against the last project, with no visual break to signal "this is a different kind of section."
+
+- Removed horizontal padding on `.summary-header` so the chevron's left edge aligns with the project rows directly above.
+- Added a faint top border (`var(--background-modifier-border)`) and a small top margin/padding above the section so Summary reads as its own block.
+
 ## [0.16.0] - 2026-05-07
 
 ### Changed — Polish: tag cloud pills match document tag rendering

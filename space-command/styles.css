@@ -908,16 +908,23 @@
 /* Summary section (replaces Done section) */
 .summary-section {
   font-size: .85em;
+  /* Faint divider above so summary reads as its own block, separate from the
+     project list it follows. Padding lifts the header off the line. */
+  border-top: 1px solid var(--background-modifier-border);
+  margin-top: 10px;
+  padding-top: 8px;
 }
 
 /* Collapsible header — chevron + title + inline preview + done-file arrow.
-   The whole row is the toggle target; the arrow stops propagation. */
+   The whole row is the toggle target; the arrow stops propagation.
+   No horizontal padding so the chevron's left edge aligns with project rows
+   above. */
 .summary-header {
   display: flex;
   align-items: center;
   gap: 6px;
   cursor: pointer;
-  padding: 4px 6px;
+  padding: 4px 0;
   border-radius: var(--radius-s);
   opacity: 0.75;
   transition: background-color 100ms ease, opacity 100ms ease;
