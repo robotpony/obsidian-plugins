@@ -433,28 +433,38 @@
   color: var(--text-accent);
 }
 
-/* Section-context link on orphan rows (no #todo-tagged parent header). Reads
-   as quiet metadata at rest, lifts to the accent colour on hover. Replaces
-   the per-row → arrow so every row has its source context inline. */
-.todo-section-link,
-.idea-section-link,
-.principle-section-link {
-  color: var(--text-faint);
-  text-decoration: none;
-  flex-shrink: 0;
-  font-size: 0.78em;
-  margin-left: auto;
-  padding-left: 8px;
-  max-width: 50%;
+/* Synthesised section heading rendered above a run of orphan items that
+   share the same source heading. Mirrors the header-row pattern — plain
+   bold label on the left, → on the right is the only click target. */
+.todo-orphan-section {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0 2px;
+}
+
+.todo-orphan-section-text {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 0.95em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.todo-orphan-section-link {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: inherit;
+  margin-left: 4px;
   transition: color 120ms ease;
 }
 
-.todo-section-link:hover,
-.idea-section-link:hover,
-.principle-section-link:hover {
+.todo-orphan-section-link:hover {
   color: var(--text-accent);
 }
 

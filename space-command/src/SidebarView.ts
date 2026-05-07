@@ -5,7 +5,7 @@ import { ProjectManager } from "./ProjectManager";
 import { TeamManager } from "./TeamManager";
 import { TodoItem, ProjectInfo, ItemRenderConfig, FocusQueueState } from "./types";
 import { ContextMenuHandler } from "./ContextMenuHandler";
-import { getPriorityValue, compareTodoItems, compareWithEffectivePriority, hasTag, openFileAtLine, extractTags, extractMentions, resolveMentions, resolveEffectiveMentions, showNotice, getTagColourInfo, extractCompletionDate, buildFocusQueue, getItemDate, rotateQueue } from "./utils";
+import { getPriorityValue, compareTodoItems, compareWithEffectivePriority, hasTag, openFileAtLine, extractTags, extractMentions, resolveMentions, resolveEffectiveMentions, showNotice, getTagColourInfo, extractCompletionDate, buildFocusQueue, getItemDate } from "./utils";
 
 export const VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 
@@ -445,13 +445,10 @@ export class TodoSidebarView extends ItemView {
 
     // Source affordance — varies by row type:
     //   - Children: nothing. The header row above already has its arrow.
-    //   - Orphan items (no parent header): a clickable section label on the
-    //     right (heading text or filename fallback). Doubles as the link to
-    //     source, replacing the per-row arrow.
-    //   - Headers (with or without children): keep the arrow.
-    if (isChild) {
-      // children render no inline link; the parent header's link gets you there
-    } else if (isHeader) {
+    //   - Headers: keep the → arrow at the end of the row.
+    //   - Orphan items (no parent header): nothing on the row. The synthesised
+    //     section heading rendered above the run carries the source link.
+    if (isHeader) {
       const link = rowContainer.createEl("a", {
         text: "→",
         cls: `${config.classPrefix}-link`,
@@ -463,20 +460,6 @@ export class TodoSidebarView extends ItemView {
           ? Math.max(...item.childLineNumbers)
           : undefined;
         openFileAtLine(this.app, item.file, item.lineNumber, blockEnd);
-      });
-    } else {
-      // Orphan item — surface its section context as the source link.
-      const sectionText = item.sectionLabel?.trim() || item.file.name;
-      const sectionLine = item.sectionLineNumber ?? item.lineNumber;
-      const sectionLink = rowContainer.createEl("a", {
-        cls: `${config.classPrefix}-section-link`,
-        text: sectionText,
-        href: "#",
-        attr: { title: `Open ${item.file.path}` },
-      });
-      sectionLink.addEventListener("click", (e) => {
-        e.preventDefault();
-        openFileAtLine(this.app, item.file, sectionLine);
       });
     }
 
@@ -1543,7 +1526,23 @@ export class TodoSidebarView extends ItemView {
 
     const list = section.createEl("ul", { cls: "todo-list" });
 
+    // Insert a synthesised section heading above each run of orphan items that
+    // share the same source heading. Repeats on interleaved runs so the
+    // current sort order is preserved (priority/focus first).
+    let lastOrphanSectionKey: string | null = null;
     for (const todo of todos) {
+      const isOrphan = !todo.isHeader && todo.parentLineNumber === undefined && !todo.isSubheading;
+      if (isOrphan) {
+        const sectionLabel = todo.sectionLabel?.trim() || todo.file.basename || todo.file.name;
+        const sectionLine = todo.sectionLineNumber ?? 0;
+        const sectionKey = `${todo.filePath}::${sectionLine}::${sectionLabel}`;
+        if (sectionKey !== lastOrphanSectionKey) {
+          this.renderOrphanSectionHeader(list, todo, sectionLabel, sectionLine);
+          lastOrphanSectionKey = sectionKey;
+        }
+      } else {
+        lastOrphanSectionKey = null;
+      }
       this.renderTodoItem(list, todo);
     }
 
@@ -1559,6 +1558,35 @@ export class TodoSidebarView extends ItemView {
 
   private renderTodoItem(list: HTMLElement, todo: TodoItem, isChild: boolean = false): void {
     this.renderListItem(list, todo, this.todoConfig, isChild);
+  }
+
+  /**
+   * Render a synthesised "section" row above a run of orphan items that share
+   * the same source heading. Mirrors the header-row pattern: the label is
+   * plain text on the left, only the right-side `→` is the click-through to
+   * the source file. Keeps the click target predictable across both shapes.
+   */
+  private renderOrphanSectionHeader(
+    list: HTMLElement,
+    item: TodoItem,
+    label: string,
+    sectionLine: number
+  ): void {
+    const li = list.createEl("li", { cls: "todo-orphan-section" });
+    li.createEl("span", { cls: "todo-orphan-section-text", text: label });
+    const link = li.createEl("a", {
+      cls: "todo-orphan-section-link",
+      text: "→",
+      href: "#",
+      attr: {
+        "aria-label": `Open ${item.file.path}`,
+        title: item.file.path,
+      },
+    });
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      openFileAtLine(this.app, item.file, sectionLine);
+    });
   }
 
   private renderSummary(container: HTMLElement): void {
@@ -2298,33 +2326,21 @@ export class TodoSidebarView extends ItemView {
   private async handleFocusSkip(): Promise<void> {
     if (!this.focusQueue || this.focusQueue.items.length === 0) return;
 
-    // Compute the next queue state up front so we know whether Skip has
-    // anything to do — bail before animating if not.
-    let nextQueue: FocusQueueState | null = null;
-    if (this.focusQueue.items.length >= 2) {
-      nextQueue = {
-        ...this.focusQueue,
-        items: rotateQueue(this.focusQueue.items),
-      };
-    } else {
-      const skipped = this.focusQueue.items[0];
-      const active = this.getActiveTodosForFocus();
-      const result = buildFocusQueue(active, Math.max(2, this.focusQueueLimit), {
-        forceFallback: this.focusQueue.inContinueMode,
-      });
-      const remaining = result.items.filter(
-        t => !(t.filePath === skipped.filePath && t.lineNumber === skipped.lineNumber)
-      );
-      if (remaining.length === 0) return;
-      nextQueue = {
-        items: [remaining[0]],
-        source: result.source,
-        inContinueMode: this.focusQueue.inContinueMode,
-      };
-    }
+    const current = this.focusQueue.items[0];
 
-    // Slide the current card out to the left, then mount the next one with the
-    // matching slide-in-from-right entrance.
+    // Build the FULL sorted candidate list (not bounded by focusQueueLimit) so
+    // Skip always advances to the next candidate in main-list order, cycling
+    // past the queue limit and across priority tiers. Wraps at the end so the
+    // button stays responsive even after the user has walked the whole list.
+    const allCandidates = this.buildFullFocusCandidateList();
+    if (allCandidates.length < 2) return;
+
+    const currentIdx = allCandidates.findIndex(
+      t => t.filePath === current.filePath && t.lineNumber === current.lineNumber
+    );
+    const nextIdx = (Math.max(currentIdx, 0) + 1) % allCandidates.length;
+    const nextItem = allCandidates[nextIdx];
+
     const card = this.containerEl.querySelector(".focus-card") as HTMLElement | null;
     if (card) {
       this.pendingFocusEnter = "skip";
@@ -2332,8 +2348,26 @@ export class TodoSidebarView extends ItemView {
       await this.waitForAnimationEnd(card, 240);
     }
 
-    this.focusQueue = nextQueue;
+    this.focusQueue = {
+      items: [nextItem],
+      source: this.focusQueue.source,
+      inContinueMode: this.focusQueue.inContinueMode,
+    };
     this.render();
+  }
+
+  /**
+   * The full ordered list of candidates Skip can walk through. Mirrors
+   * `buildFocusQueue` but with no size cap so Skip can advance past the queue
+   * limit and across priority tiers. The order matches the curated #focus or
+   * priority-fallback comparator depending on the current queue source.
+   */
+  private buildFullFocusCandidateList(): TodoItem[] {
+    const active = this.getActiveTodosForFocus();
+    const result = buildFocusQueue(active, Number.MAX_SAFE_INTEGER, {
+      forceFallback: this.focusQueue?.inContinueMode === true,
+    });
+    return result.items;
   }
 
   /**
@@ -2356,17 +2390,14 @@ export class TodoSidebarView extends ItemView {
   }
 
   /**
-   * True when there's at least one focus candidate other than `current` —
-   * used to keep Skip enabled even with a single-item queue when more work
-   * is waiting in the wider pool.
+   * True when there's at least one focus candidate other than `current` in the
+   * full sorted candidate list. Skip walks the full list, so this is the right
+   * gate for enabling the button.
    */
   private hasMoreFocusCandidates(current: TodoItem | undefined): boolean {
     if (!current) return false;
-    const active = this.getActiveTodosForFocus();
-    const result = buildFocusQueue(active, Math.max(2, this.focusQueueLimit), {
-      forceFallback: this.focusQueue?.inContinueMode === true,
-    });
-    return result.items.some(
+    const all = this.buildFullFocusCandidateList();
+    return all.some(
       t => !(t.filePath === current.filePath && t.lineNumber === current.lineNumber)
     );
   }

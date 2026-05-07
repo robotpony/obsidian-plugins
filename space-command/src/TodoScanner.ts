@@ -399,9 +399,29 @@ export class TodoScanner extends Events {
     return /^[\s]*[-*+]\s/.test(line) || /^[\s]*\d+\.\s/.test(line);
   }
 
-  // Check if a line is a bold subheading (starts with **text** or __text__)
+  /**
+   * Check if a line is a bold subheading — i.e. `**text**` (or `__text__`)
+   * that is the *whole* line, not a paragraph that merely starts with bold.
+   *
+   * Allows tags (`#tag`) and mentions (`@handle`) after the closing bold
+   * markers, since those are how subheadings carry assignment / scope, but
+   * rejects any other trailing prose. Examples:
+   *
+   *   `**Tuesday**`            ✓ subheading
+   *   `**Tuesday** #weekly`    ✓ subheading
+   *   `**Tuesday** @bruce`     ✓ subheading
+   *   `**Tuesday**: notes...`  ✗ paragraph with bolded lead — not a subheading
+   *   `**Tuesday** rest of...` ✗ paragraph with bolded first word
+   */
   private isBoldSubheading(line: string): boolean {
-    return /^\s*(\*\*|__)\S/.test(line);
+    const trimmed = line.trim();
+    // Match: **text** or __text__ (markers must match), capture the tail.
+    const match = trimmed.match(/^(\*\*|__)([^*_]+?)\1\s*(.*)$/);
+    if (!match) return false;
+    const tail = match[3].trim();
+    if (tail === "") return true;
+    // Tail must be only tags and/or mentions (whitespace-separated).
+    return /^(?:#[\w-]+|@[\w][\w.-]*)(?:\s+(?:#[\w-]+|@[\w][\w.-]*))*$/.test(tail);
   }
 
   /**

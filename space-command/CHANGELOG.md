@@ -2,6 +2,42 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.15.6] - 2026-05-07
+
+### Changed — Focus Mode Skip walks the full list
+
+Skip used to rotate within a small queue (`focusQueueLimit`-sized), which meant the user could only ever cycle between the top 2 (or N) candidates of a tier. With four `#p0 #focus` items and `focusQueueLimit: 2`, items 3 and 4 were never reachable from Skip; same problem at the priority-fallback level when 100 TODOs collapsed to a 2-item queue.
+
+Skip now advances by one position through the *full* sorted candidate list — same comparator, no size cap. Reaching the end wraps back to the start so Skip stays useful as a "let me see what else is on the list" affordance. The user's mental model is now linear: each Skip = the next item, in order.
+
+- New `buildFullFocusCandidateList()` returns the unbounded sorted candidates using the existing `buildFocusQueue` comparator (curated `#focus` or priority-fallback, depending on mode).
+- `handleFocusSkip` finds the current item's index and advances by 1 (mod length).
+- `hasMoreFocusCandidates` checks against the full list rather than the limited queue, so the Skip button is enabled whenever any other candidate exists.
+- `rotateQueue` import dropped from `SidebarView` (still exported from `utils.ts` for tests / external use).
+
+`focusQueueLimit` no longer constrains Skip; it remains in settings since the plumbing still feeds it through `buildFocusQueue`, but it has no effective bearing on the per-card view (which always renders one item) or on the Skip walk (which is now unbounded).
+
+## [0.15.5] - 2026-05-06
+
+### Fixed — Orphan section heading behaviour
+
+Two corrections to the 0.15.4 orphan section heading.
+
+- **Click target**: the whole row was clickable. Now matches the existing header-row pattern — label is plain text on the left, only the right-side `→` opens the source. Click target is predictable across both shapes.
+- **Bold-line detection**: `isBoldSubheading` was treating any line that *started* with `**…**` as a heading, including `**Note:** more text follows…`. It now requires the bold to be the entire line content; tags (`#xxx`) and mentions (`@xxx`) are still allowed in the tail since that's how subheadings carry scope, but free prose after the closing bold disqualifies the line. Both opening and closing markers must match (no `**foo__`).
+
+## [0.15.4] - 2026-05-06
+
+### Fixed — Orphan section labels render above, not on the right
+
+The 0.15.2 polish put the synthesised section label inline on the right side of each orphan row. That made every row carry a small repeated label and broke the visual rhythm: header-block items show their heading *above* their children, but orphan items showed it *beside* themselves.
+
+Now orphan items render with a heading row above each consecutive run that shares the same source heading — same shape as the bold-subheading divider used inside header blocks. Clicking the heading still opens the source at that section's line. Falls back to the file basename when no preceding heading exists.
+
+The current sort order is preserved: when priority interleaves two runs from the same section, the heading repeats above each run — the user explicitly chose this trade-off over re-sorting by section.
+
+The per-row inline section link (`.todo-section-link` / `.idea-section-link` / `.principle-section-link`) was removed.
+
 ## [0.15.3] - 2026-05-06
 
 ### Changed — Polish: Summary collapses by default

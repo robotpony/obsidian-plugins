@@ -335,12 +335,6 @@ function buildFocusQueue(activeTodos, limit, options = {}) {
   );
   return { items: sorted.slice(0, safeLimit), source: "priority-fallback" };
 }
-function rotateQueue(items) {
-  if (items.length < 2)
-    return items;
-  const [head, ...rest] = items;
-  return [...rest, head];
-}
 function getItemDate(todo) {
   var _a;
   const match = todo.text.match(/@(\d{4}-\d{2}-\d{2})/);
@@ -875,9 +869,29 @@ var TodoScanner = class extends import_obsidian4.Events {
   isListItem(line) {
     return /^[\s]*[-*+]\s/.test(line) || /^[\s]*\d+\.\s/.test(line);
   }
-  // Check if a line is a bold subheading (starts with **text** or __text__)
+  /**
+   * Check if a line is a bold subheading — i.e. `**text**` (or `__text__`)
+   * that is the *whole* line, not a paragraph that merely starts with bold.
+   *
+   * Allows tags (`#tag`) and mentions (`@handle`) after the closing bold
+   * markers, since those are how subheadings carry assignment / scope, but
+   * rejects any other trailing prose. Examples:
+   *
+   *   `**Tuesday**`            ✓ subheading
+   *   `**Tuesday** #weekly`    ✓ subheading
+   *   `**Tuesday** @bruce`     ✓ subheading
+   *   `**Tuesday**: notes...`  ✗ paragraph with bolded lead — not a subheading
+   *   `**Tuesday** rest of...` ✗ paragraph with bolded first word
+   */
   isBoldSubheading(line) {
-    return /^\s*(\*\*|__)\S/.test(line);
+    const trimmed = line.trim();
+    const match = trimmed.match(/^(\*\*|__)([^*_]+?)\1\s*(.*)$/);
+    if (!match)
+      return false;
+    const tail = match[3].trim();
+    if (tail === "")
+      return true;
+    return /^(?:#[\w-]+|@[\w][\w.-]*)(?:\s+(?:#[\w-]+|@[\w][\w.-]*))*$/.test(tail);
   }
   /**
    * Pull a clean, display-ready label from a heading or bold-subheading line.
@@ -3956,7 +3970,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
   // Unified list item renderer for todos, ideas, and principles
   // parentTags: optional tags inherited from a parent header block (for child items)
   renderListItem(list, item, config, isChild = false, parentTags = []) {
-    var _a, _b;
     if (isChild && item.isSubheading) {
       const subheadingItem = list.createEl("li", { cls: `${config.classPrefix}-item ${config.classPrefix}-child todo-subheading` });
       const cleanText2 = item.text.replace(/^\s*(\*\*|__)(.*?)(\*\*|__)\s*/, "$2 ").replace(/#[\w-]+/g, "").replace(/@[\w][\w.-]*/g, "").replace(/\s+/g, " ").trim();
@@ -4022,31 +4035,17 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     if (mergedTags.length > 0) {
       this.renderTagDropdown(mergedTags, rowContainer, item);
     }
-    if (isChild) {
-    } else if (isHeader) {
+    if (isHeader) {
       const link = rowContainer.createEl("a", {
         text: "\u2192",
         cls: `${config.classPrefix}-link`,
         href: "#"
       });
       link.addEventListener("click", (e) => {
-        var _a2;
+        var _a;
         e.preventDefault();
-        const blockEnd = ((_a2 = item.childLineNumbers) == null ? void 0 : _a2.length) ? Math.max(...item.childLineNumbers) : void 0;
+        const blockEnd = ((_a = item.childLineNumbers) == null ? void 0 : _a.length) ? Math.max(...item.childLineNumbers) : void 0;
         openFileAtLine(this.app, item.file, item.lineNumber, blockEnd);
-      });
-    } else {
-      const sectionText = ((_a = item.sectionLabel) == null ? void 0 : _a.trim()) || item.file.name;
-      const sectionLine = (_b = item.sectionLineNumber) != null ? _b : item.lineNumber;
-      const sectionLink = rowContainer.createEl("a", {
-        cls: `${config.classPrefix}-section-link`,
-        text: sectionText,
-        href: "#",
-        attr: { title: `Open ${item.file.path}` }
-      });
-      sectionLink.addEventListener("click", (e) => {
-        e.preventDefault();
-        openFileAtLine(this.app, item.file, sectionLine);
       });
     }
     if (hasChildren) {
@@ -4055,8 +4054,8 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       const headerTags = extractTags(item.text).filter((tag) => !config.tagToStrip.test(tag));
       const lines = item.childLineNumbers;
       const childItems = lines.map((ln) => {
-        var _a2;
-        return (_a2 = allItems.find((t) => t.filePath === item.filePath && t.lineNumber === ln)) != null ? _a2 : null;
+        var _a;
+        return (_a = allItems.find((t) => t.filePath === item.filePath && t.lineNumber === ln)) != null ? _a : null;
       });
       for (let idx = 0; idx < lines.length; idx++) {
         const childItem = childItems[idx];
@@ -4755,6 +4754,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     }
   }
   renderActiveTodos(container) {
+    var _a, _b;
     let todos = this.scanner.getTodos();
     todos = todos.filter(
       (todo) => !todo.tags.includes("#future") && !todo.tags.includes("#snooze") && !todo.tags.includes("#snoozed")
@@ -4802,10 +4802,10 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       const allTodosForMentionLookup = this.scanner.getTodos();
       if (this.activeAssigneeFilter === "__unassigned__") {
         todos = todos.filter((todo) => {
-          var _a;
+          var _a2;
           const effective = resolveEffectiveMentions(todo, meHandle, da);
           if (effective.length === 0) {
-            if (todo.isHeader && ((_a = todo.childLineNumbers) == null ? void 0 : _a.length)) {
+            if (todo.isHeader && ((_a2 = todo.childLineNumbers) == null ? void 0 : _a2.length)) {
               return todo.childLineNumbers.some((childLine) => {
                 const child = allTodosForMentionLookup.find((t) => t.filePath === todo.filePath && t.lineNumber === childLine);
                 return !child || resolveEffectiveMentions(child, meHandle, da).length === 0;
@@ -4818,11 +4818,11 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       } else {
         const filterHandle = this.activeAssigneeFilter === "me" && meHandle ? meHandle : this.activeAssigneeFilter;
         todos = todos.filter((todo) => {
-          var _a;
+          var _a2;
           const resolved = resolveEffectiveMentions(todo, meHandle, da);
           if (resolved.includes(filterHandle))
             return true;
-          if (todo.isHeader && ((_a = todo.childLineNumbers) == null ? void 0 : _a.length)) {
+          if (todo.isHeader && ((_a2 = todo.childLineNumbers) == null ? void 0 : _a2.length)) {
             return todo.childLineNumbers.some((childLine) => {
               const child = allTodosForMentionLookup.find((t) => t.filePath === todo.filePath && t.lineNumber === childLine);
               if (!child)
@@ -4854,7 +4854,20 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       return;
     }
     const list = section.createEl("ul", { cls: "todo-list" });
+    let lastOrphanSectionKey = null;
     for (const todo of todos) {
+      const isOrphan = !todo.isHeader && todo.parentLineNumber === void 0 && !todo.isSubheading;
+      if (isOrphan) {
+        const sectionLabel = ((_a = todo.sectionLabel) == null ? void 0 : _a.trim()) || todo.file.basename || todo.file.name;
+        const sectionLine = (_b = todo.sectionLineNumber) != null ? _b : 0;
+        const sectionKey = `${todo.filePath}::${sectionLine}::${sectionLabel}`;
+        if (sectionKey !== lastOrphanSectionKey) {
+          this.renderOrphanSectionHeader(list, todo, sectionLabel, sectionLine);
+          lastOrphanSectionKey = sectionKey;
+        }
+      } else {
+        lastOrphanSectionKey = null;
+      }
       this.renderTodoItem(list, todo);
     }
     if (totalCount > todos.length) {
@@ -4867,6 +4880,29 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
   }
   renderTodoItem(list, todo, isChild = false) {
     this.renderListItem(list, todo, this.todoConfig, isChild);
+  }
+  /**
+   * Render a synthesised "section" row above a run of orphan items that share
+   * the same source heading. Mirrors the header-row pattern: the label is
+   * plain text on the left, only the right-side `→` is the click-through to
+   * the source file. Keeps the click target predictable across both shapes.
+   */
+  renderOrphanSectionHeader(list, item, label, sectionLine) {
+    const li = list.createEl("li", { cls: "todo-orphan-section" });
+    li.createEl("span", { cls: "todo-orphan-section-text", text: label });
+    const link = li.createEl("a", {
+      cls: "todo-orphan-section-link",
+      text: "\u2192",
+      href: "#",
+      attr: {
+        "aria-label": `Open ${item.file.path}`,
+        title: item.file.path
+      }
+    });
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      openFileAtLine(this.app, item.file, sectionLine);
+    });
   }
   renderSummary(container) {
     const section = container.createEl("div", { cls: "summary-section" });
@@ -5447,37 +5483,41 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
   async handleFocusSkip() {
     if (!this.focusQueue || this.focusQueue.items.length === 0)
       return;
-    let nextQueue = null;
-    if (this.focusQueue.items.length >= 2) {
-      nextQueue = {
-        ...this.focusQueue,
-        items: rotateQueue(this.focusQueue.items)
-      };
-    } else {
-      const skipped = this.focusQueue.items[0];
-      const active = this.getActiveTodosForFocus();
-      const result = buildFocusQueue(active, Math.max(2, this.focusQueueLimit), {
-        forceFallback: this.focusQueue.inContinueMode
-      });
-      const remaining = result.items.filter(
-        (t) => !(t.filePath === skipped.filePath && t.lineNumber === skipped.lineNumber)
-      );
-      if (remaining.length === 0)
-        return;
-      nextQueue = {
-        items: [remaining[0]],
-        source: result.source,
-        inContinueMode: this.focusQueue.inContinueMode
-      };
-    }
+    const current = this.focusQueue.items[0];
+    const allCandidates = this.buildFullFocusCandidateList();
+    if (allCandidates.length < 2)
+      return;
+    const currentIdx = allCandidates.findIndex(
+      (t) => t.filePath === current.filePath && t.lineNumber === current.lineNumber
+    );
+    const nextIdx = (Math.max(currentIdx, 0) + 1) % allCandidates.length;
+    const nextItem = allCandidates[nextIdx];
     const card = this.containerEl.querySelector(".focus-card");
     if (card) {
       this.pendingFocusEnter = "skip";
       card.classList.add("focus-card--leaving-skip");
       await this.waitForAnimationEnd(card, 240);
     }
-    this.focusQueue = nextQueue;
+    this.focusQueue = {
+      items: [nextItem],
+      source: this.focusQueue.source,
+      inContinueMode: this.focusQueue.inContinueMode
+    };
     this.render();
+  }
+  /**
+   * The full ordered list of candidates Skip can walk through. Mirrors
+   * `buildFocusQueue` but with no size cap so Skip can advance past the queue
+   * limit and across priority tiers. The order matches the curated #focus or
+   * priority-fallback comparator depending on the current queue source.
+   */
+  buildFullFocusCandidateList() {
+    var _a;
+    const active = this.getActiveTodosForFocus();
+    const result = buildFocusQueue(active, Number.MAX_SAFE_INTEGER, {
+      forceFallback: ((_a = this.focusQueue) == null ? void 0 : _a.inContinueMode) === true
+    });
+    return result.items;
   }
   /**
    * Resolve when the element's CSS animation ends — or after `fallbackMs` if
@@ -5499,19 +5539,15 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     });
   }
   /**
-   * True when there's at least one focus candidate other than `current` —
-   * used to keep Skip enabled even with a single-item queue when more work
-   * is waiting in the wider pool.
+   * True when there's at least one focus candidate other than `current` in the
+   * full sorted candidate list. Skip walks the full list, so this is the right
+   * gate for enabling the button.
    */
   hasMoreFocusCandidates(current) {
-    var _a;
     if (!current)
       return false;
-    const active = this.getActiveTodosForFocus();
-    const result = buildFocusQueue(active, Math.max(2, this.focusQueueLimit), {
-      forceFallback: ((_a = this.focusQueue) == null ? void 0 : _a.inContinueMode) === true
-    });
-    return result.items.some(
+    const all = this.buildFullFocusCandidateList();
+    return all.some(
       (t) => !(t.filePath === current.filePath && t.lineNumber === current.lineNumber)
     );
   }
