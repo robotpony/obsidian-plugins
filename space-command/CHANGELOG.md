@@ -2,6 +2,41 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.21.0] - 2026-05-07
+
+### Removed — Triage feature
+
+The Triage modal and its alert button never quite earned its keep. The siren button in the sidebar header was a constant low-grade alarm, and the modal's one-by-one Snooze / Clear / Convert / Focus / Skip flow was always slower than just opening the source file. Cutting it removes a lot of moving parts.
+
+- Removed the `TriageModal` class and its keyboard flow entirely.
+- Removed the siren-icon "Triage needed" alert button from the sidebar header.
+- Removed the right-click "Triage" item from the sidebar context menu.
+- Removed the `triageSnoozedThreshold` and `triageActiveThreshold` settings (and their settings-tab UI). Stored values are silently ignored.
+- Removed all triage-specific CSS (alert pulse animation, modal layout, button variants).
+- README's "Stats and triage" section is now just "Stats."
+
+If you relied on the alert as a "you have too many snoozed items" nudge, the Stats modal still shows the same counts on demand.
+
+## [0.20.1] - 2026-05-07
+
+### Changed — Polish: tag cloud hides project tags with no active TODOs
+
+Project tags appeared in the cloud as long as any `#todo` referenced them — including snoozed items. So tags like `#api` could sit in the cloud and click through to "No TODOs matching #api," which is just noise. Obsidian's built-in tag search already covers the all-up view; the sidebar cloud is a quick filter for *active* work.
+
+- Project pills are now skipped when their only references are snoozed (`#future` / `#snooze` / `#snoozed`). Clicking any visible pill always yields at least one match.
+- Pill tooltips show both numbers when they differ — `4 active / 6 total` — so the count reflects what you'll actually see when you click. When all references are active, the tooltip stays terse: `6 items`.
+- Pinned tags (`#focus`, `#p0`) are intentionally exempt from the active-only rule. They're priority indicators rather than project filters, so they keep showing whenever any TODO carries them.
+
+## [0.20.0] - 2026-05-07
+
+### Fixed — Tag filters now find items nested under non-matching headers
+
+Clicking a project tag like `#mta` in the cloud showed "No TODOs matching #mta" even when the document obviously had matching items — because those items were children of a header (e.g., "MTA / NB 3.0 (P1)") that didn't itself carry the `#mta` tag. The pipeline filtered out child rows first, then dropped headers whose own tags didn't match — so headers with matching children disappeared, taking their children with them.
+
+- The tag filter now keeps a header if any of its children carry the filter tag, mirroring the parent-match logic the assignee filter already uses.
+- Applied at all five tag-filter sites: active TODOs, active Ideas, Principles, snoozed TODOs, snoozed Ideas.
+- Extracted into a single `filterByActiveTag` helper so the rule lives in one place.
+
 ## [0.19.1] - 2026-05-07
 
 ### Changed — Polish: crossfade on tag-filter changes

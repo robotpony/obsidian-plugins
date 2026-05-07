@@ -3760,7 +3760,7 @@ var TeamManager = class extends import_obsidian11.Events {
 var import_obsidian12 = require("obsidian");
 var VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 var TodoSidebarView = class extends import_obsidian12.ItemView {
-  constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, activeTodosLimit, focusListLimit, makeLinksClickable, triageSnoozedThreshold, triageActiveThreshold, onShowAbout, onShowStats, onShowTriage, getMoveHistory = () => [], teamManager, defaultAssignee = "", focusQueueLimit = 1, focusModeActive = false, setFocusModeActive = async () => {
+  constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, activeTodosLimit, focusListLimit, makeLinksClickable, onShowAbout, onShowStats, getMoveHistory = () => [], teamManager, defaultAssignee = "", focusQueueLimit = 1, focusModeActive = false, setFocusModeActive = async () => {
   }) {
     super(leaf);
     this.updateListener = null;
@@ -3818,11 +3818,8 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     this.activeTodosLimit = activeTodosLimit;
     this.focusListLimit = focusListLimit;
     this.makeLinksClickable = makeLinksClickable;
-    this.triageSnoozedThreshold = triageSnoozedThreshold;
-    this.triageActiveThreshold = triageActiveThreshold;
     this.onShowAbout = onShowAbout;
     this.onShowStats = onShowStats;
-    this.onShowTriage = onShowTriage;
     this.teamManager = teamManager != null ? teamManager : new TeamManager(this.app, "team.md");
     this.defaultAssignee = defaultAssignee;
     this.focusQueueLimit = focusQueueLimit;
@@ -3850,25 +3847,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
   }
   getIcon() {
     return "square-check-big";
-  }
-  shouldShowTriageAlert() {
-    const allTodos = this.scanner.getTodos();
-    const activeTodos = allTodos.filter(
-      (t) => !t.tags.includes("#future") && !t.tags.includes("#snooze") && !t.tags.includes("#snoozed") && !t.tags.includes("#idea") && !t.tags.includes("#ideas") && !t.tags.includes("#ideation")
-    );
-    const allIdeas = this.scanner.getIdeas();
-    const activeIdeas = allIdeas.filter(
-      (i) => !i.tags.includes("#future") && !i.tags.includes("#snooze") && !i.tags.includes("#snoozed")
-    );
-    const snoozedTodos = allTodos.filter(
-      (t) => t.tags.includes("#future") || t.tags.includes("#snooze") || t.tags.includes("#snoozed")
-    );
-    const snoozedIdeas = allIdeas.filter(
-      (i) => i.tags.includes("#future") || i.tags.includes("#snooze") || i.tags.includes("#snoozed")
-    );
-    const totalSnoozed = snoozedTodos.length + snoozedIdeas.length;
-    const activeCount = activeTodos.length + activeIdeas.length;
-    return totalSnoozed > this.triageSnoozedThreshold || activeCount > this.triageActiveThreshold;
   }
   stripMarkdownSyntax(text) {
     let cleaned = text;
@@ -4128,6 +4106,33 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     }
   }
   /**
+   * Apply the active tag filter while keeping header items whose children
+   * carry the tag. Without this, filtering by a tag like `#mta` would drop
+   * the parent header (which doesn't itself have `#mta`) along with all of
+   * its tagged children — leaving the user staring at "No items matching"
+   * even though matching items clearly exist. Mirrors the parent-match
+   * pattern the assignee filter already uses.
+   */
+  filterByActiveTag(items, allItemsForChildLookup) {
+    if (!this.activeTagFilter)
+      return items;
+    const tag = this.activeTagFilter;
+    return items.filter((item) => {
+      var _a;
+      if (item.tags.includes(tag))
+        return true;
+      if (item.isHeader && ((_a = item.childLineNumbers) == null ? void 0 : _a.length)) {
+        return item.childLineNumbers.some((childLine) => {
+          const child = allItemsForChildLookup.find(
+            (t) => t.filePath === item.filePath && t.lineNumber === childLine
+          );
+          return !!child && child.tags.includes(tag);
+        });
+      }
+      return false;
+    });
+  }
+  /**
    * Apply a tag filter change with a brisk crossfade (80ms out, 100ms in)
    * so list items don't flash in and out. The fade class lives on the same
    * sidebar container that survives `render()`, so the new content starts at
@@ -4188,14 +4193,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
         break;
     }
     const tabNav = headerDiv.createEl("div", { cls: "sidebar-tab-nav" });
-    if (this.shouldShowTriageAlert()) {
-      const triageBtn = tabNav.createEl("button", {
-        cls: "sidebar-tab-btn triage-alert-btn",
-        attr: { "aria-label": "Triage needed" }
-      });
-      triageBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"/><path d="m5.5 5.5 3 3"/><path d="M2 12h4"/><path d="m5.5 18.5 3-3"/><path d="M12 22v-4"/><path d="m18.5 18.5-3-3"/><path d="M22 12h-4"/><path d="m18.5 5.5-3 3"/><circle cx="12" cy="12" r="4"/></svg>';
-      triageBtn.addEventListener("click", () => this.onShowTriage());
-    }
     const todosTab = tabNav.createEl("button", {
       cls: `sidebar-tab-btn ${this.activeTab === "todos" ? "active" : ""}`,
       attr: { "aria-label": "TODOs" }
@@ -4268,9 +4265,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       (todo) => !todo.tags.includes("#idea") && !todo.tags.includes("#ideas") && !todo.tags.includes("#ideation")
     );
     todos = todos.filter((todo) => todo.parentLineNumber === void 0);
-    if (this.activeTagFilter) {
-      todos = todos.filter((todo) => todo.tags.includes(this.activeTagFilter));
-    }
+    todos = this.filterByActiveTag(todos, this.scanner.getTodos());
     todos = this.sortTodosByPriority(todos);
     const section = container.createEl("div", { cls: "snoozed-todos-section" });
     const header = section.createEl("div", {
@@ -4297,9 +4292,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       (idea) => idea.tags.includes("#future") || idea.tags.includes("#snooze") || idea.tags.includes("#snoozed")
     );
     ideas = ideas.filter((idea) => idea.parentLineNumber === void 0);
-    if (this.activeTagFilter) {
-      ideas = ideas.filter((idea) => idea.tags.includes(this.activeTagFilter));
-    }
+    ideas = this.filterByActiveTag(ideas, this.scanner.getIdeas());
     ideas = this.sortTodosByPriority(ideas);
     const section = container.createEl("div", { cls: "snoozed-ideas-section" });
     const header = section.createEl("div", {
@@ -4473,6 +4466,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     });
   }
   renderProjects(container) {
+    var _a, _b;
     const projects = this.projectManager.getProjects();
     const section = container.createEl("div", { cls: "projects-section tag-cloud-section" });
     const header = section.createEl("div", {
@@ -4489,6 +4483,15 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     this.renderFilterIndicator(header);
     const entries = [];
     const todos = this.scanner.getTodos();
+    const activeTodos = todos.filter(
+      (t) => !t.tags.includes("#future") && !t.tags.includes("#snooze") && !t.tags.includes("#snoozed")
+    );
+    const activeTagCounts = /* @__PURE__ */ new Map();
+    for (const t of activeTodos) {
+      for (const tag of t.tags) {
+        activeTagCounts.set(tag, ((_a = activeTagCounts.get(tag)) != null ? _a : 0) + 1);
+      }
+    }
     const hasAnyFocus = todos.some((t) => hasTag(t.tags, "#focus"));
     const hasAnyP0 = todos.some((t) => hasTag(t.tags, "#p0"));
     if (hasAnyFocus)
@@ -4506,7 +4509,10 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       return b.count - a.count;
     });
     for (const p of sortedProjects) {
-      entries.push({ tag: p.tag, project: p, pinned: false });
+      const activeCount = (_b = activeTagCounts.get(p.tag)) != null ? _b : 0;
+      if (activeCount === 0)
+        continue;
+      entries.push({ tag: p.tag, project: p, pinned: false, activeCount });
     }
     if (entries.length === 0) {
       section.createEl("div", {
@@ -4520,7 +4526,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     const visible = entries.slice(0, Math.max(TAG_CLOUD_CAP, entries.filter((e) => e.pinned).length));
     const cloud = section.createEl("div", { cls: "tag-cloud" });
     for (const entry of visible) {
-      this.renderTagCloudPill(cloud, entry.tag, entry.project, entry.pinned);
+      this.renderTagCloudPill(cloud, entry.tag, entry.project, entry.pinned, entry.activeCount);
     }
     if (totalCount > visible.length) {
       const more = section.createEl("div", {
@@ -4530,7 +4536,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       more.setAttribute("title", `Showing ${visible.length} of ${totalCount} tags`);
     }
   }
-  renderTagCloudPill(container, tag, project, pinned) {
+  renderTagCloudPill(container, tag, project, pinned, activeCount) {
     const isActiveFilter = this.activeTagFilter === tag;
     const isFocusTag = tag === "#focus" || (project == null ? void 0 : project.hasFocusItems) === true;
     const classes = [
@@ -4539,12 +4545,18 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       isFocusTag ? "tag-cloud-pill-focus" : "",
       isActiveFilter ? "tag-cloud-pill-active" : ""
     ].filter(Boolean).join(" ");
+    let title = tag;
+    if (project) {
+      const total = project.count;
+      const active = activeCount != null ? activeCount : total;
+      title = active === total ? `${total} item${total === 1 ? "" : "s"}` : `${active} active / ${total} total`;
+    }
     const pill = container.createEl("button", {
       cls: classes,
       attr: {
         type: "button",
         "aria-pressed": isActiveFilter ? "true" : "false",
-        title: project ? `${project.count} item${project.count === 1 ? "" : "s"}` : tag
+        title
       }
     });
     pill.appendText(tag);
@@ -4710,9 +4722,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       });
       return hasActiveChild;
     });
-    if (this.activeTagFilter) {
-      todos = todos.filter((todo) => todo.tags.includes(this.activeTagFilter));
-    }
+    todos = this.filterByActiveTag(todos, this.scanner.getTodos());
     if (this.activeAssigneeFilter) {
       const meHandle = this.teamManager.resolveMe();
       const da = this.defaultAssignee;
@@ -5004,9 +5014,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
   renderPrinciples(container) {
     let principles = this.scanner.getPrinciples();
     principles = principles.filter((p) => p.parentLineNumber === void 0);
-    if (this.activeTagFilter) {
-      principles = principles.filter((p) => p.tags.includes(this.activeTagFilter));
-    }
+    principles = this.filterByActiveTag(principles, this.scanner.getPrinciples());
     const section = container.createEl("div", { cls: "principles-section" });
     const header = section.createEl("div", {
       cls: "todo-section-header principles-header"
@@ -5037,9 +5045,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     );
     const allIdeasForChildLookup = ideas;
     ideas = ideas.filter((idea) => idea.parentLineNumber === void 0);
-    if (this.activeTagFilter) {
-      ideas = ideas.filter((idea) => idea.tags.includes(this.activeTagFilter));
-    }
+    ideas = this.filterByActiveTag(ideas, allIdeasForChildLookup);
     ideas = this.sortTodosByPriority(ideas, allIdeasForChildLookup);
     const section = container.createEl("div", { cls: "ideas-section" });
     const header = section.createEl("div", { cls: "todo-section-header" });
@@ -5281,9 +5287,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
         });
       });
       menu.addItem((item) => {
-        item.setTitle("Triage").setIcon("siren").onClick(() => this.onShowTriage());
-      });
-      menu.addItem((item) => {
         item.setTitle("Stats").setIcon("bar-chart-2").onClick(() => this.onShowStats());
       });
       menu.addSeparator();
@@ -5508,9 +5511,6 @@ var DEFAULT_SETTINGS = {
   showTabLockButton: false,
   // Link rendering settings
   makeLinksClickable: true,
-  // Triage settings
-  triageSnoozedThreshold: 10,
-  triageActiveThreshold: 20,
   // Move history
   moveHistory: [],
   // Team file
@@ -6146,11 +6146,8 @@ var SpaceCommandPlugin = class extends import_obsidian13.Plugin {
         this.settings.activeTodosLimit,
         this.settings.focusListLimit,
         this.settings.makeLinksClickable,
-        this.settings.triageSnoozedThreshold,
-        this.settings.triageActiveThreshold,
         () => this.showAboutModal(),
         () => this.showStatsModal(),
-        () => this.showTriageModal(),
         () => this.settings.moveHistory,
         this.teamManager,
         this.settings.defaultAssignee,
@@ -6343,9 +6340,6 @@ var SpaceCommandPlugin = class extends import_obsidian13.Plugin {
   showStatsModal() {
     new StatsModal(this.app, this.scanner).open();
   }
-  showTriageModal() {
-    new TriageModal(this.app, this.scanner, this.processor, this.embedRenderer, this.settings.defaultTodoneFile).open();
-  }
 };
 var AboutModal = class extends import_obsidian13.Modal {
   constructor(app, version) {
@@ -6422,223 +6416,6 @@ var StatsModal = class extends import_obsidian13.Modal {
     const row = container.createEl("div", { cls: "stats-row" });
     row.createEl("span", { cls: "stats-label", text: label });
     row.createEl("span", { cls: "stats-value", text: String(value) });
-  }
-  onClose() {
-    this.contentEl.empty();
-  }
-};
-var TriageModal = class extends import_obsidian13.Modal {
-  constructor(app, scanner, processor, embedRenderer, defaultTodoneFile) {
-    super(app);
-    this.items = [];
-    this.currentIndex = 0;
-    this.scanner = scanner;
-    this.processor = processor;
-    this.embedRenderer = embedRenderer;
-    this.defaultTodoneFile = defaultTodoneFile;
-  }
-  onOpen() {
-    const { contentEl } = this;
-    contentEl.addClass("space-command-triage-modal");
-    const todos = this.scanner.getTodos();
-    const ideas = this.scanner.getIdeas();
-    const activeTodos = todos.filter(
-      (t) => !t.isHeader && !t.tags.includes("#future") && !t.tags.includes("#snooze") && !t.tags.includes("#snoozed") && !t.tags.includes("#idea") && !t.tags.includes("#ideas") && !t.tags.includes("#ideation") && !t.tags.includes("#focus")
-      // Skip already focused
-    );
-    const activeIdeas = ideas.filter(
-      (i) => !i.isHeader && !i.tags.includes("#future") && !i.tags.includes("#snooze") && !i.tags.includes("#snoozed") && !i.tags.includes("#focus")
-      // Skip already focused
-    );
-    const snoozedTodos = todos.filter(
-      (t) => !t.isHeader && (t.tags.includes("#future") || t.tags.includes("#snooze") || t.tags.includes("#snoozed")) && !t.tags.includes("#idea") && !t.tags.includes("#ideas") && !t.tags.includes("#ideation")
-    );
-    const snoozedIdeas = ideas.filter(
-      (i) => !i.isHeader && (i.tags.includes("#future") || i.tags.includes("#snooze") || i.tags.includes("#snoozed"))
-    );
-    this.items = [...activeTodos, ...activeIdeas, ...snoozedTodos, ...snoozedIdeas];
-    this.currentIndex = 0;
-    this.renderCurrentItem();
-  }
-  renderCurrentItem() {
-    const { contentEl } = this;
-    contentEl.empty();
-    const header = contentEl.createEl("div", { cls: "triage-header" });
-    const titleGroup = header.createEl("div", { cls: "triage-title-group" });
-    titleGroup.createEl("span", { cls: "space-command-logo", text: "\u2423\u2318" });
-    const progress = header.createEl("div", { cls: "triage-progress" });
-    progress.appendText(`${this.currentIndex + 1} of ${this.items.length}`);
-    if (this.items.length === 0 || this.currentIndex >= this.items.length) {
-      const titleEl2 = titleGroup.createEl("span", { cls: "triage-title" });
-      titleEl2.appendText("Triage your ");
-      titleEl2.createEl("em", { text: "tasks" });
-      const doneEl = contentEl.createEl("div", { cls: "triage-done" });
-      doneEl.createEl("p", { text: "All items triaged!", cls: "triage-done-text" });
-      const closeBtn = doneEl.createEl("button", { text: "Close", cls: "triage-btn triage-btn-close" });
-      closeBtn.addEventListener("click", () => this.close());
-      return;
-    }
-    const item = this.items[this.currentIndex];
-    const isSnoozed2 = item.tags.includes("#future") || item.tags.includes("#snooze") || item.tags.includes("#snoozed");
-    const isIdea = item.itemType === "idea" || item.tags.includes("#idea") || item.tags.includes("#ideas");
-    const titleEl = titleGroup.createEl("span", { cls: "triage-title" });
-    titleEl.appendText("Triage your ");
-    if (isSnoozed2) {
-      titleEl.createEl("em", { text: "snoozed items" });
-    } else if (isIdea) {
-      titleEl.createEl("em", { text: "ideas" });
-    } else {
-      titleEl.createEl("em", { text: "tasks" });
-    }
-    const contextIndicator = contentEl.createEl("div", { cls: "triage-context" });
-    if (item.parentLineNumber !== void 0) {
-      const allItems = isIdea ? this.scanner.getIdeas() : this.scanner.getTodos();
-      const parentHeader = allItems.find(
-        (t) => t.filePath === item.filePath && t.lineNumber === item.parentLineNumber
-      );
-      if (parentHeader) {
-        const parentText = parentHeader.text.replace(/\\#/g, "\0ESCAPED_HASH\0").replace(/#[\w-]+/g, "").replace(/\x00ESCAPED_HASH\x00/g, "#").replace(/^#{1,6}\s+/, "").trim();
-        contextIndicator.appendText(parentText);
-      }
-    }
-    const itemContent = contentEl.createEl("div", { cls: "triage-item-content" });
-    const checkbox = itemContent.createEl("input", {
-      type: "checkbox",
-      cls: "triage-checkbox"
-    });
-    checkbox.addEventListener("change", async () => {
-      checkbox.disabled = true;
-      if (isIdea) {
-        await this.processor.completeIdea(item);
-      } else {
-        await this.processor.completeTodo(item, this.defaultTodoneFile);
-      }
-      this.nextItem();
-    });
-    const textSpan = itemContent.createEl("span", { cls: "triage-item-text" });
-    let displayText = item.text.replace(/\\#/g, "\0ESCAPED_HASH\0").replace(/#[\w-]+/g, "").replace(/\x00ESCAPED_HASH\x00/g, "#").replace(/^[-*+]\s*\[.\]\s*/, "").replace(/^[-*+]\s*/, "").replace(/^#{1,6}\s+/, "").trim();
-    this.embedRenderer.renderInlineMarkdown(displayText, textSpan);
-    const metaRow = contentEl.createEl("div", { cls: "triage-meta-row" });
-    const sourceEl = metaRow.createEl("div", { cls: "triage-source" });
-    sourceEl.appendText(`(from ${item.filePath})`);
-    const tagsEl = metaRow.createEl("div", { cls: "triage-tags" });
-    const escapedTagPattern = /\\(#[\w-]+)/g;
-    const escapedTags = /* @__PURE__ */ new Set();
-    let match;
-    while ((match = escapedTagPattern.exec(item.text)) !== null) {
-      escapedTags.add(match[1]);
-    }
-    for (const tag of item.tags) {
-      if (!escapedTags.has(tag)) {
-        tagsEl.createEl("a", { cls: "tag", href: tag, text: tag });
-      }
-    }
-    contentEl.createEl("div", { cls: "triage-separator" });
-    const actions = contentEl.createEl("div", { cls: "triage-actions" });
-    if (isSnoozed2) {
-      const unsnoozeBtn = actions.createEl("button", {
-        cls: "triage-btn triage-btn-unsnooze",
-        attr: { title: "Remove snooze tag and make this item active again" }
-      });
-      unsnoozeBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg> Wake';
-      unsnoozeBtn.addEventListener("click", async () => {
-        await this.processor.removeTag(item, "#future");
-        if (item.tags.includes("#snooze"))
-          await this.processor.removeTag(item, "#snooze");
-        if (item.tags.includes("#snoozed"))
-          await this.processor.removeTag(item, "#snoozed");
-        this.nextItem();
-      });
-    } else {
-      const snoozeBtn = actions.createEl("button", {
-        cls: "triage-btn triage-btn-snooze",
-        attr: { title: "Snooze this item for later" }
-      });
-      snoozeBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg> Snooze';
-      snoozeBtn.addEventListener("click", async () => {
-        await this.processor.setPriorityTag(item, "#future");
-        this.nextItem();
-      });
-    }
-    const clearBtn = actions.createEl("button", {
-      cls: "triage-btn triage-btn-clear",
-      attr: { title: "Remove the type tag (item will no longer appear in lists)" }
-    });
-    clearBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg> Clear';
-    clearBtn.addEventListener("click", async () => {
-      if (isIdea) {
-        await this.processor.removeTag(item, "#idea");
-        if (item.tags.includes("#ideas"))
-          await this.processor.removeTag(item, "#ideas");
-        if (item.tags.includes("#ideation"))
-          await this.processor.removeTag(item, "#ideation");
-      } else {
-        await this.processor.removeTag(item, "#todo");
-      }
-      this.nextItem();
-    });
-    if (isIdea) {
-      const toTodoBtn = actions.createEl("button", {
-        cls: "triage-btn triage-btn-convert",
-        attr: { title: "Convert this Idea to a TODO" }
-      });
-      toTodoBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.5"/><path d="m9 11 3 3L22 4"/></svg> \u2192 TODO';
-      toTodoBtn.addEventListener("click", async () => {
-        await this.processor.removeTag(item, "#idea");
-        if (item.tags.includes("#ideas"))
-          await this.processor.removeTag(item, "#ideas");
-        if (item.tags.includes("#ideation"))
-          await this.processor.removeTag(item, "#ideation");
-        await this.processor.addTag(item, "#todo");
-        this.nextItem();
-      });
-    } else {
-      const toIdeaBtn = actions.createEl("button", {
-        cls: "triage-btn triage-btn-convert",
-        attr: { title: "Convert this TODO to an Idea" }
-      });
-      toIdeaBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"></path><path d="M10 22h4"></path><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"></path></svg> \u2192 Idea';
-      toIdeaBtn.addEventListener("click", async () => {
-        await this.processor.removeTag(item, "#todo");
-        await this.processor.addTag(item, "#idea");
-        this.nextItem();
-      });
-    }
-    const focusBtn = actions.createEl("button", {
-      cls: "triage-btn triage-btn-focus",
-      attr: { title: "Add #focus tag to prioritize this item" }
-    });
-    focusBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg> Focus';
-    focusBtn.addEventListener("click", async () => {
-      await this.processor.setPriorityTag(item, "#focus");
-      this.nextItem();
-    });
-    const backBtn = actions.createEl("button", {
-      cls: "triage-btn triage-btn-back",
-      attr: { title: "Go back to previous item" }
-    });
-    backBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="5" x2="5" y2="19"/><polygon points="19 4 9 12 19 20 19 4"/></svg>';
-    backBtn.addEventListener("click", () => this.prevItem());
-    if (this.currentIndex === 0) {
-      backBtn.disabled = true;
-      backBtn.classList.add("triage-btn-disabled");
-    }
-    const skipBtn = actions.createEl("button", {
-      cls: "triage-btn triage-btn-skip",
-      attr: { title: "Skip this item and move to next" }
-    });
-    skipBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg> Skip';
-    skipBtn.addEventListener("click", () => this.nextItem());
-  }
-  prevItem() {
-    if (this.currentIndex > 0) {
-      this.currentIndex--;
-      this.renderCurrentItem();
-    }
-  }
-  nextItem() {
-    this.currentIndex++;
-    this.renderCurrentItem();
   }
   onClose() {
     this.contentEl.empty();
@@ -6775,25 +6552,6 @@ var SpaceCommandSettingTab = class extends import_obsidian13.PluginSettingTab {
           this.plugin.settings.excludeFoldersFromProjects
         );
         await this.plugin.saveSettings();
-      })
-    );
-    containerEl.createEl("h3", { text: "Triage" });
-    new import_obsidian13.Setting(containerEl).setName("Snoozed items threshold").setDesc("Show triage alert when snoozed items exceed this count").addText(
-      (text) => text.setPlaceholder("10").setValue(String(this.plugin.settings.triageSnoozedThreshold)).onChange(async (value) => {
-        const num = parseInt(value);
-        if (!isNaN(num) && num >= 0) {
-          this.plugin.settings.triageSnoozedThreshold = num;
-          await this.plugin.saveSettings();
-        }
-      })
-    );
-    new import_obsidian13.Setting(containerEl).setName("Active items threshold").setDesc("Show triage alert when active TODOs + Ideas exceed this count").addText(
-      (text) => text.setPlaceholder("20").setValue(String(this.plugin.settings.triageActiveThreshold)).onChange(async (value) => {
-        const num = parseInt(value);
-        if (!isNaN(num) && num >= 0) {
-          this.plugin.settings.triageActiveThreshold = num;
-          await this.plugin.saveSettings();
-        }
       })
     );
     containerEl.createEl("h3", { text: "Team" });

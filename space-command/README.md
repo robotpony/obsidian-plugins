@@ -196,11 +196,9 @@ Select text and right-click, or use the keyboard shortcuts:
 
 ## Sidebar Features
 
-### Stats and triage
+### Stats
 
 Click the chart icon in the sidebar header to see counts of active TODOs, focused items, snoozed items, ideas, and principles.
-
-When you have too many snoozed or active items (configurable thresholds), a triage alert appears. Click it to process items one by one: Snooze, Clear, Convert (TODO ↔ Idea), Focus, Skip.
 
 ### Clickable links
 

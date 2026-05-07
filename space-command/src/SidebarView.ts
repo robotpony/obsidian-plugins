@@ -28,8 +28,6 @@ export class TodoSidebarView extends ItemView {
   private summaryExpanded: boolean = false;
   private focusListLimit: number;
   private makeLinksClickable: boolean;
-  private triageSnoozedThreshold: number;
-  private triageActiveThreshold: number;
   private activeTab: 'todos' | 'ideas' | 'snoozed' = 'todos';
   private activeTagFilter: string | null = null;
   private activeAssigneeFilter: string | null = null;
@@ -51,7 +49,6 @@ export class TodoSidebarView extends ItemView {
   private openInfoPopup: HTMLElement | null = null;
   private onShowAbout: () => void;
   private onShowStats: () => void;
-  private onShowTriage: () => void;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -63,11 +60,8 @@ export class TodoSidebarView extends ItemView {
     activeTodosLimit: number,
     focusListLimit: number,
     makeLinksClickable: boolean,
-    triageSnoozedThreshold: number,
-    triageActiveThreshold: number,
     onShowAbout: () => void,
     onShowStats: () => void,
-    onShowTriage: () => void,
     getMoveHistory: () => string[] = () => [],
     teamManager?: TeamManager,
     defaultAssignee: string = "",
@@ -83,11 +77,8 @@ export class TodoSidebarView extends ItemView {
     this.activeTodosLimit = activeTodosLimit;
     this.focusListLimit = focusListLimit;
     this.makeLinksClickable = makeLinksClickable;
-    this.triageSnoozedThreshold = triageSnoozedThreshold;
-    this.triageActiveThreshold = triageActiveThreshold;
     this.onShowAbout = onShowAbout;
     this.onShowStats = onShowStats;
-    this.onShowTriage = onShowTriage;
     this.teamManager = teamManager ?? new TeamManager(this.app, "team.md");
     this.defaultAssignee = defaultAssignee;
     this.focusQueueLimit = focusQueueLimit;
@@ -117,44 +108,6 @@ export class TodoSidebarView extends ItemView {
 
   getIcon(): string {
     return "square-check-big";
-  }
-
-  private shouldShowTriageAlert(): boolean {
-    // Get active (non-snoozed) TODOs
-    const allTodos = this.scanner.getTodos();
-    const activeTodos = allTodos.filter(t =>
-      !t.tags.includes("#future") &&
-      !t.tags.includes("#snooze") &&
-      !t.tags.includes("#snoozed") &&
-      !t.tags.includes("#idea") &&
-      !t.tags.includes("#ideas") &&
-      !t.tags.includes("#ideation")
-    );
-
-    // Get active (non-snoozed) Ideas
-    const allIdeas = this.scanner.getIdeas();
-    const activeIdeas = allIdeas.filter(i =>
-      !i.tags.includes("#future") &&
-      !i.tags.includes("#snooze") &&
-      !i.tags.includes("#snoozed")
-    );
-
-    // Get snoozed items (both TODOs and Ideas)
-    const snoozedTodos = allTodos.filter(t =>
-      t.tags.includes("#future") ||
-      t.tags.includes("#snooze") ||
-      t.tags.includes("#snoozed")
-    );
-    const snoozedIdeas = allIdeas.filter(i =>
-      i.tags.includes("#future") ||
-      i.tags.includes("#snooze") ||
-      i.tags.includes("#snoozed")
-    );
-    const totalSnoozed = snoozedTodos.length + snoozedIdeas.length;
-
-    // Show alert if either threshold is exceeded
-    const activeCount = activeTodos.length + activeIdeas.length;
-    return totalSnoozed > this.triageSnoozedThreshold || activeCount > this.triageActiveThreshold;
   }
 
   private stripMarkdownSyntax(text: string): string {
@@ -554,6 +507,31 @@ export class TodoSidebarView extends ItemView {
   }
 
   /**
+   * Apply the active tag filter while keeping header items whose children
+   * carry the tag. Without this, filtering by a tag like `#mta` would drop
+   * the parent header (which doesn't itself have `#mta`) along with all of
+   * its tagged children — leaving the user staring at "No items matching"
+   * even though matching items clearly exist. Mirrors the parent-match
+   * pattern the assignee filter already uses.
+   */
+  private filterByActiveTag(items: TodoItem[], allItemsForChildLookup: TodoItem[]): TodoItem[] {
+    if (!this.activeTagFilter) return items;
+    const tag = this.activeTagFilter;
+    return items.filter(item => {
+      if (item.tags.includes(tag)) return true;
+      if (item.isHeader && item.childLineNumbers?.length) {
+        return item.childLineNumbers.some(childLine => {
+          const child = allItemsForChildLookup.find(
+            t => t.filePath === item.filePath && t.lineNumber === childLine
+          );
+          return !!child && child.tags.includes(tag);
+        });
+      }
+      return false;
+    });
+  }
+
+  /**
    * Apply a tag filter change with a brisk crossfade (80ms out, 100ms in)
    * so list items don't flash in and out. The fade class lives on the same
    * sidebar container that survives `render()`, so the new content starts at
@@ -623,17 +601,6 @@ export class TodoSidebarView extends ItemView {
 
     // Tab navigation
     const tabNav = headerDiv.createEl("div", { cls: "sidebar-tab-nav" });
-
-    // Triage alert button (shown when thresholds exceeded)
-    if (this.shouldShowTriageAlert()) {
-      const triageBtn = tabNav.createEl("button", {
-        cls: "sidebar-tab-btn triage-alert-btn",
-        attr: { "aria-label": "Triage needed" },
-      });
-      // Emergency siren/light icon
-      triageBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"/><path d="m5.5 5.5 3 3"/><path d="M2 12h4"/><path d="m5.5 18.5 3-3"/><path d="M12 22v-4"/><path d="m18.5 18.5-3-3"/><path d="M22 12h-4"/><path d="m18.5 5.5-3 3"/><circle cx="12" cy="12" r="4"/></svg>';
-      triageBtn.addEventListener("click", () => this.onShowTriage());
-    }
 
     const todosTab = tabNav.createEl("button", {
       cls: `sidebar-tab-btn ${this.activeTab === 'todos' ? 'active' : ''}`,
@@ -747,10 +714,8 @@ export class TodoSidebarView extends ItemView {
     // Filter out child items (they'll be rendered under their parent header)
     todos = todos.filter(todo => todo.parentLineNumber === undefined);
 
-    // Apply tag filter if active
-    if (this.activeTagFilter) {
-      todos = todos.filter(todo => todo.tags.includes(this.activeTagFilter!));
-    }
+    // Apply tag filter if active (keeps headers whose children match)
+    todos = this.filterByActiveTag(todos, this.scanner.getTodos());
 
     // Sort by priority
     todos = this.sortTodosByPriority(todos);
@@ -793,10 +758,8 @@ export class TodoSidebarView extends ItemView {
     // Filter out child items
     ideas = ideas.filter(idea => idea.parentLineNumber === undefined);
 
-    // Apply tag filter if active
-    if (this.activeTagFilter) {
-      ideas = ideas.filter(idea => idea.tags.includes(this.activeTagFilter!));
-    }
+    // Apply tag filter if active (keeps headers whose children match)
+    ideas = this.filterByActiveTag(ideas, this.scanner.getIdeas());
 
     // Sort by priority
     ideas = this.sortTodosByPriority(ideas);
@@ -1021,10 +984,28 @@ export class TodoSidebarView extends ItemView {
     // Build the cloud entries. #focus and #p0 are pinned first when in use;
     // ProjectManager already filters those out of its results, so adding them
     // here will not double-render.
-    type CloudEntry = { tag: string; project: ProjectInfo | null; pinned: boolean };
+    type CloudEntry = { tag: string; project: ProjectInfo | null; pinned: boolean; activeCount?: number };
     const entries: CloudEntry[] = [];
 
     const todos = this.scanner.getTodos();
+
+    // Active count per tag — used to skip project pills that would only match
+    // snoozed items (clicking them yields "No TODOs matching", which is just
+    // noise). Pinned tags (#focus / #p0) are intentionally NOT gated by this:
+    // they're priority indicators, not project filters, and should appear
+    // whenever any TODO carries them.
+    const activeTodos = todos.filter(t =>
+      !t.tags.includes("#future") &&
+      !t.tags.includes("#snooze") &&
+      !t.tags.includes("#snoozed")
+    );
+    const activeTagCounts = new Map<string, number>();
+    for (const t of activeTodos) {
+      for (const tag of t.tags) {
+        activeTagCounts.set(tag, (activeTagCounts.get(tag) ?? 0) + 1);
+      }
+    }
+
     const hasAnyFocus = todos.some(t => hasTag(t.tags, "#focus"));
     const hasAnyP0 = todos.some(t => hasTag(t.tags, "#p0"));
     if (hasAnyFocus) entries.push({ tag: "#focus", project: null, pinned: true });
@@ -1039,7 +1020,11 @@ export class TodoSidebarView extends ItemView {
       return b.count - a.count;
     });
     for (const p of sortedProjects) {
-      entries.push({ tag: p.tag, project: p, pinned: false });
+      const activeCount = activeTagCounts.get(p.tag) ?? 0;
+      // Skip projects whose only references are snoozed — they'd just empty
+      // out on click. Obsidian's tag search already covers the all-up view.
+      if (activeCount === 0) continue;
+      entries.push({ tag: p.tag, project: p, pinned: false, activeCount });
     }
 
     if (entries.length === 0) {
@@ -1058,7 +1043,7 @@ export class TodoSidebarView extends ItemView {
 
     const cloud = section.createEl("div", { cls: "tag-cloud" });
     for (const entry of visible) {
-      this.renderTagCloudPill(cloud, entry.tag, entry.project, entry.pinned);
+      this.renderTagCloudPill(cloud, entry.tag, entry.project, entry.pinned, entry.activeCount);
     }
 
     if (totalCount > visible.length) {
@@ -1074,7 +1059,8 @@ export class TodoSidebarView extends ItemView {
     container: HTMLElement,
     tag: string,
     project: ProjectInfo | null,
-    pinned: boolean
+    pinned: boolean,
+    activeCount?: number
   ): void {
     const isActiveFilter = this.activeTagFilter === tag;
     // The pinned #focus pill is itself a focus tag; project pills inherit focus
@@ -1088,12 +1074,23 @@ export class TodoSidebarView extends ItemView {
       isActiveFilter ? "tag-cloud-pill-active" : "",
     ].filter(Boolean).join(" ");
 
+    // Tooltip surfaces both numbers when they differ so the user knows the
+    // pill represents a curated active subset, not the full historical count.
+    let title = tag;
+    if (project) {
+      const total = project.count;
+      const active = activeCount ?? total;
+      title = active === total
+        ? `${total} item${total === 1 ? "" : "s"}`
+        : `${active} active / ${total} total`;
+    }
+
     const pill = container.createEl("button", {
       cls: classes,
       attr: {
         type: "button",
         "aria-pressed": isActiveFilter ? "true" : "false",
-        title: project ? `${project.count} item${project.count === 1 ? "" : "s"}` : tag,
+        title,
       },
     });
     pill.appendText(tag);
@@ -1326,10 +1323,8 @@ export class TodoSidebarView extends ItemView {
       return hasActiveChild; // Keep header only if it has at least one active child
     });
 
-    // Apply tag filter if active
-    if (this.activeTagFilter) {
-      todos = todos.filter(todo => todo.tags.includes(this.activeTagFilter!));
-    }
+    // Apply tag filter if active (keeps headers whose children match)
+    todos = this.filterByActiveTag(todos, this.scanner.getTodos());
 
     // Apply assignee filter if active
     if (this.activeAssigneeFilter) {
@@ -1672,10 +1667,8 @@ export class TodoSidebarView extends ItemView {
     // Filter out child items (they'll be rendered under their parent header)
     principles = principles.filter(p => p.parentLineNumber === undefined);
 
-    // Apply tag filter if active
-    if (this.activeTagFilter) {
-      principles = principles.filter(p => p.tags.includes(this.activeTagFilter!));
-    }
+    // Apply tag filter if active (keeps headers whose children match)
+    principles = this.filterByActiveTag(principles, this.scanner.getPrinciples());
 
     const section = container.createEl("div", { cls: "principles-section" });
 
@@ -1725,10 +1718,8 @@ export class TodoSidebarView extends ItemView {
     // Filter out child items (they'll be rendered under their parent header)
     ideas = ideas.filter(idea => idea.parentLineNumber === undefined);
 
-    // Apply tag filter if active
-    if (this.activeTagFilter) {
-      ideas = ideas.filter(idea => idea.tags.includes(this.activeTagFilter!));
-    }
+    // Apply tag filter if active (keeps headers whose children match)
+    ideas = this.filterByActiveTag(ideas, allIdeasForChildLookup);
 
     // Sort by priority (focus first)
     // Pass full list for accurate child priority lookup
@@ -2051,13 +2042,6 @@ export class TodoSidebarView extends ItemView {
               showNotice("Copied TODO inline syntax");
             });
         });
-      });
-
-      menu.addItem((item) => {
-        item
-          .setTitle("Triage")
-          .setIcon("siren")
-          .onClick(() => this.onShowTriage());
       });
 
       menu.addItem((item) => {

@@ -130,9 +130,6 @@ export interface SpaceCommandSettings {
   showTabLockButton: boolean;
   // Link rendering settings
   makeLinksClickable: boolean;
-  // Triage settings
-  triageSnoozedThreshold: number;
-  triageActiveThreshold: number;
   // Move history (recent move-to targets)
   moveHistory: string[];
   // Team file path
@@ -159,9 +156,6 @@ export const DEFAULT_SETTINGS: SpaceCommandSettings = {
   showTabLockButton: false,
   // Link rendering settings
   makeLinksClickable: true,
-  // Triage settings
-  triageSnoozedThreshold: 10,
-  triageActiveThreshold: 20,
   // Move history
   moveHistory: [],
   // Team file
