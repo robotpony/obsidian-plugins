@@ -633,20 +633,30 @@
   padding: 2px 0 4px;
 }
 
-/* Match Obsidian's in-document tag rendering. Inherits all --tag-* vars so
-   theme overrides flow through identically. */
-.tag-cloud-pill {
+/* Match Obsidian's in-document tag rendering. The .space-command-sidebar
+   prefix is required to win specificity against Obsidian's default <button>
+   styles inside workspace leaves — without it, pills inherit the cream
+   button background, gray border, and rounded-rectangle shape. We also
+   explicitly reset appearance/box-shadow/background-image. Concrete
+   accent-mix fallbacks ensure pills still read as tags when --tag-background
+   and --tag-color aren't reachable from this scope (some themes scope them
+   under .markdown-rendered only). */
+.space-command-sidebar .tag-cloud-pill {
+  appearance: none;
+  -webkit-appearance: none;
   display: inline-flex;
   align-items: center;
   font-family: var(--tag-font, var(--font-monospace));
   font-size: var(--tag-size, var(--font-smaller));
   font-weight: var(--tag-weight, inherit);
   line-height: 1.3;
-  color: var(--tag-color);
-  background-color: var(--tag-background);
+  color: var(--tag-color, var(--text-accent));
+  background-color: var(--tag-background, color-mix(in srgb, var(--text-accent) 12%, transparent));
+  background-image: none;
   border: 1px solid transparent;
   border-radius: var(--tag-radius, 12px);
   padding: var(--tag-padding-y, 2px) var(--tag-padding-x, 8px);
+  box-shadow: none;
   cursor: pointer;
   transition:
     background-color 120ms ease,
@@ -654,45 +664,46 @@
     color 120ms ease;
 }
 
-.tag-cloud-pill:hover {
-  background-color: var(--tag-background-hover, var(--background-modifier-hover));
-  color: var(--tag-color-hover, var(--text-normal));
+.space-command-sidebar .tag-cloud-pill:hover {
+  background-color: var(--tag-background-hover, color-mix(in srgb, var(--text-accent) 20%, transparent));
+  color: var(--tag-color-hover, var(--text-accent));
+  box-shadow: none;
 }
 
-.tag-cloud-pill:focus-visible {
+.space-command-sidebar .tag-cloud-pill:focus-visible {
   outline: none;
   border-color: var(--interactive-accent);
 }
 
-/* Pinned tags (#focus, #p0): subtle accent so they read as "lead" items
-   without competing with the active filter state. */
-.tag-cloud-pill-pinned {
+/* Pinned tags (#focus, #p0): subtle accent emphasis so they read as "lead"
+   items without competing with the active filter state. */
+.space-command-sidebar .tag-cloud-pill-pinned {
   color: var(--text-accent);
 }
 
 /* Focus tags — both the pinned #focus pill and project pills with focus
    items — share the accent-mix background that .todo-focus rows use, so the
    "this is where focus lives" signal is consistent across the sidebar. */
-.tag-cloud-pill-focus {
+.space-command-sidebar .tag-cloud-pill-focus {
   color: var(--text-normal);
   background-color: color-mix(in srgb, var(--interactive-accent) 15%, transparent);
 }
 
-.tag-cloud-pill-focus:hover {
+.space-command-sidebar .tag-cloud-pill-focus:hover {
   background-color: color-mix(in srgb, var(--interactive-accent) 25%, transparent);
   color: var(--text-normal);
 }
 
 /* Active filter: clear, high-contrast — this is the “you are filtering by X”
    signal, so it should beat both pinned and focus styling. */
-.tag-cloud-pill-active {
+.space-command-sidebar .tag-cloud-pill-active {
   background-color: var(--interactive-accent);
   color: var(--text-on-accent);
   border-color: var(--interactive-accent);
   opacity: 1;
 }
 
-.tag-cloud-pill-active:hover {
+.space-command-sidebar .tag-cloud-pill-active:hover {
   background-color: var(--interactive-accent-hover);
   color: var(--text-on-accent);
 }

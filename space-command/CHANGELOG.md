@@ -2,6 +2,18 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.19.0] - 2026-05-07
+
+### Fixed — Tag cloud pills actually look like document tags now
+
+The 0.16.0 attempt to match document tag styling didn't take effect: the cloud pills were still rendering as default Obsidian buttons (cream background, gray border, rounded-rectangle shape) because the `.tag-cloud-pill` class lost the specificity battle to Obsidian's built-in `<button>` styles inside workspace leaves. The tag CSS variables resolved fine; my rule just didn't win.
+
+- Scoped all `.tag-cloud-pill*` rules under `.space-command-sidebar` to win specificity against Obsidian's default button styling.
+- Explicitly reset button-default `appearance`, `background-image`, and `box-shadow` so the pill is a clean canvas before the tag styles apply.
+- Added concrete accent-mix fallbacks for `--tag-color` and `--tag-background` so pills still render as tags if those variables aren't reachable from the sidebar scope (some themes scope them under `.markdown-rendered` only).
+
+The focus tag treatment (`#focus` and project pills with focus items get the `.todo-focus` accent-mix background) is unchanged in intent — it just couldn't beat the button defaults before.
+
 ## [0.18.0] - 2026-05-07
 
 ### Changed — Polish: SUMMARY title sits flush left
