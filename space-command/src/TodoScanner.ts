@@ -1,6 +1,6 @@
 import { App, TFile, Vault, Events, debounce } from "obsidian";
 import { TodoItem } from "./types";
-import { createFingerprint, extractDateFromFilename, extractMentions, extractTags, filenameToTag, hasCachedRelevantTags, hasCheckboxFormat, isCheckboxChecked } from "./utils";
+import { createFingerprint, extractDateFromFilename, extractMentions, extractTags, filenameToTag, hasCachedRelevantTags, hasCheckboxFormat, isCheckboxChecked, replaceTodoneWithTodo } from "./utils";
 
 export class TodoScanner extends Events {
   private app: App;
@@ -72,6 +72,7 @@ export class TodoScanner extends Events {
       const principles: TodoItem[] = [];
       const linesToCleanup: number[] = [];
       const linesToSyncTodone: number[] = [];
+      const linesToRevertTodone: number[] = [];
       const linesToRemoveIdea: number[] = [];
       const linesToStampMoved: number[] = [];
 
@@ -190,6 +191,7 @@ export class TodoScanner extends Events {
 
             // Check if checkbox is checked but missing #todone tag - sync the state
             const isChecked = isCheckboxChecked(line);
+            const hasCheckbox = hasCheckboxFormat(line);
             const hasTodoneTag = tags.includes("#todone");
 
             if (isChecked && !hasTodoneTag) {
@@ -197,6 +199,13 @@ export class TodoScanner extends Events {
               linesToSyncTodone.push(i);
               // Treat as completed for this scan
               tags.push("#todone");
+            } else if (hasCheckbox && !isChecked && hasTodoneTag) {
+              // Reverse sync: unchecking a child strips its #todone @date
+              linesToRevertTodone.push(i);
+              // Treat as todo for this scan: drop #todone from local tag set
+              for (let j = tags.length - 1; j >= 0; j--) {
+                if (tags[j] === "#todone" || tags[j] === "#todones") tags.splice(j, 1);
+              }
             }
 
             // Skip empty child items
@@ -234,7 +243,7 @@ export class TodoScanner extends Events {
         // Regular TODO/TODONE processing (non-header, non-child items)
         // If line has both #todo and #todone, #todone wins and we clean up the #todo
         // If line has #idea, it should not appear in todos (idea takes precedence)
-        const hasTodo = tags.includes("#todo") || tags.includes("#todos");
+        let hasTodo = tags.includes("#todo") || tags.includes("#todos");
         let hasTodone = tags.includes("#todone") || tags.includes("#todones");
         const hasIdea = tags.includes("#idea") || tags.includes("#ideas") || tags.includes("#ideation");
         // Skip empty items (just tags, no content)
@@ -245,6 +254,21 @@ export class TodoScanner extends Events {
           linesToSyncTodone.push(i);
           tags.push("#todone");
           hasTodone = true;
+        }
+
+        // Reverse sync: if a #todone item is unchecked, revert to #todo
+        if (hasTodone && !hasIdea && hasCheckboxFormat(line) && !isCheckboxChecked(line)) {
+          linesToRevertTodone.push(i);
+          // After revert, the line will have #todo (from replaceTodoneWithTodo).
+          // Update local state so classification treats this as a todo, not a todone.
+          for (let j = tags.length - 1; j >= 0; j--) {
+            if (tags[j] === "#todone" || tags[j] === "#todones") tags.splice(j, 1);
+          }
+          if (!tags.includes("#todo") && !tags.includes("#todos")) {
+            tags.push("#todo");
+          }
+          hasTodone = false;
+          hasTodo = true;
         }
 
         if (hasTodone && hasTodo) {
@@ -334,7 +358,7 @@ export class TodoScanner extends Events {
       }
 
       // Apply all queued line mutations in one write to avoid concurrent vault.modify() calls
-      await this.applyLineMutations(file, lines, linesToCleanup, linesToSyncTodone, linesToRemoveIdea, linesToStampMoved);
+      await this.applyLineMutations(file, lines, linesToCleanup, linesToSyncTodone, linesToRevertTodone, linesToRemoveIdea, linesToStampMoved);
 
       // Filter out header TODOs whose children are all completed, moved, or snoozed.
       // A child is "active" if it exists in the todos array and is not snoozed.
@@ -599,10 +623,11 @@ export class TodoScanner extends Events {
     lines: string[],
     linesToCleanup: number[],
     linesToSyncTodone: number[],
+    linesToRevertTodone: number[],
     linesToRemoveIdea: number[],
     linesToStampMoved: number[] = []
   ): Promise<void> {
-    if (linesToCleanup.length === 0 && linesToSyncTodone.length === 0 && linesToRemoveIdea.length === 0 && linesToStampMoved.length === 0) {
+    if (linesToCleanup.length === 0 && linesToSyncTodone.length === 0 && linesToRevertTodone.length === 0 && linesToRemoveIdea.length === 0 && linesToStampMoved.length === 0) {
       return;
     }
 
@@ -616,6 +641,11 @@ export class TodoScanner extends Events {
 
     for (const lineNum of linesToSyncTodone) {
       const newLine = lines[lineNum].trimEnd() + ` #todone @${today}`;
+      if (newLine !== lines[lineNum]) { lines[lineNum] = newLine; modified = true; }
+    }
+
+    for (const lineNum of linesToRevertTodone) {
+      const newLine = replaceTodoneWithTodo(lines[lineNum]);
       if (newLine !== lines[lineNum]) { lines[lineNum] = newLine; modified = true; }
     }
 

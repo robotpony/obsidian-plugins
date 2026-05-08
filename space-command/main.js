@@ -616,6 +616,7 @@ var TodoScanner = class extends import_obsidian4.Events {
       const principles = [];
       const linesToCleanup = [];
       const linesToSyncTodone = [];
+      const linesToRevertTodone = [];
       const linesToRemoveIdea = [];
       const linesToStampMoved = [];
       let inCodeBlock = false;
@@ -684,10 +685,17 @@ var TodoScanner = class extends import_obsidian4.Events {
           if (hasPrincipleTag) {
           } else {
             const isChecked = isCheckboxChecked(line);
+            const hasCheckbox = hasCheckboxFormat(line);
             const hasTodoneTag = tags.includes("#todone");
             if (isChecked && !hasTodoneTag) {
               linesToSyncTodone.push(i);
               tags.push("#todone");
+            } else if (hasCheckbox && !isChecked && hasTodoneTag) {
+              linesToRevertTodone.push(i);
+              for (let j = tags.length - 1; j >= 0; j--) {
+                if (tags[j] === "#todone" || tags[j] === "#todones")
+                  tags.splice(j, 1);
+              }
             }
             if (!this.hasContent(line))
               continue;
@@ -713,7 +721,7 @@ var TodoScanner = class extends import_obsidian4.Events {
           }
           continue;
         }
-        const hasTodo = tags.includes("#todo") || tags.includes("#todos");
+        let hasTodo = tags.includes("#todo") || tags.includes("#todos");
         let hasTodone = tags.includes("#todone") || tags.includes("#todones");
         const hasIdea = tags.includes("#idea") || tags.includes("#ideas") || tags.includes("#ideation");
         const lineHasContent = this.hasContent(line);
@@ -721,6 +729,18 @@ var TodoScanner = class extends import_obsidian4.Events {
           linesToSyncTodone.push(i);
           tags.push("#todone");
           hasTodone = true;
+        }
+        if (hasTodone && !hasIdea && hasCheckboxFormat(line) && !isCheckboxChecked(line)) {
+          linesToRevertTodone.push(i);
+          for (let j = tags.length - 1; j >= 0; j--) {
+            if (tags[j] === "#todone" || tags[j] === "#todones")
+              tags.splice(j, 1);
+          }
+          if (!tags.includes("#todo") && !tags.includes("#todos")) {
+            tags.push("#todo");
+          }
+          hasTodone = false;
+          hasTodo = true;
         }
         if (hasTodone && hasTodo) {
           linesToCleanup.push(i);
@@ -789,7 +809,7 @@ var TodoScanner = class extends import_obsidian4.Events {
           principles.push(childItem);
         }
       }
-      await this.applyLineMutations(file, lines, linesToCleanup, linesToSyncTodone, linesToRemoveIdea, linesToStampMoved);
+      await this.applyLineMutations(file, lines, linesToCleanup, linesToSyncTodone, linesToRevertTodone, linesToRemoveIdea, linesToStampMoved);
       const activeTodos = todos.filter((todo) => {
         if (!todo.isHeader || !todo.childLineNumbers)
           return true;
@@ -985,8 +1005,8 @@ var TodoScanner = class extends import_obsidian4.Events {
   }
   // Apply all queued line mutations in a single vault.modify() call.
   // Processes cleanup, checkbox sync, and idea tag removal together so only one write occurs.
-  async applyLineMutations(file, lines, linesToCleanup, linesToSyncTodone, linesToRemoveIdea, linesToStampMoved = []) {
-    if (linesToCleanup.length === 0 && linesToSyncTodone.length === 0 && linesToRemoveIdea.length === 0 && linesToStampMoved.length === 0) {
+  async applyLineMutations(file, lines, linesToCleanup, linesToSyncTodone, linesToRevertTodone, linesToRemoveIdea, linesToStampMoved = []) {
+    if (linesToCleanup.length === 0 && linesToSyncTodone.length === 0 && linesToRevertTodone.length === 0 && linesToRemoveIdea.length === 0 && linesToStampMoved.length === 0) {
       return;
     }
     const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
@@ -1000,6 +1020,13 @@ var TodoScanner = class extends import_obsidian4.Events {
     }
     for (const lineNum of linesToSyncTodone) {
       const newLine = lines[lineNum].trimEnd() + ` #todone @${today}`;
+      if (newLine !== lines[lineNum]) {
+        lines[lineNum] = newLine;
+        modified = true;
+      }
+    }
+    for (const lineNum of linesToRevertTodone) {
+      const newLine = replaceTodoneWithTodo(lines[lineNum]);
       if (newLine !== lines[lineNum]) {
         lines[lineNum] = newLine;
         modified = true;

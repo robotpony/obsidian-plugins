@@ -2,6 +2,14 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.23.0] - 2026-05-08
+
+### Fixed — Unchecking a list item now removes `#todone @date`
+
+Checking a `[ ]` box already auto-stamps `#todone @YYYY-MM-DD` on the line. The reverse never worked: unchecking a `[x]` would clear the box but leave the `#todone @date` behind, so the item stayed classified as completed and the markdown drifted out of sync with the checkbox.
+
+The scanner now mirrors the forward behaviour. Unchecking a list-item checkbox on a `#todone` line strips the `#todone @date` and restores `#todo`, matching what the sidebar's "uncomplete" action does. Works for both standalone TODOs and child items under a header TODO.
+
 ## [0.22.0] - 2026-05-07
 
 ### Removed — Embed feature
