@@ -10,8 +10,6 @@ import {
 import { TodoScanner } from "./src/TodoScanner";
 import { TodoProcessor } from "./src/TodoProcessor";
 import { ProjectManager } from "./src/ProjectManager";
-import { EmbedRenderer } from "./src/EmbedRenderer";
-import { CodeBlockProcessor } from "./src/CodeBlockProcessor";
 import { SlashCommandSuggest } from "./src/SlashCommandSuggest";
 import { AtSuggest } from "./src/AtSuggest";
 import { TeamManager } from "./src/TeamManager";
@@ -38,7 +36,6 @@ export default class SpaceCommandPlugin extends Plugin {
   scanner: TodoScanner;
   processor: TodoProcessor;
   projectManager: ProjectManager;
-  embedRenderer: EmbedRenderer;
   tabLockManager: TabLockManager;
   teamManager: TeamManager;
   private sidebarManager: SidebarManager;
@@ -71,20 +68,6 @@ export default class SpaceCommandPlugin extends Plugin {
       this.settings.priorityTags,
       this.settings.excludeFoldersFromProjects
     );
-    this.embedRenderer = new EmbedRenderer(
-      this.app,
-      this.scanner,
-      this.processor,
-      this.projectManager,
-      this.settings.defaultTodoneFile,
-      this.settings.focusListLimit,
-      this.settings.priorityTags,
-      this.settings.makeLinksClickable,
-      () => this.settings.moveHistory,
-      this.teamManager,
-      this.settings.defaultAssignee
-    );
-
     // Initialize tab lock manager
     this.tabLockManager = new TabLockManager(this.app);
 
@@ -103,7 +86,6 @@ export default class SpaceCommandPlugin extends Plugin {
     // Set up processor callback to trigger re-scan after completion
     this.processor.setOnCompleteCallback(() => {
       // File will be modified, which will trigger scanner's file watcher
-      // But we can also refresh the workspace to update embeds
       this.app.workspace.trigger("markdown-changed");
     });
 
@@ -222,29 +204,6 @@ export default class SpaceCommandPlugin extends Plugin {
     );
 
     // Sidebar is activated inside onLayoutReady above (after scanVault completes).
-
-    // Register markdown post processor for {{focus-todos}}, {{focus-ideas}}, and {{focus-list}} syntax
-    this.registerMarkdownPostProcessor((el, ctx) => {
-      const codeBlocks = el.findAll("p, div");
-      for (const block of codeBlocks) {
-        const text = block.textContent || "";
-        if (text.includes("{{focus-todos")) {
-          this.embedRenderer.render(text, block);
-        } else if (text.includes("{{focus-ideas")) {
-          this.embedRenderer.render(text, block);
-        } else if (text.includes("{{focus-list}}")) {
-          this.embedRenderer.render(text, block);
-        }
-      }
-    });
-
-    // Register code block processors for focus-todos and focus-list
-    // These work in BOTH Reading Mode AND Live Preview mode
-    const codeBlockProcessor = new CodeBlockProcessor(
-      this.embedRenderer,
-      this.settings.defaultTodoneFile
-    );
-    codeBlockProcessor.registerProcessors(this);
 
     // Register editor suggesters for slash commands and @date/@user
     this.registerEditorSuggest(new SlashCommandSuggest(this.app, this.settings));
@@ -637,14 +596,13 @@ class SpaceCommandSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Make links clickable in lists")
-      .setDesc("Render wiki links and markdown links as clickable in sidebar and embeds. When disabled, links display as plain text without markdown syntax.")
+      .setDesc("Render wiki links and markdown links as clickable in the sidebar. When disabled, links display as plain text without markdown syntax.")
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.makeLinksClickable)
           .onChange(async (value) => {
             this.plugin.settings.makeLinksClickable = value;
             await this.plugin.saveSettings();
-            // Refresh sidebar and embeds to apply the change
             this.plugin.refreshSidebar();
           })
       );
@@ -700,7 +658,7 @@ class SpaceCommandSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Focus list limit")
-      .setDesc("Maximum number of projects to show in sidebar and {{focus-list}}")
+      .setDesc("Maximum number of projects to show in the sidebar")
       .addText((text) =>
         text
           .setPlaceholder("5")

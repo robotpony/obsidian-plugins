@@ -10,7 +10,6 @@ Each plugin has a unique logo badge: coloured background, white text, `border-ra
 |--------|-----------|--------|
 | space-command | `␣⌘` | `#689fd6` (blue) |
 | hugo-command | `H⌘` | `#d97706` (orange) |
-| link-command | `L⌘` | `#5da65d` (green) |
 | notate-command | `N⌘` | `#8b5cf6` (purple) |
 
 New plugins MUST pick a unique colour not already in use above.
@@ -467,7 +466,7 @@ this.addCommand({
 this.addRibbonIcon("{icon-name}", "Open Plugin Name", () => this.sidebarManager.toggle());
 ```
 
-Existing hotkey letters: `Space` (space-command), `H` (hugo-command), `L` (link-command), `N` (notate-command).
+Existing hotkey letters: `Space` (space-command), `H` (hugo-command), `N` (notate-command).
 
 ---
 

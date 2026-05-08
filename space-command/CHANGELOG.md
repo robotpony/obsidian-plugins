@@ -2,6 +2,25 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.22.0] - 2026-05-07
+
+### Removed — Embed feature
+
+The `{{focus-todos}}` / `{{focus-ideas}}` / `{{focus-list}}` inline syntax and the `` ```focus-todos `` / `` ```focus-ideas `` / `` ```focus-list `` code-block flavors are gone, along with the filter syntax (`path:`, `tags:`, `limit:`, `todone:`, `assignee:`) they used. The sidebar's tag cloud + assignee dropdown cover the same filtering needs without requiring users to remember a custom DSL inside markdown.
+
+- Removed `EmbedRenderer.ts`, `CodeBlockProcessor.ts`, and `FilterParser.ts`.
+- Removed the markdown post-processor that scanned for `{{focus-*}}` blocks and the code-block processors for `` ```focus-* ``.
+- Removed the sidebar's "Embed Syntax" right-click submenu.
+- Removed all embed-specific CSS (~130 lines).
+
+If you have `{{focus-todos}}` or `` ```focus-todos `` blocks in existing notes, they'll render as plain text now instead of as live lists.
+
+### Changed — Documentation rewrite
+
+- README rewritten from scratch to match the current code state: removed stale embed sections, removed accidental "Claude Code commands and PRD" mentions, updated the slash-command list (now includes `/todos`, `/idea`, `/ideas`), corrected the tab list (TODOs / Ideas / Snoozed — three tabs, not two), and added a commands + hotkeys table.
+- CLAUDE.md rewritten: dropped references to deleted files (`LLMClient.ts`, `DefineTooltip.ts`, `FilterParser.ts`, `EmbedRenderer.ts`, `CodeBlockProcessor.ts`) and the embed data-flow step.
+- DESIGN.md updated: removed the `EmbedRenderer` / `CodeBlockProcessor` boxes from the architecture diagram, dropped the "Filter Syntax" section, and corrected the `src/` file listing.
+
 ## [0.21.0] - 2026-05-07
 
 ### Removed — Triage feature

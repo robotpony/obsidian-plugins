@@ -129,7 +129,7 @@ interface NoteEntry {
 | Section insertion | Find-or-create header | Zero manual setup; notes always land somewhere |
 | Note format | Bullet list items (`- text`) | Clean markdown, easy to scan, works with Obsidian's list features |
 | History storage | Plugin `data.json` | Instant sidebar render on load; no vault scan needed |
-| History updates | `Events` emitter | Matches space-command/link-command pattern; sidebar stays decoupled |
+| History updates | `Events` emitter | Matches space-command pattern; sidebar stays decoupled |
 | Branding | N⌘ purple `#8b5cf6` | Distinct from existing blue/orange/green plugins |
 
 ## Shared Module Usage

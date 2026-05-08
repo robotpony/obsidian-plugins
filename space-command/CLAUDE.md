@@ -1,91 +1,80 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code (claude.ai/code) when working in this repository.
 
-## Build Commands
+## Build commands
 
 ```bash
-npm install          # Install dependencies
-npm run dev          # Watch mode (rebuilds on file changes)
-npm run build        # Production build (runs tsc + esbuild)
+npm install          # install dependencies
+npm run dev          # watch mode (rebuilds on file changes)
+npm run build        # production build (tsc -noEmit + esbuild)
+npm test             # run vitest test suite
 ```
 
-The build output is `main.js` in the project root. For testing, copy `main.js`, `manifest.json`, and `styles.css` to `.obsidian/plugins/space-command/` in an Obsidian vault.
+Build output is `main.js` at the repo root. To test in Obsidian, copy `main.js`, `manifest.json`, and `styles.css` to `<vault>/.obsidian/plugins/space-command/`. The repo-level `install.sh` script automates this for cached vault paths.
 
-## Architecture Overview
+## Architecture
 
-This is **Space Command** (`space-command`), an Obsidian plugin for tracking TODOs/TODONEs across a vault.
+Space Command is an Obsidian plugin for tracking TODOs, Ideas, and Principles across a vault. Items are tagged in markdown files (`#todo`, `#idea`, `#principle`); the plugin scans the vault, indexes them, and surfaces them in a custom sidebar with priority/focus/snooze workflows.
 
-### Entry Point and Core Flow
+### Entry point
 
-[main.ts](main.ts) - Plugin entry point extending `Plugin`. Initializes all components and registers:
-- Markdown post-processors for `{{focus-todos}}` inline syntax (Reading Mode only)
-- Code block processors for `` ```focus-todos `` and `` ```focus-list `` (works in Live Preview)
-- Editor suggesters for `/` slash commands and `@` mentions/dates
-- Commands, ribbon icon, settings tab, and sidebar view
+[main.ts](main.ts) extends Obsidian's `Plugin`. On load it:
 
-### Key Components (src/)
+- Initializes `TodoScanner` (vault scan + file watchers)
+- Wires `TodoProcessor` for completion/priority mutations
+- Builds `ProjectManager` for tag-based grouping
+- Registers the sidebar view
+- Registers `SlashCommandSuggest` (`/todo`, `/idea`, etc.) and `AtSuggest` (`@today`, `@handle`)
+- Registers CodeMirror extensions for header sort and checkbox/tag sync
+- Registers commands and the settings tab
 
-| Component | Purpose |
-|-----------|---------|
-| [TodoScanner.ts](src/TodoScanner.ts) | Scans vault for `#todo`/`#todone` tags, maintains cache, watches file changes. Extends `Events` for reactive updates. |
-| [TodoProcessor.ts](src/TodoProcessor.ts) | Handles TODO completion: updates source file (`#todo` → `#todone @date`), appends to TODONE log file. Also handles priority tag changes. |
-| [EmbedRenderer.ts](src/EmbedRenderer.ts) | Renders TODO lists in embeds. Handles inline markdown parsing (bold, italic, code, links) with XSS-safe DOM methods. |
-| [CodeBlockProcessor.ts](src/CodeBlockProcessor.ts) | Processes `` ```focus-todos `` and `` ```focus-list `` code blocks for Live Preview support. |
-| [FilterParser.ts](src/FilterParser.ts) | Parses filter syntax: `path:folder/`, `tags:#tag1,#tag2`, `limit:N`, `todone:show\|hide`, `assignee:@handle` |
-| [SidebarView.ts](src/SidebarView.ts) | Custom sidebar view with two tabs: TODOs (Active TODOs, Projects, Summary) and Ideas (Principles, Active Ideas) |
-| [ProjectManager.ts](src/ProjectManager.ts) | Groups TODOs by project tags (excludes priority tags like #p0-#p4) |
-| [ContextMenuHandler.ts](src/ContextMenuHandler.ts) | Right-click context menu for priority actions (Focus, Later, Snooze) |
-| [SlashCommandSuggest.ts](src/SlashCommandSuggest.ts) | EditorSuggest for `/` commands at column 0: `/todo`, `/callout`, `/today`, `/tomorrow` |
-| [AtSuggest.ts](src/AtSuggest.ts) | EditorSuggest for `@date/today/tomorrow/yesterday` date insert and `@handle` team mentions |
-| [TeamManager.ts](src/TeamManager.ts) | Parses `team.md`, watches for changes, resolves handles, auto-adds unknown mentions |
-| [SlackConverter.ts](src/SlackConverter.ts) | Converts markdown to Slack's mrkdwn format for clipboard copy |
-| [LLMClient.ts](src/LLMClient.ts) | Ollama client for Define/Rewrite/Review commands. Sends selected text to local LLM. |
-| [DefineTooltip.ts](src/DefineTooltip.ts) | Renders LLM responses in inline tooltips near selection. Handles Apply/Copy buttons for Rewrite. |
+### Source files (`src/`)
+
+| File | Purpose |
+|------|---------|
+| [TodoScanner.ts](src/TodoScanner.ts) | Scans vault for `#todo`/`#todone`/`#idea`/`#principle`. Maintains per-file caches, watches file changes, emits `todos-updated` events. |
+| [TodoProcessor.ts](src/TodoProcessor.ts) | Mutations: complete TODO (`#todo` → `#todone @date`, append to TODONE log), change priority, snooze, move file. |
+| [ProjectManager.ts](src/ProjectManager.ts) | Aggregates items by project tag (excludes `#focus`/priority/lifecycle tags). Reads project description from project files. |
+| [SidebarView.ts](src/SidebarView.ts) | Custom `ItemView` with TODOs / Ideas / Snoozed tabs, tag cloud, immersive Focus Mode, summary stats. |
+| [ContextMenuHandler.ts](src/ContextMenuHandler.ts) | Right-click menu on sidebar rows: priority, focus, snooze, move, copy, delete. |
+| [SlashCommandSuggest.ts](src/SlashCommandSuggest.ts) | Editor suggester for `/` at column 0: `/todo`, `/todos`, `/idea`, `/ideas`, `/today`, `/tomorrow`, `/callout`. |
+| [AtSuggest.ts](src/AtSuggest.ts) | Editor suggester for `@`: dates (`@today`, `@tomorrow`, `@yesterday`, `@<date>`) and team mentions (`@<handle>`). |
+| [DateSuggest.ts](src/DateSuggest.ts) | Date-format helpers used by the suggesters. |
+| [TeamManager.ts](src/TeamManager.ts) | Parses `team.md`, watches for changes, resolves handles, auto-adds unknown mentions. |
+| [MoveTargetModal.ts](src/MoveTargetModal.ts) | File picker for moving a TODO/idea to a different note. |
 | [TabLockManager.ts](src/TabLockManager.ts) | Adds lock buttons to tab headers. Locked tabs open links in new tabs instead of replacing content. |
-| [HeaderSortExtension.ts](src/HeaderSortExtension.ts) | CodeMirror extension for sorting header TODO children by priority. |
-| [HeaderChecklistExtension.ts](src/HeaderChecklistExtension.ts) | CodeMirror extension syncing checkbox state with `#todo`/`#todone` tags. |
-| [types.ts](src/types.ts) | TypeScript interfaces: `TodoItem`, `TodoFilters`, `ProjectInfo`, `SpaceCommandSettings` |
-| [utils.ts](src/utils.ts) | Helper functions: date formatting, tag extraction, checkbox/todo text manipulation |
+| [HeaderSortExtension.ts](src/HeaderSortExtension.ts) | CodeMirror extension that sorts header TODO children by priority. |
+| [HeaderChecklistExtension.ts](src/HeaderChecklistExtension.ts) | CodeMirror extension syncing markdown checkbox state with `#todo`/`#todone` tags. |
+| [SlackConverter.ts](src/SlackConverter.ts) | Converts markdown → Slack mrkdwn for clipboard copy. |
+| [NotionConverter.ts](src/NotionConverter.ts) | Converts Obsidian markdown → plain markdown for Notion paste. |
+| [types.ts](src/types.ts) | `TodoItem`, `ProjectInfo`, `SpaceCommandSettings`, `DEFAULT_SETTINGS`. |
+| [utils.ts](src/utils.ts) | Shared helpers: tag extraction, date formatting, priority math, checkbox parsing. |
 
-### Data Flow
+### Data flow
 
-1. **Scan**: `TodoScanner` reads all markdown files, extracts lines with `#todo`/`#todone`/`#idea`/`#principle` (skipping code blocks)
-2. **Cache**: Results stored in `Map<filePath, TodoItem[]>`, emits `todos-updated` event on changes
-3. **Render**: `EmbedRenderer`/`CodeBlockProcessor` query scanner, apply filters, render interactive checkboxes
-4. **Complete**: Checkbox click → `TodoProcessor.completeTodo()` → updates source + appends to TODONE file
-5. **Refresh**: File watchers trigger rescan, events propagate to UI
+1. **Scan**: `TodoScanner` reads all markdown files, extracts lines tagged `#todo` / `#todone` / `#idea` / `#principle`, skipping code blocks and inline backticked tags.
+2. **Cache**: Results land in `Map<filePath, TodoItem[]>`. File watchers re-scan affected files; `todos-updated` fires on any change.
+3. **Render**: The sidebar listens for `todos-updated` and re-renders. Filters (active tag, assignee, focus) apply at render time.
+4. **Mutate**: User actions (checkbox click, context menu, slash command) call `TodoProcessor` which writes back to source and (for completion) appends to the TODONE log.
+5. **Refresh**: Mutations trigger file changes → scanner rescans → events fire → sidebar re-renders.
 
-### Embed Syntax
+## Conventions
 
-- Inline (Reading Mode only): `{{focus-todos}}`, `{{focus-todos: file.md | path:x/ tags:#y}}`
-- Code blocks (Live Preview): `` ```focus-todos `` with optional file/filters on separate lines
+- **Tag system**: `#todo`/`#todone` for tasks, `#idea` for captured ideas, `#principle` for guiding principles. Lifecycle: `#focus` (top priority), `#p0`–`#p4` (priority tiers), `#future`/`#snooze`/`#snoozed` (snoozed). Project tags are anything else.
+- **Code-block safety**: The scanner tracks triple-backtick state and checks for inline backticks so `#todo` examples in code blocks are excluded.
+- **Event-driven UI**: Scanner extends `Events`. Sidebar listens; no polling.
+- **Settings tab**: `SpaceCommandSettingTab` is defined inline in [main.ts](main.ts).
+- **Tests**: Live in `src/__tests__/`, run via vitest.
 
-## Key Patterns
+## Release checklist
 
-- **Event-driven updates**: Scanner extends `Events`, sidebar/embeds listen for `todos-updated`
-- **Priority system**: Tags #p0 (highest) → #p4 (lowest), #focus for top priority, #future for snoozed
-- **Item types**: `#todo`/`#todone` for tasks, `#idea` for captured ideas, `#principle` for guiding principles
-- **Safe markdown rendering**: `EmbedRenderer.renderInlineMarkdown()` uses DOM methods to avoid XSS
-- **Code block detection**: Scanner tracks triple-backtick state and checks for inline backticks to exclude code examples
+When making changes, keep these in sync:
 
-### Settings Tab
-
-The `SpaceCommandSettingTab` class is defined inline in [main.ts](main.ts) (not a separate file).
-
-## Release Checklist
-
-When making changes, keep these files in sync:
-
-1. **Version numbers** - Update in all three files:
-   - `manifest.json` - Obsidian reads this
-   - `package.json` - npm/build tooling
-   - `CHANGELOG.md` - Add new version section at top
-
-2. **Documentation** - Update as features change:
-   - `CHANGELOG.md` - Document all user-facing changes
-   - `README.md` - Update if new features, settings, or syntax added
+1. **Version** in `manifest.json`, `package.json`, and `CHANGELOG.md` (top-of-file entry)
+2. **Documentation**: update `README.md` if user-visible features, settings, or vocabulary changed; update this file if architecture shifted
 
 ## Working with Claude Code
 
-- Use AskUserQuestion when asking questions, clarifying requirements, or asking about the approach
+- Use `AskUserQuestion` when clarifying requirements or approach
+- Run `npm run build` before declaring done; the build runs the type checker

@@ -428,36 +428,6 @@ function removeIdeaTag(text) {
 function replaceIdeaWithTodo(text) {
   return text.replace(/#idea(?:s|tion)?\b/, "#todo");
 }
-function renderTextWithTags(text, container, mutedTags = [], projectColourMap) {
-  const tagRegex = /(#[\w-]+)/g;
-  let lastIndex = 0;
-  let match;
-  while ((match = tagRegex.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      container.appendText(text.substring(lastIndex, match.index));
-    }
-    const tag = match[1];
-    const colourInfo = getTagColourInfo(tag, projectColourMap);
-    let tagEl;
-    if (mutedTags.length > 0 && mutedTags.includes(tag)) {
-      tagEl = container.createEl("span", {
-        cls: "tag muted-pill",
-        text: tag
-      });
-    } else {
-      tagEl = container.createEl("span", {
-        cls: "tag",
-        text: tag
-      });
-    }
-    tagEl.dataset.scTagType = colourInfo.type;
-    tagEl.dataset.scPriority = colourInfo.priority.toString();
-    lastIndex = tagRegex.lastIndex;
-  }
-  if (lastIndex < text.length) {
-    container.appendText(text.substring(lastIndex));
-  }
-}
 function highlightLine(editor, line) {
   const lineText = editor.getLine(line);
   const lineLength = lineText.length;
@@ -2048,1275 +2018,8 @@ ${tag}
   }
 };
 
-// src/FilterParser.ts
-var FilterParser = class {
-  static parse(filterString) {
-    const filters = {};
-    if (!filterString || filterString.trim() === "") {
-      return filters;
-    }
-    const parts = filterString.split("|").map((p) => p.trim());
-    for (const part of parts) {
-      if (part.startsWith("path:")) {
-        filters.path = part.substring(5).trim();
-      } else if (part.startsWith("tags:")) {
-        const tagString = part.substring(5).trim();
-        filters.tags = tagString.split(",").map((t) => t.trim()).filter((t) => t.length > 0);
-      } else if (part.startsWith("limit:")) {
-        const limitStr = part.substring(6).trim();
-        const limit = parseInt(limitStr, 10);
-        if (!isNaN(limit) && limit > 0) {
-          filters.limit = limit;
-        }
-      } else if (part.startsWith("todone:")) {
-        const value = part.substring(7).trim().toLowerCase();
-        if (value === "show" || value === "hide") {
-          filters.todone = value;
-        }
-      } else if (part.startsWith("assignee:")) {
-        const value = part.substring(9).trim();
-        filters.assignee = value.startsWith("@") ? value.substring(1) : value;
-      }
-    }
-    return filters;
-  }
-  static applyFilters(todos, filters, meHandle, defaultAssignee = "") {
-    let filtered = [...todos];
-    if (filters.path) {
-      const pathPrefix = filters.path.toLowerCase();
-      filtered = filtered.filter(
-        (todo) => todo.filePath.toLowerCase().startsWith(pathPrefix)
-      );
-    }
-    if (filters.tags && filters.tags.length > 0) {
-      filtered = filtered.filter((todo) => {
-        const todoTags = todo.tags.map((t) => t.toLowerCase());
-        const effectiveTags = todo.inferredFileTag ? [...todoTags, todo.inferredFileTag.toLowerCase()] : todoTags;
-        return filters.tags.every(
-          (filterTag) => effectiveTags.includes(filterTag.toLowerCase())
-        );
-      });
-    }
-    if (filters.todone === "hide") {
-      filtered = filtered.filter((todo) => todo.itemType !== "todone");
-    } else if (filters.todone === "show") {
-      filtered = filtered.filter((todo) => todo.itemType === "todone");
-    }
-    if (filters.assignee) {
-      let handle = filters.assignee;
-      if (handle === "me" && meHandle) {
-        handle = meHandle;
-      }
-      filtered = filtered.filter((todo) => {
-        var _a;
-        const mentions = (_a = todo.mentions) != null ? _a : [];
-        if (mentions.length > 0) {
-          return mentions.some((m) => {
-            const resolved = m === "me" && meHandle ? meHandle : m;
-            return resolved === handle;
-          });
-        }
-        if (defaultAssignee) {
-          const resolved = defaultAssignee === "me" && meHandle ? meHandle : defaultAssignee;
-          return resolved === handle;
-        }
-        return false;
-      });
-    }
-    if (filters.limit) {
-      filtered = filtered.slice(0, filters.limit);
-    }
-    return filtered;
-  }
-};
-
-// src/ContextMenuHandler.ts
-var import_obsidian8 = require("obsidian");
-
-// src/MoveTargetModal.ts
-var import_obsidian7 = require("obsidian");
-var MoveTargetModal = class extends import_obsidian7.SuggestModal {
-  constructor(app, moveHistory, excludePath, onChoose) {
-    super(app);
-    this.moveHistory = moveHistory;
-    this.excludePath = excludePath;
-    this.onChoose = onChoose;
-    this.setPlaceholder("Move to file...");
-  }
-  getSuggestions(query) {
-    const lowerQuery = query.toLowerCase();
-    const seen = /* @__PURE__ */ new Set();
-    const suggestions = [];
-    const addIfMatch = (file, source) => {
-      if (seen.has(file.path))
-        return;
-      if (file.path === this.excludePath)
-        return;
-      if (lowerQuery && !file.path.toLowerCase().includes(lowerQuery))
-        return;
-      seen.add(file.path);
-      suggestions.push({ file, source });
-    };
-    const bookmarks = this.getBookmarkedFiles();
-    for (const file of bookmarks) {
-      addIfMatch(file, "pinned");
-    }
-    const openFiles = this.getOpenFiles();
-    for (const file of openFiles) {
-      addIfMatch(file, "open");
-    }
-    for (const path of this.moveHistory) {
-      const file = this.app.vault.getAbstractFileByPath(path);
-      if (file instanceof import_obsidian7.TFile) {
-        addIfMatch(file, "recent");
-      }
-    }
-    if (lowerQuery) {
-      const allFiles = this.app.vault.getMarkdownFiles();
-      for (const file of allFiles) {
-        addIfMatch(file, "all");
-      }
-    }
-    return suggestions;
-  }
-  renderSuggestion(suggestion, el) {
-    const icon = suggestion.source === "pinned" ? "\u{1F4CC} " : suggestion.source === "open" ? "\u{1F4C4} " : suggestion.source === "recent" ? "\u{1F550} " : "";
-    el.createEl("div", { text: icon + suggestion.file.path, cls: "suggestion-title" });
-  }
-  onChooseSuggestion(suggestion) {
-    this.onChoose(suggestion.file);
-  }
-  getBookmarkedFiles() {
-    var _a, _b, _c;
-    const files = [];
-    try {
-      const bookmarksPlugin = (_b = (_a = this.app.internalPlugins) == null ? void 0 : _a.getPluginById) == null ? void 0 : _b.call(_a, "bookmarks");
-      if (!(bookmarksPlugin == null ? void 0 : bookmarksPlugin.enabled))
-        return files;
-      const items = (_c = bookmarksPlugin.instance) == null ? void 0 : _c.items;
-      if (!Array.isArray(items))
-        return files;
-      for (const item of items) {
-        if (item.type === "file" && item.path) {
-          const file = this.app.vault.getAbstractFileByPath(item.path);
-          if (file instanceof import_obsidian7.TFile && file.extension === "md") {
-            files.push(file);
-          }
-        }
-      }
-    } catch (e) {
-    }
-    return files;
-  }
-  getOpenFiles() {
-    const files = [];
-    const seen = /* @__PURE__ */ new Set();
-    this.app.workspace.iterateAllLeaves((leaf) => {
-      var _a;
-      const file = (_a = leaf.view) == null ? void 0 : _a.file;
-      if (file instanceof import_obsidian7.TFile && file.extension === "md" && !seen.has(file.path)) {
-        seen.add(file.path);
-        files.push(file);
-      }
-    });
-    return files;
-  }
-};
-
-// src/ContextMenuHandler.ts
-var ContextMenuHandler = class {
-  constructor(app, processor, priorityTags, getMoveHistory) {
-    this.app = app;
-    this.processor = processor;
-    this.priorityTags = priorityTags;
-    this.getMoveHistory = getMoveHistory;
-  }
-  /**
-   * Show context menu for an active TODO item
-   */
-  showTodoMenu(evt, todo, onRefresh) {
-    const menu = new import_obsidian8.Menu();
-    const currentPriority = this.getCurrentPriority(todo);
-    const hasFocus = todo.tags.includes("#focus");
-    const hasFuture = todo.tags.includes("#future");
-    const hasLaterPriority = currentPriority && /^#p[3-4]$/.test(currentPriority);
-    menu.addItem((item) => {
-      item.setTitle("Copy").setIcon("copy").onClick(async () => {
-        await navigator.clipboard.writeText(todo.text);
-      });
-    });
-    menu.addItem((item) => {
-      item.setTitle("Move to...").setIcon("arrow-right").onClick(() => {
-        new MoveTargetModal(
-          this.app,
-          this.getMoveHistory(),
-          todo.filePath,
-          async (file) => {
-            const success = await this.processor.moveTodo(todo, file.path);
-            if (success)
-              onRefresh();
-          }
-        ).open();
-      });
-    });
-    menu.addItem((item) => {
-      item.setTitle(hasFocus ? "Unfocus" : "Focus").setIcon("zap").onClick(async () => {
-        let success;
-        if (hasFocus) {
-          success = await this.processor.removeTag(todo, "#focus");
-        } else {
-          const newPriority = this.calculateFocusPriority(currentPriority);
-          success = await this.processor.setPriorityTag(todo, newPriority, true);
-        }
-        if (success)
-          onRefresh();
-      });
-    });
-    menu.addItem((item) => {
-      item.setTitle(hasLaterPriority ? "Unlater" : "Later").setIcon("clock").onClick(async () => {
-        let success;
-        if (hasLaterPriority) {
-          success = await this.processor.removeTag(todo, currentPriority);
-        } else {
-          const newPriority = this.calculateLaterPriority(currentPriority);
-          success = await this.processor.setPriorityTag(todo, newPriority);
-        }
-        if (success)
-          onRefresh();
-      });
-    });
-    menu.addItem((item) => {
-      item.setTitle(hasFuture ? "Unsnooze" : "Snooze").setIcon("moon").onClick(async () => {
-        let success;
-        if (hasFuture) {
-          success = await this.processor.removeTag(todo, "#future");
-        } else {
-          success = await this.processor.setPriorityTag(todo, "#future");
-        }
-        if (success)
-          onRefresh();
-      });
-    });
-    menu.showAtMouseEvent(evt);
-  }
-  /**
-   * Extract current priority tag from TODO
-   */
-  getCurrentPriority(todo) {
-    if (todo.tags.includes("#future")) {
-      return "#future";
-    }
-    for (const tag of todo.tags) {
-      if (/^#p[0-4]$/.test(tag)) {
-        return tag;
-      }
-    }
-    return null;
-  }
-  /**
-   * Calculate new priority for Focus action
-   * If no priority or #future → #p0
-   * If #pN → #p(N-1), but #p0 stays #p0
-   */
-  calculateFocusPriority(currentPriority) {
-    if (!currentPriority || currentPriority === "#future") {
-      return "#p0";
-    }
-    const match = currentPriority.match(/^#p([0-4])$/);
-    if (match) {
-      const num = parseInt(match[1]);
-      return num > 0 ? `#p${num - 1}` : "#p0";
-    }
-    return "#p0";
-  }
-  /**
-   * Calculate new priority for Later action
-   * If no priority or #future → #p4
-   * If #pN → #p(N+1), but #p4 stays #p4
-   */
-  calculateLaterPriority(currentPriority) {
-    if (!currentPriority || currentPriority === "#future") {
-      return "#p4";
-    }
-    const match = currentPriority.match(/^#p([0-4])$/);
-    if (match) {
-      const num = parseInt(match[1]);
-      return num < 4 ? `#p${num + 1}` : "#p4";
-    }
-    return "#p4";
-  }
-  /**
-   * Show context menu for a project (focus list item)
-   * Operations apply to all TODOs matching the project tag
-   */
-  showProjectMenu(evt, project, scanner, onRefresh, onFilterByTag) {
-    const menu = new import_obsidian8.Menu();
-    const getTodosForProject = () => {
-      return scanner.getTodos().filter((todo) => todo.tags.includes(project.tag));
-    };
-    const todos = getTodosForProject();
-    const anyHasFocus = todos.some((t) => t.tags.includes("#focus"));
-    const anyHasFuture = todos.some((t) => t.tags.includes("#future"));
-    const anyHasLaterPriority = todos.some((t) => {
-      for (const tag of t.tags) {
-        if (/^#p[3-4]$/.test(tag))
-          return true;
-      }
-      return false;
-    });
-    menu.addItem((item) => {
-      item.setTitle(project.tag).setIcon("tag");
-      const submenu = item.setSubmenu();
-      submenu.addItem((subItem) => {
-        subItem.setTitle("Filter by").setIcon("filter").onClick(() => {
-          onFilterByTag(project.tag);
-        });
-      });
-    });
-    menu.addSeparator();
-    menu.addItem((item) => {
-      item.setTitle(anyHasFocus ? "Unfocus" : "Focus").setIcon("zap").onClick(async () => {
-        const currentTodos = getTodosForProject();
-        if (anyHasFocus) {
-          await this.processor.unfocusAllWithTag(currentTodos);
-        } else {
-          await this.processor.focusAllWithTag(currentTodos);
-        }
-        onRefresh();
-      });
-    });
-    menu.addItem((item) => {
-      item.setTitle(anyHasLaterPriority ? "Unlater" : "Later").setIcon("clock").onClick(async () => {
-        const currentTodos = getTodosForProject();
-        if (anyHasLaterPriority) {
-          await this.processor.unlaterAllWithTag(currentTodos);
-        } else {
-          await this.processor.laterAllWithTag(currentTodos);
-        }
-        onRefresh();
-      });
-    });
-    menu.addItem((item) => {
-      item.setTitle(anyHasFuture ? "Unsnooze" : "Snooze").setIcon("moon").onClick(async () => {
-        const currentTodos = getTodosForProject();
-        if (anyHasFuture) {
-          await this.processor.unsnoozeAllWithTag(currentTodos);
-        } else {
-          await this.processor.snoozeAllWithTag(currentTodos);
-        }
-        onRefresh();
-      });
-    });
-    menu.showAtMouseEvent(evt);
-  }
-  /**
-   * Show context menu for an idea item
-   */
-  showIdeaMenu(evt, idea, onRefresh) {
-    const menu = new import_obsidian8.Menu();
-    const hasFocus = idea.tags.includes("#focus");
-    menu.addItem((item) => {
-      item.setTitle("Add to TODOs").setIcon("check-square").onClick(async () => {
-        const success = await this.processor.convertIdeaToTodo(idea);
-        if (success)
-          onRefresh();
-      });
-    });
-    menu.addItem((item) => {
-      item.setTitle("Copy").setIcon("copy").onClick(async () => {
-        await navigator.clipboard.writeText(idea.text);
-      });
-    });
-    menu.addItem((item) => {
-      item.setTitle(hasFocus ? "Unfocus" : "Focus").setIcon("zap").onClick(async () => {
-        let success;
-        if (hasFocus) {
-          success = await this.processor.removeTag(idea, "#focus");
-        } else {
-          success = await this.processor.addFocusToIdea(idea);
-        }
-        if (success)
-          onRefresh();
-      });
-    });
-    menu.showAtMouseEvent(evt);
-  }
-  /**
-   * Show context menu for a principle item
-   */
-  showPrincipleMenu(evt, principle) {
-    const menu = new import_obsidian8.Menu();
-    menu.addItem((item) => {
-      item.setTitle("Copy").setIcon("copy").onClick(async () => {
-        await navigator.clipboard.writeText(principle.text);
-      });
-    });
-    menu.showAtMouseEvent(evt);
-  }
-};
-
-// src/EmbedRenderer.ts
-var EmbedRenderer = class {
-  constructor(app, scanner, processor, projectManager, defaultTodoneFile = "todos/done.md", focusListLimit = 5, priorityTags = ["#p0", "#p1", "#p2", "#p3", "#p4"], makeLinksClickable = true, getMoveHistory = () => [], teamManager, defaultAssignee = "") {
-    // Track active renders for event cleanup
-    this.activeRenders = /* @__PURE__ */ new Map();
-    // Track TODONE visibility state per container
-    this.todoneVisibility = /* @__PURE__ */ new Map();
-    // Cache project colour map to avoid recalculating for each tag
-    this.projectColourMapCache = null;
-    this.app = app;
-    this.scanner = scanner;
-    this.processor = processor;
-    this.projectManager = projectManager;
-    this.defaultTodoneFile = defaultTodoneFile;
-    this.focusListLimit = focusListLimit;
-    this.priorityTags = priorityTags;
-    this.makeLinksClickable = makeLinksClickable;
-    this.teamManager = teamManager;
-    this.defaultAssignee = defaultAssignee;
-    this.contextMenuHandler = new ContextMenuHandler(app, processor, priorityTags, getMoveHistory);
-  }
-  getMeHandle() {
-    var _a, _b;
-    return (_b = (_a = this.teamManager) == null ? void 0 : _a.resolveMe()) != null ? _b : null;
-  }
-  // Get project colour map for tag colouring (cached per render cycle)
-  getProjectColourMap() {
-    if (!this.projectColourMapCache) {
-      const projects = this.projectManager.getProjects();
-      this.projectColourMapCache = /* @__PURE__ */ new Map();
-      for (const project of projects) {
-        this.projectColourMapCache.set(project.tag.toLowerCase(), project.colourIndex);
-      }
-    }
-    return this.projectColourMapCache;
-  }
-  // Invalidate colour map cache (called when re-rendering)
-  invalidateColourMapCache() {
-    this.projectColourMapCache = null;
-  }
-  // Cleanup method to remove event listeners for a specific container
-  cleanup(container) {
-    const listener = this.activeRenders.get(container);
-    if (listener) {
-      this.scanner.off("todos-updated", listener);
-      this.activeRenders.delete(container);
-    }
-    this.todoneVisibility.delete(container);
-  }
-  // Cleanup all renders (called on plugin unload)
-  cleanupAll() {
-    for (const [, listener] of this.activeRenders) {
-      this.scanner.off("todos-updated", listener);
-    }
-    this.activeRenders.clear();
-  }
-  // Public helper method for code block processor
-  // Renders a TODO list with filters (includes both TODOs and TODONEs)
-  renderTodos(container, filterString, todoneFile) {
-    const filters = FilterParser.parse(filterString);
-    const allTodos = this.scanner.getTodos().filter(
-      (t) => !t.tags.includes("#idea") && !t.tags.includes("#ideas") && !t.tags.includes("#ideation")
-    );
-    const allTodones = this.scanner.getTodones();
-    const unfiltered = [...allTodos, ...allTodones];
-    let filteredTodos = FilterParser.applyFilters(allTodos, filters, this.getMeHandle(), this.defaultAssignee);
-    let filteredTodones = FilterParser.applyFilters(allTodones, filters, this.getMeHandle(), this.defaultAssignee);
-    filteredTodos = this.includeParentHeaders(filteredTodos, allTodos);
-    filteredTodones = this.includeParentHeaders(filteredTodones, allTodones);
-    const combined = [...filteredTodos, ...filteredTodones];
-    this.renderTodoList(container, combined, todoneFile, filterString, unfiltered);
-  }
-  // Public helper method for focus-list code blocks
-  renderProjects(container) {
-    this.renderFocusList(container);
-  }
-  // Public helper method for focus-ideas code blocks
-  renderIdeas(container, filterString) {
-    const filters = FilterParser.parse(filterString);
-    const allIdeas = this.scanner.getIdeas();
-    const filteredIdeas = FilterParser.applyFilters(allIdeas, filters, this.getMeHandle(), this.defaultAssignee);
-    this.renderIdeaList(container, filteredIdeas, filterString, allIdeas);
-  }
-  // Public helper method for focus-principles code blocks
-  renderPrinciples(container, filterString) {
-    const filters = FilterParser.parse(filterString);
-    const allPrinciples = this.scanner.getPrinciples();
-    const filteredPrinciples = FilterParser.applyFilters(allPrinciples, filters, this.getMeHandle(), this.defaultAssignee);
-    this.renderPrincipleList(container, filteredPrinciples, filterString, allPrinciples);
-  }
-  async render(source, el) {
-    var _a;
-    const focusListMatch = source.match(/\{\{focus-list\}\}/);
-    if (focusListMatch) {
-      this.renderFocusList(el);
-      return;
-    }
-    const ideasMatch = source.match(
-      /\{\{focus-ideas(?:\s*\|\s*(.+))?\}\}/
-    );
-    if (ideasMatch) {
-      const filterString2 = ideasMatch[1] || "";
-      this.renderIdeas(el, filterString2);
-      return;
-    }
-    const match = source.match(
-      /\{\{focus-todos:?\s*([^|}]*)(?:\s*\|\s*(.+))?\}\}/
-    );
-    if (!match) {
-      el.createEl("div", {
-        text: "Invalid syntax (use {{focus-todos}}, {{focus-ideas}}, or {{focus-list}})",
-        cls: "space-command-error"
-      });
-      return;
-    }
-    const beforePipe = ((_a = match[1]) == null ? void 0 : _a.trim()) || "";
-    const afterPipe = match[2] || "";
-    const isFilter = beforePipe.startsWith("path:") || beforePipe.startsWith("tags:") || beforePipe.startsWith("limit:");
-    let todoneFile;
-    let filterString;
-    if (isFilter) {
-      todoneFile = this.defaultTodoneFile;
-      filterString = beforePipe + (afterPipe ? " " + afterPipe : "");
-    } else {
-      todoneFile = beforePipe || this.defaultTodoneFile;
-      filterString = afterPipe;
-    }
-    const filters = FilterParser.parse(filterString);
-    const allTodos = this.scanner.getTodos().filter(
-      (t) => !t.tags.includes("#idea") && !t.tags.includes("#ideas") && !t.tags.includes("#ideation")
-    );
-    const allTodones = this.scanner.getTodones();
-    const unfiltered = [...allTodos, ...allTodones];
-    let filteredTodos = FilterParser.applyFilters(allTodos, filters, this.getMeHandle(), this.defaultAssignee);
-    let filteredTodones = FilterParser.applyFilters(allTodones, filters, this.getMeHandle(), this.defaultAssignee);
-    filteredTodos = this.includeParentHeaders(filteredTodos, allTodos);
-    filteredTodones = this.includeParentHeaders(filteredTodones, allTodones);
-    const combined = [...filteredTodos, ...filteredTodones];
-    this.renderTodoList(el, combined, todoneFile, filterString, unfiltered);
-  }
-  renderFocusList(container) {
-    container.empty();
-    container.addClass("space-command-embed", "focus-list-embed");
-    const header = container.createEl("div", { cls: "embed-header" });
-    const refreshBtn = header.createEl("button", {
-      cls: "clickable-icon embed-refresh-btn",
-      attr: { "aria-label": "Refresh" }
-    });
-    refreshBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>';
-    refreshBtn.addEventListener("click", () => {
-      this.renderFocusList(container);
-    });
-    this.setupFocusListAutoRefresh(container);
-    const projects = this.projectManager.getFocusProjects(this.focusListLimit);
-    if (projects.length === 0) {
-      container.createEl("div", {
-        text: "No focus projects",
-        cls: "space-command-empty"
-      });
-      return;
-    }
-    const list = container.createEl("ul", { cls: "focus-list" });
-    for (const project of projects) {
-      const item = list.createEl("li", { cls: "focus-list-item" });
-      item.addEventListener("contextmenu", (e) => {
-        e.preventDefault();
-        this.contextMenuHandler.showProjectMenu(
-          e,
-          project,
-          this.scanner,
-          () => this.renderFocusList(container),
-          () => {
-          }
-          // No filter action for embeds
-        );
-      });
-      const textSpan = item.createEl("span", { cls: "focus-project-text" });
-      textSpan.textContent = `${project.tag} `;
-      const link = item.createEl("a", {
-        text: "\u2192",
-        cls: "focus-project-link",
-        href: "#"
-      });
-      link.addEventListener("click", async (e) => {
-        e.preventDefault();
-        await this.projectManager.openProjectFile(project.tag);
-      });
-    }
-  }
-  // Include parent headers when their children match the filter
-  // This ensures header TODOs appear even if only their children have the filtered tag
-  includeParentHeaders(filtered, unfiltered) {
-    const result = [...filtered];
-    const filteredPaths = new Set(filtered.map((t) => `${t.filePath}:${t.lineNumber}`));
-    for (const item of filtered) {
-      if (item.parentLineNumber !== void 0) {
-        const parentKey = `${item.filePath}:${item.parentLineNumber}`;
-        if (!filteredPaths.has(parentKey)) {
-          const parent = unfiltered.find(
-            (t) => t.filePath === item.filePath && t.lineNumber === item.parentLineNumber
-          );
-          if (parent && !filteredPaths.has(parentKey)) {
-            result.push(parent);
-            filteredPaths.add(parentKey);
-          }
-        }
-      }
-    }
-    return result;
-  }
-  sortTodos(todos, allTodosForChildLookup) {
-    const activeTodos = todos.filter((t) => t.itemType === "todo");
-    const completedTodones = todos.filter((t) => t.itemType === "todone");
-    const lookupList = allTodosForChildLookup || activeTodos;
-    activeTodos.sort((a, b) => compareWithEffectivePriority(a, b, lookupList));
-    return [...activeTodos, ...completedTodones];
-  }
-  extractCompletionDate(text) {
-    const match = text.match(/@(\d{4}-\d{2}-\d{2})/);
-    return match ? match[1] : null;
-  }
-  renderTodoList(container, todos, todoneFile, filterString = "", unfilteredTodos) {
-    var _a;
-    container.empty();
-    container.addClass("space-command-embed");
-    const filters = FilterParser.parse(filterString);
-    const showTodones = (_a = this.todoneVisibility.get(container)) != null ? _a : filters.todone !== "hide";
-    this.todoneVisibility.set(container, showTodones);
-    const header = container.createEl("div", { cls: "embed-header" });
-    const toggleBtn = header.createEl("button", {
-      cls: `clickable-icon embed-toggle-todone-btn${showTodones ? " active" : ""}`,
-      attr: { "aria-label": showTodones ? "Hide completed" : "Show completed" }
-    });
-    toggleBtn.innerHTML = showTodones ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>';
-    toggleBtn.addEventListener("click", () => {
-      this.todoneVisibility.set(container, !showTodones);
-      this.refreshEmbed(container, todoneFile, filterString);
-    });
-    const refreshBtn = header.createEl("button", {
-      cls: "clickable-icon embed-refresh-btn",
-      attr: { "aria-label": "Refresh" }
-    });
-    refreshBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>';
-    refreshBtn.addEventListener("click", () => {
-      this.refreshEmbed(container, todoneFile, filterString);
-    });
-    this.setupAutoRefresh(container, todoneFile, filterString);
-    let displayTodos = todos;
-    if (!showTodones) {
-      displayTodos = todos.filter((t) => t.itemType !== "todone");
-    }
-    if (displayTodos.length === 0) {
-      container.createEl("div", {
-        text: showTodones ? "No TODOs" : "No active TODOs",
-        cls: "space-command-empty"
-      });
-      return;
-    }
-    let topLevelTodos = displayTodos.filter((t) => t.parentLineNumber === void 0);
-    const allTodones = this.scanner.getTodones();
-    const allTodosForChildLookup = this.scanner.getTodos();
-    topLevelTodos = topLevelTodos.filter((todo) => {
-      if (!todo.isHeader) {
-        return true;
-      }
-      if (!todo.childLineNumbers) {
-        return true;
-      }
-      if (todo.childLineNumbers.length === 0) {
-        return false;
-      }
-      const hasActiveChild = todo.childLineNumbers.some((childLine) => {
-        const isComplete = allTodones.some((t) => t.filePath === todo.filePath && t.lineNumber === childLine);
-        if (isComplete)
-          return false;
-        const childItem = allTodosForChildLookup.find((t) => t.filePath === todo.filePath && t.lineNumber === childLine);
-        if (!childItem) {
-          return false;
-        }
-        const isSnoozed2 = childItem.tags.includes("#future") || childItem.tags.includes("#snooze") || childItem.tags.includes("#snoozed");
-        if (isSnoozed2)
-          return false;
-        return true;
-      });
-      return hasActiveChild;
-    });
-    const sortedTodos = this.sortTodos(topLevelTodos, allTodosForChildLookup);
-    const list = container.createEl("ul", { cls: "contains-task-list" });
-    const allTodosForLookup = unfilteredTodos || todos;
-    for (const todo of sortedTodos) {
-      this.renderTodoItem(list, todo, allTodosForLookup, showTodones, todoneFile, filterString);
-    }
-  }
-  // Render a single todo item (and its children if it's a header)
-  // parentTags: optional tags inherited from a parent header block (for child items)
-  renderTodoItem(list, todo, allTodos, showTodones, todoneFile, filterString, isChild = false, parentTags = []) {
-    var _a;
-    if (isChild && todo.isSubheading) {
-      const subheadingItem = list.createEl("li", { cls: "task-list-item todo-child todo-subheading" });
-      const cleanText2 = todo.text.replace(/^\s*(\*\*|__)(.*?)(\*\*|__)\s*/, "$2 ").replace(/#[\w-]+/g, "").replace(/@[\w][\w.-]*/g, "").replace(/\s+/g, " ").trim();
-      subheadingItem.createEl("span", { cls: "todo-subheading-text", text: cleanText2 });
-      return;
-    }
-    const isCompleted = todo.itemType === "todone";
-    const isHeader = todo.isHeader === true;
-    const hasChildren = isHeader && todo.childLineNumbers && todo.childLineNumbers.length > 0;
-    const itemClasses = [
-      "task-list-item",
-      isCompleted ? "todone-item" : "",
-      isHeader ? "todo-header" : "",
-      isChild ? "todo-child" : "",
-      hasChildren ? "todo-header-with-children" : ""
-    ].filter((c) => c).join(" ");
-    const item = list.createEl("li", { cls: itemClasses });
-    const rowContainer = hasChildren ? item.createEl("div", { cls: "todo-header-row" }) : item;
-    if (!isCompleted) {
-      item.addEventListener("contextmenu", (e) => {
-        e.preventDefault();
-        this.contextMenuHandler.showTodoMenu(e, todo, () => {
-          this.refreshEmbed(list.closest(".space-command-embed"), todoneFile, filterString);
-        });
-      });
-    }
-    if (!hasChildren) {
-      const checkbox = rowContainer.createEl("input", {
-        type: "checkbox",
-        cls: "task-list-item-checkbox"
-      });
-      if (isCompleted) {
-        checkbox.checked = true;
-        checkbox.disabled = true;
-      }
-      checkbox.addEventListener("change", async () => {
-        if (isCompleted)
-          return;
-        checkbox.disabled = true;
-        const success = await this.processor.completeTodo(todo, todoneFile);
-        if (success) {
-          const container = list.closest(".space-command-embed");
-          if (container) {
-            this.refreshEmbed(container, todoneFile, filterString);
-          }
-        } else {
-          checkbox.disabled = false;
-        }
-      });
-    }
-    const textSpan = rowContainer.createEl("span", { cls: "todo-text" });
-    if (isCompleted) {
-      textSpan.addClass("todone-text");
-    }
-    let cleanText = todo.text.replace(/#todos?\b/g, "").replace(/#todones?\b/g, "").trim();
-    const completionDate = isCompleted ? this.extractCompletionDate(cleanText) : null;
-    if (completionDate) {
-      cleanText = cleanText.replace(/@\d{4}-\d{2}-\d{2}/, "").trim();
-    }
-    let displayText = cleanText.replace(/^-\s*\[\s*\]\s*/, "").replace(/^-\s*\[x\]\s*/i, "");
-    displayText = displayText.replace(/^#{1,6}\s+/, "").replace(/^[*\-+]\s+/, "").replace(/^>\s+/, "");
-    if (parentTags.length > 0) {
-      const existingTags = new Set(displayText.match(/#[\w-]+/g) || []);
-      const newTags = parentTags.filter((tag) => !existingTags.has(tag));
-      if (newTags.length > 0) {
-        displayText = displayText.trim() + " " + newTags.join(" ");
-      }
-    }
-    this.renderInlineMarkdown(displayText, textSpan);
-    textSpan.append(" ");
-    if (completionDate) {
-      rowContainer.createEl("span", {
-        cls: "todo-date muted-pill",
-        text: completionDate
-      });
-    }
-    if (hasChildren) {
-      const folder = ((_a = todo.file.parent) == null ? void 0 : _a.name) || "";
-      const displayPath = folder ? `${folder}/${todo.file.name}` : todo.file.name;
-      rowContainer.createEl("span", {
-        cls: "header-filename",
-        text: displayPath
-      });
-    }
-    const link = rowContainer.createEl("a", {
-      text: "\u2192",
-      cls: "todo-source-link",
-      href: "#"
-    });
-    link.addEventListener("click", (e) => {
-      var _a2;
-      e.preventDefault();
-      const blockEnd = ((_a2 = todo.childLineNumbers) == null ? void 0 : _a2.length) ? Math.max(...todo.childLineNumbers) : void 0;
-      openFileAtLine(this.app, todo.file, todo.lineNumber, blockEnd);
-    });
-    if (isHeader && todo.childLineNumbers && todo.childLineNumbers.length > 0) {
-      const childrenContainer = item.createEl("ul", { cls: "todo-children contains-task-list" });
-      const headerTags = extractTags(todo.text).filter((tag) => !/#todos?\b/.test(tag) && !/#todones?\b/.test(tag));
-      const lines = todo.childLineNumbers;
-      const childItems = lines.map((ln) => {
-        var _a2;
-        return (_a2 = allTodos.find((t) => t.filePath === todo.filePath && t.lineNumber === ln)) != null ? _a2 : null;
-      });
-      for (let idx = 0; idx < lines.length; idx++) {
-        const childTodo = childItems[idx];
-        if (!childTodo)
-          continue;
-        if (!showTodones && childTodo.itemType === "todone")
-          continue;
-        if (childTodo.isSubheading) {
-          let hasTasks = false;
-          for (let k = idx + 1; k < childItems.length; k++) {
-            const next = childItems[k];
-            if (!next)
-              continue;
-            if (next.isSubheading)
-              break;
-            hasTasks = true;
-            break;
-          }
-          if (!hasTasks)
-            continue;
-        }
-        this.renderTodoItem(childrenContainer, childTodo, allTodos, showTodones, todoneFile, filterString, true, headerTags);
-      }
-    }
-  }
-  // Render ideas list (similar to renderTodoList but for ideas)
-  renderIdeaList(container, ideas, filterString = "", unfilteredIdeas) {
-    container.empty();
-    container.addClass("space-command-embed", "focus-ideas-embed");
-    const header = container.createEl("div", { cls: "embed-header" });
-    const refreshBtn = header.createEl("button", {
-      cls: "clickable-icon embed-refresh-btn",
-      attr: { "aria-label": "Refresh" }
-    });
-    refreshBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>';
-    refreshBtn.addEventListener("click", () => {
-      this.refreshIdeaEmbed(container, filterString);
-    });
-    this.setupIdeaAutoRefresh(container, filterString);
-    if (ideas.length === 0) {
-      container.createEl("div", {
-        text: "No ideas",
-        cls: "space-command-empty"
-      });
-      return;
-    }
-    const topLevelIdeas = ideas.filter((i) => i.parentLineNumber === void 0);
-    const list = container.createEl("ul", { cls: "idea-list" });
-    const allIdeasForLookup = unfilteredIdeas || ideas;
-    for (const idea of topLevelIdeas) {
-      this.renderIdeaItem(list, idea, allIdeasForLookup, filterString);
-    }
-  }
-  // Render a single idea item (and its children if it's a header)
-  // parentTags: optional tags inherited from a parent header block (for child items)
-  renderIdeaItem(list, idea, allIdeas, filterString, isChild = false, parentTags = []) {
-    const isHeader = idea.isHeader === true;
-    const hasChildren = isHeader && idea.childLineNumbers && idea.childLineNumbers.length > 0;
-    const itemClasses = [
-      "idea-item",
-      isHeader ? "idea-header" : "",
-      isChild ? "idea-child" : "",
-      hasChildren ? "idea-header-with-children" : ""
-    ].filter((c) => c).join(" ");
-    const item = list.createEl("li", { cls: itemClasses });
-    const rowContainer = hasChildren ? item.createEl("div", { cls: "idea-header-row" }) : item;
-    const textSpan = rowContainer.createEl("span", { cls: "idea-text" });
-    let cleanText = idea.text.replace(/#idea(?:s|tion)?\b/g, "").trim();
-    let displayText = cleanText.replace(/^-\s*\[\s*\]\s*/, "").replace(/^-\s*\[x\]\s*/i, "");
-    displayText = displayText.replace(/^#{1,6}\s+/, "").replace(/^[*\-+]\s+/, "").replace(/^>\s+/, "");
-    if (parentTags.length > 0) {
-      const existingTags = new Set(displayText.match(/#[\w-]+/g) || []);
-      const newTags = parentTags.filter((tag) => !existingTags.has(tag));
-      if (newTags.length > 0) {
-        displayText = displayText.trim() + " " + newTags.join(" ");
-      }
-    }
-    this.renderInlineMarkdown(displayText, textSpan);
-    textSpan.append(" ");
-    if (hasChildren) {
-      rowContainer.createEl("span", {
-        cls: "header-filename",
-        text: idea.file.basename
-      });
-    }
-    const link = rowContainer.createEl("a", {
-      text: "\u2192",
-      cls: "idea-source-link",
-      href: "#"
-    });
-    link.addEventListener("click", (e) => {
-      var _a;
-      e.preventDefault();
-      const blockEnd = ((_a = idea.childLineNumbers) == null ? void 0 : _a.length) ? Math.max(...idea.childLineNumbers) : void 0;
-      openFileAtLine(this.app, idea.file, idea.lineNumber, blockEnd);
-    });
-    if (isHeader && idea.childLineNumbers && idea.childLineNumbers.length > 0) {
-      const childrenContainer = item.createEl("ul", { cls: "idea-children" });
-      const headerTags = extractTags(idea.text).filter((tag) => !/#idea(?:s|tion)?\b/.test(tag));
-      for (const childLine of idea.childLineNumbers) {
-        const childIdea = allIdeas.find(
-          (i) => i.filePath === idea.filePath && i.lineNumber === childLine
-        );
-        if (childIdea) {
-          this.renderIdeaItem(childrenContainer, childIdea, allIdeas, filterString, true, headerTags);
-        }
-      }
-    }
-  }
-  // Render principles list
-  renderPrincipleList(container, principles, filterString = "", unfilteredPrinciples) {
-    container.empty();
-    container.addClass("space-command-embed", "focus-principles-embed");
-    const header = container.createEl("div", { cls: "embed-header" });
-    const refreshBtn = header.createEl("button", {
-      cls: "clickable-icon embed-refresh-btn",
-      attr: { "aria-label": "Refresh" }
-    });
-    refreshBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>';
-    refreshBtn.addEventListener("click", () => {
-      this.refreshPrincipleEmbed(container, filterString);
-    });
-    this.setupPrincipleAutoRefresh(container, filterString);
-    if (principles.length === 0) {
-      container.createEl("div", {
-        text: "No principles",
-        cls: "space-command-empty"
-      });
-      return;
-    }
-    const topLevelPrinciples = principles.filter((p) => p.parentLineNumber === void 0);
-    const list = container.createEl("ul", { cls: "principle-list" });
-    const allPrinciplesForLookup = unfilteredPrinciples || principles;
-    for (const principle of topLevelPrinciples) {
-      this.renderPrincipleItem(list, principle, allPrinciplesForLookup, filterString);
-    }
-  }
-  // Render a single principle item (and its children if it's a header)
-  // parentTags: optional tags inherited from a parent header block (for child items)
-  renderPrincipleItem(list, principle, allPrinciples, filterString, isChild = false, parentTags = []) {
-    const isHeader = principle.isHeader === true;
-    const hasChildren = isHeader && principle.childLineNumbers && principle.childLineNumbers.length > 0;
-    const itemClasses = [
-      "principle-item",
-      isHeader ? "principle-header" : "",
-      isChild ? "principle-child" : "",
-      hasChildren ? "principle-header-with-children" : ""
-    ].filter((c) => c).join(" ");
-    const item = list.createEl("li", { cls: itemClasses });
-    const rowContainer = hasChildren ? item.createEl("div", { cls: "principle-header-row" }) : item;
-    const textSpan = rowContainer.createEl("span", { cls: "principle-text" });
-    let cleanText = principle.text.replace(/#principles?\b/g, "").trim();
-    let displayText = cleanText.replace(/^-\s*\[\s*\]\s*/, "").replace(/^-\s*\[x\]\s*/i, "");
-    displayText = displayText.replace(/^#{1,6}\s+/, "").replace(/^[*\-+]\s+/, "").replace(/^>\s+/, "");
-    if (parentTags.length > 0) {
-      const existingTags = new Set(displayText.match(/#[\w-]+/g) || []);
-      const newTags = parentTags.filter((tag) => !existingTags.has(tag));
-      if (newTags.length > 0) {
-        displayText = displayText.trim() + " " + newTags.join(" ");
-      }
-    }
-    this.renderInlineMarkdown(displayText, textSpan);
-    textSpan.append(" ");
-    if (hasChildren) {
-      rowContainer.createEl("span", {
-        cls: "header-filename",
-        text: principle.file.basename
-      });
-    }
-    const link = rowContainer.createEl("a", {
-      text: "\u2192",
-      cls: "principle-source-link",
-      href: "#"
-    });
-    link.addEventListener("click", (e) => {
-      var _a;
-      e.preventDefault();
-      const blockEnd = ((_a = principle.childLineNumbers) == null ? void 0 : _a.length) ? Math.max(...principle.childLineNumbers) : void 0;
-      openFileAtLine(this.app, principle.file, principle.lineNumber, blockEnd);
-    });
-    if (isHeader && principle.childLineNumbers && principle.childLineNumbers.length > 0) {
-      const childrenContainer = item.createEl("ul", { cls: "principle-children" });
-      const headerTags = extractTags(principle.text).filter((tag) => !/#principles?\b/.test(tag));
-      for (const childLine of principle.childLineNumbers) {
-        const childPrinciple = allPrinciples.find(
-          (p) => p.filePath === principle.filePath && p.lineNumber === childLine
-        );
-        if (childPrinciple) {
-          this.renderPrincipleItem(childrenContainer, childPrinciple, allPrinciples, filterString, true, headerTags);
-        }
-      }
-    }
-  }
-  // Render inline markdown without creating block elements
-  // Uses DOM methods to avoid XSS vulnerabilities
-  renderInlineMarkdown(text, container) {
-    const tokens = this.parseMarkdownTokens(text);
-    const mutedTags = ["#focus", "#future", "#p0", "#p1", "#p2", "#p3", "#p4"];
-    const projectColourMap = this.getProjectColourMap();
-    for (const token of tokens) {
-      switch (token.type) {
-        case "text":
-          renderTextWithTags(token.content, container, mutedTags, projectColourMap);
-          break;
-        case "bold":
-          container.createEl("strong", { text: token.content });
-          break;
-        case "italic":
-          container.createEl("em", { text: token.content });
-          break;
-        case "code":
-          container.createEl("code", { text: token.content });
-          break;
-        case "link":
-          if (this.makeLinksClickable) {
-            const link = container.createEl("a", {
-              text: token.content,
-              cls: "internal-link"
-            });
-            link.addEventListener("click", async (e) => {
-              e.preventDefault();
-              const url = token.url || "";
-              if (url.startsWith("http://") || url.startsWith("https://")) {
-                window.open(url, "_blank");
-              } else {
-                await this.app.workspace.openLinkText(url, "", false);
-              }
-            });
-          } else {
-            container.appendText(token.content);
-          }
-          break;
-      }
-    }
-  }
-  // Parse markdown into tokens for safe rendering
-  parseMarkdownTokens(text) {
-    const tokens = [];
-    let remaining = text;
-    while (remaining.length > 0) {
-      let matched = false;
-      let match = remaining.match(/^(\*\*|__)(.+?)\1/);
-      if (match) {
-        tokens.push({ type: "bold", content: match[2] });
-        remaining = remaining.substring(match[0].length);
-        matched = true;
-        continue;
-      }
-      match = remaining.match(/^`([^`]+)`/);
-      if (match) {
-        tokens.push({ type: "code", content: match[1] });
-        remaining = remaining.substring(match[0].length);
-        matched = true;
-        continue;
-      }
-      match = remaining.match(/^\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/);
-      if (match) {
-        const pagePath = match[1];
-        const alias = match[2];
-        const displayText = alias || pagePath.split("#")[0];
-        tokens.push({ type: "link", content: displayText, url: pagePath });
-        remaining = remaining.substring(match[0].length);
-        matched = true;
-        continue;
-      }
-      match = remaining.match(/^\[([^\]]+)\]\(([^)]+)\)/);
-      if (match) {
-        tokens.push({ type: "link", content: match[1], url: match[2] });
-        remaining = remaining.substring(match[0].length);
-        matched = true;
-        continue;
-      }
-      match = remaining.match(/^(\*|_)([^\s\*_][^\*_]*?)\1/);
-      if (match) {
-        tokens.push({ type: "italic", content: match[2] });
-        remaining = remaining.substring(match[0].length);
-        matched = true;
-        continue;
-      }
-      if (!matched) {
-        const nextSpecial = remaining.search(/[\*_`\[]/);
-        if (nextSpecial === -1) {
-          tokens.push({ type: "text", content: remaining });
-          break;
-        } else if (nextSpecial > 0) {
-          tokens.push({ type: "text", content: remaining.substring(0, nextSpecial) });
-          remaining = remaining.substring(nextSpecial);
-        } else {
-          tokens.push({ type: "text", content: remaining[0] });
-          remaining = remaining.substring(1);
-        }
-      }
-    }
-    return tokens;
-  }
-  // Setup auto-refresh for focus list embed
-  setupFocusListAutoRefresh(container) {
-    this.cleanup(container);
-    const listener = () => {
-      if (container.isConnected) {
-        this.renderFocusList(container);
-      } else {
-        this.cleanup(container);
-      }
-    };
-    this.scanner.on("todos-updated", listener);
-    this.activeRenders.set(container, listener);
-  }
-  // Setup auto-refresh for this embed
-  setupAutoRefresh(container, todoneFile, filterString) {
-    this.cleanup(container);
-    const listener = () => {
-      if (container.isConnected) {
-        this.refreshEmbed(container, todoneFile, filterString);
-      } else {
-        this.cleanup(container);
-      }
-    };
-    this.scanner.on("todos-updated", listener);
-    this.activeRenders.set(container, listener);
-  }
-  // Refresh a specific embed
-  refreshEmbed(container, todoneFile, filterString) {
-    this.invalidateColourMapCache();
-    const filters = FilterParser.parse(filterString);
-    const allTodos = this.scanner.getTodos().filter(
-      (t) => !t.tags.includes("#idea") && !t.tags.includes("#ideas") && !t.tags.includes("#ideation")
-    );
-    const allTodones = this.scanner.getTodones();
-    const unfiltered = [...allTodos, ...allTodones];
-    let filteredTodos = FilterParser.applyFilters(allTodos, filters, this.getMeHandle(), this.defaultAssignee);
-    let filteredTodones = FilterParser.applyFilters(allTodones, filters, this.getMeHandle(), this.defaultAssignee);
-    filteredTodos = this.includeParentHeaders(filteredTodos, allTodos);
-    filteredTodones = this.includeParentHeaders(filteredTodones, allTodones);
-    const combined = [...filteredTodos, ...filteredTodones];
-    this.renderTodoList(container, combined, todoneFile, filterString, unfiltered);
-  }
-  // Setup auto-refresh for idea embeds
-  setupIdeaAutoRefresh(container, filterString) {
-    this.cleanup(container);
-    const listener = () => {
-      if (container.isConnected) {
-        this.refreshIdeaEmbed(container, filterString);
-      } else {
-        this.cleanup(container);
-      }
-    };
-    this.scanner.on("todos-updated", listener);
-    this.activeRenders.set(container, listener);
-  }
-  // Refresh idea embed
-  refreshIdeaEmbed(container, filterString) {
-    this.invalidateColourMapCache();
-    const filters = FilterParser.parse(filterString);
-    const allIdeas = this.scanner.getIdeas();
-    const filteredIdeas = FilterParser.applyFilters(allIdeas, filters, this.getMeHandle(), this.defaultAssignee);
-    this.renderIdeaList(container, filteredIdeas, filterString, allIdeas);
-  }
-  // Setup auto-refresh for principle embeds
-  setupPrincipleAutoRefresh(container, filterString) {
-    this.cleanup(container);
-    const listener = () => {
-      if (container.isConnected) {
-        this.refreshPrincipleEmbed(container, filterString);
-      } else {
-        this.cleanup(container);
-      }
-    };
-    this.scanner.on("todos-updated", listener);
-    this.activeRenders.set(container, listener);
-  }
-  // Refresh principle embed
-  refreshPrincipleEmbed(container, filterString) {
-    this.invalidateColourMapCache();
-    const filters = FilterParser.parse(filterString);
-    const allPrinciples = this.scanner.getPrinciples();
-    const filteredPrinciples = FilterParser.applyFilters(allPrinciples, filters, this.getMeHandle(), this.defaultAssignee);
-    this.renderPrincipleList(container, filteredPrinciples, filterString, allPrinciples);
-  }
-};
-
-// src/CodeBlockProcessor.ts
-var CodeBlockProcessor = class {
-  constructor(embedRenderer, defaultTodoneFile) {
-    this.embedRenderer = embedRenderer;
-    this.defaultTodoneFile = defaultTodoneFile;
-  }
-  // Register all code block processors
-  registerProcessors(plugin) {
-    plugin.registerMarkdownCodeBlockProcessor(
-      "focus-todos",
-      this.processFocusTodos.bind(this)
-    );
-    plugin.registerMarkdownCodeBlockProcessor(
-      "focus-list",
-      this.processFocusList.bind(this)
-    );
-    plugin.registerMarkdownCodeBlockProcessor(
-      "focus-ideas",
-      this.processFocusIdeas.bind(this)
-    );
-    plugin.registerMarkdownCodeBlockProcessor(
-      "focus-principles",
-      this.processFocusPrinciples.bind(this)
-    );
-  }
-  // Handle focus-todos code blocks
-  processFocusTodos(source, el) {
-    const { todoneFile, filterString } = this.parseContent(source);
-    this.embedRenderer.renderTodos(el, filterString, todoneFile);
-  }
-  // Handle focus-list code blocks
-  processFocusList(source, el) {
-    this.embedRenderer.renderProjects(el);
-  }
-  // Handle focus-ideas code blocks
-  processFocusIdeas(source, el) {
-    const { filterString } = this.parseContent(source);
-    this.embedRenderer.renderIdeas(el, filterString);
-  }
-  // Handle focus-principles code blocks
-  processFocusPrinciples(source, el) {
-    const { filterString } = this.parseContent(source);
-    this.embedRenderer.renderPrinciples(el, filterString);
-  }
-  // Parse code block content
-  // Supports multiple formats:
-  // 1. Empty block: uses defaults
-  // 2. File only: first line is TODONE file
-  // 3. Filters only: all lines are filters (uses default file)
-  // 4. File + filters (single line): "file.md | filters"
-  // 5. File + filters (multi-line): first line is file, rest are filters
-  parseContent(source) {
-    const lines = source.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
-    if (lines.length === 0) {
-      return {
-        todoneFile: this.defaultTodoneFile,
-        filterString: ""
-      };
-    }
-    const firstLine = lines[0];
-    const isFilter = firstLine.includes("|") || firstLine.startsWith("path:") || firstLine.startsWith("tags:") || firstLine.startsWith("limit:") || firstLine.startsWith("todone:");
-    if (isFilter) {
-      return {
-        todoneFile: this.defaultTodoneFile,
-        filterString: lines.join(" | ")
-      };
-    }
-    if (firstLine.includes("|")) {
-      const [file, ...filterParts] = firstLine.split("|");
-      return {
-        todoneFile: file.trim(),
-        filterString: filterParts.join("|").trim()
-      };
-    }
-    const todoneFile = firstLine;
-    const filterString = lines.slice(1).join(" | ");
-    return { todoneFile, filterString };
-  }
-};
-
 // src/SlashCommandSuggest.ts
-var import_obsidian9 = require("obsidian");
+var import_obsidian7 = require("obsidian");
 var CALLOUT_TYPES = [
   { id: "info", name: "Info", icon: "\u2139\uFE0F" },
   { id: "tip", name: "Tip", icon: "\u{1F4A1}" },
@@ -3331,7 +2034,7 @@ var CALLOUT_TYPES = [
   { id: "question", name: "Question", icon: "\u2753" },
   { id: "failure", name: "Failure", icon: "\u274C" }
 ];
-var SlashCommandSuggest = class extends import_obsidian9.EditorSuggest {
+var SlashCommandSuggest = class extends import_obsidian7.EditorSuggest {
   constructor(app, settings) {
     super(app);
     this.inCalloutMenu = false;
@@ -3492,8 +2195,8 @@ var SlashCommandSuggest = class extends import_obsidian9.EditorSuggest {
 };
 
 // src/AtSuggest.ts
-var import_obsidian10 = require("obsidian");
-var AtSuggest = class extends import_obsidian10.EditorSuggest {
+var import_obsidian8 = require("obsidian");
+var AtSuggest = class extends import_obsidian8.EditorSuggest {
   constructor(app, settings, teamManager) {
     super(app);
     this.settings = settings;
@@ -3634,15 +2337,15 @@ var AtSuggest = class extends import_obsidian10.EditorSuggest {
 };
 
 // src/TeamManager.ts
-var import_obsidian11 = require("obsidian");
+var import_obsidian9 = require("obsidian");
 var TEAM_LINE_REGEX = /^-\s+@([\w][\w.-]*)\s*(?:—|-)\s*(.+)$/;
 var ME_SUFFIX = /\s*\(me\)\s*$/i;
-var TeamManager = class extends import_obsidian11.Events {
+var TeamManager = class extends import_obsidian9.Events {
   constructor(app, filePath) {
     super();
     this.members = [];
     this.pendingAdds = /* @__PURE__ */ new Set();
-    this.debouncedFlushAdds = (0, import_obsidian11.debounce)(() => this.flushPendingAdds(), 500, true);
+    this.debouncedFlushAdds = (0, import_obsidian9.debounce)(() => this.flushPendingAdds(), 500, true);
     this.app = app;
     this.filePath = filePath;
   }
@@ -3688,7 +2391,7 @@ var TeamManager = class extends import_obsidian11.Events {
     const handles = [...this.pendingAdds];
     this.pendingAdds.clear();
     const file = this.app.vault.getAbstractFileByPath(this.filePath);
-    if (!(file instanceof import_obsidian11.TFile))
+    if (!(file instanceof import_obsidian9.TFile))
       return;
     const content = await this.app.vault.read(file);
     const newLines = handles.filter((h) => !this.members.some((m) => m.handle === h)).map((h) => `- @${h} \u2014 ${h}`);
@@ -3713,17 +2416,17 @@ var TeamManager = class extends import_obsidian11.Events {
   }
   watchFile() {
     this.app.vault.on("modify", (file) => {
-      if (file instanceof import_obsidian11.TFile && file.path === this.filePath) {
+      if (file instanceof import_obsidian9.TFile && file.path === this.filePath) {
         this.parse();
       }
     });
     this.app.vault.on("create", (file) => {
-      if (file instanceof import_obsidian11.TFile && file.path === this.filePath) {
+      if (file instanceof import_obsidian9.TFile && file.path === this.filePath) {
         this.parse();
       }
     });
     this.app.vault.on("delete", (file) => {
-      if (file instanceof import_obsidian11.TFile && file.path === this.filePath) {
+      if (file instanceof import_obsidian9.TFile && file.path === this.filePath) {
         this.members = [];
         this.trigger("team-updated");
       }
@@ -3731,7 +2434,7 @@ var TeamManager = class extends import_obsidian11.Events {
   }
   async parse() {
     const file = this.app.vault.getAbstractFileByPath(this.filePath);
-    if (!(file instanceof import_obsidian11.TFile)) {
+    if (!(file instanceof import_obsidian9.TFile)) {
       this.members = [];
       this.trigger("team-updated");
       return;
@@ -3758,6 +2461,333 @@ var TeamManager = class extends import_obsidian11.Events {
 
 // src/SidebarView.ts
 var import_obsidian12 = require("obsidian");
+
+// src/ContextMenuHandler.ts
+var import_obsidian11 = require("obsidian");
+
+// src/MoveTargetModal.ts
+var import_obsidian10 = require("obsidian");
+var MoveTargetModal = class extends import_obsidian10.SuggestModal {
+  constructor(app, moveHistory, excludePath, onChoose) {
+    super(app);
+    this.moveHistory = moveHistory;
+    this.excludePath = excludePath;
+    this.onChoose = onChoose;
+    this.setPlaceholder("Move to file...");
+  }
+  getSuggestions(query) {
+    const lowerQuery = query.toLowerCase();
+    const seen = /* @__PURE__ */ new Set();
+    const suggestions = [];
+    const addIfMatch = (file, source) => {
+      if (seen.has(file.path))
+        return;
+      if (file.path === this.excludePath)
+        return;
+      if (lowerQuery && !file.path.toLowerCase().includes(lowerQuery))
+        return;
+      seen.add(file.path);
+      suggestions.push({ file, source });
+    };
+    const bookmarks = this.getBookmarkedFiles();
+    for (const file of bookmarks) {
+      addIfMatch(file, "pinned");
+    }
+    const openFiles = this.getOpenFiles();
+    for (const file of openFiles) {
+      addIfMatch(file, "open");
+    }
+    for (const path of this.moveHistory) {
+      const file = this.app.vault.getAbstractFileByPath(path);
+      if (file instanceof import_obsidian10.TFile) {
+        addIfMatch(file, "recent");
+      }
+    }
+    if (lowerQuery) {
+      const allFiles = this.app.vault.getMarkdownFiles();
+      for (const file of allFiles) {
+        addIfMatch(file, "all");
+      }
+    }
+    return suggestions;
+  }
+  renderSuggestion(suggestion, el) {
+    const icon = suggestion.source === "pinned" ? "\u{1F4CC} " : suggestion.source === "open" ? "\u{1F4C4} " : suggestion.source === "recent" ? "\u{1F550} " : "";
+    el.createEl("div", { text: icon + suggestion.file.path, cls: "suggestion-title" });
+  }
+  onChooseSuggestion(suggestion) {
+    this.onChoose(suggestion.file);
+  }
+  getBookmarkedFiles() {
+    var _a, _b, _c;
+    const files = [];
+    try {
+      const bookmarksPlugin = (_b = (_a = this.app.internalPlugins) == null ? void 0 : _a.getPluginById) == null ? void 0 : _b.call(_a, "bookmarks");
+      if (!(bookmarksPlugin == null ? void 0 : bookmarksPlugin.enabled))
+        return files;
+      const items = (_c = bookmarksPlugin.instance) == null ? void 0 : _c.items;
+      if (!Array.isArray(items))
+        return files;
+      for (const item of items) {
+        if (item.type === "file" && item.path) {
+          const file = this.app.vault.getAbstractFileByPath(item.path);
+          if (file instanceof import_obsidian10.TFile && file.extension === "md") {
+            files.push(file);
+          }
+        }
+      }
+    } catch (e) {
+    }
+    return files;
+  }
+  getOpenFiles() {
+    const files = [];
+    const seen = /* @__PURE__ */ new Set();
+    this.app.workspace.iterateAllLeaves((leaf) => {
+      var _a;
+      const file = (_a = leaf.view) == null ? void 0 : _a.file;
+      if (file instanceof import_obsidian10.TFile && file.extension === "md" && !seen.has(file.path)) {
+        seen.add(file.path);
+        files.push(file);
+      }
+    });
+    return files;
+  }
+};
+
+// src/ContextMenuHandler.ts
+var ContextMenuHandler = class {
+  constructor(app, processor, priorityTags, getMoveHistory) {
+    this.app = app;
+    this.processor = processor;
+    this.priorityTags = priorityTags;
+    this.getMoveHistory = getMoveHistory;
+  }
+  /**
+   * Show context menu for an active TODO item
+   */
+  showTodoMenu(evt, todo, onRefresh) {
+    const menu = new import_obsidian11.Menu();
+    const currentPriority = this.getCurrentPriority(todo);
+    const hasFocus = todo.tags.includes("#focus");
+    const hasFuture = todo.tags.includes("#future");
+    const hasLaterPriority = currentPriority && /^#p[3-4]$/.test(currentPriority);
+    menu.addItem((item) => {
+      item.setTitle("Copy").setIcon("copy").onClick(async () => {
+        await navigator.clipboard.writeText(todo.text);
+      });
+    });
+    menu.addItem((item) => {
+      item.setTitle("Move to...").setIcon("arrow-right").onClick(() => {
+        new MoveTargetModal(
+          this.app,
+          this.getMoveHistory(),
+          todo.filePath,
+          async (file) => {
+            const success = await this.processor.moveTodo(todo, file.path);
+            if (success)
+              onRefresh();
+          }
+        ).open();
+      });
+    });
+    menu.addItem((item) => {
+      item.setTitle(hasFocus ? "Unfocus" : "Focus").setIcon("zap").onClick(async () => {
+        let success;
+        if (hasFocus) {
+          success = await this.processor.removeTag(todo, "#focus");
+        } else {
+          const newPriority = this.calculateFocusPriority(currentPriority);
+          success = await this.processor.setPriorityTag(todo, newPriority, true);
+        }
+        if (success)
+          onRefresh();
+      });
+    });
+    menu.addItem((item) => {
+      item.setTitle(hasLaterPriority ? "Unlater" : "Later").setIcon("clock").onClick(async () => {
+        let success;
+        if (hasLaterPriority) {
+          success = await this.processor.removeTag(todo, currentPriority);
+        } else {
+          const newPriority = this.calculateLaterPriority(currentPriority);
+          success = await this.processor.setPriorityTag(todo, newPriority);
+        }
+        if (success)
+          onRefresh();
+      });
+    });
+    menu.addItem((item) => {
+      item.setTitle(hasFuture ? "Unsnooze" : "Snooze").setIcon("moon").onClick(async () => {
+        let success;
+        if (hasFuture) {
+          success = await this.processor.removeTag(todo, "#future");
+        } else {
+          success = await this.processor.setPriorityTag(todo, "#future");
+        }
+        if (success)
+          onRefresh();
+      });
+    });
+    menu.showAtMouseEvent(evt);
+  }
+  /**
+   * Extract current priority tag from TODO
+   */
+  getCurrentPriority(todo) {
+    if (todo.tags.includes("#future")) {
+      return "#future";
+    }
+    for (const tag of todo.tags) {
+      if (/^#p[0-4]$/.test(tag)) {
+        return tag;
+      }
+    }
+    return null;
+  }
+  /**
+   * Calculate new priority for Focus action
+   * If no priority or #future → #p0
+   * If #pN → #p(N-1), but #p0 stays #p0
+   */
+  calculateFocusPriority(currentPriority) {
+    if (!currentPriority || currentPriority === "#future") {
+      return "#p0";
+    }
+    const match = currentPriority.match(/^#p([0-4])$/);
+    if (match) {
+      const num = parseInt(match[1]);
+      return num > 0 ? `#p${num - 1}` : "#p0";
+    }
+    return "#p0";
+  }
+  /**
+   * Calculate new priority for Later action
+   * If no priority or #future → #p4
+   * If #pN → #p(N+1), but #p4 stays #p4
+   */
+  calculateLaterPriority(currentPriority) {
+    if (!currentPriority || currentPriority === "#future") {
+      return "#p4";
+    }
+    const match = currentPriority.match(/^#p([0-4])$/);
+    if (match) {
+      const num = parseInt(match[1]);
+      return num < 4 ? `#p${num + 1}` : "#p4";
+    }
+    return "#p4";
+  }
+  /**
+   * Show context menu for a project (focus list item)
+   * Operations apply to all TODOs matching the project tag
+   */
+  showProjectMenu(evt, project, scanner, onRefresh, onFilterByTag) {
+    const menu = new import_obsidian11.Menu();
+    const getTodosForProject = () => {
+      return scanner.getTodos().filter((todo) => todo.tags.includes(project.tag));
+    };
+    const todos = getTodosForProject();
+    const anyHasFocus = todos.some((t) => t.tags.includes("#focus"));
+    const anyHasFuture = todos.some((t) => t.tags.includes("#future"));
+    const anyHasLaterPriority = todos.some((t) => {
+      for (const tag of t.tags) {
+        if (/^#p[3-4]$/.test(tag))
+          return true;
+      }
+      return false;
+    });
+    menu.addItem((item) => {
+      item.setTitle(project.tag).setIcon("tag");
+      const submenu = item.setSubmenu();
+      submenu.addItem((subItem) => {
+        subItem.setTitle("Filter by").setIcon("filter").onClick(() => {
+          onFilterByTag(project.tag);
+        });
+      });
+    });
+    menu.addSeparator();
+    menu.addItem((item) => {
+      item.setTitle(anyHasFocus ? "Unfocus" : "Focus").setIcon("zap").onClick(async () => {
+        const currentTodos = getTodosForProject();
+        if (anyHasFocus) {
+          await this.processor.unfocusAllWithTag(currentTodos);
+        } else {
+          await this.processor.focusAllWithTag(currentTodos);
+        }
+        onRefresh();
+      });
+    });
+    menu.addItem((item) => {
+      item.setTitle(anyHasLaterPriority ? "Unlater" : "Later").setIcon("clock").onClick(async () => {
+        const currentTodos = getTodosForProject();
+        if (anyHasLaterPriority) {
+          await this.processor.unlaterAllWithTag(currentTodos);
+        } else {
+          await this.processor.laterAllWithTag(currentTodos);
+        }
+        onRefresh();
+      });
+    });
+    menu.addItem((item) => {
+      item.setTitle(anyHasFuture ? "Unsnooze" : "Snooze").setIcon("moon").onClick(async () => {
+        const currentTodos = getTodosForProject();
+        if (anyHasFuture) {
+          await this.processor.unsnoozeAllWithTag(currentTodos);
+        } else {
+          await this.processor.snoozeAllWithTag(currentTodos);
+        }
+        onRefresh();
+      });
+    });
+    menu.showAtMouseEvent(evt);
+  }
+  /**
+   * Show context menu for an idea item
+   */
+  showIdeaMenu(evt, idea, onRefresh) {
+    const menu = new import_obsidian11.Menu();
+    const hasFocus = idea.tags.includes("#focus");
+    menu.addItem((item) => {
+      item.setTitle("Add to TODOs").setIcon("check-square").onClick(async () => {
+        const success = await this.processor.convertIdeaToTodo(idea);
+        if (success)
+          onRefresh();
+      });
+    });
+    menu.addItem((item) => {
+      item.setTitle("Copy").setIcon("copy").onClick(async () => {
+        await navigator.clipboard.writeText(idea.text);
+      });
+    });
+    menu.addItem((item) => {
+      item.setTitle(hasFocus ? "Unfocus" : "Focus").setIcon("zap").onClick(async () => {
+        let success;
+        if (hasFocus) {
+          success = await this.processor.removeTag(idea, "#focus");
+        } else {
+          success = await this.processor.addFocusToIdea(idea);
+        }
+        if (success)
+          onRefresh();
+      });
+    });
+    menu.showAtMouseEvent(evt);
+  }
+  /**
+   * Show context menu for a principle item
+   */
+  showPrincipleMenu(evt, principle) {
+    const menu = new import_obsidian11.Menu();
+    menu.addItem((item) => {
+      item.setTitle("Copy").setIcon("copy").onClick(async () => {
+        await navigator.clipboard.writeText(principle.text);
+      });
+    });
+    menu.showAtMouseEvent(evt);
+  }
+};
+
+// src/SidebarView.ts
 var VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 var TodoSidebarView = class extends import_obsidian12.ItemView {
   constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, activeTodosLimit, focusListLimit, makeLinksClickable, onShowAbout, onShowStats, getMoveHistory = () => [], teamManager, defaultAssignee = "", focusQueueLimit = 1, focusModeActive = false, setFocusModeActive = async () => {
@@ -5259,34 +4289,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       });
       menu.addSeparator();
       menu.addItem((item) => {
-        item.setTitle("Embed Syntax").setIcon("copy");
-        const submenu = item.setSubmenu();
-        submenu.addItem((subItem) => {
-          subItem.setTitle("IDEA code block").setIcon("code").onClick(() => {
-            navigator.clipboard.writeText("```focus-ideas\n```");
-            showNotice2("Copied IDEA code block syntax");
-          });
-        });
-        submenu.addItem((subItem) => {
-          subItem.setTitle("IDEA inline").setIcon("brackets").onClick(() => {
-            navigator.clipboard.writeText("{{focus-ideas}}");
-            showNotice2("Copied IDEA inline syntax");
-          });
-        });
-        submenu.addItem((subItem) => {
-          subItem.setTitle("TODO code block").setIcon("code").onClick(() => {
-            navigator.clipboard.writeText("```focus-todos\n```");
-            showNotice2("Copied TODO code block syntax");
-          });
-        });
-        submenu.addItem((subItem) => {
-          subItem.setTitle("TODO inline").setIcon("brackets").onClick(() => {
-            navigator.clipboard.writeText("{{focus-todos}}");
-            showNotice2("Copied TODO inline syntax");
-          });
-        });
-      });
-      menu.addItem((item) => {
         item.setTitle("Stats").setIcon("bar-chart-2").onClick(() => this.onShowStats());
       });
       menu.addSeparator();
@@ -6060,19 +5062,6 @@ var SpaceCommandPlugin = class extends import_obsidian13.Plugin {
       this.settings.priorityTags,
       this.settings.excludeFoldersFromProjects
     );
-    this.embedRenderer = new EmbedRenderer(
-      this.app,
-      this.scanner,
-      this.processor,
-      this.projectManager,
-      this.settings.defaultTodoneFile,
-      this.settings.focusListLimit,
-      this.settings.priorityTags,
-      this.settings.makeLinksClickable,
-      () => this.settings.moveHistory,
-      this.teamManager,
-      this.settings.defaultAssignee
-    );
     this.tabLockManager = new TabLockManager(this.app);
     if (this.settings.showTabLockButton) {
       this.app.workspace.onLayoutReady(() => {
@@ -6159,24 +5148,6 @@ var SpaceCommandPlugin = class extends import_obsidian13.Plugin {
         }
       )
     );
-    this.registerMarkdownPostProcessor((el, ctx) => {
-      const codeBlocks = el.findAll("p, div");
-      for (const block of codeBlocks) {
-        const text = block.textContent || "";
-        if (text.includes("{{focus-todos")) {
-          this.embedRenderer.render(text, block);
-        } else if (text.includes("{{focus-ideas")) {
-          this.embedRenderer.render(text, block);
-        } else if (text.includes("{{focus-list}}")) {
-          this.embedRenderer.render(text, block);
-        }
-      }
-    });
-    const codeBlockProcessor = new CodeBlockProcessor(
-      this.embedRenderer,
-      this.settings.defaultTodoneFile
-    );
-    codeBlockProcessor.registerProcessors(this);
     this.registerEditorSuggest(new SlashCommandSuggest(this.app, this.settings));
     this.registerEditorSuggest(new AtSuggest(this.app, this.settings, this.teamManager));
     this.addCommand({
@@ -6464,7 +5435,7 @@ var SpaceCommandSettingTab = class extends import_obsidian13.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian13.Setting(containerEl).setName("Make links clickable in lists").setDesc("Render wiki links and markdown links as clickable in sidebar and embeds. When disabled, links display as plain text without markdown syntax.").addToggle(
+    new import_obsidian13.Setting(containerEl).setName("Make links clickable in lists").setDesc("Render wiki links and markdown links as clickable in the sidebar. When disabled, links display as plain text without markdown syntax.").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.makeLinksClickable).onChange(async (value) => {
         this.plugin.settings.makeLinksClickable = value;
         await this.plugin.saveSettings();
@@ -6495,7 +5466,7 @@ var SpaceCommandSettingTab = class extends import_obsidian13.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian13.Setting(containerEl).setName("Focus list limit").setDesc("Maximum number of projects to show in sidebar and {{focus-list}}").addText(
+    new import_obsidian13.Setting(containerEl).setName("Focus list limit").setDesc("Maximum number of projects to show in the sidebar").addText(
       (text) => text.setPlaceholder("5").setValue(String(this.plugin.settings.focusListLimit)).onChange(async (value) => {
         const num = parseInt(value);
         if (!isNaN(num) && num > 0) {

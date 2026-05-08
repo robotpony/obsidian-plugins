@@ -23,10 +23,10 @@ Space Command is a task management plugin that scans markdown files for tagged i
         ▼                        ▼
 ┌───────────────────────────────────────────────────────────────────┐
 │                        Rendering Layer                            │
-│  ┌──────────────┐  ┌──────────────┐  ┌────────────────────────┐  │
-│  │EmbedRenderer │  │ SidebarView  │  │ CodeBlockProcessor     │  │
-│  │({{focus-*}}) │  │ (Sidebar UI) │  │ (```focus-* blocks)    │  │
-│  └──────────────┘  └──────────────┘  └────────────────────────┘  │
+│  ┌──────────────────────────────────────────────────────────────┐ │
+│  │                      SidebarView                             │ │
+│  │   TODOs / Ideas / Snoozed tabs · tag cloud · focus mode      │ │
+│  └──────────────────────────────────────────────────────────────┘ │
 └───────────────────────────────────────────────────────────────────┘
 ```
 
@@ -71,16 +71,6 @@ Groups TODOs by project tags:
 - Falls back to inferred file tags when no explicit tags exist
 - Calculates per-project statistics (count, last activity, highest priority)
 - Sorts projects by activity score
-
-### EmbedRenderer (`src/EmbedRenderer.ts`)
-
-Renders interactive TODO lists in markdown embeds:
-
-- Parses `{{focus-todos}}`, `{{focus-ideas}}`, `{{focus-list}}` syntax
-- Supports filter syntax: `path:`, `tags:`, `limit:`, `todone:`
-- Renders checkboxes with click handlers
-- Listens to `todos-updated` for automatic refresh
-- Uses DOM methods (not innerHTML) for XSS safety
 
 ### SidebarView (`src/SidebarView.ts`)
 
@@ -266,19 +256,6 @@ Projects track two priority-related fields:
 
 `hasFocusItems` is used as a sort tier — projects with focus items sort first.
 
-## Filter Syntax
-
-Embeds support filtering:
-
-```markdown
-{{focus-todos | path:projects/ tags:#api,#urgent limit:10 todone:show}}
-```
-
-- `path:` - Match files in path
-- `tags:` - Match items with ALL specified tags (AND logic)
-- `limit:` - Maximum items to display
-- `todone:` - Show or hide completed items
-
 ## Event System
 
 The scanner extends Obsidian's `Events` class and acts as the event bus:
@@ -291,7 +268,7 @@ this.trigger('todos-updated');
 scanner.on('todos-updated', () => this.render());
 ```
 
-This decouples components—the scanner doesn't know about the sidebar, and the sidebar doesn't know about embeds.
+This decouples components — the scanner doesn't know about the sidebar, and consumers don't know about each other.
 
 ## Editor Suggestions
 
@@ -306,18 +283,23 @@ Two suggester classes provide inline editing assistance:
 space-command/
 ├── main.ts              # Plugin entry, initialization
 ├── src/
-│   ├── TodoScanner.ts   # Vault scanning & caching
-│   ├── TodoProcessor.ts # File mutations
-│   ├── ProjectManager.ts # Project grouping
-│   ├── EmbedRenderer.ts # Embed rendering
-│   ├── SidebarView.ts   # Sidebar UI
-│   ├── CodeBlockProcessor.ts # Code block rendering
+│   ├── TodoScanner.ts        # Vault scanning & caching
+│   ├── TodoProcessor.ts      # File mutations
+│   ├── ProjectManager.ts     # Project grouping
+│   ├── SidebarView.ts        # Sidebar UI
 │   ├── ContextMenuHandler.ts # Right-click menus
-│   ├── FilterParser.ts  # Filter syntax parsing
 │   ├── SlashCommandSuggest.ts # / commands
-│   ├── DateSuggest.ts   # @ date suggestions
-│   ├── SlackConverter.ts # Markdown → Slack mrkdwn
-│   └── types.ts         # Interfaces & types
+│   ├── AtSuggest.ts          # @ mentions and dates
+│   ├── DateSuggest.ts        # Date helpers
+│   ├── TeamManager.ts        # Team file parsing
+│   ├── MoveTargetModal.ts    # File picker
+│   ├── TabLockManager.ts     # Tab lock buttons
+│   ├── HeaderSortExtension.ts      # CodeMirror extension
+│   ├── HeaderChecklistExtension.ts # CodeMirror extension
+│   ├── SlackConverter.ts     # Markdown → Slack mrkdwn
+│   ├── NotionConverter.ts    # Markdown → Notion-friendly
+│   ├── utils.ts              # Shared helpers
+│   └── types.ts              # Interfaces & types
 ├── styles.css           # Plugin styles
 └── manifest.json        # Obsidian plugin manifest
 ```
@@ -349,7 +331,6 @@ Header TODOs (e.g., `## Task Name #todo`) can have child list items. Completing 
 The architecture supports extension through:
 
 1. **New item types**: Add to scanner parsing, processor methods, and UI rendering
-2. **Custom filters**: Extend FilterParser
-3. **New slash commands**: Add to SlashCommandSuggest
-4. **Context menu actions**: Extend ContextMenuHandler
-5. **New embed types**: Create renderers following EmbedRenderer patterns
+2. **New slash commands**: Add to `SlashCommandSuggest`
+3. **Context menu actions**: Extend `ContextMenuHandler`
+4. **New sidebar tabs or sections**: Add render methods to `SidebarView`

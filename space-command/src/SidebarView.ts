@@ -2002,50 +2002,6 @@ export class TodoSidebarView extends ItemView {
 
       menu.addItem((item) => {
         item
-          .setTitle("Embed Syntax")
-          .setIcon("copy");
-
-        const submenu = (item as any).setSubmenu();
-        submenu.addItem((subItem: any) => {
-          subItem
-            .setTitle("IDEA code block")
-            .setIcon("code")
-            .onClick(() => {
-              navigator.clipboard.writeText("```focus-ideas\n```");
-              showNotice("Copied IDEA code block syntax");
-            });
-        });
-        submenu.addItem((subItem: any) => {
-          subItem
-            .setTitle("IDEA inline")
-            .setIcon("brackets")
-            .onClick(() => {
-              navigator.clipboard.writeText("{{focus-ideas}}");
-              showNotice("Copied IDEA inline syntax");
-            });
-        });
-        submenu.addItem((subItem: any) => {
-          subItem
-            .setTitle("TODO code block")
-            .setIcon("code")
-            .onClick(() => {
-              navigator.clipboard.writeText("```focus-todos\n```");
-              showNotice("Copied TODO code block syntax");
-            });
-        });
-        submenu.addItem((subItem: any) => {
-          subItem
-            .setTitle("TODO inline")
-            .setIcon("brackets")
-            .onClick(() => {
-              navigator.clipboard.writeText("{{focus-todos}}");
-              showNotice("Copied TODO inline syntax");
-            });
-        });
-      });
-
-      menu.addItem((item) => {
-        item
           .setTitle("Stats")
           .setIcon("bar-chart-2")
           .onClick(() => this.onShowStats());

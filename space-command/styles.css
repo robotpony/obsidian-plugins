@@ -520,135 +520,6 @@
   cursor: default;
 }
 
-/* Embed Styles */
-.space-command-embed {
-  margin: 10px 0;
-  padding: 10px;
-  background-color: var(--background-secondary);
-  border-radius: 4px;
-  border-left: 3px solid var(--interactive-accent);
-}
-
-.space-command-embed ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex !important;
-  flex-direction: column !important;
-}
-
-.space-command-embed .task-list-item {
-  display: flex;
-  align-items: flex-start;
-  padding: 4px 0;
-  gap: 8px;
-}
-
-.space-command-embed .task-list-item.todo-header-with-children {
-  margin-inline-start: .5ch;
-}
-
-.space-command-embed .task-list-item-checkbox {
-  margin-top: 2px;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.space-command-embed .todo-text {
-  flex: 1;
-  color: var(--text-normal);
-  line-height: 1.4;
-}
-
-.space-command-embed .todo-source-link {
-  color: var(--text-accent);
-  text-decoration: none;
-  font-weight: bold;
-  flex-shrink: 0;
-}
-
-.space-command-embed .todo-source-link:hover {
-  color: var(--text-accent-hover);
-  text-decoration: underline;
-}
-
-.space-command-empty {
-  color: var(--text-muted);
-  font-style: italic;
-  padding: 5px 0;
-}
-
-/* Idea embed styles - match todo embed layout */
-.space-command-embed .idea-item {
-  display: flex;
-  align-items: flex-start;
-  padding: 4px 0;
-  gap: 8px;
-  margin-left: 0;
-}
-
-.space-command-embed .idea-text {
-  flex: 1;
-  color: var(--text-normal);
-  line-height: 1.4;
-}
-
-.space-command-embed .idea-source-link {
-  color: var(--text-accent);
-  text-decoration: none;
-  font-weight: bold;
-  flex-shrink: 0;
-}
-
-.space-command-embed .idea-source-link:hover {
-  color: var(--text-accent-hover);
-  text-decoration: underline;
-}
-
-/* Idea header with children in embeds */
-.space-command-embed .idea-item.idea-header-with-children {
-  display: block;
-}
-
-/* Principle embed styles - match todo embed layout */
-.space-command-embed .principle-item {
-  display: flex;
-  align-items: flex-start;
-  padding: 4px 0;
-  gap: 8px;
-}
-
-.space-command-embed .principle-text {
-  flex: 1;
-  color: var(--text-normal);
-  line-height: 1.4;
-  font-style: italic;
-}
-
-.space-command-embed .principle-source-link {
-  color: var(--text-accent);
-  text-decoration: none;
-  font-weight: bold;
-  flex-shrink: 0;
-}
-
-.space-command-embed .principle-source-link:hover {
-  color: var(--text-accent-hover);
-  text-decoration: underline;
-}
-
-/* Principle header with children in embeds */
-.space-command-embed .principle-item.principle-header-with-children {
-  display: block;
-}
-
-.space-command-error {
-  color: var(--text-error);
-  padding: 10px;
-  background-color: var(--background-modifier-error);
-  border-radius: 4px;
-  border-left: 3px solid var(--text-error);
-}
 
 /* Tag cloud (replaces the old vertical project list) */
 .projects-section {
@@ -854,9 +725,8 @@
   vertical-align: middle !important;
 }
 
-/* Tag styling for sidebar and embed contexts */
-.space-command-sidebar .tag:not(.project-info-principle-tag),
-.space-command-embed .tag {
+/* Tag styling for sidebar contexts */
+.space-command-sidebar .tag:not(.project-info-principle-tag) {
   font-size: 12px !important;
   font-family: var(--font-monospace) !important;
   opacity: 0.85;
@@ -1132,26 +1002,6 @@
   background-color: color-mix(in srgb, var(--interactive-accent) 25%, transparent);
 }
 
-/* TODONE toggle button in embeds */
-.embed-toggle-todone-btn {
-  padding: 2px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  opacity: 0.4;
-  transition: opacity 0.2s;
-  margin-right: 4px;
-}
-
-.embed-toggle-todone-btn:hover {
-  opacity: 1;
-}
-
-.embed-toggle-todone-btn.active {
-  opacity: 0.7;
-  color: var(--interactive-accent);
-}
-
 /* Focus mode toggle button in sidebar */
 .focus-mode-toggle-btn {
   padding: 2px;
@@ -1179,8 +1029,6 @@
 }
 
 /* Header with children - use block layout so children appear below */
-/* Higher specificity to override flex layouts in both sidebar and embed */
-.space-command-embed .task-list-item.todo-header-with-children,
 .space-command-sidebar .todo-item.todo-header-with-children {
   display: block;
 }
@@ -1262,11 +1110,6 @@
   padding: 0;
 }
 
-/* Embeds: children indented like editor view */
-.space-command-embed .todo-children {
-  padding-left: 1.5em;
-}
-
 /* Child TODO item styling */
 .todo-child {
   opacity: 0.9;
@@ -1326,11 +1169,6 @@
   padding: 0;
 }
 
-/* Embeds: children indented like editor view */
-.space-command-embed .idea-children {
-  padding-left: 1.5em;
-}
-
 /* Child idea item styling */
 .idea-child {
   opacity: 0.9;
@@ -1369,11 +1207,6 @@
 /* Sidebar: children flush with parent (compact layout) */
 .space-command-sidebar .principle-children {
   padding: 0;
-}
-
-/* Embeds: children indented like editor view */
-.space-command-embed .principle-children {
-  padding-left: 1.5em;
 }
 
 /* Child principle item styling */
