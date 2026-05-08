@@ -612,6 +612,17 @@ export class TodoSidebarView extends ItemView {
       this.render();
     });
 
+    // Eye icon — enter immersive Focus Mode. Sits beside the TODOs tab so the
+    // primary action (focus the next thing) lives next to the primary view.
+    // handleFocusEnter snapshots the active tab; exiting restores it, so the
+    // button works from any tab.
+    const focusModeTopBtn = tabNav.createEl("button", {
+      cls: "sidebar-tab-btn focus-mode-toggle-btn",
+      attr: { "aria-label": "Enter focus mode" },
+    });
+    focusModeTopBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+    focusModeTopBtn.addEventListener("click", () => this.handleFocusEnter());
+
     const ideasTab = tabNav.createEl("button", {
       cls: `sidebar-tab-btn ${this.activeTab === 'ideas' ? 'active' : ''}`,
       attr: { "aria-label": "Ideas" },
@@ -665,25 +676,14 @@ export class TodoSidebarView extends ItemView {
   }
 
   private renderIdeasContent(container: HTMLElement): void {
-    // Ideas tab header with focus mode toggle
-    this.renderIdeasHeader(container);
+    // No tab-level header — the tab name already says "IDEAs". Filter pills
+    // surface inside the section that owns the matching items.
 
     // Principles section (grouped like projects)
     this.renderPrinciples(container);
 
     // Active Ideas section
     this.renderActiveIdeas(container);
-  }
-
-  private renderIdeasHeader(container: HTMLElement): void {
-    const header = container.createEl("div", {
-      cls: "todo-section-header ideas-tab-header",
-    });
-
-    const titleSpan = header.createEl("span", { cls: "todo-section-title" });
-    titleSpan.textContent = "Focus";
-
-    this.renderFilterIndicator(header);
   }
 
   private renderSnoozedContent(container: HTMLElement): void {
@@ -722,12 +722,11 @@ export class TodoSidebarView extends ItemView {
 
     const section = container.createEl("div", { cls: "snoozed-todos-section" });
 
+    // Header carries the filter pill only — no title (snoozed-tab name is
+    // enough; checkbox styling distinguishes these from snoozed ideas below).
     const header = section.createEl("div", {
       cls: "todo-section-header snoozed-todos-header",
     });
-
-    const titleSpan = header.createEl("span", { cls: "todo-section-title" });
-    titleSpan.textContent = "Snoozed TODOs";
     this.renderFilterIndicator(header);
 
     if (todos.length === 0) {
@@ -766,12 +765,10 @@ export class TodoSidebarView extends ItemView {
 
     const section = container.createEl("div", { cls: "snoozed-ideas-section" });
 
+    // Header carries the filter pill only — no title.
     const header = section.createEl("div", {
       cls: "todo-section-header snoozed-ideas-header",
     });
-
-    const titleSpan = header.createEl("span", { cls: "todo-section-title" });
-    titleSpan.textContent = "Snoozed Ideas";
     this.renderFilterIndicator(header);
 
     if (ideas.length === 0) {
@@ -964,22 +961,9 @@ export class TodoSidebarView extends ItemView {
 
     const section = container.createEl("div", { cls: "projects-section tag-cloud-section" });
 
-    const header = section.createEl("div", {
-      cls: "todo-section-header projects-header",
-    });
-
-    const titleSpan = header.createEl("span", { cls: "todo-section-title" });
-    titleSpan.textContent = "Focus";
-
-    // Eye icon — single click enters immersive Focus Mode.
-    const focusModeBtn = header.createEl("button", {
-      cls: "clickable-icon focus-mode-toggle-btn",
-      attr: { "aria-label": "Enter focus mode" },
-    });
-    focusModeBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
-    focusModeBtn.addEventListener("click", () => this.handleFocusEnter());
-
-    this.renderFilterIndicator(header);
+    // No section header here. The eye icon (focus mode) lives in the top tab
+    // nav now; the active-tag filter pill renders inside the TODO list header
+    // when set, so this section is just the tag cloud.
 
     // Build the cloud entries. #focus and #p0 are pinned first when in use;
     // ProjectManager already filters those out of its results, so adding them
@@ -1377,9 +1361,10 @@ export class TodoSidebarView extends ItemView {
 
     const section = container.createEl("div", { cls: "todo-section" });
 
+    // No "TODO" title — the tab is already labelled. Render the header row
+    // only when there's something to put in it (assignee filter or active
+    // tag filter). CSS hides empty headers as a safety net.
     const header = section.createEl("div", { cls: "todo-section-header" });
-    const titleSpan = header.createEl("span", { cls: "todo-section-title" });
-    titleSpan.textContent = "TODO";
     this.renderAssigneeFilter(header);
     this.renderFilterIndicator(header);
 
@@ -1672,12 +1657,11 @@ export class TodoSidebarView extends ItemView {
 
     const section = container.createEl("div", { cls: "principles-section" });
 
+    // Header carries the filter pill only — no title (principles are
+    // visually distinct from ideas below: no checkboxes, different prefix).
     const header = section.createEl("div", {
       cls: "todo-section-header principles-header",
     });
-
-    const titleSpan = header.createEl("span", { cls: "todo-section-title" });
-    titleSpan.textContent = "Principles";
     this.renderFilterIndicator(header);
 
     if (principles.length === 0) {
@@ -1727,9 +1711,9 @@ export class TodoSidebarView extends ItemView {
 
     const section = container.createEl("div", { cls: "ideas-section" });
 
+    // Header carries the filter pill only — no title (the IDEAs tab name
+    // already labels what's here).
     const header = section.createEl("div", { cls: "todo-section-header" });
-    const titleSpan = header.createEl("span", { cls: "todo-section-title" });
-    titleSpan.textContent = "Ideas";
     this.renderFilterIndicator(header);
 
     if (ideas.length === 0) {

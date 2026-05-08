@@ -2,6 +2,29 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.23.2] - 2026-05-08
+
+### Changed — Polish: Ideas and Snoozed tabs match the slimmed TODO tab
+
+Carrying the 0.23.1 cleanup across the rest of the sidebar. The Ideas tab had a redundant "Focus" header at the top (a leftover from when the eye icon lived there) and section labels that were duplicating the tab name. Snoozed had the same pattern. The tab name already says what's there; the rendered items differentiate themselves.
+
+- Ideas tab: removed the dead "Focus" header at the top and the "Principles" / "Ideas" section titles. Principles still read as a separate section because they render without checkboxes.
+- Snoozed tab: removed the "Snoozed TODOs" / "Snoozed Ideas" section titles. The two lists stay distinguishable by their existing item styling.
+- All section headers now collapse via the `:empty` rule when no filter pill is active — same pattern the TODO tab uses.
+- Added `margin-top: 1em` to the first content section in any tab so the rhythm matches the TODO tab's tag-cloud spacing.
+
+## [0.23.1] - 2026-05-08
+
+### Changed — Polish: tighter sidebar header, focus icon promoted to the top
+
+The "Focus" and "TODO" section labels were doing redundant work. The tab bar already says which view you're on, and the tag cloud is self-evident. Cutting them lets the content lead.
+
+- Eye icon (enter focus mode) moves up next to the TODOs check icon in the tab nav. Available from any tab — `handleFocusEnter` already preserves the active tab so exit lands you back where you started.
+- Removed the "Focus" heading above the tag cloud.
+- Removed the "TODO" heading above the active TODOs list. Filter pills (assignee, active tag) still render in their old slot when present; otherwise the row collapses (`:empty` selector).
+- Tag-cloud section gets `1em` of vertical breathing room to replace what the heading used to provide.
+- Focus-mode button restyled for its new home: matches tab-button padding, slightly quieter at rest (`opacity: 0.45`), brightens on hover.
+
 ## [0.23.0] - 2026-05-08
 
 ### Fixed — Unchecking a list item now removes `#todone @date`

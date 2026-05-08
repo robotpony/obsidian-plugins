@@ -202,6 +202,13 @@
   padding: 0 8px 0 4px; /* Right padding makes room for scrollbar */
 }
 
+/* Give the first content section in any tab the same breathing room the tag
+   cloud uses on the TODOs tab — keeps the rhythm consistent now that section
+   headings are gone. */
+.sidebar-content > div:first-child {
+  margin-top: 1em;
+}
+
 /* Scrollbar styling - hugs right edge, doesn't overlap content */
 .space-command-sidebar ::-webkit-scrollbar {
   width: 8px;
@@ -328,6 +335,12 @@
   margin-bottom: 10px;
   border-bottom: 1px solid var(--background-modifier-border);
   user-select: none;
+}
+
+/* When the header has no children (no title, no filters), collapse it so it
+   doesn't leave a stray border-bottom and padding above the list. */
+.todo-section-header:empty {
+  display: none;
 }
 
 .todone-header {
@@ -523,7 +536,8 @@
 
 /* Tag cloud (replaces the old vertical project list) */
 .projects-section {
-  margin-bottom: 20px;
+  margin-top: 1em;
+  margin-bottom: 1em;
 }
 
 .tag-cloud {
@@ -1002,15 +1016,17 @@
   background-color: color-mix(in srgb, var(--interactive-accent) 25%, transparent);
 }
 
-/* Focus mode toggle button in sidebar */
+/* Focus mode toggle button — lives in the top tab nav, sits beside the
+   TODOs tab. Quieter at rest than tab buttons (it's an action, not a tab),
+   brightens on hover to match the tab affordance. */
 .focus-mode-toggle-btn {
-  padding: 2px;
+  padding: 4px;
   border: none;
   background: transparent;
   cursor: pointer;
-  opacity: 0.4;
-  transition: opacity 0.2s;
-  margin-left: 6px;
+  opacity: 0.45;
+  transition: opacity 0.15s ease;
+  color: var(--text-normal);
 }
 
 .focus-mode-toggle-btn:hover {
@@ -1018,8 +1034,16 @@
 }
 
 .focus-mode-toggle-btn.active {
-  opacity: 0.7;
+  opacity: 0.85;
   color: var(--interactive-accent);
+}
+
+/* When inside the tab nav, neutralize Obsidian's default <button> chrome the
+   same way .sidebar-tab-btn does, so it sits flush with the tabs. */
+.sidebar-tab-nav .focus-mode-toggle-btn {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
 /* Header TODO styling */

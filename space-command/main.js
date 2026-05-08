@@ -3259,6 +3259,12 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       this.activeTab = "todos";
       this.render();
     });
+    const focusModeTopBtn = tabNav.createEl("button", {
+      cls: "sidebar-tab-btn focus-mode-toggle-btn",
+      attr: { "aria-label": "Enter focus mode" }
+    });
+    focusModeTopBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+    focusModeTopBtn.addEventListener("click", () => this.handleFocusEnter());
     const ideasTab = tabNav.createEl("button", {
       cls: `sidebar-tab-btn ${this.activeTab === "ideas" ? "active" : ""}`,
       attr: { "aria-label": "Ideas" }
@@ -3297,17 +3303,8 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     this.renderSummary(container);
   }
   renderIdeasContent(container) {
-    this.renderIdeasHeader(container);
     this.renderPrinciples(container);
     this.renderActiveIdeas(container);
-  }
-  renderIdeasHeader(container) {
-    const header = container.createEl("div", {
-      cls: "todo-section-header ideas-tab-header"
-    });
-    const titleSpan = header.createEl("span", { cls: "todo-section-title" });
-    titleSpan.textContent = "Focus";
-    this.renderFilterIndicator(header);
   }
   renderSnoozedContent(container) {
     this.renderSnoozedTodos(container);
@@ -3328,8 +3325,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     const header = section.createEl("div", {
       cls: "todo-section-header snoozed-todos-header"
     });
-    const titleSpan = header.createEl("span", { cls: "todo-section-title" });
-    titleSpan.textContent = "Snoozed TODOs";
     this.renderFilterIndicator(header);
     if (todos.length === 0) {
       section.createEl("div", {
@@ -3355,8 +3350,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     const header = section.createEl("div", {
       cls: "todo-section-header snoozed-ideas-header"
     });
-    const titleSpan = header.createEl("span", { cls: "todo-section-title" });
-    titleSpan.textContent = "Snoozed Ideas";
     this.renderFilterIndicator(header);
     if (ideas.length === 0) {
       section.createEl("div", {
@@ -3526,18 +3519,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     var _a, _b;
     const projects = this.projectManager.getProjects();
     const section = container.createEl("div", { cls: "projects-section tag-cloud-section" });
-    const header = section.createEl("div", {
-      cls: "todo-section-header projects-header"
-    });
-    const titleSpan = header.createEl("span", { cls: "todo-section-title" });
-    titleSpan.textContent = "Focus";
-    const focusModeBtn = header.createEl("button", {
-      cls: "clickable-icon focus-mode-toggle-btn",
-      attr: { "aria-label": "Enter focus mode" }
-    });
-    focusModeBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
-    focusModeBtn.addEventListener("click", () => this.handleFocusEnter());
-    this.renderFilterIndicator(header);
     const entries = [];
     const todos = this.scanner.getTodos();
     const activeTodos = todos.filter(
@@ -3825,8 +3806,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     }
     const section = container.createEl("div", { cls: "todo-section" });
     const header = section.createEl("div", { cls: "todo-section-header" });
-    const titleSpan = header.createEl("span", { cls: "todo-section-title" });
-    titleSpan.textContent = "TODO";
     this.renderAssigneeFilter(header);
     this.renderFilterIndicator(header);
     if (totalCount === 0) {
@@ -4076,8 +4055,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     const header = section.createEl("div", {
       cls: "todo-section-header principles-header"
     });
-    const titleSpan = header.createEl("span", { cls: "todo-section-title" });
-    titleSpan.textContent = "Principles";
     this.renderFilterIndicator(header);
     if (principles.length === 0) {
       const emptyText = this.activeTagFilter ? `No principles matching ${this.activeTagFilter}` : "No principles yet";
@@ -4106,8 +4083,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     ideas = this.sortTodosByPriority(ideas, allIdeasForChildLookup);
     const section = container.createEl("div", { cls: "ideas-section" });
     const header = section.createEl("div", { cls: "todo-section-header" });
-    const titleSpan = header.createEl("span", { cls: "todo-section-title" });
-    titleSpan.textContent = "Ideas";
     this.renderFilterIndicator(header);
     if (ideas.length === 0) {
       const emptyText = this.activeTagFilter ? `No ideas matching ${this.activeTagFilter}` : "No ideas yet";

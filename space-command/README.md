@@ -52,7 +52,7 @@ Right-click any TODO row for quick actions: Focus, Later, Snooze, Copy, Move to.
 
 ## Focus mode
 
-Click the eye icon in the Focus section header to enter immersive Focus Mode. The sidebar replaces its content with a single focus card — the source heading with a link icon, a checkbox beside the task, faded tag chiclets, and a friendly date.
+Click the eye icon next to the TODOs tab to enter immersive Focus Mode. The sidebar replaces its content with a single focus card — the source heading with a link icon, a checkbox beside the task, faded tag chiclets, and a friendly date.
 
 - **Complete** finishes the task (or just check the box)
 - **Skip** rotates the current item to the back of the queue
