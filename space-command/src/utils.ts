@@ -582,6 +582,41 @@ export function removeIdeaTag(text: string): string {
   return text.replace(/#idea(?:s|tion)?\b\s*/, "").trim();
 }
 
+/**
+ * Tags that the tag-cloud excludes — they're lifecycle, type, or structural
+ * markers, not project labels. ProjectManager.getProjects uses the same set
+ * for the TODOs cloud; this helper lets the Ideas/Snoozed clouds match.
+ *
+ * Returns a `tag → count` map sorted-insertion-order doesn't matter here;
+ * callers sort by count descending.
+ */
+export function tallyProjectTags(
+  items: Array<{ tags: string[] }>,
+  priorityTags: string[]
+): Map<string, number> {
+  const excluded = new Set<string>([
+    "#todo", "#todos", "#todone", "#todones",
+    "#idea", "#ideas", "#ideation",
+    "#principle", "#principles",
+    "#future", "#snooze", "#snoozed",
+    "#focus", "#today",
+    "#moved",
+    ...priorityTags,
+  ]);
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    // De-dupe within a single item so a line with the same tag twice doesn't
+    // double-count — extractTags can return duplicates for `#tag #tag`.
+    const seen = new Set<string>();
+    for (const tag of item.tags) {
+      if (excluded.has(tag) || seen.has(tag)) continue;
+      seen.add(tag);
+      counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    }
+  }
+  return counts;
+}
+
 export function replaceIdeaWithTodo(text: string): string {
   return text.replace(/#idea(?:s|tion)?\b/, "#todo");
 }

@@ -5,7 +5,7 @@ import { ProjectManager } from "./ProjectManager";
 import { TeamManager } from "./TeamManager";
 import { TodoItem, ProjectInfo, ItemRenderConfig, FocusQueueState } from "./types";
 import { ContextMenuHandler } from "./ContextMenuHandler";
-import { getPriorityValue, compareTodoItems, compareWithEffectivePriority, hasTag, openFileAtLine, extractMentions, resolveMentions, resolveEffectiveMentions, showNotice, getTagColourInfo, extractCompletionDate, buildFocusQueue, getItemDate } from "./utils";
+import { getPriorityValue, compareTodoItems, compareWithEffectivePriority, hasTag, openFileAtLine, extractMentions, resolveMentions, resolveEffectiveMentions, showNotice, getTagColourInfo, extractCompletionDate, buildFocusQueue, getItemDate, tallyProjectTags } from "./utils";
 
 export const VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
 
@@ -36,6 +36,7 @@ export class TodoSidebarView extends ItemView {
   private filterFadeTimer: number | null = null;
   private teamManager: TeamManager;
   private defaultAssignee: string;
+  private priorityTags: string[];
   // Immersive focus mode state.
   private focusQueueLimit: number;
   private focusModeActive: boolean = false;
@@ -81,6 +82,7 @@ export class TodoSidebarView extends ItemView {
     this.onShowStats = onShowStats;
     this.teamManager = teamManager ?? new TeamManager(this.app, "team.md");
     this.defaultAssignee = defaultAssignee;
+    this.priorityTags = priorityTags;
     this.focusQueueLimit = focusQueueLimit;
     this.focusModeActive = focusModeActive;
     this.setFocusModeActive = setFocusModeActive;
@@ -671,10 +673,35 @@ export class TodoSidebarView extends ItemView {
     // surface inside the section that owns the matching items.
     // Principles are still scanned and surface in the project-info popup,
     // but they no longer get their own section here.
+
+    // Tag cloud built from active (non-snoozed) ideas. Clicking a pill
+    // applies activeTagFilter, which renderActiveIdeas already respects.
+    const activeIdeas = this.scanner.getIdeas().filter(i =>
+      !i.tags.includes("#future") &&
+      !i.tags.includes("#snooze") &&
+      !i.tags.includes("#snoozed")
+    );
+    this.renderSimpleTagCloud(container, activeIdeas);
+
     this.renderActiveIdeas(container);
   }
 
   private renderSnoozedContent(container: HTMLElement): void {
+    // Tag cloud at top, built from all snoozed items (todos + ideas combined,
+    // since both lists render under it). The same activeTagFilter feeds
+    // renderSnoozedTodos and renderSnoozedIdeas.
+    const snoozedTodos = this.scanner.getTodos().filter(t =>
+      t.tags.includes("#future") ||
+      t.tags.includes("#snooze") ||
+      t.tags.includes("#snoozed")
+    );
+    const snoozedIdeas = this.scanner.getIdeas().filter(i =>
+      i.tags.includes("#future") ||
+      i.tags.includes("#snooze") ||
+      i.tags.includes("#snoozed")
+    );
+    this.renderSimpleTagCloud(container, [...snoozedTodos, ...snoozedIdeas]);
+
     // Snoozed TODOs section
     this.renderSnoozedTodos(container);
 
@@ -1027,6 +1054,45 @@ export class TodoSidebarView extends ItemView {
     }
   }
 
+  /**
+   * Lightweight tag cloud for tabs without project metadata (Ideas, Snoozed).
+   * Builds entries from the items' own tags using the same exclusion rules
+   * `ProjectManager` uses for the TODOs cloud. Pills route through the same
+   * `setTagFilterWithCrossfade` flow, so filtering on these tabs feels and
+   * persists identically.
+   *
+   * Renders nothing (not even an empty-state message) when there are no
+   * project-style tags to show — Ideas and Snoozed lists may legitimately
+   * contain only untagged entries.
+   */
+  private renderSimpleTagCloud(container: HTMLElement, items: TodoItem[]): void {
+    const counts = tallyProjectTags(items, this.priorityTags);
+    if (counts.size === 0) return;
+
+    const entries = Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([tag, count]) => ({ tag, count }));
+
+    const section = container.createEl("div", { cls: "projects-section tag-cloud-section" });
+
+    const TAG_CLOUD_CAP = 15;
+    const totalCount = entries.length;
+    const visible = entries.slice(0, TAG_CLOUD_CAP);
+
+    const cloud = section.createEl("div", { cls: "tag-cloud" });
+    for (const entry of visible) {
+      this.renderTagCloudPill(cloud, entry.tag, null, false, entry.count);
+    }
+
+    if (totalCount > visible.length) {
+      const more = section.createEl("div", {
+        cls: "todo-more-indicator",
+        text: `+${totalCount - visible.length} more`,
+      });
+      more.setAttribute("title", `Showing ${visible.length} of ${totalCount} tags`);
+    }
+  }
+
   private renderTagCloudPill(
     container: HTMLElement,
     tag: string,
@@ -1048,6 +1114,8 @@ export class TodoSidebarView extends ItemView {
 
     // Tooltip surfaces both numbers when they differ so the user knows the
     // pill represents a curated active subset, not the full historical count.
+    // For non-project clouds (Ideas, Snoozed), `activeCount` is the only number
+    // we have — show it as a plain item count.
     let title = tag;
     if (project) {
       const total = project.count;
@@ -1055,6 +1123,8 @@ export class TodoSidebarView extends ItemView {
       title = active === total
         ? `${total} item${total === 1 ? "" : "s"}`
         : `${active} active / ${total} total`;
+    } else if (activeCount !== undefined) {
+      title = `${activeCount} item${activeCount === 1 ? "" : "s"}`;
     }
 
     const pill = container.createEl("button", {

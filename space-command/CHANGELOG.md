@@ -2,6 +2,20 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.25.0] - 2026-05-08
+
+### Added — Tag-cloud filter on Ideas and Snoozed tabs
+
+The TODOs tab has had the click-a-pill-to-filter tag cloud since the early days. The Ideas and Snoozed tabs were stuck filtering only via the in-document tag clicks or the assignee dropdown. This brings the cloud to both.
+
+- **Ideas tab**: tag cloud built from active (non-snoozed) `#idea` items. Click a pill to filter the list below.
+- **Snoozed tab**: tag cloud built from all snoozed items (TODOs and Ideas combined). Filter applies to both lists at once.
+- The `activeTagFilter` state is shared across tabs, so a filter set on one tab persists when you switch — useful for "what `#api` work is queued vs. snoozed?" jumps. Click the pill again or the filter pill in the section header to clear.
+- Same `TAG_CLOUD_CAP = 15` and `+N more` indicator as the TODOs cloud.
+- Tag-cloud renders nothing on Ideas/Snoozed when there are no project tags — those tabs may legitimately contain only untagged entries.
+
+Implementation note: extracted `tallyProjectTags(items, priorityTags)` into `utils.ts` (covered by 8 new unit tests) and reused the existing `renderTagCloudPill` in a lightweight `renderSimpleTagCloud` helper.
+
 ## [0.24.0] - 2026-05-08
 
 ### Removed — Principles section in the Ideas tab

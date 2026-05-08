@@ -48,6 +48,8 @@ Items sort by: focus → priority → tag count (more tags = more context = high
 
 Click a tag in the cloud to filter the list. Click again to clear. The cloud only shows tags with at least one active TODO — empty tags are hidden so you can always click and see results. Pinned `#focus` and `#p0` lead the cloud when they're in use.
 
+The Ideas and Snoozed tabs have their own tag clouds built from items in those tabs (no `#focus` / `#p0` pinning — those are TODO concepts). The active filter persists across tabs, so clicking `#api` on TODOs and switching to Snoozed shows you what's queued vs. parked under the same label.
+
 Right-click any TODO row for quick actions: Focus, Later, Snooze, Copy, Move to.
 
 ## Focus mode

@@ -425,6 +425,38 @@ function markCheckboxIncomplete(text) {
 function removeIdeaTag(text) {
   return text.replace(/#idea(?:s|tion)?\b\s*/, "").trim();
 }
+function tallyProjectTags(items, priorityTags) {
+  var _a;
+  const excluded = /* @__PURE__ */ new Set([
+    "#todo",
+    "#todos",
+    "#todone",
+    "#todones",
+    "#idea",
+    "#ideas",
+    "#ideation",
+    "#principle",
+    "#principles",
+    "#future",
+    "#snooze",
+    "#snoozed",
+    "#focus",
+    "#today",
+    "#moved",
+    ...priorityTags
+  ]);
+  const counts = /* @__PURE__ */ new Map();
+  for (const item of items) {
+    const seen = /* @__PURE__ */ new Set();
+    for (const tag of item.tags) {
+      if (excluded.has(tag) || seen.has(tag))
+        continue;
+      seen.add(tag);
+      counts.set(tag, ((_a = counts.get(tag)) != null ? _a : 0) + 1);
+    }
+  }
+  return counts;
+}
 function replaceIdeaWithTodo(text) {
   return text.replace(/#idea(?:s|tion)?\b/, "#todo");
 }
@@ -2860,6 +2892,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     this.onShowStats = onShowStats;
     this.teamManager = teamManager != null ? teamManager : new TeamManager(this.app, "team.md");
     this.defaultAssignee = defaultAssignee;
+    this.priorityTags = priorityTags;
     this.focusQueueLimit = focusQueueLimit;
     this.focusModeActive = focusModeActive;
     this.setFocusModeActive = setFocusModeActive;
@@ -3284,9 +3317,20 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     this.renderSummary(container);
   }
   renderIdeasContent(container) {
+    const activeIdeas = this.scanner.getIdeas().filter(
+      (i) => !i.tags.includes("#future") && !i.tags.includes("#snooze") && !i.tags.includes("#snoozed")
+    );
+    this.renderSimpleTagCloud(container, activeIdeas);
     this.renderActiveIdeas(container);
   }
   renderSnoozedContent(container) {
+    const snoozedTodos = this.scanner.getTodos().filter(
+      (t) => t.tags.includes("#future") || t.tags.includes("#snooze") || t.tags.includes("#snoozed")
+    );
+    const snoozedIdeas = this.scanner.getIdeas().filter(
+      (i) => i.tags.includes("#future") || i.tags.includes("#snooze") || i.tags.includes("#snoozed")
+    );
+    this.renderSimpleTagCloud(container, [...snoozedTodos, ...snoozedIdeas]);
     this.renderSnoozedTodos(container);
     this.renderSnoozedIdeas(container);
   }
@@ -3554,6 +3598,38 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       more.setAttribute("title", `Showing ${visible.length} of ${totalCount} tags`);
     }
   }
+  /**
+   * Lightweight tag cloud for tabs without project metadata (Ideas, Snoozed).
+   * Builds entries from the items' own tags using the same exclusion rules
+   * `ProjectManager` uses for the TODOs cloud. Pills route through the same
+   * `setTagFilterWithCrossfade` flow, so filtering on these tabs feels and
+   * persists identically.
+   *
+   * Renders nothing (not even an empty-state message) when there are no
+   * project-style tags to show — Ideas and Snoozed lists may legitimately
+   * contain only untagged entries.
+   */
+  renderSimpleTagCloud(container, items) {
+    const counts = tallyProjectTags(items, this.priorityTags);
+    if (counts.size === 0)
+      return;
+    const entries = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).map(([tag, count]) => ({ tag, count }));
+    const section = container.createEl("div", { cls: "projects-section tag-cloud-section" });
+    const TAG_CLOUD_CAP = 15;
+    const totalCount = entries.length;
+    const visible = entries.slice(0, TAG_CLOUD_CAP);
+    const cloud = section.createEl("div", { cls: "tag-cloud" });
+    for (const entry of visible) {
+      this.renderTagCloudPill(cloud, entry.tag, null, false, entry.count);
+    }
+    if (totalCount > visible.length) {
+      const more = section.createEl("div", {
+        cls: "todo-more-indicator",
+        text: `+${totalCount - visible.length} more`
+      });
+      more.setAttribute("title", `Showing ${visible.length} of ${totalCount} tags`);
+    }
+  }
   renderTagCloudPill(container, tag, project, pinned, activeCount) {
     const isActiveFilter = this.activeTagFilter === tag;
     const isFocusTag = tag === "#focus" || (project == null ? void 0 : project.hasFocusItems) === true;
@@ -3568,6 +3644,8 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       const total = project.count;
       const active = activeCount != null ? activeCount : total;
       title = active === total ? `${total} item${total === 1 ? "" : "s"}` : `${active} active / ${total} total`;
+    } else if (activeCount !== void 0) {
+      title = `${activeCount} item${activeCount === 1 ? "" : "s"}`;
     }
     const pill = container.createEl("button", {
       cls: classes,
