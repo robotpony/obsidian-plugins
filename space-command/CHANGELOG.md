@@ -2,6 +2,18 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.24.0] - 2026-05-08
+
+### Removed — Principles section in the Ideas tab
+
+The italic-rendered Principles section at the top of the Ideas tab wasn't earning its keep — it read like "notable quotes," didn't behave like one, and crowded out the actual ideas.
+
+- Removed the Principles list rendering, item rendering, render config, and right-click menu (`SidebarView.renderPrinciples`, `renderPrincipleItem`, `principleConfig`, `ContextMenuHandler.showPrincipleMenu`).
+- Removed the related CSS: `.principles-section`, `.principle-list`, `.principle-item`, `.principle-text`, `.principle-link`, `.principle-count`, `.principle-header*`, `.principle-children`, `.principle-child`, `.principle-focus`, and the principle-list filter-fade transitions.
+- README updated: Ideas tab description no longer mentions `#principle`; the Ideas/Principles section notes that principles still surface in the project-info popup and Stats modal.
+
+`#principle` tagging itself is unchanged. Items are still detected and cached; the project-info popup (click the (i) on a project tag) still lists principles for that project, and Stats still counts them.
+
 ## [0.23.2] - 2026-05-08
 
 ### Changed — Polish: Ideas and Snoozed tabs match the slimmed TODO tab

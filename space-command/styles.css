@@ -414,14 +414,12 @@
    from under them. 80ms out / 100ms in — snappy, just takes the edge off
    the otherwise hard re-render. */
 .space-command-sidebar .todo-list,
-.space-command-sidebar .idea-list,
-.space-command-sidebar .principle-list {
+.space-command-sidebar .idea-list {
   transition: opacity 100ms ease;
 }
 
 .space-command-sidebar.sc-filter-fading .todo-list,
-.space-command-sidebar.sc-filter-fading .idea-list,
-.space-command-sidebar.sc-filter-fading .principle-list {
+.space-command-sidebar.sc-filter-fading .idea-list {
   opacity: 0;
   transition-duration: 80ms;
 }
@@ -429,10 +427,8 @@
 @media (prefers-reduced-motion: reduce) {
   .space-command-sidebar .todo-list,
   .space-command-sidebar .idea-list,
-  .space-command-sidebar .principle-list,
   .space-command-sidebar.sc-filter-fading .todo-list,
-  .space-command-sidebar.sc-filter-fading .idea-list,
-  .space-command-sidebar.sc-filter-fading .principle-list {
+  .space-command-sidebar.sc-filter-fading .idea-list {
     transition: none;
     opacity: 1;
   }
@@ -665,47 +661,8 @@
   color: var(--text-accent);
 }
 
-/* Principles section styles */
-.principles-section {
-  margin-bottom: 20px;
-}
-
-.principle-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.principle-item {
-  display: flex;
-  align-items: flex-start;
-  padding: 4px 0;
-  gap: 8px;
-}
-
-.principle-text {
-  flex: 1;
-  color: var(--text-normal);
-  line-height: 1.4;
-  word-wrap: break-word;
-  font-style: italic;
-}
-
-.principle-link {
-  color: var(--text-muted);
-  text-decoration: none;
-  flex-shrink: 0;
-  font-size: inherit;
-  margin-left: 4px;
-}
-
-.principle-link:hover {
-  color: var(--text-accent);
-}
-
-/* Count styling for ideas/principles */
-.idea-count,
-.principle-count {
+/* Count styling for ideas */
+.idea-count {
   opacity: 0.65;
   background-color: var(--background-modifier-border);
   border-radius: 4px;
@@ -713,8 +670,7 @@
   font-size: 0.8em;
 }
 
-.space-command-sidebar .idea-count,
-.space-command-sidebar .principle-count {
+.space-command-sidebar .idea-count {
   background-color: var(--background-primary);
 }
 
@@ -751,15 +707,13 @@
   line-height: 1.3 !important;
 }
 
-/* Focus highlighting for ideas and principles */
-.space-command-sidebar .idea-focus,
-.space-command-sidebar .principle-focus {
+/* Focus highlighting for ideas */
+.space-command-sidebar .idea-focus {
   background-color: color-mix(in srgb, var(--interactive-accent) 15%, transparent);
   border-radius: 4px;
 }
 
-.space-command-sidebar .idea-focus:hover,
-.space-command-sidebar .principle-focus:hover {
+.space-command-sidebar .idea-focus:hover {
   background-color: color-mix(in srgb, var(--interactive-accent) 25%, transparent);
 }
 
@@ -1195,46 +1149,6 @@
 
 /* Child idea item styling */
 .idea-child {
-  opacity: 0.9;
-}
-
-/* Principle header styling */
-.principle-header > .principle-text,
-.principle-header .principle-header-row > .principle-text {
-  font-weight: 600;
-  font-style: normal; /* Remove italic for headers */
-}
-
-/* Principle header with children - use block layout so children appear below */
-.space-command-sidebar .principle-item.principle-header-with-children {
-  display: block;
-}
-
-/* Principle header row (text + count + link) stays as flex */
-.principle-header-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.principle-header-row > .principle-text {
-  flex: 1;
-}
-
-/* Child principle container - base styles */
-.principle-children {
-  list-style: none;
-  margin: 0;
-  font-size: .85em;
-}
-
-/* Sidebar: children flush with parent (compact layout) */
-.space-command-sidebar .principle-children {
-  padding: 0;
-}
-
-/* Child principle item styling */
-.principle-child {
   opacity: 0.9;
 }
 

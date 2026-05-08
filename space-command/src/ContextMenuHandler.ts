@@ -329,22 +329,4 @@ export class ContextMenuHandler {
     menu.showAtMouseEvent(evt);
   }
 
-  /**
-   * Show context menu for a principle item
-   */
-  showPrincipleMenu(evt: MouseEvent, principle: TodoItem): void {
-    const menu = new Menu();
-
-    // Copy - copies the full line text to clipboard
-    menu.addItem((item) => {
-      item
-        .setTitle("Copy")
-        .setIcon("copy")
-        .onClick(async () => {
-          await navigator.clipboard.writeText(principle.text);
-        });
-    });
-
-    menu.showAtMouseEvent(evt);
-  }
 }

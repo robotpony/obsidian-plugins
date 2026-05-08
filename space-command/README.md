@@ -69,7 +69,7 @@ The sidebar has three tabs:
 | Tab     | Shows                                                                                  |
 |---------|----------------------------------------------------------------------------------------|
 | TODOs   | Active (non-snoozed) `#todo` items, grouped by header where applicable. Default tab.   |
-| Ideas   | Active `#idea` / `#ideas` / `#ideation` items + `#principle` references                |
+| Ideas   | Active `#idea` / `#ideas` / `#ideation` items                                          |
 | Snoozed | `#future` / `#snooze` / `#snoozed` TODOs and Ideas — review and unsnooze when ready    |
 
 Below the lists, the **Summary** section shows priority breakdown, completion velocity (today / week / month), top backlogs, and a link to your TODONE log file.
@@ -121,6 +121,8 @@ Capture ideas separately from actionable TODOs:
 | `#principle`                     | A guiding principle (reference only)          |
 
 Click an idea's checkbox to dismiss it. Right-click to promote it to a TODO.
+
+`#principle` items aren't surfaced in the Ideas tab anymore — they appear in the project-info popup for any project they're tagged with, and the Stats modal still counts them.
 
 ## Moving TODOs between files
 

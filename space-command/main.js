@@ -2800,18 +2800,6 @@ var ContextMenuHandler = class {
     });
     menu.showAtMouseEvent(evt);
   }
-  /**
-   * Show context menu for a principle item
-   */
-  showPrincipleMenu(evt, principle) {
-    const menu = new import_obsidian11.Menu();
-    menu.addItem((item) => {
-      item.setTitle("Copy").setIcon("copy").onClick(async () => {
-        await navigator.clipboard.writeText(principle.text);
-      });
-    });
-    menu.showAtMouseEvent(evt);
-  }
 };
 
 // src/SidebarView.ts
@@ -2860,13 +2848,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       showCheckbox: true,
       onComplete: (item) => this.processor.completeIdea(item),
       onContextMenu: (e, item) => this.contextMenuHandler.showIdeaMenu(e, item, () => this.render())
-    };
-    this.principleConfig = {
-      type: "principle",
-      classPrefix: "principle",
-      tagToStrip: /#principles?\b/g,
-      showCheckbox: false,
-      onContextMenu: (e, item) => this.contextMenuHandler.showPrincipleMenu(e, item)
     };
     this.scanner = scanner;
     this.processor = processor;
@@ -3303,7 +3284,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     this.renderSummary(container);
   }
   renderIdeasContent(container) {
-    this.renderPrinciples(container);
     this.renderActiveIdeas(container);
   }
   renderSnoozedContent(container) {
@@ -4046,31 +4026,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
         valEl.addClass("summary-backlog-warn");
       }
     }
-  }
-  renderPrinciples(container) {
-    let principles = this.scanner.getPrinciples();
-    principles = principles.filter((p) => p.parentLineNumber === void 0);
-    principles = this.filterByActiveTag(principles, this.scanner.getPrinciples());
-    const section = container.createEl("div", { cls: "principles-section" });
-    const header = section.createEl("div", {
-      cls: "todo-section-header principles-header"
-    });
-    this.renderFilterIndicator(header);
-    if (principles.length === 0) {
-      const emptyText = this.activeTagFilter ? `No principles matching ${this.activeTagFilter}` : "No principles yet";
-      section.createEl("div", {
-        text: emptyText,
-        cls: "todo-empty"
-      });
-      return;
-    }
-    const list = section.createEl("ul", { cls: "principle-list" });
-    for (const principle of principles) {
-      this.renderPrincipleItem(list, principle);
-    }
-  }
-  renderPrincipleItem(list, principle) {
-    this.renderListItem(list, principle, this.principleConfig);
   }
   renderActiveIdeas(container) {
     let ideas = this.scanner.getIdeas();

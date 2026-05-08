@@ -280,15 +280,6 @@ export class TodoSidebarView extends ItemView {
     onContextMenu: (e, item) => this.contextMenuHandler.showIdeaMenu(e, item, () => this.render())
   };
 
-  private readonly principleConfig: ItemRenderConfig = {
-    type: 'principle',
-    classPrefix: 'principle',
-    tagToStrip: /#principles?\b/g,
-    showCheckbox: false,
-    onContextMenu: (e, item) => this.contextMenuHandler.showPrincipleMenu(e, item)
-  };
-
-
   // Unified list item renderer for todos, ideas, and principles
   private renderListItem(
     list: HTMLElement,
@@ -678,11 +669,8 @@ export class TodoSidebarView extends ItemView {
   private renderIdeasContent(container: HTMLElement): void {
     // No tab-level header — the tab name already says "IDEAs". Filter pills
     // surface inside the section that owns the matching items.
-
-    // Principles section (grouped like projects)
-    this.renderPrinciples(container);
-
-    // Active Ideas section
+    // Principles are still scanned and surface in the project-info popup,
+    // but they no longer get their own section here.
     this.renderActiveIdeas(container);
   }
 
@@ -1644,46 +1632,6 @@ export class TodoSidebarView extends ItemView {
         valEl.addClass("summary-backlog-warn");
       }
     }
-  }
-
-  private renderPrinciples(container: HTMLElement): void {
-    let principles = this.scanner.getPrinciples();
-
-    // Filter out child items (they'll be rendered under their parent header)
-    principles = principles.filter(p => p.parentLineNumber === undefined);
-
-    // Apply tag filter if active (keeps headers whose children match)
-    principles = this.filterByActiveTag(principles, this.scanner.getPrinciples());
-
-    const section = container.createEl("div", { cls: "principles-section" });
-
-    // Header carries the filter pill only — no title (principles are
-    // visually distinct from ideas below: no checkboxes, different prefix).
-    const header = section.createEl("div", {
-      cls: "todo-section-header principles-header",
-    });
-    this.renderFilterIndicator(header);
-
-    if (principles.length === 0) {
-      const emptyText = this.activeTagFilter
-        ? `No principles matching ${this.activeTagFilter}`
-        : "No principles yet";
-      section.createEl("div", {
-        text: emptyText,
-        cls: "todo-empty",
-      });
-      return;
-    }
-
-    const list = section.createEl("ul", { cls: "principle-list" });
-
-    for (const principle of principles) {
-      this.renderPrincipleItem(list, principle);
-    }
-  }
-
-  private renderPrincipleItem(list: HTMLElement, principle: TodoItem): void {
-    this.renderListItem(list, principle, this.principleConfig);
   }
 
   private renderActiveIdeas(container: HTMLElement): void {
