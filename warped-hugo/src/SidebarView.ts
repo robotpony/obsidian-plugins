@@ -545,11 +545,6 @@ export class HugoSidebarView extends ItemView {
       });
     }
 
-    // Apply drafts visibility from settings
-    if (!this.settings.showDrafts && this.activeStatusFilter === "all") {
-      items = items.filter((item) => !item.isDraft);
-    }
-
     if (items.length === 0) {
       const emptyDiv = container.createEl("div", {
         cls: "warped-hugo-empty",

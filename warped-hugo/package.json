@@ -1,6 +1,6 @@
 {
   "name": "warped-hugo",
-  "version": "0.6.12",
+  "version": "0.7.0",
   "description": "Warped Hugo - Obsidian plugin for managing Hugo content",
   "main": "main.js",
   "scripts": {

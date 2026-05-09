@@ -2,6 +2,41 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.30.0] - 2026-05-09
+
+### Changed — Settings cleanup
+
+- **"Focus list limit"** renamed to **"Project list limit"** — the previous name implied a connection to Focus Mode.
+- **"Focus queue limit"** and **"Persist focus mode across sessions"** moved from the Projects section into a new **Focus Mode** section.
+- **"Priority tags"** setting removed. It was never changed from the default (`#p0`–`#p4`) and added noise without practical value.
+- **"Date format"** description now shows a concrete example instead of referencing moment.js internals.
+- **"Default projects folder"** description clarified: it says "scanned" not "created".
+
+## [0.29.0] - 2026-05-09
+
+### Fixed — Focus eye icon now shows a visible yellow pill
+
+The previous approach set `color: #ffcc00` on the button, but two `!important` transparent-background rules (one on `.sidebar-tab-btn`, one on `.sidebar-tab-nav .focus-mode-toggle-btn`) were overriding the background, and Obsidian's theme styles can further stomp `color` on SVG icons. The active state now uses a `.sidebar-tab-nav` context selector to beat both conflicts, applying `background-color: #ffcc00 !important` with a dark icon and full opacity — matching the pill appearance of other active tab buttons.
+
+## [0.28.0] - 2026-05-09
+
+### Fixed — Focus mode eye icon is now bright yellow
+
+The eye icon colour was resolving to a muted amber via `var(--color-yellow)`, which some themes define as a desaturated gold. The colour is now hardcoded to `#ffcc00` so it stays vivid across all themes.
+
+## [0.27.0] - 2026-05-09
+
+### Changed — Focus mode eye button stays visible and toggles in place
+
+The sidebar header now renders in full regardless of whether focus mode is on or off. When focus mode is active:
+
+- The eye icon turns amber/yellow and remains clickable — clicking it exits focus mode without moving the mouse.
+- The other tab buttons (TODOs, Ideas, Snoozed) fade to 20% opacity and become inert (`pointer-events: none`).
+- The kebab menu remains accessible for refresh, stats, and about.
+- The focus card exit link at the bottom is preserved as a secondary exit path.
+
+Previously the header was replaced entirely by a slim logo-only header on focus mode entry, which required hunting for the exit link. The font scale (1.4×) that enlarges focus card text is now applied to the content area only, not the whole sidebar, so the header always reads at normal size.
+
 ## [0.26.0] - 2026-05-09
 
 ### Changed — Assignee filter moved into the tag cloud

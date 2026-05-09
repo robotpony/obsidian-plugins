@@ -625,7 +625,7 @@ class WarpedTodoSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Date format")
-      .setDesc("Format for completion dates (using moment.js format)")
+      .setDesc("Format for completion dates. e.g. YYYY-MM-DD → 2026-05-09, D/M/YYYY → 9/5/2026")
       .addText((text) =>
         text
           .setPlaceholder("YYYY-MM-DD")
@@ -645,7 +645,7 @@ class WarpedTodoSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Default projects folder")
-      .setDesc("Folder where project files are created (e.g., projects/)")
+      .setDesc("Folder scanned for project files. TODOs here get automatic project tags if no explicit tag is set (e.g., projects/)")
       .addText((text) =>
         text
           .setPlaceholder("projects/")
@@ -657,8 +657,8 @@ class WarpedTodoSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Focus list limit")
-      .setDesc("Maximum number of projects to show in the sidebar")
+      .setName("Project list limit")
+      .setDesc("Maximum number of projects to show in the tag cloud")
       .addText((text) =>
         text
           .setPlaceholder("5")
@@ -689,32 +689,6 @@ class WarpedTodoSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Focus queue limit")
-      .setDesc("Number of items shown at once in immersive Focus Mode (1–5). Default 1 = single-task focus.")
-      .addSlider((slider) =>
-        slider
-          .setLimits(1, 5, 1)
-          .setValue(this.plugin.settings.focusQueueLimit)
-          .setDynamicTooltip()
-          .onChange(async (value) => {
-            this.plugin.settings.focusQueueLimit = value;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName("Persist focus mode across sessions")
-      .setDesc("When enabled, Focus Mode stays on after closing and reopening Obsidian.")
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.focusModePersist)
-          .onChange(async (value) => {
-            this.plugin.settings.focusModePersist = value;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
       .setName("Exclude folders from projects")
       .setDesc("Comma-separated folders to exclude from inferred project tags (e.g., log, archive)")
       .addText((text) =>
@@ -729,7 +703,6 @@ class WarpedTodoSettingTab extends PluginSettingTab {
 
             this.plugin.settings.excludeFoldersFromProjects = folders;
 
-            // Update ProjectManager with new exclude folders
             this.plugin.projectManager = new ProjectManager(
               this.app,
               this.plugin.scanner,
@@ -742,34 +715,31 @@ class WarpedTodoSettingTab extends PluginSettingTab {
           })
       );
 
-    containerEl.createEl("h3", { text: "Priority Settings" });
+    // Focus Mode section
+    containerEl.createEl("h3", { text: "Focus Mode" });
 
     new Setting(containerEl)
-      .setName("Priority tags")
-      .setDesc("Comma-separated list of priority tags (e.g., #p0, #p1, #p2, #p3, #p4). These tags won't appear in the Projects list.")
-      .addText((text) =>
-        text
-          .setPlaceholder("#p0, #p1, #p2, #p3, #p4")
-          .setValue(this.plugin.settings.priorityTags.join(", "))
+      .setName("Focus queue limit")
+      .setDesc("How many items to show at once in Focus Mode (1–5). 1 means strict single-task focus.")
+      .addSlider((slider) =>
+        slider
+          .setLimits(1, 5, 1)
+          .setValue(this.plugin.settings.focusQueueLimit)
+          .setDynamicTooltip()
           .onChange(async (value) => {
-            // Parse comma-separated tags
-            const tags = value
-              .split(",")
-              .map(tag => tag.trim())
-              .filter(tag => tag.length > 0)
-              .map(tag => tag.startsWith("#") ? tag : `#${tag}`);
+            this.plugin.settings.focusQueueLimit = value;
+            await this.plugin.saveSettings();
+          })
+      );
 
-            this.plugin.settings.priorityTags = tags;
-
-            // Update ProjectManager with new priority tags
-            this.plugin.projectManager = new ProjectManager(
-              this.app,
-              this.plugin.scanner,
-              this.plugin.settings.defaultProjectsFolder,
-              tags,
-              this.plugin.settings.excludeFoldersFromProjects
-            );
-
+    new Setting(containerEl)
+      .setName("Persist focus mode across sessions")
+      .setDesc("When on, Focus Mode stays active after closing and reopening Obsidian.")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.focusModePersist)
+          .onChange(async (value) => {
+            this.plugin.settings.focusModePersist = value;
             await this.plugin.saveSettings();
           })
       );

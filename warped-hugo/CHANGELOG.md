@@ -2,6 +2,12 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.7.0] - 2026-05-09
+
+### Changed — Settings cleanup
+
+- **"Show drafts" toggle removed**. The "Default status filter" dropdown (All / Published / Drafts) already controls draft visibility — the toggle was redundant and the two settings conflicted with each other. Use the status filter to control what appears by default.
+
 ## [0.6.12] - 2026-03-23
 
 ### Removed

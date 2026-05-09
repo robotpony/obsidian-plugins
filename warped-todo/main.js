@@ -3243,63 +3243,80 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     const container = this.containerEl.children[1];
     container.empty();
     container.addClass("warped-todo-sidebar");
-    if (this.focusModeActive) {
-      container.addClass("sidebar-focus-mode-active");
-      this.renderFocusCard(container);
-      return;
-    }
     container.removeClass("sidebar-focus-mode-active");
     const headerDiv = container.createEl("div", { cls: "sidebar-header" });
     const titleEl = headerDiv.createEl("h4", { cls: "sidebar-title" });
     const logoEl = titleEl.createEl("span", { cls: "warped-todo-logo clickable-logo", text: "\u2423\u2318" });
     logoEl.addEventListener("click", () => this.onShowAbout());
-    switch (this.activeTab) {
-      case "todos":
-        titleEl.appendText(" TODOs");
-        break;
-      case "ideas":
-        titleEl.appendText(" IDEAs");
-        break;
-      case "snoozed":
-        titleEl.appendText(" Snoozed");
-        break;
+    if (this.focusModeActive) {
+      titleEl.appendText(" TODOs");
+    } else {
+      switch (this.activeTab) {
+        case "todos":
+          titleEl.appendText(" TODOs");
+          break;
+        case "ideas":
+          titleEl.appendText(" IDEAs");
+          break;
+        case "snoozed":
+          titleEl.appendText(" Snoozed");
+          break;
+      }
     }
     const tabNav = headerDiv.createEl("div", { cls: "sidebar-tab-nav" });
+    const tabDisabledCls = this.focusModeActive ? " focus-mode-disabled" : "";
     const todosTab = tabNav.createEl("button", {
-      cls: `sidebar-tab-btn ${this.activeTab === "todos" ? "active" : ""}`,
+      cls: `sidebar-tab-btn${!this.focusModeActive && this.activeTab === "todos" ? " active" : ""}${tabDisabledCls}`,
       attr: { "aria-label": "TODOs" }
     });
     todosTab.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.5"/><path d="m9 11 3 3L22 4"/></svg>';
-    todosTab.addEventListener("click", () => {
-      this.activeTab = "todos";
-      this.render();
-    });
+    if (!this.focusModeActive) {
+      todosTab.addEventListener("click", () => {
+        this.activeTab = "todos";
+        this.render();
+      });
+    }
     const focusModeTopBtn = tabNav.createEl("button", {
-      cls: "sidebar-tab-btn focus-mode-toggle-btn",
-      attr: { "aria-label": "Enter focus mode" }
+      cls: `sidebar-tab-btn focus-mode-toggle-btn${this.focusModeActive ? " focus-mode-active" : ""}`,
+      attr: { "aria-label": this.focusModeActive ? "Exit focus mode" : "Enter focus mode" }
     });
     focusModeTopBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
-    focusModeTopBtn.addEventListener("click", () => this.handleFocusEnter());
+    focusModeTopBtn.addEventListener("click", () => {
+      if (this.focusModeActive) {
+        this.handleFocusExit();
+      } else {
+        this.handleFocusEnter();
+      }
+    });
     const ideasTab = tabNav.createEl("button", {
-      cls: `sidebar-tab-btn ${this.activeTab === "ideas" ? "active" : ""}`,
+      cls: `sidebar-tab-btn${!this.focusModeActive && this.activeTab === "ideas" ? " active" : ""}${tabDisabledCls}`,
       attr: { "aria-label": "Ideas" }
     });
     ideasTab.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"></path><path d="M10 22h4"></path><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"></path></svg>';
-    ideasTab.addEventListener("click", () => {
-      this.activeTab = "ideas";
-      this.render();
-    });
+    if (!this.focusModeActive) {
+      ideasTab.addEventListener("click", () => {
+        this.activeTab = "ideas";
+        this.render();
+      });
+    }
     const snoozedTab = tabNav.createEl("button", {
-      cls: `sidebar-tab-btn ${this.activeTab === "snoozed" ? "active" : ""}`,
+      cls: `sidebar-tab-btn${!this.focusModeActive && this.activeTab === "snoozed" ? " active" : ""}${tabDisabledCls}`,
       attr: { "aria-label": "Snoozed" }
     });
     snoozedTab.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>';
-    snoozedTab.addEventListener("click", () => {
-      this.activeTab = "snoozed";
-      this.render();
-    });
+    if (!this.focusModeActive) {
+      snoozedTab.addEventListener("click", () => {
+        this.activeTab = "snoozed";
+        this.render();
+      });
+    }
     this.createSidebarMenuButton(headerDiv);
     const content = container.createEl("div", { cls: "sidebar-content" });
+    if (this.focusModeActive) {
+      content.addClass("sidebar-focus-mode-active");
+      this.renderFocusCard(content);
+      return;
+    }
     switch (this.activeTab) {
       case "todos":
         this.renderTodosContent(content);
@@ -4118,12 +4135,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     };
   }
   renderFocusCard(container) {
-    const header = container.createEl("div", { cls: "sidebar-header sidebar-header-focus" });
-    const titleEl = header.createEl("h4", { cls: "sidebar-title" });
-    const logoEl = titleEl.createEl("span", { cls: "warped-todo-logo clickable-logo", text: "\u2423\u2318" });
-    logoEl.addEventListener("click", () => this.onShowAbout());
-    titleEl.appendText(" TODOs");
-    this.createSidebarMenuButton(header);
     if (!this.focusQueue) {
       this.rebuildFocusQueue();
     }
@@ -5440,7 +5451,7 @@ var WarpedTodoSettingTab = class extends import_obsidian13.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian13.Setting(containerEl).setName("Date format").setDesc("Format for completion dates (using moment.js format)").addText(
+    new import_obsidian13.Setting(containerEl).setName("Date format").setDesc("Format for completion dates. e.g. YYYY-MM-DD \u2192 2026-05-09, D/M/YYYY \u2192 9/5/2026").addText(
       (text) => text.setPlaceholder("YYYY-MM-DD").setValue(this.plugin.settings.dateFormat).onChange(async (value) => {
         this.plugin.settings.dateFormat = value;
         this.plugin.processor = new TodoProcessor(
@@ -5451,13 +5462,13 @@ var WarpedTodoSettingTab = class extends import_obsidian13.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: "Projects" });
-    new import_obsidian13.Setting(containerEl).setName("Default projects folder").setDesc("Folder where project files are created (e.g., projects/)").addText(
+    new import_obsidian13.Setting(containerEl).setName("Default projects folder").setDesc("Folder scanned for project files. TODOs here get automatic project tags if no explicit tag is set (e.g., projects/)").addText(
       (text) => text.setPlaceholder("projects/").setValue(this.plugin.settings.defaultProjectsFolder).onChange(async (value) => {
         this.plugin.settings.defaultProjectsFolder = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian13.Setting(containerEl).setName("Focus list limit").setDesc("Maximum number of projects to show in the sidebar").addText(
+    new import_obsidian13.Setting(containerEl).setName("Project list limit").setDesc("Maximum number of projects to show in the tag cloud").addText(
       (text) => text.setPlaceholder("5").setValue(String(this.plugin.settings.focusListLimit)).onChange(async (value) => {
         const num = parseInt(value);
         if (!isNaN(num) && num > 0) {
@@ -5475,18 +5486,6 @@ var WarpedTodoSettingTab = class extends import_obsidian13.PluginSettingTab {
         }
       })
     );
-    new import_obsidian13.Setting(containerEl).setName("Focus queue limit").setDesc("Number of items shown at once in immersive Focus Mode (1\u20135). Default 1 = single-task focus.").addSlider(
-      (slider) => slider.setLimits(1, 5, 1).setValue(this.plugin.settings.focusQueueLimit).setDynamicTooltip().onChange(async (value) => {
-        this.plugin.settings.focusQueueLimit = value;
-        await this.plugin.saveSettings();
-      })
-    );
-    new import_obsidian13.Setting(containerEl).setName("Persist focus mode across sessions").setDesc("When enabled, Focus Mode stays on after closing and reopening Obsidian.").addToggle(
-      (toggle) => toggle.setValue(this.plugin.settings.focusModePersist).onChange(async (value) => {
-        this.plugin.settings.focusModePersist = value;
-        await this.plugin.saveSettings();
-      })
-    );
     new import_obsidian13.Setting(containerEl).setName("Exclude folders from projects").setDesc("Comma-separated folders to exclude from inferred project tags (e.g., log, archive)").addText(
       (text) => text.setPlaceholder("log").setValue(this.plugin.settings.excludeFoldersFromProjects.join(", ")).onChange(async (value) => {
         const folders = value.split(",").map((f) => f.trim()).filter((f) => f.length > 0);
@@ -5501,18 +5500,16 @@ var WarpedTodoSettingTab = class extends import_obsidian13.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    containerEl.createEl("h3", { text: "Priority Settings" });
-    new import_obsidian13.Setting(containerEl).setName("Priority tags").setDesc("Comma-separated list of priority tags (e.g., #p0, #p1, #p2, #p3, #p4). These tags won't appear in the Projects list.").addText(
-      (text) => text.setPlaceholder("#p0, #p1, #p2, #p3, #p4").setValue(this.plugin.settings.priorityTags.join(", ")).onChange(async (value) => {
-        const tags = value.split(",").map((tag) => tag.trim()).filter((tag) => tag.length > 0).map((tag) => tag.startsWith("#") ? tag : `#${tag}`);
-        this.plugin.settings.priorityTags = tags;
-        this.plugin.projectManager = new ProjectManager(
-          this.app,
-          this.plugin.scanner,
-          this.plugin.settings.defaultProjectsFolder,
-          tags,
-          this.plugin.settings.excludeFoldersFromProjects
-        );
+    containerEl.createEl("h3", { text: "Focus Mode" });
+    new import_obsidian13.Setting(containerEl).setName("Focus queue limit").setDesc("How many items to show at once in Focus Mode (1\u20135). 1 means strict single-task focus.").addSlider(
+      (slider) => slider.setLimits(1, 5, 1).setValue(this.plugin.settings.focusQueueLimit).setDynamicTooltip().onChange(async (value) => {
+        this.plugin.settings.focusQueueLimit = value;
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian13.Setting(containerEl).setName("Persist focus mode across sessions").setDesc("When on, Focus Mode stays active after closing and reopening Obsidian.").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.focusModePersist).onChange(async (value) => {
+        this.plugin.settings.focusModePersist = value;
         await this.plugin.saveSettings();
       })
     );

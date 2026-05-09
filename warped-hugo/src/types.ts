@@ -40,7 +40,6 @@ export interface HugoCommandSettings {
   contentPaths: string[];
   trashFolder: string;
   showSidebarByDefault: boolean;
-  showDrafts: boolean;
   defaultSortOrder: "date-desc" | "date-asc" | "title";
   defaultStatusFilter: StatusFilter;
 }
@@ -49,7 +48,6 @@ export const DEFAULT_SETTINGS: HugoCommandSettings = {
   contentPaths: ["content"],
   trashFolder: "_trash",
   showSidebarByDefault: true,
-  showDrafts: true,
   defaultSortOrder: "date-desc",
   defaultStatusFilter: "draft",
 };

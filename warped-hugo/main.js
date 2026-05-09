@@ -1085,9 +1085,6 @@ var HugoSidebarView = class extends import_obsidian5.ItemView {
         return false;
       });
     }
-    if (!this.settings.showDrafts && this.activeStatusFilter === "all") {
-      items = items.filter((item) => !item.isDraft);
-    }
     if (items.length === 0) {
       const emptyDiv = container.createEl("div", {
         cls: "warped-hugo-empty",
@@ -1409,7 +1406,6 @@ var DEFAULT_SETTINGS = {
   contentPaths: ["content"],
   trashFolder: "_trash",
   showSidebarByDefault: true,
-  showDrafts: true,
   defaultSortOrder: "date-desc",
   defaultStatusFilter: "draft"
 };
@@ -1824,12 +1820,6 @@ var HugoCommandSettingTab = class extends import_obsidian7.PluginSettingTab {
     new import_obsidian7.Setting(containerEl).setName("Default sort order").setDesc("How to sort content in the sidebar").addDropdown(
       (dropdown) => dropdown.addOption("date-desc", "Date (newest first)").addOption("date-asc", "Date (oldest first)").addOption("title", "Title (A-Z)").setValue(this.plugin.settings.defaultSortOrder).onChange(async (value) => {
         this.plugin.settings.defaultSortOrder = value;
-        await this.plugin.saveSettings();
-      })
-    );
-    new import_obsidian7.Setting(containerEl).setName("Show drafts").setDesc("Include draft posts in the content list").addToggle(
-      (toggle) => toggle.setValue(this.plugin.settings.showDrafts).onChange(async (value) => {
-        this.plugin.settings.showDrafts = value;
         await this.plugin.saveSettings();
       })
     );

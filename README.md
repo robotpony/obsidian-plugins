@@ -1,4 +1,4 @@
-# Warped
+# Warped Command
 
 A set of Obsidian plugins for writers who work in plain markdown. Tasks stay in your notes. Content stays in your files. Nothing moves until you say so.
 
@@ -25,7 +25,7 @@ Add `#todo` to any line:
 ```markdown
 - [ ] Review the intake form #todo
 - [ ] Update onboarding copy #todo #content
-- [ ] Call Dana about the deadline #todo @dana
+- [ ] Call Dana about the deadline #todo @me
 ```
 
 Open the sidebar (`Cmd+Shift+T`). Your TODOs appear sorted by priority, grouped by project tag. Click a checkbox and the item becomes `#todone @2026-05-09`, logged to your TODONE file.
@@ -51,7 +51,9 @@ in: work/projects.md > Sprint 12
 
 **Done** completes the task and advances the queue. **Skip** rotates it to the back. When your `#focus` items are finished, you can continue with the next highest priority or stop.
 
-The queue is built from `#focus`-tagged items first. If none exist, it falls back to your top-priority TODOs so the card is always useful.
+The header stays in place during focus mode. The eye icon turns amber, and clicking it again exits focus without moving the mouse. Other tab buttons are faded and inert until focus is off.
+
+Your most important TODOs are shown first, based on tags like `#focus` (meaning I want to focus on this task), and priority (like, `#p0`). If no priority is set, it falls back to your top-priority TODOs so the card is always useful.
 
 ### Priority tags
 

@@ -570,90 +570,87 @@ export class TodoSidebarView extends ItemView {
     const container = this.containerEl.children[1] as HTMLElement;
     container.empty();
     container.addClass("warped-todo-sidebar");
-
-    // Phase 2: when immersive Focus Mode is active, replace the entire sidebar
-    // content with the focus card. Tabs, summary, and project list are not
-    // rendered. Exit returns to normal rendering.
-    if (this.focusModeActive) {
-      container.addClass("sidebar-focus-mode-active");
-      this.renderFocusCard(container);
-      return;
-    }
     container.removeClass("sidebar-focus-mode-active");
 
-    // Header with buttons
+    // Header — always rendered in full so the button positions stay fixed
+    // whether focus mode is on or off. The eye button becomes the exit toggle
+    // when focus is active; other tab buttons are faded and inert.
     const headerDiv = container.createEl("div", { cls: "sidebar-header" });
     const titleEl = headerDiv.createEl("h4", { cls: "sidebar-title" });
     const logoEl = titleEl.createEl("span", { cls: "warped-todo-logo clickable-logo", text: "␣⌘" });
     logoEl.addEventListener("click", () => this.onShowAbout());
-    switch (this.activeTab) {
-      case 'todos': titleEl.appendText(" TODOs"); break;
-      case 'ideas': titleEl.appendText(" IDEAs"); break;
-      case 'snoozed': titleEl.appendText(" Snoozed"); break;
+    if (this.focusModeActive) {
+      titleEl.appendText(" TODOs");
+    } else {
+      switch (this.activeTab) {
+        case 'todos': titleEl.appendText(" TODOs"); break;
+        case 'ideas': titleEl.appendText(" IDEAs"); break;
+        case 'snoozed': titleEl.appendText(" Snoozed"); break;
+      }
     }
 
     // Tab navigation
     const tabNav = headerDiv.createEl("div", { cls: "sidebar-tab-nav" });
+    const tabDisabledCls = this.focusModeActive ? " focus-mode-disabled" : "";
 
     const todosTab = tabNav.createEl("button", {
-      cls: `sidebar-tab-btn ${this.activeTab === 'todos' ? 'active' : ''}`,
+      cls: `sidebar-tab-btn${!this.focusModeActive && this.activeTab === 'todos' ? ' active' : ''}${tabDisabledCls}`,
       attr: { "aria-label": "TODOs" },
     });
     todosTab.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.5"/><path d="m9 11 3 3L22 4"/></svg>';
-    todosTab.addEventListener("click", () => {
-      this.activeTab = 'todos';
-      this.render();
-    });
+    if (!this.focusModeActive) {
+      todosTab.addEventListener("click", () => { this.activeTab = 'todos'; this.render(); });
+    }
 
-    // Eye icon — enter immersive Focus Mode. Sits beside the TODOs tab so the
-    // primary action (focus the next thing) lives next to the primary view.
-    // handleFocusEnter snapshots the active tab; exiting restores it, so the
-    // button works from any tab.
+    // Eye icon — toggles focus mode. Active (yellow) when focus is on so the
+    // user can click the same spot to exit without moving the mouse.
     const focusModeTopBtn = tabNav.createEl("button", {
-      cls: "sidebar-tab-btn focus-mode-toggle-btn",
-      attr: { "aria-label": "Enter focus mode" },
+      cls: `sidebar-tab-btn focus-mode-toggle-btn${this.focusModeActive ? ' focus-mode-active' : ''}`,
+      attr: { "aria-label": this.focusModeActive ? "Exit focus mode" : "Enter focus mode" },
     });
     focusModeTopBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
-    focusModeTopBtn.addEventListener("click", () => this.handleFocusEnter());
+    focusModeTopBtn.addEventListener("click", () => {
+      if (this.focusModeActive) {
+        this.handleFocusExit();
+      } else {
+        this.handleFocusEnter();
+      }
+    });
 
     const ideasTab = tabNav.createEl("button", {
-      cls: `sidebar-tab-btn ${this.activeTab === 'ideas' ? 'active' : ''}`,
+      cls: `sidebar-tab-btn${!this.focusModeActive && this.activeTab === 'ideas' ? ' active' : ''}${tabDisabledCls}`,
       attr: { "aria-label": "Ideas" },
     });
     ideasTab.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"></path><path d="M10 22h4"></path><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"></path></svg>';
-    ideasTab.addEventListener("click", () => {
-      this.activeTab = 'ideas';
-      this.render();
-    });
+    if (!this.focusModeActive) {
+      ideasTab.addEventListener("click", () => { this.activeTab = 'ideas'; this.render(); });
+    }
 
     const snoozedTab = tabNav.createEl("button", {
-      cls: `sidebar-tab-btn ${this.activeTab === 'snoozed' ? 'active' : ''}`,
+      cls: `sidebar-tab-btn${!this.focusModeActive && this.activeTab === 'snoozed' ? ' active' : ''}${tabDisabledCls}`,
       attr: { "aria-label": "Snoozed" },
     });
-    // Clock icon for snoozed
     snoozedTab.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>';
-    snoozedTab.addEventListener("click", () => {
-      this.activeTab = 'snoozed';
-      this.render();
-    });
+    if (!this.focusModeActive) {
+      snoozedTab.addEventListener("click", () => { this.activeTab = 'snoozed'; this.render(); });
+    }
 
-    // Hamburger menu button (kebab style - vertical dots)
+    // Kebab menu stays accessible in all modes (refresh, stats, about)
     this.createSidebarMenuButton(headerDiv);
 
-    // Content wrapper for scrolling
+    // Content wrapper — font scale applied here only, so the header is unaffected
     const content = container.createEl("div", { cls: "sidebar-content" });
 
-    // Render content based on active tab
+    if (this.focusModeActive) {
+      content.addClass("sidebar-focus-mode-active");
+      this.renderFocusCard(content);
+      return;
+    }
+
     switch (this.activeTab) {
-      case 'todos':
-        this.renderTodosContent(content);
-        break;
-      case 'ideas':
-        this.renderIdeasContent(content);
-        break;
-      case 'snoozed':
-        this.renderSnoozedContent(content);
-        break;
+      case 'todos':  this.renderTodosContent(content); break;
+      case 'ideas':  this.renderIdeasContent(content); break;
+      case 'snoozed': this.renderSnoozedContent(content); break;
     }
   }
 
@@ -1736,16 +1733,6 @@ export class TodoSidebarView extends ItemView {
   }
 
   private renderFocusCard(container: HTMLElement): void {
-    // Slim sidebar header — anchors the user in the plugin without the tab
-    // chrome. Logo still opens About; the kebab menu carries the same actions
-    // as the regular sidebar.
-    const header = container.createEl("div", { cls: "sidebar-header sidebar-header-focus" });
-    const titleEl = header.createEl("h4", { cls: "sidebar-title" });
-    const logoEl = titleEl.createEl("span", { cls: "warped-todo-logo clickable-logo", text: "␣⌘" });
-    logoEl.addEventListener("click", () => this.onShowAbout());
-    titleEl.appendText(" TODOs");
-    this.createSidebarMenuButton(header);
-
     if (!this.focusQueue) {
       this.rebuildFocusQueue();
     }

@@ -259,18 +259,6 @@ class HugoCommandSettingTab extends PluginSettingTab {
           })
       );
 
-    new Setting(containerEl)
-      .setName("Show drafts")
-      .setDesc("Include draft posts in the content list")
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.showDrafts)
-          .onChange(async (value) => {
-            this.plugin.settings.showDrafts = value;
-            await this.plugin.saveSettings();
-          })
-      );
-
     // Content section
     containerEl.createEl("h3", { text: "Content" });
 
