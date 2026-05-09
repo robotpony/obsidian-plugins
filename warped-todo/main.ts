@@ -18,7 +18,7 @@ import {
   VIEW_TYPE_TODO_SIDEBAR,
 } from "./src/SidebarView";
 import {
-  SpaceCommandSettings,
+  WarpedTodoSettings,
   DEFAULT_SETTINGS,
   TodoItem,
 } from "./src/types";
@@ -31,8 +31,8 @@ import { createHeaderSortPlugin } from "./src/HeaderSortExtension";
 import { createHeaderChecklistExtension } from "./src/HeaderChecklistExtension";
 import { SidebarManager } from "../shared";
 
-export default class SpaceCommandPlugin extends Plugin {
-  settings: SpaceCommandSettings;
+export default class WarpedTodoPlugin extends Plugin {
+  settings: WarpedTodoSettings;
   scanner: TodoScanner;
   processor: TodoProcessor;
   projectManager: ProjectManager;
@@ -373,7 +373,7 @@ export default class SpaceCommandPlugin extends Plugin {
     });
 
     // Add settings tab
-    this.addSettingTab(new SpaceCommandSettingTab(this.app, this));
+    this.addSettingTab(new WarpedTodoSettingTab(this.app, this));
   }
 
   onunload() {
@@ -423,7 +423,7 @@ class AboutModal extends Modal {
     // Logo and title
     const header = contentEl.createEl("div", { cls: "about-header" });
     header.createEl("span", { cls: "warped-todo-logo about-logo", text: "␣⌘" });
-    header.createEl("h2", { text: "Space Command" });
+    header.createEl("h2", { text: "Warped Todo" });
 
     // Version
     contentEl.createEl("p", { cls: "about-version", text: `Version ${this.version}` });
@@ -527,10 +527,10 @@ class StatsModal extends Modal {
   }
 }
 
-class SpaceCommandSettingTab extends PluginSettingTab {
-  plugin: SpaceCommandPlugin;
+class WarpedTodoSettingTab extends PluginSettingTab {
+  plugin: WarpedTodoPlugin;
 
-  constructor(app: App, plugin: SpaceCommandPlugin) {
+  constructor(app: App, plugin: WarpedTodoPlugin) {
     super(app, plugin);
     this.plugin = plugin;
   }
@@ -539,13 +539,13 @@ class SpaceCommandSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: "Space Command Settings" });
+    containerEl.createEl("h2", { text: "Warped Todo Settings" });
 
     // About section
     const aboutSection = containerEl.createEl("div", { cls: "warped-todo-about-section" });
     const aboutHeader = aboutSection.createEl("div", { cls: "about-header" });
     aboutHeader.createEl("span", { cls: "warped-todo-logo about-logo", text: "␣⌘" });
-    aboutHeader.createEl("span", { cls: "about-title", text: "Space Command" });
+    aboutHeader.createEl("span", { cls: "about-title", text: "Warped Todo" });
 
     aboutSection.createEl("p", {
       cls: "about-blurb",

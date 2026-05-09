@@ -1,6 +1,6 @@
 {
   "name": "warped-todo",
-  "version": "0.25.0",
+  "version": "0.25.5",
   "description": "Warped Todo - Obsidian plugin for managing TODOs, TODONEs, and workflows",
   "main": "main.js",
   "scripts": {

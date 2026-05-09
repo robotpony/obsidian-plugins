@@ -1,7 +1,7 @@
 {
   "id": "warped-todo",
   "name": "Warped Todo",
-  "version": "0.25.0",
+  "version": "0.25.5",
   "minAppVersion": "0.15.0",
   "description": "Tools for managing TODOs, TODONEs, and workflows across your vault with live embeds and interactive sidebar.",
   "author": "Bruce Alderson",

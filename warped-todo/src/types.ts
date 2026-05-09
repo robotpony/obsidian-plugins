@@ -109,7 +109,7 @@ export interface ItemRenderConfig {
   onContextMenu?: (e: MouseEvent, item: TodoItem) => void;
 }
 
-export interface SpaceCommandSettings {
+export interface WarpedTodoSettings {
   defaultTodoneFile: string;
   showSidebarByDefault: boolean;
   dateFormat: string;
@@ -138,7 +138,7 @@ export interface SpaceCommandSettings {
   defaultAssignee: string;
 }
 
-export const DEFAULT_SETTINGS: SpaceCommandSettings = {
+export const DEFAULT_SETTINGS: WarpedTodoSettings = {
   defaultTodoneFile: "todos/done.md",
   showSidebarByDefault: true,
   dateFormat: "YYYY-MM-DD",

@@ -6,14 +6,14 @@ import type { FocusQueueResult, ItemDate, TodoItem } from "./types";
 export const LOGO_PREFIX = "␣⌘";
 
 /**
- * Show a notice with the styled Space Command logo badge.
+ * Show a notice with the styled Warped Todo logo badge.
  * Uses the shared notice factory pattern.
  */
 export const showNotice = createNoticeFactory(LOGO_PREFIX, "warped-todo-logo");
 
 /**
  * Plugin tags - system tags that get base logo colour styling.
- * These are the core tags that Space Command uses.
+ * These are the core tags that Warped Todo uses.
  */
 export const PLUGIN_TAGS = new Set([
   '#todo', '#todos', '#todone', '#todones',
@@ -82,7 +82,7 @@ export function getTagColourInfo(
 
 /**
  * Return true if the given metadataCache tag list contains at least one tag
- * that Space Command tracks (`PLUGIN_TAGS`). Used by TodoScanner to skip files
+ * that Warped Todo tracks (`PLUGIN_TAGS`). Used by TodoScanner to skip files
  * before reading them, avoiding unnecessary vault I/O.
  *
  * Accepts the `tags` field from `CachedMetadata` directly (or undefined when

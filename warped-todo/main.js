@@ -24,7 +24,7 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // main.ts
 var main_exports = {};
 __export(main_exports, {
-  default: () => SpaceCommandPlugin
+  default: () => WarpedTodoPlugin
 });
 module.exports = __toCommonJS(main_exports);
 var import_obsidian13 = require("obsidian");
@@ -5077,7 +5077,7 @@ function createHeaderChecklistExtension() {
 }
 
 // main.ts
-var SpaceCommandPlugin = class extends import_obsidian13.Plugin {
+var WarpedTodoPlugin = class extends import_obsidian13.Plugin {
   async onload() {
     await this.loadSettings();
     if (!this.settings.focusModePersist && this.settings.focusModeActive) {
@@ -5324,7 +5324,7 @@ var SpaceCommandPlugin = class extends import_obsidian13.Plugin {
     this.addRibbonIcon("square-check-big", "Toggle TODO Sidebar", () => {
       this.sidebarManager.toggle();
     });
-    this.addSettingTab(new SpaceCommandSettingTab(this.app, this));
+    this.addSettingTab(new WarpedTodoSettingTab(this.app, this));
   }
   onunload() {
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_TODO_SIDEBAR);
@@ -5358,7 +5358,7 @@ var AboutModal = class extends import_obsidian13.Modal {
     contentEl.addClass("warped-todo-about-modal");
     const header = contentEl.createEl("div", { cls: "about-header" });
     header.createEl("span", { cls: "warped-todo-logo about-logo", text: "\u2423\u2318" });
-    header.createEl("h2", { text: "Space Command" });
+    header.createEl("h2", { text: "Warped Todo" });
     contentEl.createEl("p", { cls: "about-version", text: `Version ${this.version}` });
     contentEl.createEl("p", {
       cls: "about-blurb",
@@ -5427,7 +5427,7 @@ var StatsModal = class extends import_obsidian13.Modal {
     this.contentEl.empty();
   }
 };
-var SpaceCommandSettingTab = class extends import_obsidian13.PluginSettingTab {
+var WarpedTodoSettingTab = class extends import_obsidian13.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -5435,11 +5435,11 @@ var SpaceCommandSettingTab = class extends import_obsidian13.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: "Space Command Settings" });
+    containerEl.createEl("h2", { text: "Warped Todo Settings" });
     const aboutSection = containerEl.createEl("div", { cls: "warped-todo-about-section" });
     const aboutHeader = aboutSection.createEl("div", { cls: "about-header" });
     aboutHeader.createEl("span", { cls: "warped-todo-logo about-logo", text: "\u2423\u2318" });
-    aboutHeader.createEl("span", { cls: "about-title", text: "Space Command" });
+    aboutHeader.createEl("span", { cls: "about-title", text: "Warped Todo" });
     aboutSection.createEl("p", {
       cls: "about-blurb",
       text: "Focus on the right next task. Simple TODOs and tags in your markdown, surfaced when you need them."

@@ -301,7 +301,7 @@ export class TodoScanner extends Events {
           if (!lineHasContent) continue;
 
           // Sync checked checkboxes: if an #idea item has [x], remove the #idea tag
-          // (completed ideas become regular checked list items, not tracked by Space Command)
+          // (completed ideas become regular checked list items, not tracked by Warped Todo)
           if (isCheckboxChecked(line)) {
             linesToRemoveIdea.push(i);
             // Don't add to ideas list - it's being completed

@@ -2,6 +2,36 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.25.5] - 2026-05-08
+
+### Fixed — Tag cloud pills no longer oversized in sidebar
+
+Tag cloud pills (`<button>` elements) were being overridden by Obsidian's workspace-scoped button styles, which have sufficient specificity to beat plain property values. Added `!important` to the size-critical properties (`font-size`, `padding`, `line-height`, `border-radius`, `min-height`, `box-shadow`) and switched from `display: inline-flex` to `display: inline-block !important`, matching how inline `.tag` elements are styled. Pills now render at the same compact size as inline document tags across all sidebar tabs.
+
+## [0.25.4] - 2026-05-08
+
+### Fixed — "Space Command" branding replaced with "Warped Todo"
+
+Settings panel header, about modal, and about section in settings all still showed "Space Command". Updated to "Warped Todo" throughout. Also renamed the internal TypeScript identifiers (`SpaceCommandPlugin`, `SpaceCommandSettingTab`, `SpaceCommandSettings`) to `WarpedTodoPlugin`, `WarpedTodoSettingTab`, `WarpedTodoSettings` for consistency.
+
+## [0.25.3] - 2026-05-08
+
+### Fixed — Tag cloud pill size matches inline tags
+
+Tag cloud pills were taller than inline document tags because `font-size` and `padding` deferred to theme variables (`--tag-size`, `--tag-padding-y/x`) that exceed the sidebar's intended values. Both are now hardcoded to match the existing inline `.tag` rule: `font-size: 12px`, `padding: 2px 5px`.
+
+## [0.25.2] - 2026-05-08
+
+### Fixed — Tag cloud pills restored to chiclet shape
+
+Tag cloud filter pills were rendering as ovals because `border-radius` deferred to the theme's `--tag-radius` variable, which this theme sets to a large value. Overridden to `4px` to match the chiclet shape used by all other tags and pills in the sidebar.
+
+## [0.25.1] - 2026-05-08
+
+### Fixed — Header icon opacity now consistent
+
+The focus-mode button (eye icon) was set to `opacity: 0.45` while the tab buttons (todos, ideas, snoozed) had no explicit opacity, leaving the eye visibly faded against the set. All header icons now share a common base opacity of 0.55, with a unified hover (0.8) and active (1.0) state. The active tab still carries its background highlight for orientation.
+
 ## [0.25.0] - 2026-05-08
 
 ### Added — Tag-cloud filter on Ideas and Snoozed tabs

@@ -7,7 +7,7 @@ import {
   EditorSuggestTriggerInfo,
   TFile,
 } from "obsidian";
-import { SpaceCommandSettings, TeamMember } from "./types";
+import { WarpedTodoSettings, TeamMember } from "./types";
 import { TeamManager } from "./TeamManager";
 import { formatDate } from "./utils";
 
@@ -22,10 +22,10 @@ interface AtSuggestion {
 }
 
 export class AtSuggest extends EditorSuggest<AtSuggestion> {
-  private settings: SpaceCommandSettings;
+  private settings: WarpedTodoSettings;
   private teamManager: TeamManager;
 
-  constructor(app: App, settings: SpaceCommandSettings, teamManager: TeamManager) {
+  constructor(app: App, settings: WarpedTodoSettings, teamManager: TeamManager) {
     super(app);
     this.settings = settings;
     this.teamManager = teamManager;

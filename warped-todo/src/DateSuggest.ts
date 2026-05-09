@@ -7,7 +7,7 @@ import {
   EditorSuggestTriggerInfo,
   TFile,
 } from "obsidian";
-import { SpaceCommandSettings } from "./types";
+import { WarpedTodoSettings } from "./types";
 import { formatDate } from "./utils";
 
 interface DateOption {
@@ -19,9 +19,9 @@ interface DateOption {
 }
 
 export class DateSuggest extends EditorSuggest<DateOption> {
-  private settings: SpaceCommandSettings;
+  private settings: WarpedTodoSettings;
 
-  constructor(app: App, settings: SpaceCommandSettings) {
+  constructor(app: App, settings: WarpedTodoSettings) {
     super(app);
     this.settings = settings;
   }
