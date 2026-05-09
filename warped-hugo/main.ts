@@ -124,7 +124,7 @@ export default class HugoCommandPlugin extends Plugin {
 
   openSettings() {
     (this.app as any).setting.open();
-    (this.app as any).setting.openTabById("hugo-command");
+    (this.app as any).setting.openTabById("warped-hugo");
   }
 
   showSiteSettings() {
@@ -144,11 +144,11 @@ class AboutModal extends Modal {
   onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.addClass("hugo-command-about-modal");
+    contentEl.addClass("warped-hugo-about-modal");
 
     // Logo and title
     const header = contentEl.createEl("div", { cls: "about-header" });
-    header.createEl("span", { cls: "hugo-command-logo about-logo", text: LOGO_PREFIX });
+    header.createEl("span", { cls: "warped-hugo-logo about-logo", text: LOGO_PREFIX });
     header.createEl("h2", { text: "Hugo Command" });
 
     // Version
@@ -194,9 +194,9 @@ class HugoCommandSettingTab extends PluginSettingTab {
     containerEl.createEl("h2", { text: "Hugo Command Settings" });
 
     // About section
-    const aboutSection = containerEl.createEl("div", { cls: "hugo-command-about-section" });
+    const aboutSection = containerEl.createEl("div", { cls: "warped-hugo-about-section" });
     const aboutHeader = aboutSection.createEl("div", { cls: "about-header" });
-    aboutHeader.createEl("span", { cls: "hugo-command-logo about-logo", text: LOGO_PREFIX });
+    aboutHeader.createEl("span", { cls: "warped-hugo-logo about-logo", text: LOGO_PREFIX });
     aboutHeader.createEl("span", { cls: "about-title", text: "Hugo Command" });
 
     aboutSection.createEl("p", {

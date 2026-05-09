@@ -113,7 +113,7 @@ export class DateSuggest extends EditorSuggest<DateOption> {
   }
 
   renderSuggestion(item: DateOption, el: HTMLElement): void {
-    el.addClass("space-command-suggestion");
+    el.addClass("warped-todo-suggestion");
 
     const iconSpan = el.createEl("span", { cls: "suggestion-icon" });
     iconSpan.textContent = item.icon;

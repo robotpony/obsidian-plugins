@@ -25,8 +25,8 @@ export class SiteSettingsModal extends Modal {
   async onOpen(): Promise<void> {
     const { contentEl, modalEl } = this;
     contentEl.empty();
-    contentEl.addClass("hugo-command-site-settings");
-    modalEl.addClass("hugo-command-site-settings-modal");
+    contentEl.addClass("warped-hugo-site-settings");
+    modalEl.addClass("warped-hugo-site-settings-modal");
 
     // Load config file
     this.configFile = await findHugoConfigFile(this.app);
@@ -46,7 +46,7 @@ export class SiteSettingsModal extends Modal {
   private renderNoConfigFound(container: HTMLElement): void {
     // Header (fixed)
     const header = container.createEl("div", { cls: "site-settings-header" });
-    header.createEl("span", { cls: "hugo-command-logo", text: LOGO_PREFIX });
+    header.createEl("span", { cls: "warped-hugo-logo", text: LOGO_PREFIX });
     header.createEl("h2", { text: "Site Settings" });
 
     container.createEl("p", {
@@ -61,7 +61,7 @@ export class SiteSettingsModal extends Modal {
 
     // Header with logo
     const header = headerSection.createEl("div", { cls: "site-settings-header" });
-    header.createEl("span", { cls: "hugo-command-logo", text: LOGO_PREFIX });
+    header.createEl("span", { cls: "warped-hugo-logo", text: LOGO_PREFIX });
     header.createEl("h2", { text: "Site Settings" });
 
     // Site title display (prominent)

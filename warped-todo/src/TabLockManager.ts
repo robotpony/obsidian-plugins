@@ -217,7 +217,7 @@ export class TabLockManager {
     }
 
     // Check for existing button - if present, just update its state
-    const existingBtn = tabHeader.querySelector(".space-command-tab-lock-btn") as HTMLElement | null;
+    const existingBtn = tabHeader.querySelector(".warped-todo-tab-lock-btn") as HTMLElement | null;
     if (existingBtn) {
       // Update state in case pinned status changed
       // @ts-expect-error - pinned is not in the public API
@@ -240,7 +240,7 @@ export class TabLockManager {
 
     // Create the lock button
     const lockBtn = document.createElement("div");
-    lockBtn.className = "space-command-tab-lock-btn workspace-tab-header-status-icon";
+    lockBtn.className = "warped-todo-tab-lock-btn workspace-tab-header-status-icon";
     lockBtn.setAttribute("aria-label", "Lock tab (pinned tabs open links in new tabs)");
 
     // Set initial state based on leaf's pinned status
@@ -287,8 +287,8 @@ export class TabLockManager {
     if (!pinContainer) return;
 
     // Don't add handler if already present
-    if (pinContainer.hasAttribute("data-space-command-pin-handler")) return;
-    pinContainer.setAttribute("data-space-command-pin-handler", "true");
+    if (pinContainer.hasAttribute("data-warped-todo-pin-handler")) return;
+    pinContainer.setAttribute("data-warped-todo-pin-handler", "true");
 
     pinContainer.addEventListener(
       "click",
@@ -301,7 +301,7 @@ export class TabLockManager {
         e.preventDefault();
 
         leaf.setPinned(false);
-        tabHeader.classList.remove("space-command-tab-locked");
+        tabHeader.classList.remove("warped-todo-tab-locked");
         this.updateButtonState(lockBtn, false);
       },
       { capture: true }
@@ -317,7 +317,7 @@ export class TabLockManager {
 
     const tabHeader = button.closest(".workspace-tab-header") as HTMLElement;
     if (tabHeader) {
-      tabHeader.classList.toggle("space-command-tab-locked", isPinned);
+      tabHeader.classList.toggle("warped-todo-tab-locked", isPinned);
     }
 
     // Open padlock icon - when locked, button is hidden via CSS
@@ -328,19 +328,19 @@ export class TabLockManager {
    * Remove all lock buttons and cleanup.
    */
   private removeAllButtons(): void {
-    const buttons = document.querySelectorAll(".space-command-tab-lock-btn");
+    const buttons = document.querySelectorAll(".warped-todo-tab-lock-btn");
     buttons.forEach((btn) => btn.remove());
 
-    const lockedTabs = document.querySelectorAll(".space-command-tab-locked");
+    const lockedTabs = document.querySelectorAll(".warped-todo-tab-locked");
     lockedTabs.forEach((tab) =>
-      tab.classList.remove("space-command-tab-locked")
+      tab.classList.remove("warped-todo-tab-locked")
     );
 
     const pinContainers = document.querySelectorAll(
-      "[data-space-command-pin-handler]"
+      "[data-warped-todo-pin-handler]"
     );
     pinContainers.forEach((container) =>
-      container.removeAttribute("data-space-command-pin-handler")
+      container.removeAttribute("data-warped-todo-pin-handler")
     );
   }
 }

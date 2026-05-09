@@ -1,7 +1,7 @@
-/* g-command Plugin Styles */
+/* warped-reference Plugin Styles */
 
 /* Sidebar container */
-.g-command-sidebar {
+.warped-reference-sidebar {
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -9,7 +9,7 @@
 }
 
 /* Logo badge */
-.g-command-logo {
+.warped-reference-logo {
   display: inline-block;
   background-color: #e74c3c;
   color: white;
@@ -23,7 +23,7 @@
 }
 
 /* Header bar */
-.g-command-header {
+.warped-reference-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -33,24 +33,24 @@
   z-index: 1;
 }
 
-.g-command-header-title {
+.warped-reference-header-title {
   display: flex;
   align-items: center;
   gap: 6px;
   white-space: nowrap;
 }
 
-.g-command-header-title h4 {
+.warped-reference-header-title h4 {
   margin: 0;
 }
 
-.g-command-button-group {
+.warped-reference-button-group {
   display: flex;
   gap: 4px;
   align-items: center;
 }
 
-.g-command-menu-btn {
+.warped-reference-menu-btn {
   padding: 4px;
   border: none !important;
   background: transparent !important;
@@ -62,13 +62,13 @@
   border-radius: 4px;
 }
 
-.g-command-menu-btn:hover {
+.warped-reference-menu-btn:hover {
   opacity: 1;
   background-color: var(--background-modifier-hover) !important;
 }
 
 /* Search bar */
-.g-command-search-row {
+.warped-reference-search-row {
   display: flex;
   align-items: center;
   padding: 4px 8px;
@@ -76,7 +76,7 @@
   flex-shrink: 0;
 }
 
-.g-command-search {
+.warped-reference-search {
   flex: 1;
   padding: 4px 8px;
   border: 1px solid var(--background-modifier-border);
@@ -87,15 +87,15 @@
   outline: none;
 }
 
-.g-command-search:focus {
+.warped-reference-search:focus {
   border-color: var(--text-accent);
 }
 
-.g-command-search::placeholder {
+.warped-reference-search::placeholder {
   color: var(--text-faint);
 }
 
-.g-command-search-clear {
+.warped-reference-search-clear {
   padding: 2px 4px;
   border: none !important;
   background: transparent !important;
@@ -108,12 +108,12 @@
   flex-shrink: 0;
 }
 
-.g-command-search-clear:hover {
+.warped-reference-search-clear:hover {
   opacity: 1;
 }
 
 /* Search all button */
-.g-command-search-all-btn {
+.warped-reference-search-all-btn {
   display: block;
   margin: 8px auto;
   padding: 4px 12px;
@@ -126,35 +126,35 @@
   transition: background-color 0.15s, color 0.15s;
 }
 
-.g-command-search-all-btn:hover:not(:disabled) {
+.warped-reference-search-all-btn:hover:not(:disabled) {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
 
-.g-command-search-all-btn:disabled {
+.warped-reference-search-all-btn:disabled {
   opacity: 0.5;
   cursor: default;
 }
 
 /* Status line */
-.g-command-status {
+.warped-reference-status {
   font-size: 0.85em;
   color: var(--text-faint);
   padding: 4px 12px;
   flex-shrink: 0;
 }
 
-.g-command-status.g-command-status--error {
+.warped-reference-status.warped-reference-status--error {
   color: var(--text-error);
 }
 
 /* Synced files pane */
-.g-command-synced-pane {
+.warped-reference-synced-pane {
   flex-shrink: 0;
   border-bottom: 1px solid var(--background-modifier-border);
 }
 
-.g-command-section-header {
+.warped-reference-section-header {
   display: flex;
   align-items: center;
   padding: 5px 8px;
@@ -165,13 +165,13 @@
   color: var(--text-normal);
 }
 
-.g-command-synced-body {
+.warped-reference-synced-body {
   max-height: 200px;
   overflow-y: auto;
   padding: 2px 0;
 }
 
-.g-command-synced-row {
+.warped-reference-synced-row {
   display: flex;
   align-items: center;
   padding: 3px 12px;
@@ -179,11 +179,11 @@
   font-size: 13px;
 }
 
-.g-command-synced-row:hover {
+.warped-reference-synced-row:hover {
   background: var(--background-modifier-hover);
 }
 
-.g-command-synced-name {
+.warped-reference-synced-name {
   flex: 1;
   white-space: nowrap;
   overflow: hidden;
@@ -191,7 +191,7 @@
   color: var(--text-muted);
 }
 
-.g-command-resync-btn {
+.warped-reference-resync-btn {
   flex-shrink: 0;
   border: none !important;
   background: transparent !important;
@@ -204,17 +204,17 @@
   transition: opacity 0.15s;
 }
 
-.g-command-synced-row:hover .g-command-resync-btn {
+.warped-reference-synced-row:hover .warped-reference-resync-btn {
   opacity: 0.5;
 }
 
-.g-command-resync-btn:hover {
+.warped-reference-resync-btn:hover {
   opacity: 1 !important;
   color: var(--text-accent);
 }
 
 /* File tree */
-.g-command-tree {
+.warped-reference-tree {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -222,7 +222,7 @@
 }
 
 /* Error banner (shown when rclone is missing or misconfigured) */
-.g-command-error-banner {
+.warped-reference-error-banner {
   margin: 12px;
   padding: 10px 12px;
   background: var(--background-secondary);
@@ -233,13 +233,13 @@
   line-height: 1.6;
 }
 
-.g-command-error-banner .g-command-error-title {
+.warped-reference-error-banner .warped-reference-error-title {
   color: var(--text-error);
   font-weight: 600;
   margin-bottom: 6px;
 }
 
-.g-command-error-banner code {
+.warped-reference-error-banner code {
   background: var(--background-modifier-hover);
   padding: 1px 4px;
   border-radius: 3px;
@@ -247,21 +247,21 @@
   color: var(--text-normal);
 }
 
-.g-command-error-banner p {
+.warped-reference-error-banner p {
   margin: 0 0 4px 0;
 }
 
-.g-command-error-banner p:last-child {
+.warped-reference-error-banner p:last-child {
   margin-bottom: 0;
 }
 
 /* Code block inside error banner */
-.g-command-code-block {
+.warped-reference-code-block {
   position: relative;
   margin: 8px 0;
 }
 
-.g-command-code-block pre {
+.warped-reference-code-block pre {
   margin: 0;
   padding: 8px 10px;
   background: var(--background-primary);
@@ -270,7 +270,7 @@
   overflow-x: auto;
 }
 
-.g-command-code-block code {
+.warped-reference-code-block code {
   font-size: var(--font-ui-smaller);
   color: var(--text-normal);
   white-space: pre;
@@ -278,7 +278,7 @@
   padding: 0;
 }
 
-.g-command-copy-btn {
+.warped-reference-copy-btn {
   position: absolute;
   top: 4px;
   right: 4px;
@@ -293,18 +293,18 @@
   transition: opacity 0.15s;
 }
 
-.g-command-code-block:hover .g-command-copy-btn {
+.warped-reference-code-block:hover .warped-reference-copy-btn {
   opacity: 1;
 }
 
-.g-command-error-ref {
+.warped-reference-error-ref {
   font-size: var(--font-ui-smaller);
   color: var(--text-faint);
   font-style: italic;
 }
 
 /* Tree rows */
-.g-command-row {
+.warped-reference-row {
   display: flex;
   align-items: center;
   padding: 4px 8px;
@@ -314,20 +314,20 @@
   gap: 6px;
 }
 
-.g-command-row--folder {
+.warped-reference-row--folder {
   cursor: pointer;
 }
 
-.g-command-row--folder:hover {
+.warped-reference-row--folder:hover {
   background: var(--background-modifier-hover);
 }
 
-.g-command-row--file {
+.warped-reference-row--file {
   color: var(--text-muted);
 }
 
 /* Expand/collapse arrow */
-.g-command-arrow {
+.warped-reference-arrow {
   display: inline-flex;
   width: 14px;
   flex-shrink: 0;
@@ -336,33 +336,33 @@
   user-select: none;
 }
 
-.g-command-arrow--spacer {
+.warped-reference-arrow--spacer {
   visibility: hidden;
 }
 
 /* Loading spinner for folder expand */
-.g-command-arrow--loading {
-  animation: g-command-spin 0.8s linear infinite;
+.warped-reference-arrow--loading {
+  animation: warped-reference-spin 0.8s linear infinite;
 }
 
-.g-command-arrow--loading::after {
+.warped-reference-arrow--loading::after {
   content: "◌";
 }
 
-@keyframes g-command-spin {
+@keyframes warped-reference-spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
 
-.g-command-name {
+.warped-reference-name {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 /* Loading and empty states */
-.g-command-loading,
-.g-command-empty {
+.warped-reference-loading,
+.warped-reference-empty {
   padding: 16px 12px;
   text-align: center;
   color: var(--text-faint);
@@ -370,7 +370,7 @@
 }
 
 /* File checkbox */
-.g-command-checkbox {
+.warped-reference-checkbox {
   width: 14px;
   height: 14px;
   flex-shrink: 0;
@@ -380,7 +380,7 @@
 }
 
 /* Sync badge on synced files */
-.g-command-sync-badge {
+.warped-reference-sync-badge {
   color: var(--text-accent);
   font-size: 11px;
   flex-shrink: 0;
@@ -389,17 +389,17 @@
 }
 
 /* Sync button */
-.g-command-sync-btn {
+.warped-reference-sync-btn {
   font-size: 16px;
 }
 
-.g-command-sync-btn:disabled {
+.warped-reference-sync-btn:disabled {
   opacity: 0.4;
   cursor: default;
 }
 
 /* Log status indicator (tri-state: idle/syncing/error) */
-.g-command-log-status {
+.warped-reference-log-status {
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -408,29 +408,29 @@
   transition: background 0.3s;
 }
 
-.g-command-log-status--syncing {
+.warped-reference-log-status--syncing {
   background: var(--text-success, #4caf50);
-  animation: g-command-pulse 1.5s ease-in-out infinite;
+  animation: warped-reference-pulse 1.5s ease-in-out infinite;
 }
 
-.g-command-log-status--error {
+.warped-reference-log-status--error {
   background: var(--text-error);
-  animation: g-command-pulse 1.5s ease-in-out infinite;
+  animation: warped-reference-pulse 1.5s ease-in-out infinite;
 }
 
-@keyframes g-command-pulse {
+@keyframes warped-reference-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
 }
 
 /* Log pane */
-.g-command-log-pane {
+.warped-reference-log-pane {
   flex-shrink: 0;
   border-top: 1px solid var(--background-modifier-border);
   background: var(--background-primary-alt);
 }
 
-.g-command-log-header {
+.warped-reference-log-header {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -442,17 +442,17 @@
   background: var(--background-secondary);
 }
 
-.g-command-log-header:hover {
+.warped-reference-log-header:hover {
   color: var(--text-normal);
 }
 
-.g-command-log-arrow {
+.warped-reference-log-arrow {
   font-size: 10px;
   width: 12px;
   flex-shrink: 0;
 }
 
-.g-command-log-clear {
+.warped-reference-log-clear {
   margin-left: auto;
   padding: 0 4px;
   border: none !important;
@@ -465,18 +465,18 @@
   transition: opacity 0.15s;
 }
 
-.g-command-log-clear:hover {
+.warped-reference-log-clear:hover {
   opacity: 1;
 }
 
-.g-command-log-body {
+.warped-reference-log-body {
   max-height: 150px;
   overflow-y: auto;
   padding: 4px 0;
   background: var(--background-primary-alt);
 }
 
-.g-command-log-entry {
+.warped-reference-log-entry {
   display: flex;
   gap: 6px;
   padding: 1px 8px;
@@ -485,11 +485,11 @@
   line-height: 1.5;
 }
 
-.g-command-log-entry--error {
+.warped-reference-log-entry--error {
   color: var(--text-error);
 }
 
-.g-command-log-time {
+.warped-reference-log-time {
   color: var(--text-faint);
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
@@ -497,7 +497,7 @@
 
 /* --- Phase 5: Connection status & setup --- */
 
-.g-command-connection-dot {
+.warped-reference-connection-dot {
   display: inline-block;
   width: 8px;
   height: 8px;
@@ -506,23 +506,23 @@
   margin-right: 2px;
 }
 
-.g-command-connection-dot--connected {
+.warped-reference-connection-dot--connected {
   background: var(--text-success, #4caf50);
 }
 
-.g-command-connection-dot--disconnected {
+.warped-reference-connection-dot--disconnected {
   background: var(--text-faint);
 }
 
-.g-command-connection-dot--connecting {
+.warped-reference-connection-dot--connecting {
   background: var(--text-accent);
-  animation: g-command-pulse 1.5s ease-in-out infinite;
+  animation: warped-reference-pulse 1.5s ease-in-out infinite;
 }
 
-.g-command-error-banner .mod-cta {
+.warped-reference-error-banner .mod-cta {
   margin-top: 8px;
 }
 
-.g-command-install-instructions p {
+.warped-reference-install-instructions p {
   margin: 4px 0;
 }

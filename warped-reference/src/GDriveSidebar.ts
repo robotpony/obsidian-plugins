@@ -3,7 +3,7 @@ import { DriveProvider, DriveError, getRcloneInstallInstructions } from "./Drive
 import { DriveFile, DriveTreeCache, GCommandSettings, SyncRecord } from "./types";
 import { syncFiles, getFormatMapping, sanitizeFilename, SyncLogFn } from "./SyncManager";
 
-export const VIEW_TYPE_GDRIVE_SIDEBAR = "g-command-drive";
+export const VIEW_TYPE_GDRIVE_SIDEBAR = "warped-reference-drive";
 
 const KEBAB_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>';
@@ -293,7 +293,7 @@ export class GDriveSidebar extends ItemView {
   render(): void {
     const container = this.containerEl.children[1] as HTMLElement;
     container.empty();
-    container.addClass("g-command-sidebar");
+    container.addClass("warped-reference-sidebar");
 
     this.renderHeader(container);
     this.renderSearchBar(container);
@@ -309,16 +309,16 @@ export class GDriveSidebar extends ItemView {
       this.renderSyncedPane(container);
     }
 
-    container.createDiv({ cls: "g-command-section-header", text: "Drive" });
-    const tree = container.createDiv({ cls: "g-command-tree" });
+    container.createDiv({ cls: "warped-reference-section-header", text: "Drive" });
+    const tree = container.createDiv({ cls: "warped-reference-tree" });
 
     if (this.loadingRoot) {
-      tree.createDiv({ cls: "g-command-loading", text: "Loading…" });
+      tree.createDiv({ cls: "warped-reference-loading", text: "Loading…" });
       return;
     }
 
     if (!this.rootNodes || this.rootNodes.length === 0) {
-      tree.createDiv({ cls: "g-command-empty", text: "No files found" });
+      tree.createDiv({ cls: "warped-reference-empty", text: "No files found" });
       return;
     }
 
@@ -339,9 +339,9 @@ export class GDriveSidebar extends ItemView {
     }
 
     if (query && displayNodes.length === 0 && !this.allFiles) {
-      tree.createDiv({ cls: "g-command-empty", text: "No matches in loaded folders" });
+      tree.createDiv({ cls: "warped-reference-empty", text: "No matches in loaded folders" });
     } else if (query && displayNodes.length === 0) {
-      tree.createDiv({ cls: "g-command-empty", text: "No matches found" });
+      tree.createDiv({ cls: "warped-reference-empty", text: "No matches found" });
     } else {
       for (const node of displayNodes) {
         this.renderNode(tree, node, 0);
@@ -508,20 +508,20 @@ export class GDriveSidebar extends ItemView {
   // --- Rendering helpers ----------------------------------------------------
 
   private renderHeader(parent: HTMLElement): void {
-    const header = parent.createDiv({ cls: "g-command-header" });
+    const header = parent.createDiv({ cls: "warped-reference-header" });
 
     // Title with logo badge
-    const titleEl = header.createEl("div", { cls: "g-command-header-title" });
-    titleEl.createEl("span", { cls: "g-command-logo", text: "GC" });
+    const titleEl = header.createEl("div", { cls: "warped-reference-header-title" });
+    titleEl.createEl("span", { cls: "warped-reference-logo", text: "GC" });
     titleEl.createEl("h4", { text: "Drive" });
 
     // Button group: sync + kebab menu
-    const buttonGroup = header.createEl("div", { cls: "g-command-button-group" });
+    const buttonGroup = header.createEl("div", { cls: "warped-reference-button-group" });
 
     // Sync button — active when files are selected
     const hasSelection = this.selectedPaths.size > 0;
     const syncBtn = buttonGroup.createEl("button", {
-      cls: "g-command-sync-btn clickable-icon",
+      cls: "warped-reference-sync-btn clickable-icon",
       attr: { "aria-label": hasSelection ? `Sync ${this.selectedPaths.size} file(s)` : "Select files to sync" },
     });
     syncBtn.createSpan({ text: this.syncing ? "⏳" : "↻" });
@@ -530,7 +530,7 @@ export class GDriveSidebar extends ItemView {
 
     // Kebab menu
     const menuBtn = buttonGroup.createEl("button", {
-      cls: "clickable-icon g-command-menu-btn",
+      cls: "clickable-icon warped-reference-menu-btn",
       attr: { "aria-label": "Menu" },
     });
     menuBtn.innerHTML = KEBAB_SVG;
@@ -579,10 +579,10 @@ export class GDriveSidebar extends ItemView {
   }
 
   private renderSearchBar(parent: HTMLElement): void {
-    const row = parent.createDiv({ cls: "g-command-search-row" });
+    const row = parent.createDiv({ cls: "warped-reference-search-row" });
 
     const input = row.createEl("input", {
-      cls: "g-command-search",
+      cls: "warped-reference-search",
       attr: { type: "text", placeholder: "Search files…" },
     });
     input.value = this.searchQuery;
@@ -602,7 +602,7 @@ export class GDriveSidebar extends ItemView {
 
     if (this.searchQuery) {
       const clearBtn = row.createEl("button", {
-        cls: "g-command-search-clear clickable-icon",
+        cls: "warped-reference-search-clear clickable-icon",
         attr: { "aria-label": "Clear search" },
       });
       clearBtn.textContent = "✕";
@@ -616,7 +616,7 @@ export class GDriveSidebar extends ItemView {
 
   private renderSearchAllButton(parent: HTMLElement): void {
     const btn = parent.createEl("button", {
-      cls: "g-command-search-all-btn",
+      cls: "warped-reference-search-all-btn",
       text: this.searchingAll ? "Searching…" : "Search all of Drive",
     });
     btn.disabled = this.searchingAll;
@@ -642,33 +642,33 @@ export class GDriveSidebar extends ItemView {
     const text = this.syncing
       ? "Syncing…"
       : "Read only access to Google Drive documents, in Markdown or CSV.";
-    parent.createDiv({ cls: "g-command-status", text });
+    parent.createDiv({ cls: "warped-reference-status", text });
   }
 
   private renderSyncedPane(parent: HTMLElement): void {
-    const pane = parent.createDiv({ cls: "g-command-synced-pane" });
+    const pane = parent.createDiv({ cls: "warped-reference-synced-pane" });
     const entries = Object.entries(this.settings.syncState);
     pane.createDiv({
-      cls: "g-command-section-header",
+      cls: "warped-reference-section-header",
       text: `Synced files (${entries.length})`,
     });
 
-    const body = pane.createDiv({ cls: "g-command-synced-body" });
+    const body = pane.createDiv({ cls: "warped-reference-synced-body" });
     for (const [drivePath, rec] of entries) {
       this.renderSyncedRow(body, drivePath, rec);
     }
   }
 
   private renderSyncedRow(parent: HTMLElement, drivePath: string, rec: SyncRecord): void {
-    const row = parent.createDiv({ cls: "g-command-synced-row" });
+    const row = parent.createDiv({ cls: "warped-reference-synced-row" });
 
     // Display the vault filename (last segment of vault path, or drive path)
     const displayName = (rec.vaultPath ?? drivePath).split("/").pop() ?? drivePath;
-    row.createSpan({ cls: "g-command-synced-name", text: displayName });
+    row.createSpan({ cls: "warped-reference-synced-name", text: displayName });
 
     // Resync button
     const btn = row.createEl("button", {
-      cls: "g-command-resync-btn clickable-icon",
+      cls: "warped-reference-resync-btn clickable-icon",
       attr: { "aria-label": `Resync ${displayName}` },
     });
     btn.textContent = "↻";
@@ -689,16 +689,16 @@ export class GDriveSidebar extends ItemView {
   }
 
   private renderLogPane(parent: HTMLElement): void {
-    const pane = parent.createDiv({ cls: "g-command-log-pane" });
+    const pane = parent.createDiv({ cls: "warped-reference-log-pane" });
 
     // Header with toggle
-    const header = pane.createDiv({ cls: "g-command-log-header" });
-    const arrow = header.createSpan({ cls: "g-command-log-arrow", text: this.logCollapsed ? "▶" : "▼" });
-    header.createDiv({ cls: `g-command-log-status g-command-log-status--${this.syncStatus}` });
+    const header = pane.createDiv({ cls: "warped-reference-log-header" });
+    const arrow = header.createSpan({ cls: "warped-reference-log-arrow", text: this.logCollapsed ? "▶" : "▼" });
+    header.createDiv({ cls: `warped-reference-log-status warped-reference-log-status--${this.syncStatus}` });
     header.createSpan({ text: `Sync log (${this.logEntries.length})` });
 
     const clearBtn = header.createEl("button", {
-      cls: "g-command-log-clear clickable-icon",
+      cls: "warped-reference-log-clear clickable-icon",
       attr: { "aria-label": "Clear log" },
     });
     clearBtn.textContent = "✕";
@@ -715,12 +715,12 @@ export class GDriveSidebar extends ItemView {
     });
 
     if (!this.logCollapsed) {
-      const body = pane.createDiv({ cls: "g-command-log-body" });
+      const body = pane.createDiv({ cls: "warped-reference-log-body" });
       for (const entry of this.logEntries) {
         const row = body.createDiv({
-          cls: `g-command-log-entry ${entry.level === "error" ? "g-command-log-entry--error" : ""}`,
+          cls: `warped-reference-log-entry ${entry.level === "error" ? "warped-reference-log-entry--error" : ""}`,
         });
-        row.createSpan({ cls: "g-command-log-time", text: entry.time });
+        row.createSpan({ cls: "warped-reference-log-time", text: entry.time });
         row.createSpan({ text: entry.message });
       }
       // Scroll to bottom
@@ -732,7 +732,7 @@ export class GDriveSidebar extends ItemView {
 
   private renderErrorBanner(parent: HTMLElement): void {
     const err = this.error!;
-    const banner = parent.createDiv({ cls: "g-command-error-banner" });
+    const banner = parent.createDiv({ cls: "warped-reference-error-banner" });
 
     if (err instanceof DriveError) {
       if (err.code === "binary-missing") {
@@ -741,21 +741,21 @@ export class GDriveSidebar extends ItemView {
         this.renderRemoteSetup(banner);
       }
     } else {
-      banner.createDiv({ cls: "g-command-error-title", text: err.message });
+      banner.createDiv({ cls: "warped-reference-error-title", text: err.message });
     }
   }
 
   private renderBinaryMissing(banner: HTMLElement): void {
-    banner.createDiv({ cls: "g-command-error-title", text: "rclone is required" });
+    banner.createDiv({ cls: "warped-reference-error-title", text: "rclone is required" });
     banner.createEl("p", { text: "Install rclone to connect to Google Drive:" });
 
     const info = getRcloneInstallInstructions();
-    const codeWrap = banner.createDiv({ cls: "g-command-code-block" });
+    const codeWrap = banner.createDiv({ cls: "warped-reference-code-block" });
     const pre = codeWrap.createEl("pre");
     pre.createEl("code", { text: info.command });
 
     const copyBtn = codeWrap.createEl("button", {
-      cls: "g-command-copy-btn clickable-icon",
+      cls: "warped-reference-copy-btn clickable-icon",
       attr: { "aria-label": "Copy to clipboard" },
     });
     copyBtn.textContent = "Copy";
@@ -765,7 +765,7 @@ export class GDriveSidebar extends ItemView {
       setTimeout(() => (copyBtn.textContent = "Copy"), 1500);
     });
 
-    const linkP = banner.createEl("p", { cls: "g-command-error-ref" });
+    const linkP = banner.createEl("p", { cls: "warped-reference-error-ref" });
     linkP.appendText("Other platforms: ");
     const link = linkP.createEl("a", { text: "rclone.org/install", href: "https://rclone.org/install/" });
     link.setAttr("target", "_blank");
@@ -778,11 +778,11 @@ export class GDriveSidebar extends ItemView {
   }
 
   private renderRemoteSetup(banner: HTMLElement): void {
-    banner.createDiv({ cls: "g-command-error-title", text: "Connect to Google Drive" });
+    banner.createDiv({ cls: "warped-reference-error-title", text: "Connect to Google Drive" });
 
     if (this.connectingInProgress) {
       banner.createEl("p", { text: "Waiting for Google sign-in..." });
-      banner.createEl("p", { cls: "g-command-error-ref", text: "Complete the sign-in in your browser window." });
+      banner.createEl("p", { cls: "warped-reference-error-ref", text: "Complete the sign-in in your browser window." });
       return;
     }
 
@@ -815,7 +815,7 @@ export class GDriveSidebar extends ItemView {
   }
 
   private renderNode(parent: HTMLElement, node: TreeNode, depth: number): void {
-    const row = parent.createDiv({ cls: "g-command-row" });
+    const row = parent.createDiv({ cls: "warped-reference-row" });
     row.style.paddingLeft = `${12 + depth * 18}px`;
 
     if (node.file.IsDir) {
@@ -832,7 +832,7 @@ export class GDriveSidebar extends ItemView {
   ): void {
     // Checkbox for folder selection (recursive sync)
     const cb = row.createEl("input", {
-      cls: "g-command-checkbox",
+      cls: "warped-reference-checkbox",
       attr: { type: "checkbox" },
     }) as HTMLInputElement;
     cb.checked = this.selectedPaths.has(node.file.Path);
@@ -845,11 +845,11 @@ export class GDriveSidebar extends ItemView {
     });
 
     // Expand/collapse arrow
-    const arrow = row.createSpan({ cls: "g-command-arrow" });
+    const arrow = row.createSpan({ cls: "warped-reference-arrow" });
     arrow.textContent = node.expanded ? "▼" : "▶";
 
-    row.createSpan({ cls: "g-command-name", text: sanitizeFilename(node.file.Name) });
-    row.addClass("g-command-row--folder");
+    row.createSpan({ cls: "warped-reference-name", text: sanitizeFilename(node.file.Name) });
+    row.addClass("warped-reference-row--folder");
 
     row.addEventListener("click", async (e) => {
       if ((e.target as HTMLElement).tagName === "INPUT") return;
@@ -862,9 +862,9 @@ export class GDriveSidebar extends ItemView {
       // Lazy-load children on first expand
       if (node.children === null) {
         arrow.textContent = "";
-        arrow.addClass("g-command-arrow--loading");
+        arrow.addClass("warped-reference-arrow--loading");
         await this.loadChildren(node);
-        arrow.removeClass("g-command-arrow--loading");
+        arrow.removeClass("warped-reference-arrow--loading");
       }
 
       node.expanded = true;
@@ -882,7 +882,7 @@ export class GDriveSidebar extends ItemView {
   private renderFileRow(row: HTMLElement, node: TreeNode): void {
     // Checkbox for file selection
     const cb = row.createEl("input", {
-      cls: "g-command-checkbox",
+      cls: "warped-reference-checkbox",
       attr: { type: "checkbox" },
     }) as HTMLInputElement;
     cb.checked = this.selectedPaths.has(node.file.Path);
@@ -896,14 +896,14 @@ export class GDriveSidebar extends ItemView {
       this.render();
     });
 
-    row.createSpan({ cls: "g-command-name", text: sanitizeFilename(node.file.Name) });
+    row.createSpan({ cls: "warped-reference-name", text: sanitizeFilename(node.file.Name) });
 
     // Sync badge for previously synced files
     if (this.settings.syncState[node.file.Path]) {
-      row.createSpan({ cls: "g-command-sync-badge", text: "✓" });
+      row.createSpan({ cls: "warped-reference-sync-badge", text: "✓" });
     }
 
-    row.addClass("g-command-row--file");
+    row.addClass("warped-reference-row--file");
   }
 }
 

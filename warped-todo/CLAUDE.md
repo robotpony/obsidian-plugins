@@ -11,11 +11,11 @@ npm run build        # production build (tsc -noEmit + esbuild)
 npm test             # run vitest test suite
 ```
 
-Build output is `main.js` at the repo root. To test in Obsidian, copy `main.js`, `manifest.json`, and `styles.css` to `<vault>/.obsidian/plugins/space-command/`. The repo-level `install.sh` script automates this for cached vault paths.
+Build output is `main.js` at the repo root. To test in Obsidian, copy `main.js`, `manifest.json`, and `styles.css` to `<vault>/.obsidian/plugins/warped-todo/`. The repo-level `install.sh` script automates this for cached vault paths.
 
 ## Architecture
 
-Space Command is an Obsidian plugin for tracking TODOs, Ideas, and Principles across a vault. Items are tagged in markdown files (`#todo`, `#idea`, `#principle`); the plugin scans the vault, indexes them, and surfaces them in a custom sidebar with priority/focus/snooze workflows.
+Warped Todo is an Obsidian plugin for tracking TODOs, Ideas, and Principles across a vault. Items are tagged in markdown files (`#todo`, `#idea`, `#principle`); the plugin scans the vault, indexes them, and surfaces them in a custom sidebar with priority/focus/snooze workflows.
 
 ### Entry point
 

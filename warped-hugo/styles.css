@@ -1,7 +1,7 @@
 /* Hugo Command Plugin Styles */
 
-/* Logo styling - rust/orange color to differentiate from space-command */
-.hugo-command-logo {
+/* Logo styling - rust/orange color to differentiate from warped-todo */
+.warped-hugo-logo {
   display: inline-block;
   background-color: #d97706;
   color: white;
@@ -15,23 +15,23 @@
 }
 
 /* Clickable logo in sidebar */
-.hugo-command-logo.clickable-logo {
+.warped-hugo-logo.clickable-logo {
   cursor: pointer;
   transition: opacity 0.2s, transform 0.1s;
 }
 
-.hugo-command-logo.clickable-logo:hover {
+.warped-hugo-logo.clickable-logo:hover {
   opacity: 0.85;
   transform: scale(1.05);
 }
 
 /* About Modal */
-.hugo-command-about-modal {
+.warped-hugo-about-modal {
   text-align: center;
   padding: 20px;
 }
 
-.hugo-command-about-modal .about-header {
+.warped-hugo-about-modal .about-header {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -39,85 +39,85 @@
   margin-bottom: 16px;
 }
 
-.hugo-command-about-modal .about-logo {
+.warped-hugo-about-modal .about-logo {
   font-size: 2em;
   padding: 8px 10px 6px;
 }
 
-.hugo-command-about-modal .about-header h2 {
+.warped-hugo-about-modal .about-header h2 {
   margin: 0;
   font-size: 1.5em;
 }
 
-.hugo-command-about-modal .about-version {
+.warped-hugo-about-modal .about-version {
   color: var(--text-muted);
   font-size: 0.9em;
   margin: 0 0 12px 0;
 }
 
-.hugo-command-about-modal .about-blurb {
+.warped-hugo-about-modal .about-blurb {
   color: var(--text-muted);
   margin-bottom: 20px;
   line-height: 1.5;
 }
 
-.hugo-command-about-modal .about-details {
+.warped-hugo-about-modal .about-details {
   font-size: 0.9em;
   color: var(--text-muted);
 }
 
-.hugo-command-about-modal .about-details a {
+.warped-hugo-about-modal .about-details a {
   color: var(--text-accent);
 }
 
 /* About Section in Settings */
-.hugo-command-about-section {
+.warped-hugo-about-section {
   background-color: var(--background-secondary);
   border-radius: 8px;
   padding: 16px;
   margin-bottom: 24px;
 }
 
-.hugo-command-about-section .about-header {
+.warped-hugo-about-section .about-header {
   display: flex;
   align-items: center;
   gap: 10px;
   margin-bottom: 8px;
 }
 
-.hugo-command-about-section .about-logo {
+.warped-hugo-about-section .about-logo {
   font-size: 1.2em;
 }
 
-.hugo-command-about-section .about-title {
+.warped-hugo-about-section .about-title {
   font-weight: 600;
   font-size: 1.1em;
 }
 
-.hugo-command-about-section .about-blurb {
+.warped-hugo-about-section .about-blurb {
   color: var(--text-muted);
   margin: 0 0 12px 0;
   font-size: 0.95em;
   line-height: 1.4;
 }
 
-.hugo-command-about-section .about-version {
+.warped-hugo-about-section .about-version {
   color: var(--text-muted);
   font-size: 0.85em;
   margin: 0 0 8px 0;
 }
 
-.hugo-command-about-section .about-details {
+.warped-hugo-about-section .about-details {
   font-size: 0.85em;
   color: var(--text-muted);
 }
 
-.hugo-command-about-section .about-details a {
+.warped-hugo-about-section .about-details a {
   color: var(--text-accent);
 }
 
 /* Sidebar Styles */
-.hugo-command-sidebar {
+.warped-hugo-sidebar {
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -125,7 +125,7 @@
   overflow: hidden;
 }
 
-.hugo-command-header {
+.warped-hugo-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -135,24 +135,24 @@
   z-index: 1;
 }
 
-.hugo-command-header-title {
+.warped-hugo-header-title {
   display: flex;
   align-items: center;
   gap: 6px;
   white-space: nowrap;
 }
 
-.hugo-command-header-title h4 {
+.warped-hugo-header-title h4 {
   margin: 0;
 }
 
-.hugo-command-button-group {
+.warped-hugo-button-group {
   display: flex;
   gap: 4px;
   align-items: center;
 }
 
-.hugo-command-content {
+.warped-hugo-content {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
@@ -160,23 +160,23 @@
 }
 
 /* Scrollbar styling - hugs right edge, doesn't overlap content */
-.hugo-command-sidebar ::-webkit-scrollbar {
+.warped-hugo-sidebar ::-webkit-scrollbar {
   width: 8px;
   position: absolute;
   right: 0;
 }
 
-.hugo-command-sidebar ::-webkit-scrollbar-track {
+.warped-hugo-sidebar ::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.hugo-command-sidebar ::-webkit-scrollbar-thumb {
+.warped-hugo-sidebar ::-webkit-scrollbar-thumb {
   background-color: color-mix(in srgb, var(--text-muted) 65%, transparent);
   border-radius: 4px;
 }
 
 /* New post button */
-.hugo-command-new-btn {
+.warped-hugo-new-btn {
   padding: 4px;
   border: none !important;
   background: transparent !important;
@@ -188,13 +188,13 @@
   border-radius: 4px;
 }
 
-.hugo-command-new-btn:hover {
+.warped-hugo-new-btn:hover {
   opacity: 1;
   background-color: var(--background-modifier-hover) !important;
 }
 
 /* Menu button (kebab) */
-.hugo-command-menu-btn {
+.warped-hugo-menu-btn {
   padding: 4px;
   border: none !important;
   background: transparent !important;
@@ -206,13 +206,13 @@
   border-radius: 4px;
 }
 
-.hugo-command-menu-btn:hover {
+.warped-hugo-menu-btn:hover {
   opacity: 1;
   background-color: var(--background-modifier-hover) !important;
 }
 
 /* Enhance outline button (sparkles) */
-.hugo-command-enhance-btn {
+.warped-hugo-enhance-btn {
   padding: 4px;
   border: none !important;
   background: transparent !important;
@@ -224,12 +224,12 @@
   border-radius: 4px;
 }
 
-.hugo-command-enhance-btn:hover {
+.warped-hugo-enhance-btn:hover {
   opacity: 1;
   background-color: var(--background-modifier-hover) !important;
 }
 
-.hugo-command-enhance-btn.loading {
+.warped-hugo-enhance-btn.loading {
   opacity: 0.4;
   cursor: wait;
   animation: hugo-enhance-pulse 1.5s ease-in-out infinite;
@@ -248,7 +248,7 @@
 }
 
 /* Filter bar */
-.hugo-command-filters {
+.warped-hugo-filters {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -256,7 +256,7 @@
   flex-wrap: wrap;
 }
 
-.hugo-command-status-filter {
+.warped-hugo-status-filter {
   padding: 4px 8px;
   border-radius: 4px;
   border: 1px solid var(--background-modifier-border);
@@ -266,7 +266,7 @@
 }
 
 /* Unified filter trigger buttons (folder, tags) */
-.hugo-command-filter-trigger {
+.warped-hugo-filter-trigger {
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -281,19 +281,19 @@
   transition: background-color 0.15s, color 0.15s, border-color 0.15s;
 }
 
-.hugo-command-filter-trigger:hover {
+.warped-hugo-filter-trigger:hover {
   background-color: var(--background-modifier-hover);
   color: var(--text-normal);
   border-color: var(--background-modifier-border-hover);
 }
 
-.hugo-command-filter-trigger svg {
+.warped-hugo-filter-trigger svg {
   width: 12px;
   height: 12px;
 }
 
 /* Legacy tag trigger - keep for backwards compatibility */
-.hugo-command-tag-trigger {
+.warped-hugo-tag-trigger {
   cursor: pointer;
   font-size: 9pt;
   font-family: var(--font-monospace);
@@ -305,21 +305,21 @@
   transition: opacity 0.15s, background-color 0.15s;
 }
 
-.hugo-command-tag-trigger:hover {
+.warped-hugo-tag-trigger:hover {
   opacity: 1;
   color: var(--tag-color-hover);
   background-color: var(--tag-background-hover);
 }
 
 /* Filter prefix label at start of filter bar */
-.hugo-command-filter-prefix {
+.warped-hugo-filter-prefix {
   font-size: 0.85em;
   color: var(--text-muted);
   font-weight: 500;
 }
 
 /* Active filter chip (value + clear button) */
-.hugo-command-active-filter {
+.warped-hugo-active-filter {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -330,27 +330,27 @@
   border-radius: var(--tag-radius);
 }
 
-.hugo-command-active-filter.folder-filter {
+.warped-hugo-active-filter.folder-filter {
   background-color: var(--background-modifier-success);
 }
 
-.hugo-command-filter-value {
+.warped-hugo-filter-value {
   font-weight: 500;
 }
 
-.hugo-command-filter-clear {
+.warped-hugo-filter-clear {
   cursor: pointer;
   opacity: 0.7;
   font-weight: bold;
   margin-left: 2px;
 }
 
-.hugo-command-filter-clear:hover {
+.warped-hugo-filter-clear:hover {
   opacity: 1;
 }
 
 /* Info icon for stats */
-.hugo-command-info-icon {
+.warped-hugo-info-icon {
   cursor: pointer;
   font-size: 0.9em;
   opacity: 0.6;
@@ -358,12 +358,12 @@
   transition: opacity 0.15s;
 }
 
-.hugo-command-info-icon:hover {
+.warped-hugo-info-icon:hover {
   opacity: 1;
 }
 
 /* Info popup */
-.hugo-command-info-popup {
+.warped-hugo-info-popup {
   background-color: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   border-radius: 6px;
@@ -373,13 +373,13 @@
   z-index: 1000;
 }
 
-.hugo-command-info-row {
+.warped-hugo-info-row {
   font-size: 0.85em;
   color: var(--text-normal);
   padding: 2px 0;
 }
 
-.hugo-command-info-row.total {
+.warped-hugo-info-row.total {
   font-weight: 500;
   border-top: 1px solid var(--background-modifier-border);
   margin-top: 4px;
@@ -387,7 +387,7 @@
 }
 
 /* Tag dropdown */
-.hugo-command-tag-dropdown {
+.warped-hugo-tag-dropdown {
   background-color: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   border-radius: 6px;
@@ -399,12 +399,12 @@
 }
 
 /* Wider dropdown when review section is present */
-.hugo-command-tag-dropdown:has(.hugo-command-review-container) {
+.warped-hugo-tag-dropdown:has(.warped-hugo-review-container) {
   min-width: 280px;
   max-width: 320px;
 }
 
-.hugo-command-tag-item {
+.warped-hugo-tag-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -415,48 +415,48 @@
   transition: background-color 0.1s;
 }
 
-.hugo-command-tag-item:hover {
+.warped-hugo-tag-item:hover {
   background-color: var(--background-modifier-hover);
 }
 
-.hugo-command-tag-item.active {
+.warped-hugo-tag-item.active {
   background-color: var(--background-modifier-active-hover);
 }
 
-.hugo-command-tag-item.clear {
+.warped-hugo-tag-item.clear {
   color: var(--text-muted);
   font-size: 0.85em;
 }
 
-.hugo-command-tag-label {
+.warped-hugo-tag-label {
   flex: 1;
 }
 
-.hugo-command-tag-action {
+.warped-hugo-tag-action {
   font-size: 0.8em;
   color: var(--text-muted);
   opacity: 0;
   transition: opacity 0.1s;
 }
 
-.hugo-command-tag-item:hover .hugo-command-tag-action {
+.warped-hugo-tag-item:hover .warped-hugo-tag-action {
   opacity: 1;
 }
 
-.hugo-command-tag-separator {
+.warped-hugo-tag-separator {
   height: 1px;
   background-color: var(--background-modifier-border);
   margin: 4px 0;
 }
 
 /* Content list */
-.hugo-command-list {
+.warped-hugo-list {
   list-style: none;
   padding: 0;
   margin: 0;
 }
 
-.hugo-command-item {
+.warped-hugo-item {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -464,12 +464,12 @@
   border-bottom: 1px solid var(--background-modifier-border-hover);
 }
 
-.hugo-command-item:last-child {
+.warped-hugo-item:last-child {
   border-bottom: none;
 }
 
 /* Status badges */
-.hugo-command-badge {
+.warped-hugo-badge {
   font-size: 0.7em;
   font-weight: 600;
   padding: 2px 5px;
@@ -477,17 +477,17 @@
   flex-shrink: 0;
 }
 
-.hugo-command-badge.draft {
+.warped-hugo-badge.draft {
   background-color: var(--color-yellow);
   color: var(--background-primary);
 }
 
-.hugo-command-badge.published {
+.warped-hugo-badge.published {
   background-color: var(--color-green);
   color: var(--background-primary);
 }
 
-.hugo-command-item-title {
+.warped-hugo-item-title {
   flex: 1;
   cursor: pointer;
   color: var(--text-normal);
@@ -496,12 +496,12 @@
   white-space: nowrap;
 }
 
-.hugo-command-item-title:hover {
+.warped-hugo-item-title:hover {
   color: var(--text-accent);
 }
 
 /* Subfolder chip next to post title */
-.hugo-command-subfolder-chip {
+.warped-hugo-subfolder-chip {
   font-size: 0.7em;
   padding: 2px 6px;
   background-color: var(--background-modifier-hover);
@@ -511,14 +511,14 @@
   white-space: nowrap;
 }
 
-.hugo-command-item-date {
+.warped-hugo-item-date {
   font-size: 0.8em;
   color: var(--text-muted);
   flex-shrink: 0;
 }
 
 /* Info trigger on each post item (i) */
-.hugo-command-item-info-trigger {
+.warped-hugo-item-info-trigger {
   cursor: pointer;
   font-size: 0.85em;
   opacity: 0.5;
@@ -527,17 +527,17 @@
   flex-shrink: 0;
 }
 
-.hugo-command-item-info-trigger:hover {
+.warped-hugo-item-info-trigger:hover {
   opacity: 1;
 }
 
 /* Header section in item info dropdown */
-.hugo-command-info-header {
+.warped-hugo-info-header {
   padding: 10px 12px;
   border-bottom: 1px solid var(--background-modifier-border);
 }
 
-.hugo-command-info-title {
+.warped-hugo-info-title {
   font-size: 0.95em;
   font-weight: 600;
   color: var(--text-normal);
@@ -545,13 +545,13 @@
   margin-bottom: 4px;
 }
 
-.hugo-command-info-meta {
+.warped-hugo-info-meta {
   font-size: 0.8em;
   color: var(--text-muted);
 }
 
 /* Date display in item info dropdown (legacy, kept for compatibility) */
-.hugo-command-info-date {
+.warped-hugo-info-date {
   font-size: 0.85em;
   color: var(--text-normal);
   padding: 8px 12px;
@@ -559,7 +559,7 @@
 }
 
 /* Empty state */
-.hugo-command-empty {
+.warped-hugo-empty {
   color: var(--text-muted);
   font-style: italic;
   padding: 20px 0;
@@ -567,11 +567,11 @@
 }
 
 /* Folder groups */
-.hugo-command-folder-group {
+.warped-hugo-folder-group {
   margin-bottom: 8px;
 }
 
-.hugo-command-folder-header {
+.warped-hugo-folder-header {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -582,37 +582,37 @@
   user-select: none;
 }
 
-.hugo-command-folder-header.static {
+.warped-hugo-folder-header.static {
   cursor: default;
 }
 
-.hugo-command-folder-header:not(.static):hover {
+.warped-hugo-folder-header:not(.static):hover {
   background-color: var(--background-modifier-hover);
 }
 
-.hugo-command-folder-chevron {
+.warped-hugo-folder-chevron {
   font-size: 0.8em;
   width: 12px;
   color: var(--text-muted);
 }
 
-.hugo-command-folder-name {
+.warped-hugo-folder-name {
   font-weight: 500;
   flex: 1;
 }
 
-.hugo-command-folder-count {
+.warped-hugo-folder-count {
   font-size: 0.8em;
   color: var(--text-muted);
 }
 
-.hugo-command-folder-group .hugo-command-list {
+.warped-hugo-folder-group .warped-hugo-list {
   margin-left: 0;
   padding-left: 0;
 }
 
-/* Folder filter trigger button (SVG icon) - deprecated, use .hugo-command-filter-trigger */
-.hugo-command-folder-trigger {
+/* Folder filter trigger button (SVG icon) - deprecated, use .warped-hugo-filter-trigger */
+.warped-hugo-folder-trigger {
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -624,18 +624,18 @@
   color: var(--text-muted);
 }
 
-.hugo-command-folder-trigger:hover {
+.warped-hugo-folder-trigger:hover {
   opacity: 1;
   background-color: var(--background-modifier-hover);
   color: var(--text-normal);
 }
 
-.hugo-command-folder-trigger svg {
+.warped-hugo-folder-trigger svg {
   display: block;
 }
 
 /* Search field container */
-.hugo-command-search-container {
+.warped-hugo-search-container {
   flex: 1;
   min-width: 100px;
   display: flex;
@@ -647,12 +647,12 @@
   background-color: var(--background-primary);
 }
 
-.hugo-command-search-container:focus-within {
+.warped-hugo-search-container:focus-within {
   border-color: var(--interactive-accent);
 }
 
 /* Filter chips inside search field */
-.hugo-command-search-chip {
+.warped-hugo-search-chip {
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -665,24 +665,24 @@
   flex-shrink: 0;
 }
 
-.hugo-command-search-chip.folder-chip {
+.warped-hugo-search-chip.folder-chip {
   background-color: var(--background-modifier-hover);
   color: var(--text-muted);
 }
 
-.hugo-command-search-chip-clear {
+.warped-hugo-search-chip-clear {
   cursor: pointer;
   opacity: 0.7;
   font-weight: bold;
   margin-left: 2px;
 }
 
-.hugo-command-search-chip-clear:hover {
+.warped-hugo-search-chip-clear:hover {
   opacity: 1;
 }
 
 /* Search input */
-.hugo-command-search-input {
+.warped-hugo-search-input {
   flex: 1;
   min-width: 40px;
   border: none;
@@ -692,12 +692,12 @@
   color: var(--text-normal);
 }
 
-.hugo-command-search-input::placeholder {
+.warped-hugo-search-input::placeholder {
   color: var(--text-muted);
 }
 
 /* Clear all button in search */
-.hugo-command-search-clear {
+.warped-hugo-search-clear {
   cursor: pointer;
   color: var(--text-muted);
   opacity: 0.6;
@@ -705,39 +705,39 @@
   flex-shrink: 0;
 }
 
-.hugo-command-search-clear:hover {
+.warped-hugo-search-clear:hover {
   opacity: 1;
   color: var(--text-normal);
 }
 
 /* Folder tag styling in dropdowns */
-.hugo-command-tag-item.folder-tag {
+.warped-hugo-tag-item.folder-tag {
   color: var(--text-accent);
 }
 
 /* Hierarchical folder indentation */
-.hugo-command-tag-item.folder-depth-0 {
+.warped-hugo-tag-item.folder-depth-0 {
   padding-left: 12px;
 }
 
-.hugo-command-tag-item.folder-depth-1 {
+.warped-hugo-tag-item.folder-depth-1 {
   padding-left: 24px;
 }
 
-.hugo-command-tag-item.folder-depth-2 {
+.warped-hugo-tag-item.folder-depth-2 {
   padding-left: 36px;
 }
 
-.hugo-command-tag-item.folder-depth-3 {
+.warped-hugo-tag-item.folder-depth-3 {
   padding-left: 48px;
 }
 
-.hugo-command-tag-item.folder-depth-4 {
+.warped-hugo-tag-item.folder-depth-4 {
   padding-left: 60px;
 }
 
 /* Tag section headers in dropdowns */
-.hugo-command-tag-section-header {
+.warped-hugo-tag-section-header {
   font-size: 0.75em;
   font-weight: 600;
   color: var(--text-muted);
@@ -747,20 +747,20 @@
 }
 
 /* Title prompt modal */
-.hugo-command-title-modal {
+.warped-hugo-title-modal {
   padding: 16px;
 }
 
-.hugo-command-title-modal h3 {
+.warped-hugo-title-modal h3 {
   margin: 0 0 16px 0;
   font-size: 1.2em;
 }
 
-.hugo-command-title-input-container {
+.warped-hugo-title-input-container {
   margin-bottom: 16px;
 }
 
-.hugo-command-title-input {
+.warped-hugo-title-input {
   width: 100%;
   padding: 8px 12px;
   font-size: 1em;
@@ -770,30 +770,30 @@
   color: var(--text-normal);
 }
 
-.hugo-command-title-input:focus {
+.warped-hugo-title-input:focus {
   border-color: var(--interactive-accent);
   outline: none;
 }
 
-.hugo-command-title-buttons {
+.warped-hugo-title-buttons {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
 }
 
-.hugo-command-title-buttons button {
+.warped-hugo-title-buttons button {
   padding: 6px 16px;
   border-radius: 4px;
   cursor: pointer;
 }
 
 /* Site Settings Modal */
-.hugo-command-site-settings-modal {
+.warped-hugo-site-settings-modal {
   width: 700px;
   max-width: 90vw;
 }
 
-.hugo-command-site-settings {
+.warped-hugo-site-settings {
   display: flex;
   flex-direction: column;
   height: 70vh;
@@ -802,26 +802,26 @@
 }
 
 /* Fixed header section */
-.hugo-command-site-settings .site-settings-header-section {
+.warped-hugo-site-settings .site-settings-header-section {
   flex-shrink: 0;
   padding: 20px 24px 16px;
   border-bottom: 1px solid var(--background-modifier-border);
   background-color: var(--background-primary);
 }
 
-.hugo-command-site-settings .site-settings-header {
+.warped-hugo-site-settings .site-settings-header {
   display: flex;
   align-items: center;
   gap: 12px;
   margin-bottom: 12px;
 }
 
-.hugo-command-site-settings .site-settings-header h2 {
+.warped-hugo-site-settings .site-settings-header h2 {
   margin: 0;
   font-size: 1.4em;
 }
 
-.hugo-command-site-settings .site-settings-title-display {
+.warped-hugo-site-settings .site-settings-title-display {
   display: flex;
   align-items: baseline;
   gap: 8px;
@@ -830,25 +830,25 @@
   border-radius: 6px;
 }
 
-.hugo-command-site-settings .site-title-label {
+.warped-hugo-site-settings .site-title-label {
   font-size: 0.9em;
   color: var(--text-muted);
 }
 
-.hugo-command-site-settings .site-title-value {
+.warped-hugo-site-settings .site-title-value {
   font-size: 1.2em;
   font-weight: 600;
   color: var(--text-normal);
 }
 
 /* Scrollable content area */
-.hugo-command-site-settings .site-settings-scroll-area {
+.warped-hugo-site-settings .site-settings-scroll-area {
   flex: 1;
   overflow-y: auto;
   padding: 16px 24px;
 }
 
-.hugo-command-site-settings h3 {
+.warped-hugo-site-settings h3 {
   font-size: 0.85em;
   font-weight: 600;
   color: var(--text-muted);
@@ -857,35 +857,35 @@
   letter-spacing: 0.5px;
 }
 
-.hugo-command-site-settings h3:first-child {
+.warped-hugo-site-settings h3:first-child {
   margin-top: 8px;
 }
 
 /* Wider input fields */
-.hugo-command-site-settings .setting-item {
+.warped-hugo-site-settings .setting-item {
   padding: 12px 0;
   border-top: none;
 }
 
-.hugo-command-site-settings .setting-item-control input[type="text"] {
+.warped-hugo-site-settings .setting-item-control input[type="text"] {
   width: 280px;
 }
 
-.hugo-command-site-settings .setting-item-info {
+.warped-hugo-site-settings .setting-item-info {
   flex: 1;
 }
 
-.hugo-command-site-settings .setting-item-name {
+.warped-hugo-site-settings .setting-item-name {
   font-weight: 500;
 }
 
-.hugo-command-site-settings .setting-item-description {
+.warped-hugo-site-settings .setting-item-description {
   font-size: 0.85em;
   color: var(--text-muted);
 }
 
 /* Fixed footer section */
-.hugo-command-site-settings .site-settings-footer-section {
+.warped-hugo-site-settings .site-settings-footer-section {
   flex-shrink: 0;
   padding: 16px 24px;
   border-top: 1px solid var(--background-modifier-border);
@@ -895,61 +895,61 @@
   justify-content: space-between;
 }
 
-.hugo-command-site-settings .site-settings-file-info {
+.warped-hugo-site-settings .site-settings-file-info {
   font-size: 0.85em;
   color: var(--text-muted);
 }
 
-.hugo-command-site-settings .site-settings-file-info.clickable {
+.warped-hugo-site-settings .site-settings-file-info.clickable {
   cursor: pointer;
 }
 
-.hugo-command-site-settings .site-settings-file-link {
+.warped-hugo-site-settings .site-settings-file-link {
   color: var(--text-accent);
   text-decoration: underline;
   text-decoration-style: dotted;
 }
 
-.hugo-command-site-settings .site-settings-file-link:hover {
+.warped-hugo-site-settings .site-settings-file-link:hover {
   text-decoration-style: solid;
 }
 
-.hugo-command-site-settings .site-settings-buttons {
+.warped-hugo-site-settings .site-settings-buttons {
   display: flex;
   gap: 8px;
 }
 
-.hugo-command-site-settings .site-settings-buttons button {
+.warped-hugo-site-settings .site-settings-buttons button {
   padding: 8px 20px;
   border-radius: 4px;
   cursor: pointer;
 }
 
-.hugo-command-site-settings .site-settings-error {
+.warped-hugo-site-settings .site-settings-error {
   color: var(--text-muted);
   font-style: italic;
   padding: 40px 20px;
   text-align: center;
 }
 
-.hugo-command-site-settings .site-settings-divider {
+.warped-hugo-site-settings .site-settings-divider {
   border: none;
   border-top: 1px solid var(--background-modifier-border);
   margin: 20px 0;
 }
 
 /* Review Section in Item Info Dropdown */
-.hugo-command-review-container {
+.warped-hugo-review-container {
   padding: 8px 12px;
 }
 
-.hugo-command-review-list {
+.warped-hugo-review-list {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.hugo-command-review-item {
+.warped-hugo-review-item {
   display: flex;
   align-items: flex-start;
   gap: 8px;
@@ -957,32 +957,32 @@
   line-height: 1.4;
 }
 
-.hugo-command-review-status {
+.warped-hugo-review-status {
   flex-shrink: 0;
   font-weight: 600;
   width: 16px;
   text-align: center;
 }
 
-.hugo-command-review-status.passed {
+.warped-hugo-review-status.passed {
   color: #22c55e;
 }
 
-.hugo-command-review-status.failed {
+.warped-hugo-review-status.failed {
   color: #ef4444;
 }
 
-.hugo-command-review-status.unknown {
+.warped-hugo-review-status.unknown {
   color: var(--text-muted);
 }
 
-.hugo-command-review-text {
+.warped-hugo-review-text {
   flex: 1;
   color: var(--text-normal);
   cursor: help;
 }
 
-.hugo-command-review-timestamp {
+.warped-hugo-review-timestamp {
   font-size: 0.8em;
   color: var(--text-muted);
   margin-top: 6px;
@@ -990,7 +990,7 @@
   border-top: 1px solid var(--background-modifier-border);
 }
 
-.hugo-command-review-btn {
+.warped-hugo-review-btn {
   padding: 6px 12px;
   margin-top: 8px;
   cursor: pointer;
@@ -1002,16 +1002,16 @@
   transition: background-color 0.15s;
 }
 
-.hugo-command-review-btn:hover {
+.warped-hugo-review-btn:hover {
   background-color: var(--interactive-hover);
 }
 
-.hugo-command-review-btn.loading {
+.warped-hugo-review-btn.loading {
   opacity: 0.6;
   cursor: wait;
 }
 
-.hugo-command-review-loading {
+.warped-hugo-review-loading {
   color: var(--text-muted);
   font-style: italic;
   padding: 16px 12px;
@@ -1021,7 +1021,7 @@
   gap: 8px;
 }
 
-.hugo-command-review-spinner {
+.warped-hugo-review-spinner {
   display: inline-block;
   width: 14px;
   height: 14px;
@@ -1037,7 +1037,7 @@
   }
 }
 
-.hugo-command-review-score {
+.warped-hugo-review-score {
   font-size: 0.85em;
   font-weight: 600;
   padding: 4px 8px;
@@ -1046,22 +1046,22 @@
   text-align: center;
 }
 
-.hugo-command-review-score.all-passed {
+.warped-hugo-review-score.all-passed {
   background-color: rgba(34, 197, 94, 0.15);
   color: #22c55e;
 }
 
-.hugo-command-review-score.some-failed {
+.warped-hugo-review-score.some-failed {
   background-color: rgba(234, 179, 8, 0.15);
   color: #eab308;
 }
 
-.hugo-command-review-score.many-failed {
+.warped-hugo-review-score.many-failed {
   background-color: rgba(239, 68, 68, 0.15);
   color: #ef4444;
 }
 
-.hugo-command-review-error {
+.warped-hugo-review-error {
   color: var(--text-error);
   font-size: 0.9em;
   padding: 4px 0;

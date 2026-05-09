@@ -7,7 +7,7 @@ import { TodoItem, ProjectInfo, ItemRenderConfig, FocusQueueState } from "./type
 import { ContextMenuHandler } from "./ContextMenuHandler";
 import { getPriorityValue, compareTodoItems, compareWithEffectivePriority, hasTag, openFileAtLine, extractMentions, resolveMentions, resolveEffectiveMentions, showNotice, getTagColourInfo, extractCompletionDate, buildFocusQueue, getItemDate, tallyProjectTags } from "./utils";
 
-export const VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
+export const VIEW_TYPE_TODO_SIDEBAR = "warped-todo-sidebar";
 
 export class TodoSidebarView extends ItemView {
   private scanner: TodoScanner;
@@ -569,7 +569,7 @@ export class TodoSidebarView extends ItemView {
   render(): void {
     const container = this.containerEl.children[1] as HTMLElement;
     container.empty();
-    container.addClass("space-command-sidebar");
+    container.addClass("warped-todo-sidebar");
 
     // Phase 2: when immersive Focus Mode is active, replace the entire sidebar
     // content with the focus card. Tabs, summary, and project list are not
@@ -584,7 +584,7 @@ export class TodoSidebarView extends ItemView {
     // Header with buttons
     const headerDiv = container.createEl("div", { cls: "sidebar-header" });
     const titleEl = headerDiv.createEl("h4", { cls: "sidebar-title" });
-    const logoEl = titleEl.createEl("span", { cls: "space-command-logo clickable-logo", text: "␣⌘" });
+    const logoEl = titleEl.createEl("span", { cls: "warped-todo-logo clickable-logo", text: "␣⌘" });
     logoEl.addEventListener("click", () => this.onShowAbout());
     switch (this.activeTab) {
       case 'todos': titleEl.appendText(" TODOs"); break;
@@ -1797,7 +1797,7 @@ export class TodoSidebarView extends ItemView {
     // as the regular sidebar.
     const header = container.createEl("div", { cls: "sidebar-header sidebar-header-focus" });
     const titleEl = header.createEl("h4", { cls: "sidebar-title" });
-    const logoEl = titleEl.createEl("span", { cls: "space-command-logo clickable-logo", text: "␣⌘" });
+    const logoEl = titleEl.createEl("span", { cls: "warped-todo-logo clickable-logo", text: "␣⌘" });
     logoEl.addEventListener("click", () => this.onShowAbout());
     titleEl.appendText(" TODOs");
     this.createSidebarMenuButton(header);
@@ -2024,7 +2024,7 @@ export class TodoSidebarView extends ItemView {
           .setIcon("settings")
           .onClick(() => {
             (this.app as any).setting.open();
-            (this.app as any).setting.openTabById("space-command");
+            (this.app as any).setting.openTabById("warped-todo");
           });
       });
 

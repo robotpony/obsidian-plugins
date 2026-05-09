@@ -3,6 +3,8 @@ import {
   replaceTodoneWithTodo,
   hasCheckboxFormat,
   isCheckboxChecked,
+  markCheckboxComplete,
+  markCheckboxIncomplete,
 } from "../utils";
 
 // Covers the line-level transform that runs when the scanner sees an unchecked
@@ -33,6 +35,28 @@ describe("replaceTodoneWithTodo (uncheck revert)", () => {
   it("is a no-op on a line without #todone", () => {
     const input = "- [ ] Already a todo #todo";
     expect(replaceTodoneWithTodo(input)).toBe(input);
+  });
+});
+
+describe("markCheckboxComplete / markCheckboxIncomplete", () => {
+  it("checks an unindented item", () => {
+    expect(markCheckboxComplete("- [ ] Task #todo")).toBe("- [x] Task #todo");
+  });
+
+  it("checks an indented item (2 spaces)", () => {
+    expect(markCheckboxComplete("  - [ ] Task #todo")).toBe("  - [x] Task #todo");
+  });
+
+  it("checks an indented item (4 spaces)", () => {
+    expect(markCheckboxComplete("    - [ ] Task #todo")).toBe("    - [x] Task #todo");
+  });
+
+  it("unchecks an unindented item", () => {
+    expect(markCheckboxIncomplete("- [x] Task #todone @2026-05-08")).toBe("- [ ] Task #todone @2026-05-08");
+  });
+
+  it("unchecks an indented item (2 spaces)", () => {
+    expect(markCheckboxIncomplete("  - [x] Task #todone @2026-05-08")).toBe("  - [ ] Task #todone @2026-05-08");
   });
 });
 

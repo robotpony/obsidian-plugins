@@ -418,11 +418,11 @@ class AboutModal extends Modal {
   onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.addClass("space-command-about-modal");
+    contentEl.addClass("warped-todo-about-modal");
 
     // Logo and title
     const header = contentEl.createEl("div", { cls: "about-header" });
-    header.createEl("span", { cls: "space-command-logo about-logo", text: "␣⌘" });
+    header.createEl("span", { cls: "warped-todo-logo about-logo", text: "␣⌘" });
     header.createEl("h2", { text: "Space Command" });
 
     // Version
@@ -465,11 +465,11 @@ class StatsModal extends Modal {
   onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.addClass("space-command-stats-modal");
+    contentEl.addClass("warped-todo-stats-modal");
 
     // Header
     const header = contentEl.createEl("div", { cls: "stats-header" });
-    header.createEl("span", { cls: "space-command-logo stats-logo", text: "␣⌘" });
+    header.createEl("span", { cls: "warped-todo-logo stats-logo", text: "␣⌘" });
     header.createEl("h2", { text: "Vault Statistics" });
 
     // Gather stats
@@ -542,9 +542,9 @@ class SpaceCommandSettingTab extends PluginSettingTab {
     containerEl.createEl("h2", { text: "Space Command Settings" });
 
     // About section
-    const aboutSection = containerEl.createEl("div", { cls: "space-command-about-section" });
+    const aboutSection = containerEl.createEl("div", { cls: "warped-todo-about-section" });
     const aboutHeader = aboutSection.createEl("div", { cls: "about-header" });
-    aboutHeader.createEl("span", { cls: "space-command-logo about-logo", text: "␣⌘" });
+    aboutHeader.createEl("span", { cls: "warped-todo-logo about-logo", text: "␣⌘" });
     aboutHeader.createEl("span", { cls: "about-title", text: "Space Command" });
 
     aboutSection.createEl("p", {

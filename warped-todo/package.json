@@ -1,7 +1,7 @@
 {
-  "name": "space-command",
+  "name": "warped-todo",
   "version": "0.25.0",
-  "description": "␣⌘ Space Command - Obsidian plugin for managing TODOs, TODONEs, and workflows",
+  "description": "Warped Todo - Obsidian plugin for managing TODOs, TODONEs, and workflows",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",

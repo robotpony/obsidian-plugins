@@ -186,7 +186,7 @@ export class SlashCommandSuggest extends EditorSuggest<SuggestionItem> {
   }
 
   renderSuggestion(item: SuggestionItem, el: HTMLElement): void {
-    el.addClass("space-command-suggestion");
+    el.addClass("warped-todo-suggestion");
 
     const iconSpan = el.createEl("span", { cls: "suggestion-icon" });
     iconSpan.textContent = item.icon;

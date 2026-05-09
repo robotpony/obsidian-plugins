@@ -85,7 +85,7 @@ export default class GCommandPlugin extends Plugin {
     const setting = (this.app as any).setting;
     if (setting) {
       setting.open();
-      setting.openTabById("g-command");
+      setting.openTabById("warped-reference");
     }
   }
 
@@ -230,7 +230,7 @@ class GCommandSettingTab extends PluginSettingTab {
       case "connected": {
         const descEl = document.createDocumentFragment();
         const dot = document.createElement("span");
-        dot.className = "g-command-connection-dot g-command-connection-dot--connected";
+        dot.className = "warped-reference-connection-dot warped-reference-connection-dot--connected";
         descEl.appendChild(dot);
         descEl.appendText(" Connected");
         setting.setDesc(descEl as unknown as string);
@@ -239,7 +239,7 @@ class GCommandSettingTab extends PluginSettingTab {
       case "connecting": {
         const descEl = document.createDocumentFragment();
         const dot = document.createElement("span");
-        dot.className = "g-command-connection-dot g-command-connection-dot--connecting";
+        dot.className = "warped-reference-connection-dot warped-reference-connection-dot--connecting";
         descEl.appendChild(dot);
         descEl.appendText(" Waiting for Google sign-in... Complete the sign-in in your browser.");
         setting.setDesc(descEl as unknown as string);

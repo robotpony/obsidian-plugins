@@ -137,7 +137,7 @@ var import_obsidian2 = require("obsidian");
 
 // src/utils.ts
 var LOGO_PREFIX = "H\u2318";
-var showNotice2 = createNoticeFactory(LOGO_PREFIX, "hugo-command-logo");
+var showNotice2 = createNoticeFactory(LOGO_PREFIX, "warped-hugo-logo");
 function parseFrontmatter(content) {
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
   if (!match) {
@@ -690,7 +690,7 @@ var HugoScanner = class extends import_obsidian4.Events {
 
 // src/SidebarView.ts
 var import_obsidian5 = require("obsidian");
-var VIEW_TYPE_HUGO_SIDEBAR = "hugo-command-sidebar";
+var VIEW_TYPE_HUGO_SIDEBAR = "warped-hugo-sidebar";
 var HugoSidebarView = class extends import_obsidian5.ItemView {
   constructor(leaf, scanner, settings, onShowAbout, onOpenSettings, onOpenSiteSettings) {
     super(leaf);
@@ -751,26 +751,26 @@ var HugoSidebarView = class extends import_obsidian5.ItemView {
   render() {
     const container = this.containerEl.children[1];
     container.empty();
-    container.addClass("hugo-command-sidebar");
+    container.addClass("warped-hugo-sidebar");
     this.renderHeader(container);
-    const content = container.createEl("div", { cls: "hugo-command-content" });
+    const content = container.createEl("div", { cls: "warped-hugo-content" });
     this.renderFilters(content);
     this.renderContentList(content);
   }
   renderHeader(container) {
-    const header = container.createEl("div", { cls: "hugo-command-header" });
-    const titleEl = header.createEl("div", { cls: "hugo-command-header-title" });
+    const header = container.createEl("div", { cls: "warped-hugo-header" });
+    const titleEl = header.createEl("div", { cls: "warped-hugo-header-title" });
     const logo = titleEl.createEl("span", {
-      cls: "hugo-command-logo clickable-logo",
+      cls: "warped-hugo-logo clickable-logo",
       text: LOGO_PREFIX
     });
     logo.addEventListener("click", () => {
       this.onShowAbout();
     });
     titleEl.createEl("h4", { text: "Hugo" });
-    const buttonGroup = header.createEl("div", { cls: "hugo-command-button-group" });
+    const buttonGroup = header.createEl("div", { cls: "warped-hugo-button-group" });
     const newBtn = buttonGroup.createEl("button", {
-      cls: "clickable-icon hugo-command-new-btn",
+      cls: "clickable-icon warped-hugo-new-btn",
       attr: { "aria-label": "New post" }
     });
     newBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
@@ -779,7 +779,7 @@ var HugoSidebarView = class extends import_obsidian5.ItemView {
       this.showNewPostDropdown(newBtn);
     });
     const menuBtn = buttonGroup.createEl("button", {
-      cls: "clickable-icon hugo-command-menu-btn",
+      cls: "clickable-icon warped-hugo-menu-btn",
       attr: { "aria-label": "Menu" }
     });
     menuBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>';
@@ -805,9 +805,9 @@ var HugoSidebarView = class extends import_obsidian5.ItemView {
     });
   }
   renderFilters(container) {
-    const filterBar = container.createEl("div", { cls: "hugo-command-filters" });
+    const filterBar = container.createEl("div", { cls: "warped-hugo-filters" });
     filterBar.createEl("span", {
-      cls: "hugo-command-filter-prefix",
+      cls: "warped-hugo-filter-prefix",
       text: ""
     });
     const folderHierarchy = this.scanner.getFolderHierarchy();
@@ -819,7 +819,7 @@ var HugoSidebarView = class extends import_obsidian5.ItemView {
       this.renderTagFilterButton(filterBar, allTags);
     }
     const statusSelect = filterBar.createEl("select", {
-      cls: "hugo-command-status-filter"
+      cls: "warped-hugo-status-filter"
     });
     const statusOptions = [
       { value: "all", label: "All" },
@@ -842,7 +842,7 @@ var HugoSidebarView = class extends import_obsidian5.ItemView {
     this.renderSearchField(filterBar);
     const counts = this.scanner.getCount();
     const infoIcon = filterBar.createEl("span", {
-      cls: "hugo-command-info-icon",
+      cls: "warped-hugo-info-icon",
       text: "\u24D8",
       attr: { "aria-label": "Content stats" }
     });
@@ -851,21 +851,21 @@ var HugoSidebarView = class extends import_obsidian5.ItemView {
       this.closeInfoPopup();
       this.closeDropdown();
       const popup = document.createElement("div");
-      popup.className = "hugo-command-info-popup";
+      popup.className = "warped-hugo-info-popup";
       const rect = infoIcon.getBoundingClientRect();
       popup.style.position = "fixed";
       popup.style.top = `${rect.bottom + 4}px`;
       popup.style.right = `${window.innerWidth - rect.right}px`;
       popup.createEl("div", {
-        cls: "hugo-command-info-row",
+        cls: "warped-hugo-info-row",
         text: `${counts.published} published`
       });
       popup.createEl("div", {
-        cls: "hugo-command-info-row",
+        cls: "warped-hugo-info-row",
         text: `${counts.drafts} drafts`
       });
       popup.createEl("div", {
-        cls: "hugo-command-info-row total",
+        cls: "warped-hugo-info-row total",
         text: `${counts.total} total`
       });
       document.body.appendChild(popup);
@@ -881,15 +881,15 @@ var HugoSidebarView = class extends import_obsidian5.ItemView {
   }
   renderSearchField(container) {
     const searchContainer = container.createEl("div", {
-      cls: "hugo-command-search-container"
+      cls: "warped-hugo-search-container"
     });
     if (this.activeFolderTagFilter) {
       const chip = searchContainer.createEl("span", {
-        cls: "hugo-command-search-chip folder-chip"
+        cls: "warped-hugo-search-chip folder-chip"
       });
       chip.createEl("span", { text: this.activeFolderTagFilter });
       const clearBtn = chip.createEl("span", {
-        cls: "hugo-command-search-chip-clear",
+        cls: "warped-hugo-search-chip-clear",
         text: "\xD7"
       });
       clearBtn.addEventListener("click", (e) => {
@@ -900,11 +900,11 @@ var HugoSidebarView = class extends import_obsidian5.ItemView {
     }
     if (this.activeTagFilter) {
       const chip = searchContainer.createEl("span", {
-        cls: "hugo-command-search-chip"
+        cls: "warped-hugo-search-chip"
       });
       chip.createEl("span", { text: this.activeTagFilter });
       const clearBtn = chip.createEl("span", {
-        cls: "hugo-command-search-chip-clear",
+        cls: "warped-hugo-search-chip-clear",
         text: "\xD7"
       });
       clearBtn.addEventListener("click", (e) => {
@@ -914,7 +914,7 @@ var HugoSidebarView = class extends import_obsidian5.ItemView {
       });
     }
     const searchInput = searchContainer.createEl("input", {
-      cls: "hugo-command-search-input",
+      cls: "warped-hugo-search-input",
       attr: {
         type: "text",
         placeholder: "Search..."
@@ -934,7 +934,7 @@ var HugoSidebarView = class extends import_obsidian5.ItemView {
     const hasFilters = this.activeTagFilter || this.activeFolderTagFilter || this.searchQuery;
     if (hasFilters) {
       const clearAll = searchContainer.createEl("span", {
-        cls: "hugo-command-search-clear",
+        cls: "warped-hugo-search-clear",
         text: "\xD7"
       });
       clearAll.addEventListener("click", (e) => {
@@ -948,21 +948,21 @@ var HugoSidebarView = class extends import_obsidian5.ItemView {
   }
   renderTagFilterButton(container, allTags) {
     const trigger = container.createEl("span", {
-      cls: "hugo-command-filter-trigger"
+      cls: "warped-hugo-filter-trigger"
     });
     trigger.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg><span>Tags</span>';
     trigger.addEventListener("click", (e) => {
       e.stopPropagation();
       this.closeDropdown();
       const dropdown = document.createElement("div");
-      dropdown.className = "hugo-command-tag-dropdown";
+      dropdown.className = "warped-hugo-tag-dropdown";
       const rect = trigger.getBoundingClientRect();
       dropdown.style.position = "fixed";
       dropdown.style.top = `${rect.bottom + 4}px`;
       dropdown.style.left = `${rect.left}px`;
       for (const tag of allTags) {
         const tagItem = dropdown.createEl("div", {
-          cls: "hugo-command-tag-item",
+          cls: "warped-hugo-tag-item",
           text: tag
         });
         if (tag === this.activeTagFilter) {
@@ -976,9 +976,9 @@ var HugoSidebarView = class extends import_obsidian5.ItemView {
         });
       }
       if (this.activeTagFilter) {
-        dropdown.createEl("div", { cls: "hugo-command-tag-separator" });
+        dropdown.createEl("div", { cls: "warped-hugo-tag-separator" });
         const clearItem = dropdown.createEl("div", {
-          cls: "hugo-command-tag-item clear",
+          cls: "warped-hugo-tag-item clear",
           text: "Clear filter"
         });
         clearItem.addEventListener("click", (e2) => {
@@ -1001,14 +1001,14 @@ var HugoSidebarView = class extends import_obsidian5.ItemView {
   }
   renderFolderFilterButton(container, folderHierarchy) {
     const trigger = container.createEl("span", {
-      cls: "hugo-command-filter-trigger"
+      cls: "warped-hugo-filter-trigger"
     });
     trigger.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg><span>Folder</span>';
     trigger.addEventListener("click", (e) => {
       e.stopPropagation();
       this.closeDropdown();
       const dropdown = document.createElement("div");
-      dropdown.className = "hugo-command-tag-dropdown";
+      dropdown.className = "warped-hugo-tag-dropdown";
       const rect = trigger.getBoundingClientRect();
       dropdown.style.position = "fixed";
       dropdown.style.top = `${rect.bottom + 4}px`;
@@ -1016,7 +1016,7 @@ var HugoSidebarView = class extends import_obsidian5.ItemView {
       for (const folder of folderHierarchy) {
         const depthClass = `folder-depth-${Math.min(folder.depth, 4)}`;
         const folderItem = dropdown.createEl("div", {
-          cls: `hugo-command-tag-item folder-tag ${depthClass}`,
+          cls: `warped-hugo-tag-item folder-tag ${depthClass}`,
           text: folder.name
         });
         if (folder.path === this.activeFolderTagFilter) {
@@ -1030,9 +1030,9 @@ var HugoSidebarView = class extends import_obsidian5.ItemView {
         });
       }
       if (this.activeFolderTagFilter) {
-        dropdown.createEl("div", { cls: "hugo-command-tag-separator" });
+        dropdown.createEl("div", { cls: "warped-hugo-tag-separator" });
         const clearItem = dropdown.createEl("div", {
-          cls: "hugo-command-tag-item clear",
+          cls: "warped-hugo-tag-item clear",
           text: "Clear filter"
         });
         clearItem.addEventListener("click", (e2) => {
@@ -1090,7 +1090,7 @@ var HugoSidebarView = class extends import_obsidian5.ItemView {
     }
     if (items.length === 0) {
       const emptyDiv = container.createEl("div", {
-        cls: "hugo-command-empty",
+        cls: "warped-hugo-empty",
         text: "No content found"
       });
       return;
@@ -1114,28 +1114,28 @@ var HugoSidebarView = class extends import_obsidian5.ItemView {
     }
   }
   renderFolderGroup(container, folder, items) {
-    const group = container.createEl("div", { cls: "hugo-command-folder-group" });
+    const group = container.createEl("div", { cls: "warped-hugo-folder-group" });
     const header = group.createEl("div", {
-      cls: "hugo-command-folder-header static"
+      cls: "warped-hugo-folder-header static"
     });
     header.createEl("span", {
-      cls: "hugo-command-folder-name",
+      cls: "warped-hugo-folder-name",
       text: folder
     });
-    const list = group.createEl("ul", { cls: "hugo-command-list" });
+    const list = group.createEl("ul", { cls: "warped-hugo-list" });
     for (const item of items) {
       this.renderContentItem(list, item);
     }
   }
   renderContentItem(list, item) {
-    const listItem = list.createEl("li", { cls: "hugo-command-item" });
+    const listItem = list.createEl("li", { cls: "warped-hugo-item" });
     const badge = listItem.createEl("span", {
-      cls: `hugo-command-badge ${item.isDraft ? "draft" : "published"}`,
+      cls: `warped-hugo-badge ${item.isDraft ? "draft" : "published"}`,
       text: item.isDraft ? "D" : "P"
     });
     badge.setAttribute("aria-label", item.isDraft ? "Draft" : "Published");
     const title = listItem.createEl("span", {
-      cls: "hugo-command-item-title",
+      cls: "warped-hugo-item-title",
       text: item.title
     });
     title.addEventListener("click", () => {
@@ -1143,7 +1143,7 @@ var HugoSidebarView = class extends import_obsidian5.ItemView {
     });
     if (item.folderTags.length > 0) {
       const subfolderChip = listItem.createEl("span", {
-        cls: "hugo-command-subfolder-chip",
+        cls: "warped-hugo-subfolder-chip",
         text: item.folderTags.join("/")
       });
     }
@@ -1154,7 +1154,7 @@ var HugoSidebarView = class extends import_obsidian5.ItemView {
   renderItemInfoDropdown(container, item, frontmatterTags, folderTags) {
     const date = item.date;
     const trigger = container.createEl("span", {
-      cls: "hugo-command-item-info-trigger",
+      cls: "warped-hugo-item-info-trigger",
       text: "\u24D8"
     });
     trigger.addEventListener("click", (e) => {
@@ -1165,7 +1165,7 @@ var HugoSidebarView = class extends import_obsidian5.ItemView {
       }
       this.closeDropdown();
       const dropdown = document.createElement("div");
-      dropdown.className = "hugo-command-tag-dropdown";
+      dropdown.className = "warped-hugo-tag-dropdown";
       const rect = trigger.getBoundingClientRect();
       const sidebarRoot = this.leaf.getRoot();
       const isRightSidebar = sidebarRoot === this.app.workspace.rightSplit;
@@ -1177,10 +1177,10 @@ var HugoSidebarView = class extends import_obsidian5.ItemView {
         dropdown.style.left = `${rect.left}px`;
       }
       const headerSection = dropdown.createEl("div", {
-        cls: "hugo-command-info-header"
+        cls: "warped-hugo-info-header"
       });
       headerSection.createEl("div", {
-        cls: "hugo-command-info-title",
+        cls: "warped-hugo-info-title",
         text: item.title
       });
       const metaParts = [];
@@ -1192,28 +1192,28 @@ var HugoSidebarView = class extends import_obsidian5.ItemView {
       }
       if (metaParts.length > 0) {
         headerSection.createEl("div", {
-          cls: "hugo-command-info-meta",
+          cls: "warped-hugo-info-meta",
           text: metaParts.join(" \xB7 ")
         });
       }
       if (frontmatterTags.length > 0) {
         if (date || folderTags.length > 0) {
-          dropdown.createEl("div", { cls: "hugo-command-tag-separator" });
+          dropdown.createEl("div", { cls: "warped-hugo-tag-separator" });
         }
         dropdown.createEl("div", {
-          cls: "hugo-command-tag-section-header",
+          cls: "warped-hugo-tag-section-header",
           text: "Tags"
         });
         for (const tag of frontmatterTags) {
           const tagItem = dropdown.createEl("div", {
-            cls: "hugo-command-tag-item"
+            cls: "warped-hugo-tag-item"
           });
           tagItem.createEl("span", {
-            cls: "hugo-command-tag-label",
+            cls: "warped-hugo-tag-label",
             text: tag
           });
           const filterBtn = tagItem.createEl("span", {
-            cls: "hugo-command-tag-action",
+            cls: "warped-hugo-tag-action",
             text: "Filter"
           });
           filterBtn.addEventListener("click", (e2) => {
@@ -1265,19 +1265,19 @@ var HugoSidebarView = class extends import_obsidian5.ItemView {
     this.closeDropdown();
     this.closeInfoPopup();
     const dropdown = document.createElement("div");
-    dropdown.className = "hugo-command-tag-dropdown";
+    dropdown.className = "warped-hugo-tag-dropdown";
     const rect = trigger.getBoundingClientRect();
     dropdown.style.position = "fixed";
     dropdown.style.top = `${rect.bottom + 4}px`;
     dropdown.style.right = `${window.innerWidth - rect.right}px`;
     dropdown.createEl("div", {
-      cls: "hugo-command-tag-section-header",
+      cls: "warped-hugo-tag-section-header",
       text: "Create in folder"
     });
     const folderHierarchy = this.scanner.getFolderHierarchy();
     const contentRoot = this.getContentRoot();
     const rootItem = dropdown.createEl("div", {
-      cls: "hugo-command-tag-item",
+      cls: "warped-hugo-tag-item",
       text: `(${contentRoot || "root"})`
     });
     rootItem.addEventListener("click", (e) => {
@@ -1288,7 +1288,7 @@ var HugoSidebarView = class extends import_obsidian5.ItemView {
     for (const folder of folderHierarchy) {
       const depthClass = `folder-depth-${Math.min(folder.depth, 4)}`;
       const folderItem = dropdown.createEl("div", {
-        cls: `hugo-command-tag-item folder-tag ${depthClass}`,
+        cls: `warped-hugo-tag-item folder-tag ${depthClass}`,
         text: folder.name
       });
       const fullPath = contentRoot ? `${contentRoot}/${folder.path}` : folder.path;
@@ -1354,13 +1354,13 @@ var TitlePromptModal = class extends import_obsidian5.Modal {
   onOpen() {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.addClass("hugo-command-title-modal");
+    contentEl.addClass("warped-hugo-title-modal");
     contentEl.createEl("h3", { text: "New Post" });
     const inputContainer = contentEl.createEl("div", {
-      cls: "hugo-command-title-input-container"
+      cls: "warped-hugo-title-input-container"
     });
     this.inputEl = inputContainer.createEl("input", {
-      cls: "hugo-command-title-input",
+      cls: "warped-hugo-title-input",
       attr: {
         type: "text",
         placeholder: "Enter post title..."
@@ -1373,7 +1373,7 @@ var TitlePromptModal = class extends import_obsidian5.Modal {
       }
     });
     const buttonContainer = contentEl.createEl("div", {
-      cls: "hugo-command-title-buttons"
+      cls: "warped-hugo-title-buttons"
     });
     const cancelBtn = buttonContainer.createEl("button", {
       text: "Cancel"
@@ -1427,8 +1427,8 @@ var SiteSettingsModal = class extends import_obsidian6.Modal {
   async onOpen() {
     const { contentEl, modalEl } = this;
     contentEl.empty();
-    contentEl.addClass("hugo-command-site-settings");
-    modalEl.addClass("hugo-command-site-settings-modal");
+    contentEl.addClass("warped-hugo-site-settings");
+    modalEl.addClass("warped-hugo-site-settings-modal");
     this.configFile = await findHugoConfigFile(this.app);
     if (!this.configFile) {
       this.renderNoConfigFound(contentEl);
@@ -1441,7 +1441,7 @@ var SiteSettingsModal = class extends import_obsidian6.Modal {
   }
   renderNoConfigFound(container) {
     const header = container.createEl("div", { cls: "site-settings-header" });
-    header.createEl("span", { cls: "hugo-command-logo", text: LOGO_PREFIX });
+    header.createEl("span", { cls: "warped-hugo-logo", text: LOGO_PREFIX });
     header.createEl("h2", { text: "Site Settings" });
     container.createEl("p", {
       cls: "site-settings-error",
@@ -1452,7 +1452,7 @@ var SiteSettingsModal = class extends import_obsidian6.Modal {
     var _a;
     const headerSection = container.createEl("div", { cls: "site-settings-header-section" });
     const header = headerSection.createEl("div", { cls: "site-settings-header" });
-    header.createEl("span", { cls: "hugo-command-logo", text: LOGO_PREFIX });
+    header.createEl("span", { cls: "warped-hugo-logo", text: LOGO_PREFIX });
     header.createEl("h2", { text: "Site Settings" });
     const titleDisplay = headerSection.createEl("div", { cls: "site-settings-title-display" });
     const siteTitle = this.config.title || "Untitled Site";
@@ -1746,7 +1746,7 @@ var HugoCommandPlugin = class extends import_obsidian7.Plugin {
   }
   openSettings() {
     this.app.setting.open();
-    this.app.setting.openTabById("hugo-command");
+    this.app.setting.openTabById("warped-hugo");
   }
   showSiteSettings() {
     new SiteSettingsModal(this.app).open();
@@ -1760,9 +1760,9 @@ var AboutModal = class extends import_obsidian7.Modal {
   onOpen() {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.addClass("hugo-command-about-modal");
+    contentEl.addClass("warped-hugo-about-modal");
     const header = contentEl.createEl("div", { cls: "about-header" });
-    header.createEl("span", { cls: "hugo-command-logo about-logo", text: LOGO_PREFIX });
+    header.createEl("span", { cls: "warped-hugo-logo about-logo", text: LOGO_PREFIX });
     header.createEl("h2", { text: "Hugo Command" });
     contentEl.createEl("p", { cls: "about-version", text: `Version ${this.version}` });
     contentEl.createEl("p", {
@@ -1792,9 +1792,9 @@ var HugoCommandSettingTab = class extends import_obsidian7.PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     containerEl.createEl("h2", { text: "Hugo Command Settings" });
-    const aboutSection = containerEl.createEl("div", { cls: "hugo-command-about-section" });
+    const aboutSection = containerEl.createEl("div", { cls: "warped-hugo-about-section" });
     const aboutHeader = aboutSection.createEl("div", { cls: "about-header" });
-    aboutHeader.createEl("span", { cls: "hugo-command-logo about-logo", text: LOGO_PREFIX });
+    aboutHeader.createEl("span", { cls: "warped-hugo-logo about-logo", text: LOGO_PREFIX });
     aboutHeader.createEl("span", { cls: "about-title", text: "Hugo Command" });
     aboutSection.createEl("p", {
       cls: "about-blurb",

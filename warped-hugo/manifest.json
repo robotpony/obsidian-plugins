@@ -1,6 +1,6 @@
 {
-  "id": "hugo-command",
-  "name": "Hugo Command",
+  "id": "warped-hugo",
+  "name": "Warped Hugo",
   "version": "0.6.12",
   "minAppVersion": "0.15.0",
   "description": "Manage and browse your Hugo content with a sidebar showing posts, drafts, and tags.",

@@ -8,7 +8,7 @@ export const LOGO_PREFIX = "H\u2318";
  * Show a notice with the styled Hugo Command logo.
  * Uses the shared notice factory pattern.
  */
-export const showNotice = createNoticeFactory(LOGO_PREFIX, "hugo-command-logo");
+export const showNotice = createNoticeFactory(LOGO_PREFIX, "warped-hugo-logo");
 
 /**
  * Parse YAML frontmatter from markdown content

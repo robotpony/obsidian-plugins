@@ -1,7 +1,7 @@
 {
-  "name": "g-command",
+  "name": "warped-reference",
   "version": "1.14.0",
-  "description": "Google Drive browser and sync for Obsidian",
+  "description": "Warped Reference - Google Drive browser and sync for Obsidian",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",

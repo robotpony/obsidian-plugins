@@ -20,7 +20,7 @@ afterAll(async () => {
 describe("readVaultRoot", () => {
   it("reads vaultRoot from data.json", async () => {
     const vaultPath = join(testDir, "vault-with-root");
-    const pluginDir = join(vaultPath, ".obsidian", "plugins", "g-command");
+    const pluginDir = join(vaultPath, ".obsidian", "plugins", "warped-reference");
     await mkdir(pluginDir, { recursive: true });
     await writeFile(
       join(pluginDir, "data.json"),
@@ -37,7 +37,7 @@ describe("readVaultRoot", () => {
 
   it("returns 'gdrive' when vaultRoot key is absent", async () => {
     const vaultPath = join(testDir, "vault-no-key");
-    const pluginDir = join(vaultPath, ".obsidian", "plugins", "g-command");
+    const pluginDir = join(vaultPath, ".obsidian", "plugins", "warped-reference");
     await mkdir(pluginDir, { recursive: true });
     await writeFile(join(pluginDir, "data.json"), JSON.stringify({ syncState: {} }));
 
@@ -62,7 +62,7 @@ describe("updateSyncState", () => {
     const vaultPath = join(testDir, "vault-fresh");
     updateSyncState(vaultPath, file, "gdrive/Projects/Brief.md");
 
-    const dataPath = join(vaultPath, ".obsidian", "plugins", "g-command", "data.json");
+    const dataPath = join(vaultPath, ".obsidian", "plugins", "warped-reference", "data.json");
     const data = JSON.parse(await readFile(dataPath, "utf-8"));
 
     expect(data.syncState).toBeDefined();
@@ -76,7 +76,7 @@ describe("updateSyncState", () => {
 
   it("merges into existing data.json without clobbering other keys", async () => {
     const vaultPath = join(testDir, "vault-existing");
-    const pluginDir = join(vaultPath, ".obsidian", "plugins", "g-command");
+    const pluginDir = join(vaultPath, ".obsidian", "plugins", "warped-reference");
     await mkdir(pluginDir, { recursive: true });
     await writeFile(
       join(pluginDir, "data.json"),
@@ -98,7 +98,7 @@ describe("updateSyncState", () => {
 
   it("overwrites existing syncState entry for the same path", async () => {
     const vaultPath = join(testDir, "vault-overwrite");
-    const pluginDir = join(vaultPath, ".obsidian", "plugins", "g-command");
+    const pluginDir = join(vaultPath, ".obsidian", "plugins", "warped-reference");
     await mkdir(pluginDir, { recursive: true });
     await writeFile(
       join(pluginDir, "data.json"),

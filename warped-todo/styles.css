@@ -1,7 +1,7 @@
 /* Space Command Plugin Styles */
 
 /* Logo styling */
-.space-command-logo {
+.warped-todo-logo {
   display: inline-block;
   background-color: #689fd6;
   color: white;
@@ -15,23 +15,23 @@
 }
 
 /* Clickable logo in sidebar */
-.space-command-logo.clickable-logo {
+.warped-todo-logo.clickable-logo {
   cursor: pointer;
   transition: opacity 0.2s, transform 0.1s;
 }
 
-.space-command-logo.clickable-logo:hover {
+.warped-todo-logo.clickable-logo:hover {
   opacity: 0.85;
   transform: scale(1.05);
 }
 
 /* About Modal */
-.space-command-about-modal {
+.warped-todo-about-modal {
   text-align: center;
   padding: 20px;
 }
 
-.space-command-about-modal .about-header {
+.warped-todo-about-modal .about-header {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -39,38 +39,38 @@
   margin-bottom: 16px;
 }
 
-.space-command-about-modal .about-logo {
+.warped-todo-about-modal .about-logo {
   font-size: 2em;
   padding: 8px 10px 6px;
 }
 
-.space-command-about-modal .about-header h2 {
+.warped-todo-about-modal .about-header h2 {
   margin: 0;
   font-size: 1.5em;
 }
 
-.space-command-about-modal .about-blurb {
+.warped-todo-about-modal .about-blurb {
   color: var(--text-muted);
   margin-bottom: 20px;
   line-height: 1.5;
 }
 
-.space-command-about-modal .about-details {
+.warped-todo-about-modal .about-details {
   font-size: 0.9em;
   color: var(--text-muted);
 }
 
-.space-command-about-modal .about-details a {
+.warped-todo-about-modal .about-details a {
   color: var(--text-accent);
 }
 
 /* Stats Modal */
-.space-command-stats-modal {
+.warped-todo-stats-modal {
   text-align: center;
   padding: 20px;
 }
 
-.space-command-stats-modal .stats-header {
+.warped-todo-stats-modal .stats-header {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -78,17 +78,17 @@
   margin-bottom: 24px;
 }
 
-.space-command-stats-modal .stats-logo {
+.warped-todo-stats-modal .stats-logo {
   font-size: 2em;
   padding: 8px 10px 6px;
 }
 
-.space-command-stats-modal .stats-header h2 {
+.warped-todo-stats-modal .stats-header h2 {
   margin: 0;
   font-size: 1.5em;
 }
 
-.space-command-stats-modal .stats-grid {
+.warped-todo-stats-modal .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 20px;
@@ -96,13 +96,13 @@
   text-align: left;
 }
 
-.space-command-stats-modal .stats-section {
+.warped-todo-stats-modal .stats-section {
   background-color: var(--background-secondary);
   border-radius: 8px;
   padding: 16px;
 }
 
-.space-command-stats-modal .stats-section h3 {
+.warped-todo-stats-modal .stats-section h3 {
   margin: 0 0 12px 0;
   font-size: 1em;
   color: var(--text-normal);
@@ -110,74 +110,74 @@
   padding-bottom: 8px;
 }
 
-.space-command-stats-modal .stats-row {
+.warped-todo-stats-modal .stats-row {
   display: flex;
   justify-content: space-between;
   padding: 4px 0;
 }
 
-.space-command-stats-modal .stats-label {
+.warped-todo-stats-modal .stats-label {
   color: var(--text-muted);
 }
 
-.space-command-stats-modal .stats-value {
+.warped-todo-stats-modal .stats-value {
   font-weight: 600;
   color: var(--text-normal);
 }
 
-.space-command-stats-modal .stats-summary {
+.warped-todo-stats-modal .stats-summary {
   border-top: 1px solid var(--background-modifier-border);
   padding-top: 16px;
 }
 
-.space-command-stats-modal .stats-total {
+.warped-todo-stats-modal .stats-total {
   font-size: 1.1em;
   color: var(--text-muted);
   margin: 0;
 }
 
 /* About Section in Settings */
-.space-command-about-section {
+.warped-todo-about-section {
   background-color: var(--background-secondary);
   border-radius: 8px;
   padding: 16px;
   margin-bottom: 24px;
 }
 
-.space-command-about-section .about-header {
+.warped-todo-about-section .about-header {
   display: flex;
   align-items: center;
   gap: 10px;
   margin-bottom: 8px;
 }
 
-.space-command-about-section .about-logo {
+.warped-todo-about-section .about-logo {
   font-size: 1.2em;
 }
 
-.space-command-about-section .about-title {
+.warped-todo-about-section .about-title {
   font-weight: 600;
   font-size: 1.1em;
 }
 
-.space-command-about-section .about-blurb {
+.warped-todo-about-section .about-blurb {
   color: var(--text-muted);
   margin: 0 0 12px 0;
   font-size: 0.95em;
   line-height: 1.4;
 }
 
-.space-command-about-section .about-details {
+.warped-todo-about-section .about-details {
   font-size: 0.85em;
   color: var(--text-muted);
 }
 
-.space-command-about-section .about-details a {
+.warped-todo-about-section .about-details a {
   color: var(--text-accent);
 }
 
 /* Sidebar Styles */
-.space-command-sidebar {
+.warped-todo-sidebar {
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -210,22 +210,22 @@
 }
 
 /* Scrollbar styling - hugs right edge, doesn't overlap content */
-.space-command-sidebar ::-webkit-scrollbar {
+.warped-todo-sidebar ::-webkit-scrollbar {
   width: 8px;
   position: absolute;
   right: 0;
 }
 
-.space-command-sidebar ::-webkit-scrollbar-track {
+.warped-todo-sidebar ::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.space-command-sidebar ::-webkit-scrollbar-thumb {
+.warped-todo-sidebar ::-webkit-scrollbar-thumb {
   background-color: color-mix(in srgb, var(--text-muted) 65%, transparent);
   border-radius: 4px;
 }
 
-.space-command-sidebar h4 {
+.warped-todo-sidebar h4 {
   margin: 0;
   color: var(--text-normal);
 }
@@ -413,22 +413,22 @@
    the lists fade so the user's click target (the pill) doesn't slide out
    from under them. 80ms out / 100ms in — snappy, just takes the edge off
    the otherwise hard re-render. */
-.space-command-sidebar .todo-list,
-.space-command-sidebar .idea-list {
+.warped-todo-sidebar .todo-list,
+.warped-todo-sidebar .idea-list {
   transition: opacity 100ms ease;
 }
 
-.space-command-sidebar.sc-filter-fading .todo-list,
-.space-command-sidebar.sc-filter-fading .idea-list {
+.warped-todo-sidebar.sc-filter-fading .todo-list,
+.warped-todo-sidebar.sc-filter-fading .idea-list {
   opacity: 0;
   transition-duration: 80ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .space-command-sidebar .todo-list,
-  .space-command-sidebar .idea-list,
-  .space-command-sidebar.sc-filter-fading .todo-list,
-  .space-command-sidebar.sc-filter-fading .idea-list {
+  .warped-todo-sidebar .todo-list,
+  .warped-todo-sidebar .idea-list,
+  .warped-todo-sidebar.sc-filter-fading .todo-list,
+  .warped-todo-sidebar.sc-filter-fading .idea-list {
     transition: none;
     opacity: 1;
   }
@@ -512,7 +512,7 @@
 /* Scale top-level orphan TODO items to the same .85em as in-block children so
    the entire list reads at one rhythm. Header items (with or without children)
    keep their natural 1em since they're the visual anchors. */
-.space-command-sidebar .todo-list > .todo-item:not(.todo-header) {
+.warped-todo-sidebar .todo-list > .todo-item:not(.todo-header) {
   font-size: 0.85em;
 }
 
@@ -543,7 +543,7 @@
   padding: 2px 0 4px;
 }
 
-/* Match Obsidian's in-document tag rendering. The .space-command-sidebar
+/* Match Obsidian's in-document tag rendering. The .warped-todo-sidebar
    prefix is required to win specificity against Obsidian's default <button>
    styles inside workspace leaves — without it, pills inherit the cream
    button background, gray border, and rounded-rectangle shape. We also
@@ -551,7 +551,7 @@
    accent-mix fallbacks ensure pills still read as tags when --tag-background
    and --tag-color aren't reachable from this scope (some themes scope them
    under .markdown-rendered only). */
-.space-command-sidebar .tag-cloud-pill {
+.warped-todo-sidebar .tag-cloud-pill {
   appearance: none;
   -webkit-appearance: none;
   display: inline-flex;
@@ -574,46 +574,46 @@
     color 120ms ease;
 }
 
-.space-command-sidebar .tag-cloud-pill:hover {
+.warped-todo-sidebar .tag-cloud-pill:hover {
   background-color: var(--tag-background-hover, color-mix(in srgb, var(--text-accent) 20%, transparent));
   color: var(--tag-color-hover, var(--text-accent));
   box-shadow: none;
 }
 
-.space-command-sidebar .tag-cloud-pill:focus-visible {
+.warped-todo-sidebar .tag-cloud-pill:focus-visible {
   outline: none;
   border-color: var(--interactive-accent);
 }
 
 /* Pinned tags (#focus, #p0): subtle accent emphasis so they read as "lead"
    items without competing with the active filter state. */
-.space-command-sidebar .tag-cloud-pill-pinned {
+.warped-todo-sidebar .tag-cloud-pill-pinned {
   color: var(--text-accent);
 }
 
 /* Focus tags — both the pinned #focus pill and project pills with focus
    items — share the accent-mix background that .todo-focus rows use, so the
    "this is where focus lives" signal is consistent across the sidebar. */
-.space-command-sidebar .tag-cloud-pill-focus {
+.warped-todo-sidebar .tag-cloud-pill-focus {
   color: var(--text-normal);
   background-color: color-mix(in srgb, var(--interactive-accent) 15%, transparent);
 }
 
-.space-command-sidebar .tag-cloud-pill-focus:hover {
+.warped-todo-sidebar .tag-cloud-pill-focus:hover {
   background-color: color-mix(in srgb, var(--interactive-accent) 25%, transparent);
   color: var(--text-normal);
 }
 
 /* Active filter: clear, high-contrast — this is the “you are filtering by X”
    signal, so it should beat both pinned and focus styling. */
-.space-command-sidebar .tag-cloud-pill-active {
+.warped-todo-sidebar .tag-cloud-pill-active {
   background-color: var(--interactive-accent);
   color: var(--text-on-accent);
   border-color: var(--interactive-accent);
   opacity: 1;
 }
 
-.space-command-sidebar .tag-cloud-pill-active:hover {
+.warped-todo-sidebar .tag-cloud-pill-active:hover {
   background-color: var(--interactive-accent-hover);
   color: var(--text-on-accent);
 }
@@ -670,7 +670,7 @@
   font-size: 0.8em;
 }
 
-.space-command-sidebar .idea-count {
+.warped-todo-sidebar .idea-count {
   background-color: var(--background-primary);
 }
 
@@ -696,7 +696,7 @@
 }
 
 /* Tag styling for sidebar contexts */
-.space-command-sidebar .tag:not(.project-info-principle-tag) {
+.warped-todo-sidebar .tag:not(.project-info-principle-tag) {
   font-size: 12px !important;
   font-family: var(--font-monospace) !important;
   opacity: 0.85;
@@ -708,12 +708,12 @@
 }
 
 /* Focus highlighting for ideas */
-.space-command-sidebar .idea-focus {
+.warped-todo-sidebar .idea-focus {
   background-color: color-mix(in srgb, var(--interactive-accent) 15%, transparent);
   border-radius: 4px;
 }
 
-.space-command-sidebar .idea-focus:hover {
+.warped-todo-sidebar .idea-focus:hover {
   background-color: color-mix(in srgb, var(--interactive-accent) 25%, transparent);
 }
 
@@ -737,9 +737,9 @@
 }
 
 /* Sidebar-specific override for better contrast on grey background */
-.space-command-sidebar .muted-pill,
-.space-command-sidebar .todo-count,
-.space-command-sidebar .project-count {
+.warped-todo-sidebar .muted-pill,
+.warped-todo-sidebar .todo-count,
+.warped-todo-sidebar .project-count {
   background-color: var(--background-primary);
 }
 
@@ -749,33 +749,33 @@
 }
 
 /* Slash Command & Date Suggest Styles */
-.space-command-suggestion {
+.warped-todo-suggestion {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 6px 10px;
 }
 
-.space-command-suggestion .suggestion-icon {
+.warped-todo-suggestion .suggestion-icon {
   font-size: 16px;
   width: 24px;
   text-align: center;
   flex-shrink: 0;
 }
 
-.space-command-suggestion .suggestion-content {
+.warped-todo-suggestion .suggestion-content {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
 }
 
-.space-command-suggestion .suggestion-name {
+.warped-todo-suggestion .suggestion-name {
   font-weight: 500;
   color: var(--text-normal);
 }
 
-.space-command-suggestion .suggestion-description {
+.warped-todo-suggestion .suggestion-description {
   font-size: 12px;
   color: var(--text-muted);
   white-space: nowrap;
@@ -956,8 +956,8 @@
 /* Focus tag highlighting in sidebar — edge-to-edge background. The +6px on
    each side keeps text aligned with non-focus rows, which carry a 6px inline
    padding from .project-item. */
-.space-command-sidebar .todo-focus,
-.space-command-sidebar .project-focus {
+.warped-todo-sidebar .todo-focus,
+.warped-todo-sidebar .project-focus {
   background-color: color-mix(in srgb, var(--interactive-accent) 15%, transparent);
   margin-left: -16px;
   margin-right: -16px;
@@ -965,8 +965,8 @@
   padding-right: 22px;
 }
 
-.space-command-sidebar .todo-focus:hover,
-.space-command-sidebar .project-focus:hover {
+.warped-todo-sidebar .todo-focus:hover,
+.warped-todo-sidebar .project-focus:hover {
   background-color: color-mix(in srgb, var(--interactive-accent) 25%, transparent);
 }
 
@@ -1007,7 +1007,7 @@
 }
 
 /* Header with children - use block layout so children appear below */
-.space-command-sidebar .todo-item.todo-header-with-children {
+.warped-todo-sidebar .todo-item.todo-header-with-children {
   display: block;
 }
 
@@ -1084,7 +1084,7 @@
 }
 
 /* Sidebar: children flush with parent (compact layout) */
-.space-command-sidebar .todo-children {
+.warped-todo-sidebar .todo-children {
   padding: 0;
 }
 
@@ -1120,7 +1120,7 @@
 }
 
 /* Idea header with children - use block layout so children appear below */
-.space-command-sidebar .idea-item.idea-header-with-children {
+.warped-todo-sidebar .idea-item.idea-header-with-children {
   display: block;
 }
 
@@ -1143,7 +1143,7 @@
 }
 
 /* Sidebar: children flush with parent (compact layout) */
-.space-command-sidebar .idea-children {
+.warped-todo-sidebar .idea-children {
   padding: 0;
 }
 
@@ -1525,7 +1525,7 @@
 }
 
 /* Tab Lock Button Styles */
-.space-command-tab-lock-btn {
+.warped-todo-tab-lock-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1538,26 +1538,26 @@
   flex-shrink: 0;
 }
 
-.space-command-tab-lock-btn:hover {
+.warped-todo-tab-lock-btn:hover {
   opacity: 0.8;
   background-color: var(--background-modifier-hover);
 }
 
-.space-command-tab-lock-btn svg {
+.warped-todo-tab-lock-btn svg {
   display: block;
 }
 
 /* When tab is locked: hide lock button and close button, show only Obsidian's pushpin */
-.space-command-tab-locked .space-command-tab-lock-btn {
+.warped-todo-tab-locked .warped-todo-tab-lock-btn {
   display: none;
 }
 
-.space-command-tab-locked .workspace-tab-header-inner-close-button {
+.warped-todo-tab-locked .workspace-tab-header-inner-close-button {
   display: none;
 }
 
 /* Make the pin icon clickable when locked */
-.space-command-tab-locked .workspace-tab-header-status-container {
+.warped-todo-tab-locked .workspace-tab-header-status-container {
   cursor: pointer;
 }
 

@@ -10,11 +10,11 @@ npm run dev          # Watch mode (rebuilds on file changes)
 npm run build        # Production build (runs tsc + esbuild)
 ```
 
-The build output is `main.js` in the project root. For testing, copy `main.js`, `manifest.json`, and `styles.css` to `.obsidian/plugins/hugo-command/` in an Obsidian vault.
+The build output is `main.js` in the project root. For testing, copy `main.js`, `manifest.json`, and `styles.css` to `.obsidian/plugins/warped-hugo/` in an Obsidian vault.
 
 ## Architecture Overview
 
-This is **Hugo Command** (`hugo-command`), an Obsidian plugin for managing Hugo static site content.
+This is **Warped Hugo** (`warped-hugo`), an Obsidian plugin for managing Hugo static site content.
 
 ### Entry Point and Core Flow
 

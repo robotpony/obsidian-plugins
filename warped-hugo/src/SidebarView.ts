@@ -3,7 +3,7 @@ import { HugoScanner } from "./HugoScanner";
 import { HugoContentItem, StatusFilter, HugoCommandSettings } from "./types";
 import { formatDate, openFile, LOGO_PREFIX, slugify, generateHugoFrontmatter, showNotice } from "./utils";
 
-export const VIEW_TYPE_HUGO_SIDEBAR = "hugo-command-sidebar";
+export const VIEW_TYPE_HUGO_SIDEBAR = "warped-hugo-sidebar";
 
 export class HugoSidebarView extends ItemView {
   private scanner: HugoScanner;
@@ -88,23 +88,23 @@ export class HugoSidebarView extends ItemView {
   render(): void {
     const container = this.containerEl.children[1];
     container.empty();
-    container.addClass("hugo-command-sidebar");
+    container.addClass("warped-hugo-sidebar");
 
     this.renderHeader(container as HTMLElement);
 
     // Content wrapper for scrolling (includes filters and list)
-    const content = (container as HTMLElement).createEl("div", { cls: "hugo-command-content" });
+    const content = (container as HTMLElement).createEl("div", { cls: "warped-hugo-content" });
     this.renderFilters(content);
     this.renderContentList(content);
   }
 
   private renderHeader(container: HTMLElement): void {
-    const header = container.createEl("div", { cls: "hugo-command-header" });
+    const header = container.createEl("div", { cls: "warped-hugo-header" });
 
     // Title container with logo
-    const titleEl = header.createEl("div", { cls: "hugo-command-header-title" });
+    const titleEl = header.createEl("div", { cls: "warped-hugo-header-title" });
     const logo = titleEl.createEl("span", {
-      cls: "hugo-command-logo clickable-logo",
+      cls: "warped-hugo-logo clickable-logo",
       text: LOGO_PREFIX,
     });
     logo.addEventListener("click", () => {
@@ -113,11 +113,11 @@ export class HugoSidebarView extends ItemView {
     titleEl.createEl("h4", { text: "Hugo" });
 
     // Button group
-    const buttonGroup = header.createEl("div", { cls: "hugo-command-button-group" });
+    const buttonGroup = header.createEl("div", { cls: "warped-hugo-button-group" });
 
     // New post button (plus icon)
     const newBtn = buttonGroup.createEl("button", {
-      cls: "clickable-icon hugo-command-new-btn",
+      cls: "clickable-icon warped-hugo-new-btn",
       attr: { "aria-label": "New post" },
     });
     newBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
@@ -129,7 +129,7 @@ export class HugoSidebarView extends ItemView {
 
     // Kebab menu button (three vertical dots)
     const menuBtn = buttonGroup.createEl("button", {
-      cls: "clickable-icon hugo-command-menu-btn",
+      cls: "clickable-icon warped-hugo-menu-btn",
       attr: { "aria-label": "Menu" },
     });
     menuBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>';
@@ -180,11 +180,11 @@ export class HugoSidebarView extends ItemView {
   }
 
   private renderFilters(container: HTMLElement): void {
-    const filterBar = container.createEl("div", { cls: "hugo-command-filters" });
+    const filterBar = container.createEl("div", { cls: "warped-hugo-filters" });
 
     // "Filter:" label at the start
     filterBar.createEl("span", {
-      cls: "hugo-command-filter-prefix",
+      cls: "warped-hugo-filter-prefix",
       text: "",
     });
 
@@ -204,7 +204,7 @@ export class HugoSidebarView extends ItemView {
 
     // Status filter dropdown
     const statusSelect = filterBar.createEl("select", {
-      cls: "hugo-command-status-filter",
+      cls: "warped-hugo-status-filter",
     });
 
     const statusOptions: { value: StatusFilter; label: string }[] = [
@@ -234,7 +234,7 @@ export class HugoSidebarView extends ItemView {
     // Info icon for count display (pushed to right)
     const counts = this.scanner.getCount();
     const infoIcon = filterBar.createEl("span", {
-      cls: "hugo-command-info-icon",
+      cls: "warped-hugo-info-icon",
       text: "\u24d8",
       attr: { "aria-label": "Content stats" },
     });
@@ -245,7 +245,7 @@ export class HugoSidebarView extends ItemView {
       this.closeDropdown();
 
       const popup = document.createElement("div");
-      popup.className = "hugo-command-info-popup";
+      popup.className = "warped-hugo-info-popup";
 
       const rect = infoIcon.getBoundingClientRect();
       popup.style.position = "fixed";
@@ -253,15 +253,15 @@ export class HugoSidebarView extends ItemView {
       popup.style.right = `${window.innerWidth - rect.right}px`;
 
       popup.createEl("div", {
-        cls: "hugo-command-info-row",
+        cls: "warped-hugo-info-row",
         text: `${counts.published} published`,
       });
       popup.createEl("div", {
-        cls: "hugo-command-info-row",
+        cls: "warped-hugo-info-row",
         text: `${counts.drafts} drafts`,
       });
       popup.createEl("div", {
-        cls: "hugo-command-info-row total",
+        cls: "warped-hugo-info-row total",
         text: `${counts.total} total`,
       });
 
@@ -280,17 +280,17 @@ export class HugoSidebarView extends ItemView {
 
   private renderSearchField(container: HTMLElement): void {
     const searchContainer = container.createEl("div", {
-      cls: "hugo-command-search-container",
+      cls: "warped-hugo-search-container",
     });
 
     // Show active folder filter as chip inside search
     if (this.activeFolderTagFilter) {
       const chip = searchContainer.createEl("span", {
-        cls: "hugo-command-search-chip folder-chip",
+        cls: "warped-hugo-search-chip folder-chip",
       });
       chip.createEl("span", { text: this.activeFolderTagFilter });
       const clearBtn = chip.createEl("span", {
-        cls: "hugo-command-search-chip-clear",
+        cls: "warped-hugo-search-chip-clear",
         text: "\u00d7",
       });
       clearBtn.addEventListener("click", (e) => {
@@ -303,11 +303,11 @@ export class HugoSidebarView extends ItemView {
     // Show active tag filter as chip inside search
     if (this.activeTagFilter) {
       const chip = searchContainer.createEl("span", {
-        cls: "hugo-command-search-chip",
+        cls: "warped-hugo-search-chip",
       });
       chip.createEl("span", { text: this.activeTagFilter });
       const clearBtn = chip.createEl("span", {
-        cls: "hugo-command-search-chip-clear",
+        cls: "warped-hugo-search-chip-clear",
         text: "\u00d7",
       });
       clearBtn.addEventListener("click", (e) => {
@@ -319,7 +319,7 @@ export class HugoSidebarView extends ItemView {
 
     // Search input
     const searchInput = searchContainer.createEl("input", {
-      cls: "hugo-command-search-input",
+      cls: "warped-hugo-search-input",
       attr: {
         type: "text",
         placeholder: "Search...",
@@ -344,7 +344,7 @@ export class HugoSidebarView extends ItemView {
     const hasFilters = this.activeTagFilter || this.activeFolderTagFilter || this.searchQuery;
     if (hasFilters) {
       const clearAll = searchContainer.createEl("span", {
-        cls: "hugo-command-search-clear",
+        cls: "warped-hugo-search-clear",
         text: "\u00d7",
       });
       clearAll.addEventListener("click", (e) => {
@@ -362,7 +362,7 @@ export class HugoSidebarView extends ItemView {
     allTags: string[]
   ): void {
     const trigger = container.createEl("span", {
-      cls: "hugo-command-filter-trigger",
+      cls: "warped-hugo-filter-trigger",
     });
     // Tag icon SVG
     trigger.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg><span>Tags</span>';
@@ -372,7 +372,7 @@ export class HugoSidebarView extends ItemView {
       this.closeDropdown();
 
       const dropdown = document.createElement("div");
-      dropdown.className = "hugo-command-tag-dropdown";
+      dropdown.className = "warped-hugo-tag-dropdown";
 
       const rect = trigger.getBoundingClientRect();
       dropdown.style.position = "fixed";
@@ -381,7 +381,7 @@ export class HugoSidebarView extends ItemView {
 
       for (const tag of allTags) {
         const tagItem = dropdown.createEl("div", {
-          cls: "hugo-command-tag-item",
+          cls: "warped-hugo-tag-item",
           text: tag,
         });
 
@@ -398,9 +398,9 @@ export class HugoSidebarView extends ItemView {
       }
 
       if (this.activeTagFilter) {
-        dropdown.createEl("div", { cls: "hugo-command-tag-separator" });
+        dropdown.createEl("div", { cls: "warped-hugo-tag-separator" });
         const clearItem = dropdown.createEl("div", {
-          cls: "hugo-command-tag-item clear",
+          cls: "warped-hugo-tag-item clear",
           text: "Clear filter",
         });
         clearItem.addEventListener("click", (e) => {
@@ -429,7 +429,7 @@ export class HugoSidebarView extends ItemView {
     folderHierarchy: { name: string; path: string; depth: number }[]
   ): void {
     const trigger = container.createEl("span", {
-      cls: "hugo-command-filter-trigger",
+      cls: "warped-hugo-filter-trigger",
     });
     // SVG folder icon with label
     trigger.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg><span>Folder</span>';
@@ -439,7 +439,7 @@ export class HugoSidebarView extends ItemView {
       this.closeDropdown();
 
       const dropdown = document.createElement("div");
-      dropdown.className = "hugo-command-tag-dropdown";
+      dropdown.className = "warped-hugo-tag-dropdown";
 
       const rect = trigger.getBoundingClientRect();
       dropdown.style.position = "fixed";
@@ -449,7 +449,7 @@ export class HugoSidebarView extends ItemView {
       for (const folder of folderHierarchy) {
         const depthClass = `folder-depth-${Math.min(folder.depth, 4)}`;
         const folderItem = dropdown.createEl("div", {
-          cls: `hugo-command-tag-item folder-tag ${depthClass}`,
+          cls: `warped-hugo-tag-item folder-tag ${depthClass}`,
           text: folder.name,
         });
 
@@ -466,9 +466,9 @@ export class HugoSidebarView extends ItemView {
       }
 
       if (this.activeFolderTagFilter) {
-        dropdown.createEl("div", { cls: "hugo-command-tag-separator" });
+        dropdown.createEl("div", { cls: "warped-hugo-tag-separator" });
         const clearItem = dropdown.createEl("div", {
-          cls: "hugo-command-tag-item clear",
+          cls: "warped-hugo-tag-item clear",
           text: "Clear filter",
         });
         clearItem.addEventListener("click", (e) => {
@@ -552,7 +552,7 @@ export class HugoSidebarView extends ItemView {
 
     if (items.length === 0) {
       const emptyDiv = container.createEl("div", {
-        cls: "hugo-command-empty",
+        cls: "warped-hugo-empty",
         text: "No content found",
       });
       return;
@@ -587,38 +587,38 @@ export class HugoSidebarView extends ItemView {
     folder: string,
     items: HugoContentItem[]
   ): void {
-    const group = container.createEl("div", { cls: "hugo-command-folder-group" });
+    const group = container.createEl("div", { cls: "warped-hugo-folder-group" });
 
     // Folder header (static, not collapsible)
     const header = group.createEl("div", {
-      cls: "hugo-command-folder-header static",
+      cls: "warped-hugo-folder-header static",
     });
 
     header.createEl("span", {
-      cls: "hugo-command-folder-name",
+      cls: "warped-hugo-folder-name",
       text: folder,
     });
 
     // Content list
-    const list = group.createEl("ul", { cls: "hugo-command-list" });
+    const list = group.createEl("ul", { cls: "warped-hugo-list" });
     for (const item of items) {
       this.renderContentItem(list, item);
     }
   }
 
   private renderContentItem(list: HTMLElement, item: HugoContentItem): void {
-    const listItem = list.createEl("li", { cls: "hugo-command-item" });
+    const listItem = list.createEl("li", { cls: "warped-hugo-item" });
 
     // Status badge
     const badge = listItem.createEl("span", {
-      cls: `hugo-command-badge ${item.isDraft ? "draft" : "published"}`,
+      cls: `warped-hugo-badge ${item.isDraft ? "draft" : "published"}`,
       text: item.isDraft ? "D" : "P",
     });
     badge.setAttribute("aria-label", item.isDraft ? "Draft" : "Published");
 
     // Title (clickable)
     const title = listItem.createEl("span", {
-      cls: "hugo-command-item-title",
+      cls: "warped-hugo-item-title",
       text: item.title,
     });
 
@@ -629,7 +629,7 @@ export class HugoSidebarView extends ItemView {
     // Subfolder chip (if item is in a subfolder - show full path)
     if (item.folderTags.length > 0) {
       const subfolderChip = listItem.createEl("span", {
-        cls: "hugo-command-subfolder-chip",
+        cls: "warped-hugo-subfolder-chip",
         text: item.folderTags.join("/"),
       });
     }
@@ -648,7 +648,7 @@ export class HugoSidebarView extends ItemView {
   ): void {
     const date = item.date;
     const trigger = container.createEl("span", {
-      cls: "hugo-command-item-info-trigger",
+      cls: "warped-hugo-item-info-trigger",
       text: "\u24d8",
     });
 
@@ -664,7 +664,7 @@ export class HugoSidebarView extends ItemView {
       this.closeDropdown();
 
       const dropdown = document.createElement("div");
-      dropdown.className = "hugo-command-tag-dropdown";
+      dropdown.className = "warped-hugo-tag-dropdown";
 
       const rect = trigger.getBoundingClientRect();
       const sidebarRoot = this.leaf.getRoot();
@@ -681,12 +681,12 @@ export class HugoSidebarView extends ItemView {
 
       // Header section: title + metadata
       const headerSection = dropdown.createEl("div", {
-        cls: "hugo-command-info-header",
+        cls: "warped-hugo-info-header",
       });
 
       // Post title
       headerSection.createEl("div", {
-        cls: "hugo-command-info-title",
+        cls: "warped-hugo-info-title",
         text: item.title,
       });
 
@@ -700,7 +700,7 @@ export class HugoSidebarView extends ItemView {
       }
       if (metaParts.length > 0) {
         headerSection.createEl("div", {
-          cls: "hugo-command-info-meta",
+          cls: "warped-hugo-info-meta",
           text: metaParts.join(" · "),
         });
       }
@@ -708,26 +708,26 @@ export class HugoSidebarView extends ItemView {
       // Frontmatter tags section
       if (frontmatterTags.length > 0) {
         if (date || folderTags.length > 0) {
-          dropdown.createEl("div", { cls: "hugo-command-tag-separator" });
+          dropdown.createEl("div", { cls: "warped-hugo-tag-separator" });
         }
 
         dropdown.createEl("div", {
-          cls: "hugo-command-tag-section-header",
+          cls: "warped-hugo-tag-section-header",
           text: "Tags",
         });
 
         for (const tag of frontmatterTags) {
           const tagItem = dropdown.createEl("div", {
-            cls: "hugo-command-tag-item",
+            cls: "warped-hugo-tag-item",
           });
 
           tagItem.createEl("span", {
-            cls: "hugo-command-tag-label",
+            cls: "warped-hugo-tag-label",
             text: tag,
           });
 
           const filterBtn = tagItem.createEl("span", {
-            cls: "hugo-command-tag-action",
+            cls: "warped-hugo-tag-action",
             text: "Filter",
           });
 
@@ -787,7 +787,7 @@ export class HugoSidebarView extends ItemView {
     this.closeInfoPopup();
 
     const dropdown = document.createElement("div");
-    dropdown.className = "hugo-command-tag-dropdown";
+    dropdown.className = "warped-hugo-tag-dropdown";
 
     const rect = trigger.getBoundingClientRect();
     dropdown.style.position = "fixed";
@@ -796,7 +796,7 @@ export class HugoSidebarView extends ItemView {
 
     // Header
     dropdown.createEl("div", {
-      cls: "hugo-command-tag-section-header",
+      cls: "warped-hugo-tag-section-header",
       text: "Create in folder",
     });
 
@@ -806,7 +806,7 @@ export class HugoSidebarView extends ItemView {
 
     // Add root option first (content folder root)
     const rootItem = dropdown.createEl("div", {
-      cls: "hugo-command-tag-item",
+      cls: "warped-hugo-tag-item",
       text: `(${contentRoot || "root"})`,
     });
     rootItem.addEventListener("click", (e) => {
@@ -819,7 +819,7 @@ export class HugoSidebarView extends ItemView {
     for (const folder of folderHierarchy) {
       const depthClass = `folder-depth-${Math.min(folder.depth, 4)}`;
       const folderItem = dropdown.createEl("div", {
-        cls: `hugo-command-tag-item folder-tag ${depthClass}`,
+        cls: `warped-hugo-tag-item folder-tag ${depthClass}`,
         text: folder.name,
       });
 
@@ -909,16 +909,16 @@ class TitlePromptModal extends Modal {
   onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.addClass("hugo-command-title-modal");
+    contentEl.addClass("warped-hugo-title-modal");
 
     contentEl.createEl("h3", { text: "New Post" });
 
     const inputContainer = contentEl.createEl("div", {
-      cls: "hugo-command-title-input-container",
+      cls: "warped-hugo-title-input-container",
     });
 
     this.inputEl = inputContainer.createEl("input", {
-      cls: "hugo-command-title-input",
+      cls: "warped-hugo-title-input",
       attr: {
         type: "text",
         placeholder: "Enter post title...",
@@ -935,7 +935,7 @@ class TitlePromptModal extends Modal {
 
     // Button container
     const buttonContainer = contentEl.createEl("div", {
-      cls: "hugo-command-title-buttons",
+      cls: "warped-hugo-title-buttons",
     });
 
     const cancelBtn = buttonContainer.createEl("button", {

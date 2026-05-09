@@ -1,0 +1,2 @@
+# Obsidian-plugins plan
+

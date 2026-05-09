@@ -68,7 +68,7 @@ function mimeTypeForPath(filePath: string): string {
 }
 
 const server = new Server(
-  { name: "g-command/vault", version: "1.3.0" },
+  { name: "warped-reference/vault", version: "1.3.0" },
   { capabilities: { resources: {}, tools: {} } },
 );
 

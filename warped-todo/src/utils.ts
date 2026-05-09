@@ -9,7 +9,7 @@ export const LOGO_PREFIX = "␣⌘";
  * Show a notice with the styled Space Command logo badge.
  * Uses the shared notice factory pattern.
  */
-export const showNotice = createNoticeFactory(LOGO_PREFIX, "space-command-logo");
+export const showNotice = createNoticeFactory(LOGO_PREFIX, "warped-todo-logo");
 
 /**
  * Plugin tags - system tags that get base logo colour styling.
@@ -528,7 +528,7 @@ export function isCheckboxChecked(text: string): boolean {
 }
 
 export function markCheckboxComplete(text: string): string {
-  return text.replace(/^(-\s*\[)[ ](\])/, "$1x$2");
+  return text.replace(/^(\s*-\s*\[)[ ](\])/, "$1x$2");
 }
 
 export function replaceTodoWithTodone(text: string, date: string): string {
@@ -574,7 +574,7 @@ export function replaceTodoneWithTodo(text: string): string {
 }
 
 export function markCheckboxIncomplete(text: string): string {
-  return text.replace(/^(-\s*\[)x(\])/i, "$1 $2");
+  return text.replace(/^(\s*-\s*\[)x(\])/i, "$1 $2");
 }
 
 export function removeIdeaTag(text: string): string {

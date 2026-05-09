@@ -1,11 +1,11 @@
 {
-  "name": "g-command-vault",
+  "name": "warped-reference-vault",
   "version": "1.0.0",
   "description": "MCP server for read-only Google Drive access via rclone",
   "license": "MIT",
   "type": "module",
   "bin": {
-    "g-command-vault": "dist/gdrive/index.js"
+    "warped-reference-vault": "dist/gdrive/index.js"
   },
   "files": [
     "dist"

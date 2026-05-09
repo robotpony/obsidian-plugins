@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Structure
 
-This is a mono-repo containing three Obsidian plugins and shared utilities:
+This is a mono-repo containing Obsidian plugins and shared utilities, published under the **Warped** name:
 
 | Directory | Description |
 |-----------|-------------|
-| [space-command/](space-command/) | TODO/TODONE tracking with sidebar, embeds, slash commands |
-| [hugo-command/](hugo-command/) | Hugo content browser and management |
-| [notate-command/](notate-command/) | Quick note capture to daily/weekly logs with sidebar and history |
+| [warped-todo/](warped-todo/) | TODO/TODONE tracking with sidebar, embeds, slash commands |
+| [warped-hugo/](warped-hugo/) | Hugo content browser and management |
+| [warped-reference/](warped-reference/) | Google Drive browser and sync |
 | [shared/](shared/) | Common utilities used by all plugins |
 
 See plugin-specific CLAUDE.md files for detailed architecture.

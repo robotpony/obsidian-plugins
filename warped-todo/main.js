@@ -137,7 +137,7 @@ var import_obsidian2 = require("obsidian");
 
 // src/utils.ts
 var LOGO_PREFIX = "\u2423\u2318";
-var showNotice2 = createNoticeFactory(LOGO_PREFIX, "space-command-logo");
+var showNotice2 = createNoticeFactory(LOGO_PREFIX, "warped-todo-logo");
 var PLUGIN_TAGS = /* @__PURE__ */ new Set([
   "#todo",
   "#todos",
@@ -391,7 +391,7 @@ function isCheckboxChecked(text) {
   return /^-\s*\[x\]/i.test(text.trim());
 }
 function markCheckboxComplete(text) {
-  return text.replace(/^(-\s*\[)[ ](\])/, "$1x$2");
+  return text.replace(/^(\s*-\s*\[)[ ](\])/, "$1x$2");
 }
 function replaceTodoWithTodone(text, date) {
   if (text.includes("#todos")) {
@@ -420,7 +420,7 @@ function replaceTodoneWithTodo(text) {
   return result;
 }
 function markCheckboxIncomplete(text) {
-  return text.replace(/^(-\s*\[)x(\])/i, "$1 $2");
+  return text.replace(/^(\s*-\s*\[)x(\])/i, "$1 $2");
 }
 function removeIdeaTag(text) {
   return text.replace(/#idea(?:s|tion)?\b\s*/, "").trim();
@@ -2211,7 +2211,7 @@ var SlashCommandSuggest = class extends import_obsidian7.EditorSuggest {
     );
   }
   renderSuggestion(item, el) {
-    el.addClass("space-command-suggestion");
+    el.addClass("warped-todo-suggestion");
     const iconSpan = el.createEl("span", { cls: "suggestion-icon" });
     iconSpan.textContent = item.icon;
     const textContainer = el.createEl("div", { cls: "suggestion-content" });
@@ -2364,7 +2364,7 @@ var AtSuggest = class extends import_obsidian8.EditorSuggest {
     });
   }
   renderSuggestion(item, el) {
-    el.addClass("space-command-suggestion");
+    el.addClass("warped-todo-suggestion");
     const iconSpan = el.createEl("span", { cls: "suggestion-icon" });
     iconSpan.textContent = item.icon;
     const textContainer = el.createEl("div", { cls: "suggestion-content" });
@@ -2835,7 +2835,7 @@ var ContextMenuHandler = class {
 };
 
 // src/SidebarView.ts
-var VIEW_TYPE_TODO_SIDEBAR = "space-command-sidebar";
+var VIEW_TYPE_TODO_SIDEBAR = "warped-todo-sidebar";
 var TodoSidebarView = class extends import_obsidian12.ItemView {
   constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, activeTodosLimit, focusListLimit, makeLinksClickable, onShowAbout, onShowStats, getMoveHistory = () => [], teamManager, defaultAssignee = "", focusQueueLimit = 1, focusModeActive = false, setFocusModeActive = async () => {
   }) {
@@ -3241,7 +3241,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
   render() {
     const container = this.containerEl.children[1];
     container.empty();
-    container.addClass("space-command-sidebar");
+    container.addClass("warped-todo-sidebar");
     if (this.focusModeActive) {
       container.addClass("sidebar-focus-mode-active");
       this.renderFocusCard(container);
@@ -3250,7 +3250,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     container.removeClass("sidebar-focus-mode-active");
     const headerDiv = container.createEl("div", { cls: "sidebar-header" });
     const titleEl = headerDiv.createEl("h4", { cls: "sidebar-title" });
-    const logoEl = titleEl.createEl("span", { cls: "space-command-logo clickable-logo", text: "\u2423\u2318" });
+    const logoEl = titleEl.createEl("span", { cls: "warped-todo-logo clickable-logo", text: "\u2423\u2318" });
     logoEl.addEventListener("click", () => this.onShowAbout());
     switch (this.activeTab) {
       case "todos":
@@ -4164,7 +4164,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
   renderFocusCard(container) {
     const header = container.createEl("div", { cls: "sidebar-header sidebar-header-focus" });
     const titleEl = header.createEl("h4", { cls: "sidebar-title" });
-    const logoEl = titleEl.createEl("span", { cls: "space-command-logo clickable-logo", text: "\u2423\u2318" });
+    const logoEl = titleEl.createEl("span", { cls: "warped-todo-logo clickable-logo", text: "\u2423\u2318" });
     logoEl.addEventListener("click", () => this.onShowAbout());
     titleEl.appendText(" TODOs");
     this.createSidebarMenuButton(header);
@@ -4333,7 +4333,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       menu.addItem((item) => {
         item.setTitle("Settings").setIcon("settings").onClick(() => {
           this.app.setting.open();
-          this.app.setting.openTabById("space-command");
+          this.app.setting.openTabById("warped-todo");
         });
       });
       menu.showAtMouseEvent(evt);
@@ -4818,7 +4818,7 @@ var TabLockManager = class {
       console.log(`[TabLockManager] Skipping non-markdown tab: data-type="${dataType}"`);
       return;
     }
-    const existingBtn = tabHeader.querySelector(".space-command-tab-lock-btn");
+    const existingBtn = tabHeader.querySelector(".warped-todo-tab-lock-btn");
     if (existingBtn) {
       const isPinned2 = leaf.pinned === true;
       this.updateButtonState(existingBtn, isPinned2);
@@ -4832,7 +4832,7 @@ var TabLockManager = class {
     console.log(`[TabLockManager] Adding button to leaf`);
     const closeButton = innerContainer.querySelector(".workspace-tab-header-inner-close-button");
     const lockBtn = document.createElement("div");
-    lockBtn.className = "space-command-tab-lock-btn workspace-tab-header-status-icon";
+    lockBtn.className = "warped-todo-tab-lock-btn workspace-tab-header-status-icon";
     lockBtn.setAttribute("aria-label", "Lock tab (pinned tabs open links in new tabs)");
     const isPinned = leaf.pinned === true;
     this.updateButtonState(lockBtn, isPinned);
@@ -4860,9 +4860,9 @@ var TabLockManager = class {
     );
     if (!pinContainer)
       return;
-    if (pinContainer.hasAttribute("data-space-command-pin-handler"))
+    if (pinContainer.hasAttribute("data-warped-todo-pin-handler"))
       return;
-    pinContainer.setAttribute("data-space-command-pin-handler", "true");
+    pinContainer.setAttribute("data-warped-todo-pin-handler", "true");
     pinContainer.addEventListener(
       "click",
       (e) => {
@@ -4872,7 +4872,7 @@ var TabLockManager = class {
         e.stopPropagation();
         e.preventDefault();
         leaf.setPinned(false);
-        tabHeader.classList.remove("space-command-tab-locked");
+        tabHeader.classList.remove("warped-todo-tab-locked");
         this.updateButtonState(lockBtn, false);
       },
       { capture: true }
@@ -4886,7 +4886,7 @@ var TabLockManager = class {
     button.setAttribute("aria-label", isPinned ? "Unlock tab" : "Lock tab");
     const tabHeader = button.closest(".workspace-tab-header");
     if (tabHeader) {
-      tabHeader.classList.toggle("space-command-tab-locked", isPinned);
+      tabHeader.classList.toggle("warped-todo-tab-locked", isPinned);
     }
     button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>`;
   }
@@ -4894,17 +4894,17 @@ var TabLockManager = class {
    * Remove all lock buttons and cleanup.
    */
   removeAllButtons() {
-    const buttons = document.querySelectorAll(".space-command-tab-lock-btn");
+    const buttons = document.querySelectorAll(".warped-todo-tab-lock-btn");
     buttons.forEach((btn) => btn.remove());
-    const lockedTabs = document.querySelectorAll(".space-command-tab-locked");
+    const lockedTabs = document.querySelectorAll(".warped-todo-tab-locked");
     lockedTabs.forEach(
-      (tab) => tab.classList.remove("space-command-tab-locked")
+      (tab) => tab.classList.remove("warped-todo-tab-locked")
     );
     const pinContainers = document.querySelectorAll(
-      "[data-space-command-pin-handler]"
+      "[data-warped-todo-pin-handler]"
     );
     pinContainers.forEach(
-      (container) => container.removeAttribute("data-space-command-pin-handler")
+      (container) => container.removeAttribute("data-warped-todo-pin-handler")
     );
   }
 };
@@ -5355,9 +5355,9 @@ var AboutModal = class extends import_obsidian13.Modal {
   onOpen() {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.addClass("space-command-about-modal");
+    contentEl.addClass("warped-todo-about-modal");
     const header = contentEl.createEl("div", { cls: "about-header" });
-    header.createEl("span", { cls: "space-command-logo about-logo", text: "\u2423\u2318" });
+    header.createEl("span", { cls: "warped-todo-logo about-logo", text: "\u2423\u2318" });
     header.createEl("h2", { text: "Space Command" });
     contentEl.createEl("p", { cls: "about-version", text: `Version ${this.version}` });
     contentEl.createEl("p", {
@@ -5386,9 +5386,9 @@ var StatsModal = class extends import_obsidian13.Modal {
   onOpen() {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.addClass("space-command-stats-modal");
+    contentEl.addClass("warped-todo-stats-modal");
     const header = contentEl.createEl("div", { cls: "stats-header" });
-    header.createEl("span", { cls: "space-command-logo stats-logo", text: "\u2423\u2318" });
+    header.createEl("span", { cls: "warped-todo-logo stats-logo", text: "\u2423\u2318" });
     header.createEl("h2", { text: "Vault Statistics" });
     const todos = this.scanner.getTodos();
     const todones = this.scanner.getTodones();
@@ -5436,9 +5436,9 @@ var SpaceCommandSettingTab = class extends import_obsidian13.PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     containerEl.createEl("h2", { text: "Space Command Settings" });
-    const aboutSection = containerEl.createEl("div", { cls: "space-command-about-section" });
+    const aboutSection = containerEl.createEl("div", { cls: "warped-todo-about-section" });
     const aboutHeader = aboutSection.createEl("div", { cls: "about-header" });
-    aboutHeader.createEl("span", { cls: "space-command-logo about-logo", text: "\u2423\u2318" });
+    aboutHeader.createEl("span", { cls: "warped-todo-logo about-logo", text: "\u2423\u2318" });
     aboutHeader.createEl("span", { cls: "about-title", text: "Space Command" });
     aboutSection.createEl("p", {
       cls: "about-blurb",

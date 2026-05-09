@@ -63,7 +63,7 @@ export async function downloadDriveFile(
  * Falls back to "gdrive" if not found.
  */
 export function readVaultRoot(vaultPath: string): string {
-  const dataPath = join(vaultPath, ".obsidian", "plugins", "g-command", "data.json");
+  const dataPath = join(vaultPath, ".obsidian", "plugins", "warped-reference", "data.json");
   try {
     const data = JSON.parse(readFileSync(dataPath, "utf-8"));
     return data.vaultRoot ?? "gdrive";
@@ -80,7 +80,7 @@ export function updateSyncState(
   driveFile: ConvertFile,
   vaultRelPath: string,
 ): void {
-  const dataPath = join(vaultPath, ".obsidian", "plugins", "g-command", "data.json");
+  const dataPath = join(vaultPath, ".obsidian", "plugins", "warped-reference", "data.json");
   let data: Record<string, any> = {};
   try {
     data = JSON.parse(readFileSync(dataPath, "utf-8"));

@@ -1,6 +1,6 @@
 {
-  "id": "space-command",
-  "name": "Space Command",
+  "id": "warped-todo",
+  "name": "Warped Todo",
   "version": "0.25.0",
   "minAppVersion": "0.15.0",
   "description": "Tools for managing TODOs, TODONEs, and workflows across your vault with live embeds and interactive sidebar.",
