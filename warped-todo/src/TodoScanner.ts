@@ -1,6 +1,6 @@
 import { App, TFile, Vault, Events, debounce } from "obsidian";
 import { TodoItem } from "./types";
-import { createFingerprint, extractDateFromFilename, extractMentions, extractTags, filenameToTag, hasCachedRelevantTags, hasCheckboxFormat, isCheckboxChecked, replaceTodoneWithTodo } from "./utils";
+import { createFingerprint, extractDateFromFilename, extractMentions, extractTags, filenameToTag, formatDate, hasCachedRelevantTags, hasCheckboxFormat, isCheckboxChecked, replaceTodoneWithTodo } from "./utils";
 
 export class TodoScanner extends Events {
   private app: App;
@@ -631,7 +631,7 @@ export class TodoScanner extends Events {
       return;
     }
 
-    const today = new Date().toISOString().split("T")[0];
+    const today = formatDate(new Date(), "YYYY-MM-DD");
     let modified = false;
 
     for (const lineNum of linesToCleanup) {

@@ -2,6 +2,12 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.25.6] - 2026-05-08
+
+### Fixed — Todone dates no longer written as UTC (+1 day in North American timezones)
+
+When checking a checkbox directly in the editor, the scanner auto-stamps the `#todone @date`. It was using `new Date().toISOString().split("T")[0]`, which returns the UTC date. In any timezone behind UTC (UTC-7, UTC-5, etc.) this produces the next calendar day after a certain hour in the evening. Fixed to use `formatDate(new Date(), "YYYY-MM-DD")` (moment local time), matching the completion path in `TodoProcessor`. The same UTC issue in the `getItemDate` mtime fallback is fixed with an explicit local-date calculation.
+
 ## [0.25.5] - 2026-05-08
 
 ### Fixed — Tag cloud pills no longer oversized in sidebar

@@ -344,7 +344,8 @@ function getItemDate(todo) {
   const file = todo.file;
   const mtime = (_a = file == null ? void 0 : file.stat) == null ? void 0 : _a.mtime;
   if (typeof mtime === "number" && Number.isFinite(mtime)) {
-    const iso = new Date(mtime).toISOString().slice(0, 10);
+    const d = new Date(mtime);
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     return { kind: "modified", iso };
   }
   return { kind: "none", iso: null };
@@ -1041,7 +1042,7 @@ var TodoScanner = class extends import_obsidian4.Events {
     if (linesToCleanup.length === 0 && linesToSyncTodone.length === 0 && linesToRevertTodone.length === 0 && linesToRemoveIdea.length === 0 && linesToStampMoved.length === 0) {
       return;
     }
-    const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+    const today = formatDate(/* @__PURE__ */ new Date(), "YYYY-MM-DD");
     let modified = false;
     for (const lineNum of linesToCleanup) {
       const newLine = lines[lineNum].replace(/#todos?\b\s*/g, "");

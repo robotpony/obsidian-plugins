@@ -450,7 +450,8 @@ export function getItemDate(todo: TodoItem): ItemDate {
   const file = todo.file as { stat?: { mtime?: number } } | undefined;
   const mtime = file?.stat?.mtime;
   if (typeof mtime === "number" && Number.isFinite(mtime)) {
-    const iso = new Date(mtime).toISOString().slice(0, 10);
+    const d = new Date(mtime);
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     return { kind: "modified", iso };
   }
 

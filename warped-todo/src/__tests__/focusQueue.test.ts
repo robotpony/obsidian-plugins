@@ -349,11 +349,14 @@ describe("getItemDate", () => {
   });
 
   it("falls back to the file mtime when no @date is present", () => {
-    // 2024-01-15T00:00:00Z = 1705276800000
-    const item = makeTodo({ text: "No date task #todo", mtime: 1705276800000 });
+    const mtime = 1705276800000; // 2024-01-15T00:00:00Z
+    const item = makeTodo({ text: "No date task #todo", mtime });
     const result = getItemDate(item);
+    // Expected iso uses local time, not UTC, to match the fix.
+    const d = new Date(mtime);
+    const expectedIso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     expect(result.kind).toBe("modified");
-    expect(result.iso).toBe("2024-01-15");
+    expect(result.iso).toBe(expectedIso);
   });
 
   it("returns 'none' when neither @date nor mtime is available", () => {
