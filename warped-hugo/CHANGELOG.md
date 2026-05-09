@@ -2,6 +2,13 @@
 
 All notable changes to the Hugo Command plugin will be documented in this file.
 
+## [0.8.0] - 2026-05-09
+
+### Removed — LLM documentation cleanup
+
+- **LLM references removed from docs and CLAUDE.md**: The LLM source files were removed in 0.6.12; this release removes the remaining references from plugin docs, CLAUDE.md component table, data flow, and key patterns sections.
+- Fixed stale inline comment in `SidebarView.ts` that still referenced "review" in the info dropdown.
+
 ## [0.7.0] - 2026-05-09
 
 ### Changed — Settings cleanup

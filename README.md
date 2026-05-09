@@ -143,14 +143,6 @@ Click `+` in the sidebar header:
 2. Enter a title
 3. A new file is created with Hugo frontmatter (`title`, `date`, `draft: true`, empty `tags`)
 
-### LLM review
-
-If you configure an LLM provider (Ollama, OpenAI, Gemini, or Anthropic), Warped Hugo can evaluate posts against a configurable checklist and cache results by file hash. Useful for catching missing elements before publishing.
-
-### Outline enhancement
-
-The sparkles button (or "Enhance Outline" command) sends a file to your LLM, which adds inline questions and suggestions as HTML comments. These render as interactive bubbles in the editor so you can work through feedback without leaving the file.
-
 ---
 
 ## Warped Reference

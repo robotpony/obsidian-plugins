@@ -83,8 +83,8 @@ Configure the plugin in Settings > Hugo Command:
 
 - **Content Paths**: Folders to scan for Hugo content (one per line, default: `content`). Use `.` to scan the entire vault.
 - **Show Sidebar by Default**: Open sidebar when Obsidian starts
-- **Show Drafts**: Include draft posts in the content list
-- **Default Sort Order**: How to sort content (date or title)
+- **Default Status Filter**: Which posts to show by default (All, Published, or Drafts)
+- **Default Sort Order**: How to sort content (by date or title)
 - **Trash Folder**: Folder for trashed posts (default: `_trash`)
 
 ## Hugo Frontmatter

@@ -629,7 +629,7 @@ export class HugoSidebarView extends ItemView {
       });
     }
 
-    // Info dropdown (always show - contains date, folder tags, frontmatter tags, review)
+    // Info dropdown (always show - contains date, folder tags, frontmatter tags)
     const frontmatterTags = [...item.tags, ...item.categories];
     const folderTags = item.folderTags;
     this.renderItemInfoDropdown(listItem, item, frontmatterTags, folderTags);
