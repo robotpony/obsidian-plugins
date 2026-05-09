@@ -2,6 +2,12 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.26.0] - 2026-05-09
+
+### Changed — Assignee filter moved into the tag cloud
+
+The `@` dropdown button that appeared between the tag cloud and the TODO list has been replaced. Assignee options now render as pills directly in the tag cloud, alongside project and priority tags. `@me` appears first (with accent colouring), followed by other handles with active TODOs, and `@unassigned` if any items have no assignee. Clicking a pill toggles the assignee filter in place, same as before. The isolated `@` character is gone.
+
 ## [0.25.6] - 2026-05-08
 
 ### Fixed — Todone dates no longer written as UTC (+1 day in North American timezones)

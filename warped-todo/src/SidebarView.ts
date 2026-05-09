@@ -843,118 +843,6 @@ export class TodoSidebarView extends ItemView {
     }
   }
 
-  private renderAssigneeFilter(header: HTMLElement): void {
-    const team = this.teamManager.getTeam();
-    // Only show filter if there are team members defined
-    if (team.length === 0) return;
-
-    const label = this.activeAssigneeFilter
-      ? (this.activeAssigneeFilter === "__unassigned__" ? "?" : `@${this.activeAssigneeFilter}`)
-      : "@";
-
-    const trigger = header.createEl("span", {
-      cls: `sc-assignee-filter${this.activeAssigneeFilter ? " active" : ""}`,
-      text: label,
-      attr: { "aria-label": "Filter by assignee" },
-    });
-
-    trigger.addEventListener("click", (e) => {
-      e.stopPropagation();
-      this.closeDropdown();
-
-      const dropdown = document.createElement("div");
-      dropdown.className = "tag-dropdown-menu";
-
-      const rect = trigger.getBoundingClientRect();
-      dropdown.style.position = "fixed";
-      dropdown.style.top = `${rect.bottom + 4}px`;
-
-      const sidebarRoot = this.leaf.getRoot();
-      const isRightSidebar = sidebarRoot === this.app.workspace.rightSplit;
-      if (isRightSidebar) {
-        dropdown.style.right = `${window.innerWidth - rect.right}px`;
-        dropdown.classList.add("dropdown-left");
-      } else {
-        dropdown.style.left = `${rect.left}px`;
-      }
-
-      // "Everyone" option
-      const everyoneItem = dropdown.createEl("div", { cls: "tag-dropdown-item" });
-      everyoneItem.createEl("span", { cls: "tag-dropdown-item-label", text: "Everyone" });
-      everyoneItem.addEventListener("click", () => {
-        this.activeAssigneeFilter = null;
-        this.closeDropdown();
-        this.render();
-      });
-
-      // Team members
-      const meHandle = this.teamManager.resolveMe();
-      if (meHandle) {
-        const meItem = dropdown.createEl("div", { cls: "tag-dropdown-item" });
-        const meMember = team.find(m => m.isMe);
-        meItem.createEl("span", { cls: "tag-dropdown-item-label sc-mention sc-mention-me", text: `@me` });
-        if (meMember) meItem.createEl("span", { cls: "sc-assignee-filter-name", text: meMember.name });
-        meItem.addEventListener("click", () => {
-          this.activeAssigneeFilter = "me";
-          this.closeDropdown();
-          this.render();
-        });
-      }
-
-      for (const member of team) {
-        if (member.isMe) continue;
-        const item = dropdown.createEl("div", { cls: "tag-dropdown-item" });
-        item.createEl("span", { cls: "tag-dropdown-item-label sc-mention", text: `@${member.handle}` });
-        item.createEl("span", { cls: "sc-assignee-filter-name", text: member.name });
-        item.addEventListener("click", () => {
-          this.activeAssigneeFilter = member.handle;
-          this.closeDropdown();
-          this.render();
-        });
-      }
-
-      // Add handles found in TODOs but not in team.md
-      const teamHandles = new Set(team.map(m => m.handle));
-      if (meHandle) teamHandles.add("me");
-      const allMentions = new Set<string>();
-      for (const todo of this.scanner.getTodos()) {
-        for (const m of todo.mentions) allMentions.add(m);
-      }
-      for (const handle of [...allMentions].sort()) {
-        if (handle === "me" || teamHandles.has(handle)) continue;
-        const item = dropdown.createEl("div", { cls: "tag-dropdown-item" });
-        item.createEl("span", { cls: "tag-dropdown-item-label sc-mention", text: `@${handle}` });
-        item.addEventListener("click", () => {
-          this.activeAssigneeFilter = handle;
-          this.closeDropdown();
-          this.render();
-        });
-      }
-
-      // Unassigned option
-      const unassignedItem = dropdown.createEl("div", { cls: "tag-dropdown-item" });
-      unassignedItem.createEl("span", { cls: "tag-dropdown-item-label", text: "Unassigned" });
-      unassignedItem.addEventListener("click", () => {
-        this.activeAssigneeFilter = "__unassigned__";
-        this.closeDropdown();
-        this.render();
-      });
-
-      document.body.appendChild(dropdown);
-      this.openDropdown = dropdown;
-      this.openDropdownTrigger = trigger;
-
-      // Close on click outside
-      const closeHandler = (e: MouseEvent) => {
-        if (!dropdown.contains(e.target as Node) && e.target !== trigger) {
-          this.closeDropdown();
-          document.removeEventListener("click", closeHandler);
-        }
-      };
-      setTimeout(() => document.addEventListener("click", closeHandler), 0);
-    });
-  }
-
   private renderFilterIndicator(header: HTMLElement): void {
     if (!this.activeTagFilter) return;
 
@@ -1052,6 +940,64 @@ export class TodoSidebarView extends ItemView {
       });
       more.setAttribute("title", `Showing ${visible.length} of ${totalCount} tags`);
     }
+
+    // Assignee pills — only when a team is configured
+    const team = this.teamManager.getTeam();
+    if (team.length > 0) {
+      const meHandle = this.teamManager.resolveMe();
+      const mentionCounts = new Map<string, number>();
+      let unassignedCount = 0;
+      for (const t of activeTodos) {
+        if (t.isHeader) continue;
+        const effective = resolveEffectiveMentions(t, meHandle, this.defaultAssignee);
+        if (effective.length === 0) {
+          unassignedCount++;
+        } else {
+          for (const m of effective) {
+            mentionCounts.set(m, (mentionCounts.get(m) ?? 0) + 1);
+          }
+        }
+      }
+
+      // @me first, then other handles sorted alphabetically, then @unassigned
+      if (meHandle && mentionCounts.has(meHandle)) {
+        this.renderAssigneePill(cloud, "me", mentionCounts.get(meHandle)!, true);
+      }
+      for (const [handle, count] of [...mentionCounts.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+        if (handle === meHandle) continue;
+        this.renderAssigneePill(cloud, handle, count, false);
+      }
+      if (unassignedCount > 0) {
+        this.renderAssigneePill(cloud, "__unassigned__", unassignedCount, false);
+      }
+    }
+  }
+
+  private renderAssigneePill(container: HTMLElement, handle: string, count: number, isMe: boolean): void {
+    const isActive = this.activeAssigneeFilter === handle;
+    const label = handle === "__unassigned__" ? "@unassigned" : `@${handle}`;
+
+    const classes = [
+      "tag-cloud-pill",
+      "tag-cloud-pill-mention",
+      isMe ? "tag-cloud-pill-mention-me" : "",
+      isActive ? "tag-cloud-pill-active" : "",
+    ].filter(Boolean).join(" ");
+
+    const pill = container.createEl("button", {
+      cls: classes,
+      attr: {
+        type: "button",
+        "aria-pressed": isActive ? "true" : "false",
+        title: `${count} item${count === 1 ? "" : "s"}`,
+      },
+    });
+    pill.appendText(label);
+
+    pill.addEventListener("click", () => {
+      this.activeAssigneeFilter = isActive ? null : handle;
+      this.render();
+    });
   }
 
   /**
@@ -1420,10 +1366,8 @@ export class TodoSidebarView extends ItemView {
     const section = container.createEl("div", { cls: "todo-section" });
 
     // No "TODO" title — the tab is already labelled. Render the header row
-    // only when there's something to put in it (assignee filter or active
-    // tag filter). CSS hides empty headers as a safety net.
+    // only when there's an active tag filter. CSS hides empty headers as a safety net.
     const header = section.createEl("div", { cls: "todo-section-header" });
-    this.renderAssigneeFilter(header);
     this.renderFilterIndicator(header);
 
     if (totalCount === 0) {

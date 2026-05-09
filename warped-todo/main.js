@@ -3430,102 +3430,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       });
     }
   }
-  renderAssigneeFilter(header) {
-    const team = this.teamManager.getTeam();
-    if (team.length === 0)
-      return;
-    const label = this.activeAssigneeFilter ? this.activeAssigneeFilter === "__unassigned__" ? "?" : `@${this.activeAssigneeFilter}` : "@";
-    const trigger = header.createEl("span", {
-      cls: `sc-assignee-filter${this.activeAssigneeFilter ? " active" : ""}`,
-      text: label,
-      attr: { "aria-label": "Filter by assignee" }
-    });
-    trigger.addEventListener("click", (e) => {
-      e.stopPropagation();
-      this.closeDropdown();
-      const dropdown = document.createElement("div");
-      dropdown.className = "tag-dropdown-menu";
-      const rect = trigger.getBoundingClientRect();
-      dropdown.style.position = "fixed";
-      dropdown.style.top = `${rect.bottom + 4}px`;
-      const sidebarRoot = this.leaf.getRoot();
-      const isRightSidebar = sidebarRoot === this.app.workspace.rightSplit;
-      if (isRightSidebar) {
-        dropdown.style.right = `${window.innerWidth - rect.right}px`;
-        dropdown.classList.add("dropdown-left");
-      } else {
-        dropdown.style.left = `${rect.left}px`;
-      }
-      const everyoneItem = dropdown.createEl("div", { cls: "tag-dropdown-item" });
-      everyoneItem.createEl("span", { cls: "tag-dropdown-item-label", text: "Everyone" });
-      everyoneItem.addEventListener("click", () => {
-        this.activeAssigneeFilter = null;
-        this.closeDropdown();
-        this.render();
-      });
-      const meHandle = this.teamManager.resolveMe();
-      if (meHandle) {
-        const meItem = dropdown.createEl("div", { cls: "tag-dropdown-item" });
-        const meMember = team.find((m) => m.isMe);
-        meItem.createEl("span", { cls: "tag-dropdown-item-label sc-mention sc-mention-me", text: `@me` });
-        if (meMember)
-          meItem.createEl("span", { cls: "sc-assignee-filter-name", text: meMember.name });
-        meItem.addEventListener("click", () => {
-          this.activeAssigneeFilter = "me";
-          this.closeDropdown();
-          this.render();
-        });
-      }
-      for (const member of team) {
-        if (member.isMe)
-          continue;
-        const item = dropdown.createEl("div", { cls: "tag-dropdown-item" });
-        item.createEl("span", { cls: "tag-dropdown-item-label sc-mention", text: `@${member.handle}` });
-        item.createEl("span", { cls: "sc-assignee-filter-name", text: member.name });
-        item.addEventListener("click", () => {
-          this.activeAssigneeFilter = member.handle;
-          this.closeDropdown();
-          this.render();
-        });
-      }
-      const teamHandles = new Set(team.map((m) => m.handle));
-      if (meHandle)
-        teamHandles.add("me");
-      const allMentions = /* @__PURE__ */ new Set();
-      for (const todo of this.scanner.getTodos()) {
-        for (const m of todo.mentions)
-          allMentions.add(m);
-      }
-      for (const handle of [...allMentions].sort()) {
-        if (handle === "me" || teamHandles.has(handle))
-          continue;
-        const item = dropdown.createEl("div", { cls: "tag-dropdown-item" });
-        item.createEl("span", { cls: "tag-dropdown-item-label sc-mention", text: `@${handle}` });
-        item.addEventListener("click", () => {
-          this.activeAssigneeFilter = handle;
-          this.closeDropdown();
-          this.render();
-        });
-      }
-      const unassignedItem = dropdown.createEl("div", { cls: "tag-dropdown-item" });
-      unassignedItem.createEl("span", { cls: "tag-dropdown-item-label", text: "Unassigned" });
-      unassignedItem.addEventListener("click", () => {
-        this.activeAssigneeFilter = "__unassigned__";
-        this.closeDropdown();
-        this.render();
-      });
-      document.body.appendChild(dropdown);
-      this.openDropdown = dropdown;
-      this.openDropdownTrigger = trigger;
-      const closeHandler = (e2) => {
-        if (!dropdown.contains(e2.target) && e2.target !== trigger) {
-          this.closeDropdown();
-          document.removeEventListener("click", closeHandler);
-        }
-      };
-      setTimeout(() => document.addEventListener("click", closeHandler), 0);
-    });
-  }
   renderFilterIndicator(header) {
     if (!this.activeTagFilter)
       return;
@@ -3541,7 +3445,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     });
   }
   renderProjects(container) {
-    var _a, _b;
+    var _a, _b, _c;
     const projects = this.projectManager.getProjects();
     const section = container.createEl("div", { cls: "projects-section tag-cloud-section" });
     const entries = [];
@@ -3598,6 +3502,58 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       });
       more.setAttribute("title", `Showing ${visible.length} of ${totalCount} tags`);
     }
+    const team = this.teamManager.getTeam();
+    if (team.length > 0) {
+      const meHandle = this.teamManager.resolveMe();
+      const mentionCounts = /* @__PURE__ */ new Map();
+      let unassignedCount = 0;
+      for (const t of activeTodos) {
+        if (t.isHeader)
+          continue;
+        const effective = resolveEffectiveMentions(t, meHandle, this.defaultAssignee);
+        if (effective.length === 0) {
+          unassignedCount++;
+        } else {
+          for (const m of effective) {
+            mentionCounts.set(m, ((_c = mentionCounts.get(m)) != null ? _c : 0) + 1);
+          }
+        }
+      }
+      if (meHandle && mentionCounts.has(meHandle)) {
+        this.renderAssigneePill(cloud, "me", mentionCounts.get(meHandle), true);
+      }
+      for (const [handle, count] of [...mentionCounts.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+        if (handle === meHandle)
+          continue;
+        this.renderAssigneePill(cloud, handle, count, false);
+      }
+      if (unassignedCount > 0) {
+        this.renderAssigneePill(cloud, "__unassigned__", unassignedCount, false);
+      }
+    }
+  }
+  renderAssigneePill(container, handle, count, isMe) {
+    const isActive = this.activeAssigneeFilter === handle;
+    const label = handle === "__unassigned__" ? "@unassigned" : `@${handle}`;
+    const classes = [
+      "tag-cloud-pill",
+      "tag-cloud-pill-mention",
+      isMe ? "tag-cloud-pill-mention-me" : "",
+      isActive ? "tag-cloud-pill-active" : ""
+    ].filter(Boolean).join(" ");
+    const pill = container.createEl("button", {
+      cls: classes,
+      attr: {
+        type: "button",
+        "aria-pressed": isActive ? "true" : "false",
+        title: `${count} item${count === 1 ? "" : "s"}`
+      }
+    });
+    pill.appendText(label);
+    pill.addEventListener("click", () => {
+      this.activeAssigneeFilter = isActive ? null : handle;
+      this.render();
+    });
   }
   /**
    * Lightweight tag cloud for tabs without project metadata (Ideas, Snoozed).
@@ -3865,7 +3821,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     }
     const section = container.createEl("div", { cls: "todo-section" });
     const header = section.createEl("div", { cls: "todo-section-header" });
-    this.renderAssigneeFilter(header);
     this.renderFilterIndicator(header);
     if (totalCount === 0) {
       const emptyText = this.activeTagFilter ? `No TODOs matching ${this.activeTagFilter}` : "No TODOs";

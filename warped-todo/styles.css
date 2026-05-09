@@ -1596,33 +1596,25 @@
   background-color: color-mix(in srgb, var(--interactive-accent) 30%, transparent);
 }
 
-/* Assignee filter button — matches focus-mode-toggle-btn opacity pattern */
-.sc-assignee-filter {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 12px;
+/* Assignee pills in the tag cloud — muted tone to distinguish from #project tags */
+.warped-todo-sidebar .tag-cloud-pill-mention {
+  color: var(--text-muted);
+  background-color: color-mix(in srgb, var(--text-muted) 12%, transparent);
+  font-family: var(--font-monospace);
+}
+
+.warped-todo-sidebar .tag-cloud-pill-mention:hover {
   color: var(--text-normal);
-  opacity: 0.55;
-  background: transparent;
-  border: none;
+  background-color: color-mix(in srgb, var(--text-muted) 22%, transparent);
 }
 
-.sc-assignee-filter:hover {
-  opacity: 1;
+.warped-todo-sidebar .tag-cloud-pill-mention-me {
+  color: var(--text-normal);
+  background-color: color-mix(in srgb, var(--interactive-accent) 15%, transparent);
 }
 
-.sc-assignee-filter.active {
-  opacity: 0.7;
-  color: var(--interactive-accent);
-}
-
-.sc-assignee-filter-name {
-  font-size: 11px;
-  opacity: 0.65;
+.warped-todo-sidebar .tag-cloud-pill-mention-me:hover {
+  background-color: color-mix(in srgb, var(--interactive-accent) 25%, transparent);
 }
 
 /* Assignee stats row */

@@ -85,7 +85,7 @@ Assign TODOs to people with `@handle`:
 - [ ] Update onboarding docs #todo @me
 ```
 
-Mentions appear as subdued badges next to topic tags. `@me` resolves to your handle from the team file. The sidebar has an assignee dropdown to filter by person.
+Mentions appear as subdued badges next to topic tags. `@me` resolves to your handle from the team file. The tag cloud shows assignee pills alongside project tags (`@me` first, then other handles with active TODOs, then `@unassigned`). Click a pill to filter by that person; click again to clear.
 
 ### Team file
 
