@@ -22,7 +22,12 @@ The `shared/` directory contains utilities used across all plugins:
 - **`ui/Notice.ts`**: Styled notice display with plugin branding via `createNoticeFactory()`
 - **`plugin/SidebarManager.ts`**: Manages sidebar lifecycle (activate, toggle, refresh)
 - **`types/Result.ts`**: Standard result type for success/error handling
-- **`llm/LLMClient.ts`**: Multi-provider LLM client (Ollama, OpenAI, Gemini, Anthropic)
+
+### Claude Helpers (planned)
+
+A cross-plugin feature that installs Claude Code skills and rules into `~/.claude/`. The plugin becomes a configuration manager: write once in Obsidian, use in any Claude Code session. Implementation lives in `warped-reference/src/ClaudeHelpersManager.ts`.
+
+Design docs at the repo root: [ARCHITECTURE.md](ARCHITECTURE.md), [DESIGN.md](DESIGN.md), [LIBRARIES.md](LIBRARIES.md), [PLAN.md](PLAN.md).
 
 Plugins import from shared using relative paths:
 
