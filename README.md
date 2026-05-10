@@ -77,6 +77,24 @@ Any tag that isn't a priority or lifecycle tag becomes a project tag. The sideba
 
 Click `#q2-campaign` in the cloud to filter. Click again to clear. The cloud only shows tags with active items.
 
+### Header TODOs
+
+Tag a heading with `#todo` (or `#todos`) and the list items beneath it become children of that block — sprints, meeting follow-ups, anything that belongs together:
+
+```markdown
+## Sprint 12 #todos #api
+- [ ] Fix auth bug #p0
+- [ ] Update docs
+
+**Diagnostics**
+- [ ] Add structured logging
+- [ ] Wire OpenTelemetry traces
+```
+
+In the sidebar the heading renders as a single block: header row with the source filename and a `→` to open the whole block, children indented underneath, bold lines like `**Diagnostics**` carrying through as in-block labels. The header itself has no checkbox — children are completed individually, and the whole block disappears from the active list once the last child is done. Tag filters keep the parent header visible when only its children match. Right-click → **Move to…** relocates the entire block — header plus children — to another file in one move.
+
+The same pattern works for `#idea` / `#ideas` headings in the Ideas tab.
+
 ### Ideas tab
 
 Not everything is a task. Capture ideas without cluttering your TODO list:

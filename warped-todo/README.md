@@ -103,17 +103,36 @@ Mark yourself with `(me)`. The plugin auto-creates this file from Settings if it
 
 ## Header TODOs
 
-Add `#todo` to a heading — list items below become children:
+Tag a heading with `#todo` (or `#todos`) and the list items underneath become children of that heading. It's the most useful style for sprints, meeting follow-ups, or any block of related tasks that belongs in one place.
 
 ```markdown
-## Sprint 12 #todo
-- Fix auth bug
-- Update docs
+## Sprint 12 #todos #api
+- [ ] Fix auth bug #p0
+- [ ] Update docs
+- [ ] Investigate flaky test
+
+**Diagnostics (P0)**
+- [ ] Add structured logging
+- [ ] Wire OpenTelemetry traces
 ```
 
-Children are completed individually. Header TODOs with children don't get a checkbox in the sidebar so you can't accidentally bulk-complete a whole block. Sort buttons appear inline to re-sort children by priority tag.
+**In the sidebar**, the heading renders as a single block:
 
-"Move to..." (right-click or command palette) relocates the entire block — header plus children — to another file.
+- The header row shows the heading text, the source filename, and a `→` link that opens the file with the entire block (header through last child) selected.
+- Children render indented underneath, each with its own checkbox.
+- Bold lines like `**Diagnostics (P0)**` carry through as in-block subheadings, so you can label sections without breaking the parent relationship.
+- The header itself has no checkbox — completing a block used to cascade to all children, and it was too easy to do by accident.
+
+**Completion is per-child.** Tick children as you finish them. When the last live child is done (or snoozed), the whole header block disappears from the active list automatically. No "mark the header done" step.
+
+**Filtering keeps headers visible.** Click a tag like `#api` in the cloud and the header stays in view even if only its children carry the tag — you see the matching work in its original context, not stripped of its parent.
+
+**Inline controls on the header row:**
+
+- **Sort buttons** re-order children by priority tag (`#p0` → `#p4`).
+- **Right-click → Move to…** (or the command palette) relocates the entire block — header plus all children — to another file in one move.
+
+The same pattern works for `#idea` / `#ideas` headings, with children rendered the same way in the Ideas tab.
 
 ## Ideas and principles
 
