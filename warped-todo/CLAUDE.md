@@ -40,7 +40,6 @@ Warped Todo is an Obsidian plugin for tracking TODOs, Ideas, and Principles acro
 | [ContextMenuHandler.ts](src/ContextMenuHandler.ts) | Right-click menu on sidebar rows: priority, focus, snooze, move, copy, delete. |
 | [SlashCommandSuggest.ts](src/SlashCommandSuggest.ts) | Editor suggester for `/` at column 0: `/todo`, `/todos`, `/idea`, `/ideas`, `/today`, `/tomorrow`, `/callout`. |
 | [AtSuggest.ts](src/AtSuggest.ts) | Editor suggester for `@`: dates (`@today`, `@tomorrow`, `@yesterday`, `@<date>`) and team mentions (`@<handle>`). |
-| [DateSuggest.ts](src/DateSuggest.ts) | Date-format helpers used by the suggesters. |
 | [TeamManager.ts](src/TeamManager.ts) | Parses `team.md`, watches for changes, resolves handles, auto-adds unknown mentions. |
 | [MoveTargetModal.ts](src/MoveTargetModal.ts) | File picker for moving a TODO/idea to a different note. |
 | [TabLockManager.ts](src/TabLockManager.ts) | Adds lock buttons to tab headers. Locked tabs open links in new tabs instead of replacing content. |

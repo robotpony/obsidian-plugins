@@ -54,70 +54,6 @@ this.sidebarManager.forEach<MySidebarView>((view) => {
 });
 ```
 
-### Result Type (`types/Result.ts`)
-
-Standard result type for operations that can succeed or fail.
-
-```ts
-import { Result, ok, err, isOk, isErr } from "../shared";
-
-type FetchError = "network_error" | "timeout" | "parse_error";
-
-async function fetchData(): Promise<Result<Data, FetchError>> {
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      return err("network_error", `HTTP ${response.status}`);
-    }
-    return ok(await response.json());
-  } catch (e) {
-    return err("timeout", "Request timed out");
-  }
-}
-
-// Usage
-const result = await fetchData();
-if (isOk(result)) {
-  console.log(result.data);
-} else {
-  console.error(result.error, result.errorMessage);
-}
-```
-
-### LLMClient (`llm/LLMClient.ts`)
-
-Multi-provider LLM client supporting Ollama, OpenAI, Gemini, and Anthropic.
-
-```ts
-import { LLMClient, DEFAULT_LLM_PROVIDER_SETTINGS } from "../shared";
-
-// Create client with settings
-const llm = new LLMClient({
-  ...DEFAULT_LLM_PROVIDER_SETTINGS,
-  provider: "openai",
-  openaiApiKey: "sk-...",
-});
-
-// Make a request
-const response = await llm.request({
-  system: "You are a helpful assistant.",
-  prompt: "Explain this code: ...",
-  jsonResponse: false,
-});
-
-if (response.success) {
-  console.log(response.content);
-} else {
-  console.error(response.error);
-}
-```
-
-Provider-specific settings:
-- **Ollama**: `ollamaEndpoint`, `ollamaModel`
-- **OpenAI**: `openaiApiKey`, `openaiModel`
-- **Gemini**: `geminiApiKey`, `geminiModel`
-- **Anthropic**: `anthropicApiKey`, `anthropicModel`
-
 ## Development
 
 The shared module has its own `package.json` to provide TypeScript types for `obsidian`. When building a plugin, TypeScript resolves types from the shared module's `node_modules`.
@@ -130,5 +66,5 @@ npm install  # Only needed once for type checking
 Plugins import from the shared module using relative paths:
 
 ```ts
-import { SidebarManager, createNoticeFactory, LLMClient } from "../shared";
+import { SidebarManager, createNoticeFactory } from "../shared";
 ```
