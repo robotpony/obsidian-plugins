@@ -444,7 +444,10 @@
 }
 
 .todo-checkbox {
-  margin-top: 2px;
+  /* Lands the checkbox on the first-line text midline. The 0.85em scaling
+     on leaf rows shrinks the line box around the unchanged native checkbox,
+     so 3px sits truer than the old 2px. */
+  margin-top: 3px;
   cursor: pointer;
   flex-shrink: 0;
 }
@@ -542,7 +545,10 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px 4px;
-  padding: 2px 0 4px;
+  /* 4px top so the first row of pills doesn't get clipped against the
+     section's upper edge — 2px wasn't enough once the pill border was
+     factored in. */
+  padding: 4px 0 4px;
 }
 
 /* Match Obsidian's in-document tag rendering. The .warped-todo-sidebar
@@ -641,7 +647,7 @@
 }
 
 .idea-checkbox {
-  margin-top: 2px;
+  margin-top: 3px;
   cursor: pointer;
   flex-shrink: 0;
 }
