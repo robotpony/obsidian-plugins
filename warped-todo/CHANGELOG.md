@@ -7,7 +7,7 @@ All notable changes to the ␣⌘ Space Command plugin will be documented in thi
 ### Fixed — Sidebar pixel polish
 
 - **Tag cloud top no longer clips.** The first row of pills was sitting flush against the section's upper edge (the 2px top padding was eaten by the pill border). Bumped to 4px so the row sits cleanly under the header.
-- **Checkboxes now sit on the text midline.** On 0.85em-scaled leaf rows, the unchanged native checkbox was rendering 1–2px above the first-line midline. Adjusted `margin-top` from 2px to 3px on `.todo-checkbox` and `.idea-checkbox` so they centre properly.
+- **Checkboxes now sit on the text midline.** Native checkbox heights vary across themes, so a hard-coded `margin-top` couldn't reliably centre them on the first-line midline. Wrapped each checkbox in a flex container sized to the text's line box and centre-aligned the input — same pattern Focus Mode already uses. Affects `.todo-checkbox` and `.idea-checkbox`.
 
 ## [0.30.0] - 2026-05-09
 

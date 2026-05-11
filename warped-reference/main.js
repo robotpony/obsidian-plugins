@@ -27,7 +27,7 @@ __export(main_exports, {
   default: () => GCommandPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian5 = require("obsidian");
+var import_obsidian4 = require("obsidian");
 
 // src/types.ts
 var DEFAULT_SETTINGS = {
@@ -189,21 +189,21 @@ var DriveProvider = class {
             "config_change_team_drive=false"
           ],
           { maxBuffer: MAX_BUFFER, timeout: 12e4 },
-          (err2, _stdout, stderr) => {
-            if (err2) {
-              const detail = (stderr == null ? void 0 : stderr.trim()) || err2.message;
-              return reject(Object.assign(err2, { detail }));
+          (err, _stdout, stderr) => {
+            if (err) {
+              const detail = (stderr == null ? void 0 : stderr.trim()) || err.message;
+              return reject(Object.assign(err, { detail }));
             }
             resolve();
           }
         );
       });
     } catch (e) {
-      const err2 = e;
-      if (err2.killed) {
+      const err = e;
+      if (err.killed) {
         return { ok: false, code: "timeout", message: "Sign-in timed out. Try again." };
       }
-      const detail = err2.detail || err2.message;
+      const detail = err.detail || err.message;
       console.error(TAG, "setupRemote config create failed:", detail);
       return { ok: false, code: "setup-failed", message: `Setup failed: ${detail}` };
     }
@@ -257,10 +257,10 @@ var DriveProvider = class {
   }
   tryBinary(bin) {
     return new Promise((resolve, reject) => {
-      (0, import_child_process.execFile)(bin, ["version"], { maxBuffer: MAX_BUFFER }, (err2, stdout) => {
+      (0, import_child_process.execFile)(bin, ["version"], { maxBuffer: MAX_BUFFER }, (err, stdout) => {
         var _a;
-        if (err2)
-          return reject(err2);
+        if (err)
+          return reject(err);
         resolve((_a = stdout.split("\n")[0]) != null ? _a : "unknown");
       });
     });
@@ -272,9 +272,9 @@ var DriveProvider = class {
         this.rclonePath,
         ["lsjson", `${this.remote}:`, "--max-depth", "1", "--files-only"],
         { maxBuffer: MAX_BUFFER },
-        (err2, _stdout, stderr) => {
-          if (err2) {
-            const detail = (stderr == null ? void 0 : stderr.trim()) || err2.message;
+        (err, _stdout, stderr) => {
+          if (err) {
+            const detail = (stderr == null ? void 0 : stderr.trim()) || err.message;
             console.error(TAG, `Remote "${this.remote}" check failed:`, detail);
             reject(
               new DriveError(
@@ -295,11 +295,11 @@ var DriveProvider = class {
       return Promise.reject(new DriveError("binary-missing", "rclone path not resolved \u2014 call check() first."));
     }
     return new Promise((resolve, reject) => {
-      (0, import_child_process.execFile)(this.rclonePath, args, { maxBuffer: MAX_BUFFER }, (err2, stdout, stderr) => {
-        if (err2) {
-          const detail = (stderr == null ? void 0 : stderr.trim()) || err2.message;
+      (0, import_child_process.execFile)(this.rclonePath, args, { maxBuffer: MAX_BUFFER }, (err, stdout, stderr) => {
+        if (err) {
+          const detail = (stderr == null ? void 0 : stderr.trim()) || err.message;
           console.error(TAG, `rclone ${args[0]} failed:`, detail);
-          return reject(err2);
+          return reject(err);
         }
         resolve(stdout);
       });
@@ -1554,9 +1554,9 @@ var GDriveSidebar = class extends import_obsidian2.ItemView {
       this.settings.driveCache.lastRefresh = (/* @__PURE__ */ new Date()).toISOString();
       await this.saveSettings();
     } catch (e) {
-      const err2 = e instanceof DriveError || e instanceof Error ? e : new Error(String(e));
-      console.error("[G Command] loadRoot failed:", err2.message);
-      this.error = err2;
+      const err = e instanceof DriveError || e instanceof Error ? e : new Error(String(e));
+      console.error("[G Command] loadRoot failed:", err.message);
+      this.error = err;
       this.rootNodes = null;
     } finally {
       this.loadingRoot = false;
@@ -1833,16 +1833,16 @@ var GDriveSidebar = class extends import_obsidian2.ItemView {
     }
   }
   renderErrorBanner(parent) {
-    const err2 = this.error;
+    const err = this.error;
     const banner = parent.createDiv({ cls: "warped-reference-error-banner" });
-    if (err2 instanceof DriveError) {
-      if (err2.code === "binary-missing") {
+    if (err instanceof DriveError) {
+      if (err.code === "binary-missing") {
         this.renderBinaryMissing(banner);
       } else {
         this.renderRemoteSetup(banner);
       }
     } else {
-      banner.createDiv({ cls: "warped-reference-error-title", text: err2.message });
+      banner.createDiv({ cls: "warped-reference-error-title", text: err.message });
     }
   }
   renderBinaryMissing(banner) {
@@ -2121,11 +2121,8 @@ var SidebarManager = class {
   }
 };
 
-// ../shared/llm/LLMClient.ts
-var import_obsidian4 = require("obsidian");
-
 // main.ts
-var GCommandPlugin = class extends import_obsidian5.Plugin {
+var GCommandPlugin = class extends import_obsidian4.Plugin {
   async onload() {
     var _a;
     await this.loadSettings();
@@ -2205,20 +2202,20 @@ var GCommandPlugin = class extends import_obsidian5.Plugin {
     await this.saveData(this.settings);
   }
 };
-var GCommandSettingTab = class extends import_obsidian5.PluginSettingTab {
+var GCommandSettingTab = class extends import_obsidian4.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.connectionStatus = "idle";
     this.connectionError = "";
     this.hasChecked = false;
     this.plugin = plugin;
-    this.debouncedUpdateRemote = (0, import_obsidian5.debounce)(() => this.plugin.updateRemote(), 500, true);
+    this.debouncedUpdateRemote = (0, import_obsidian4.debounce)(() => this.plugin.updateRemote(), 500, true);
   }
   display() {
     const { containerEl } = this;
     containerEl.empty();
     this.renderConnectionStatus(containerEl);
-    new import_obsidian5.Setting(containerEl).setName("rclone remote").setDesc("Name of the rclone remote for Google Drive. Default: gdrive.").addText(
+    new import_obsidian4.Setting(containerEl).setName("rclone remote").setDesc("Name of the rclone remote for Google Drive. Default: gdrive.").addText(
       (text) => text.setPlaceholder("gdrive").setValue(this.plugin.settings.rcloneRemote).onChange(async (value) => {
         this.plugin.settings.rcloneRemote = value.trim() || "gdrive";
         await this.plugin.saveSettings();
@@ -2227,7 +2224,7 @@ var GCommandSettingTab = class extends import_obsidian5.PluginSettingTab {
         this.hasChecked = false;
       })
     );
-    new import_obsidian5.Setting(containerEl).setName("rclone path").setDesc(
+    new import_obsidian4.Setting(containerEl).setName("rclone path").setDesc(
       "Absolute path to the rclone binary. Leave empty to auto-detect (Homebrew, /usr/local/bin, PATH)."
     ).addText(
       (text) => text.setPlaceholder("auto-detect").setValue(this.plugin.settings.rclonePath).onChange(async (value) => {
@@ -2239,7 +2236,7 @@ var GCommandSettingTab = class extends import_obsidian5.PluginSettingTab {
         this.hasChecked = false;
       })
     );
-    new import_obsidian5.Setting(containerEl).setName("Vault sync root").setDesc(
+    new import_obsidian4.Setting(containerEl).setName("Vault sync root").setDesc(
       "Folder in this vault where synced Drive files will be written. Drive folder structure is mirrored inside it."
     ).addText(
       (text) => text.setPlaceholder("gdrive").setValue(this.plugin.settings.vaultRoot).onChange(async (value) => {
@@ -2262,7 +2259,7 @@ var GCommandSettingTab = class extends import_obsidian5.PluginSettingTab {
         shell.showItemInFolder(fullPath);
       })
     );
-    new import_obsidian5.Setting(containerEl).setName("Include Drive metadata in frontmatter").setDesc(
+    new import_obsidian4.Setting(containerEl).setName("Include Drive metadata in frontmatter").setDesc(
       "Add gdrive_id and gdrive_path fields to synced markdown files. The synced timestamp is always included."
     ).addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.frontmatterGdriveFields).onChange(async (value) => {
@@ -2275,7 +2272,7 @@ var GCommandSettingTab = class extends import_obsidian5.PluginSettingTab {
     }
   }
   renderConnectionStatus(containerEl) {
-    const setting = new import_obsidian5.Setting(containerEl).setName("Google Drive");
+    const setting = new import_obsidian4.Setting(containerEl).setName("Google Drive");
     switch (this.connectionStatus) {
       case "checking": {
         setting.setDesc("Checking connection...");

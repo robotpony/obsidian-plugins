@@ -336,7 +336,15 @@ export class TodoSidebarView extends ItemView {
     // checkbox — completing a header used to cascade-complete its children,
     // which was easy to do accidentally. Children are completed individually.
     if (config.showCheckbox && config.onComplete && !hasChildren) {
-      const checkbox = rowContainer.createEl("input", {
+      // Wrap the checkbox so we can lock its vertical box to the text's
+      // first-line height and centre it. A bare margin-top can't track
+      // varying checkbox sizes across themes, which left the box drifting
+      // 1–2px above the midline (and earlier attempts to nudge it landed
+      // at the top of the line). Mirrors the focus-card-checkbox-wrap pattern.
+      const checkboxWrap = rowContainer.createEl("div", {
+        cls: `${config.classPrefix}-checkbox-wrap`,
+      });
+      const checkbox = checkboxWrap.createEl("input", {
         type: "checkbox",
         cls: `${config.classPrefix}-checkbox`,
       });
