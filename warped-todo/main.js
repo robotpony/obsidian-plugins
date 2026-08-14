@@ -3047,7 +3047,10 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
     }
     const rowContainer = hasChildren ? listItem.createEl("div", { cls: `${config.classPrefix}-header-row` }) : listItem;
     if (config.showCheckbox && config.onComplete && !hasChildren) {
-      const checkbox = rowContainer.createEl("input", {
+      const checkboxWrap = rowContainer.createEl("div", {
+        cls: `${config.classPrefix}-checkbox-wrap`
+      });
+      const checkbox = checkboxWrap.createEl("input", {
         type: "checkbox",
         cls: `${config.classPrefix}-checkbox`
       });

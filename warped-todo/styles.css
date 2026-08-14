@@ -443,8 +443,18 @@
   gap: 8px;
 }
 
+/* Wrap the checkbox so flexbox can centre it on the first-line midline.
+   Height = 1em × 1.4 line-height matches the .todo-text line box, so the
+   native checkbox lands dead-centre regardless of theme or row scale. */
+.todo-checkbox-wrap {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  height: calc(1em * 1.4);
+}
+
 .todo-checkbox {
-  margin-top: 2px;
+  margin: 0;
   cursor: pointer;
   flex-shrink: 0;
 }
@@ -542,7 +552,10 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px 4px;
-  padding: 2px 0 4px;
+  /* 4px top so the first row of pills doesn't get clipped against the
+     section's upper edge — 2px wasn't enough once the pill border was
+     factored in. */
+  padding: 4px 0 4px;
 }
 
 /* Match Obsidian's in-document tag rendering. The .warped-todo-sidebar
@@ -640,8 +653,15 @@
   gap: 8px;
 }
 
+.idea-checkbox-wrap {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  height: calc(1em * 1.4);
+}
+
 .idea-checkbox {
-  margin-top: 2px;
+  margin: 0;
   cursor: pointer;
   flex-shrink: 0;
 }
