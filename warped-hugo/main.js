@@ -27,13 +27,13 @@ __export(main_exports, {
   default: () => HugoCommandPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian7 = require("obsidian");
+var import_obsidian6 = require("obsidian");
 
 // src/HugoScanner.ts
-var import_obsidian4 = require("obsidian");
+var import_obsidian3 = require("obsidian");
 
 // src/utils.ts
-var import_obsidian3 = require("obsidian");
+var import_obsidian2 = require("obsidian");
 
 // ../shared/ui/Notice.ts
 var import_obsidian = require("obsidian");
@@ -132,9 +132,6 @@ var SidebarManager = class {
   }
 };
 
-// ../shared/llm/LLMClient.ts
-var import_obsidian2 = require("obsidian");
-
 // src/utils.ts
 var LOGO_PREFIX = "H\u2318";
 var showNotice2 = createNoticeFactory(LOGO_PREFIX, "warped-hugo-logo");
@@ -144,7 +141,7 @@ function parseFrontmatter(content) {
     return null;
   }
   try {
-    const yaml = (0, import_obsidian3.parseYaml)(match[1]);
+    const yaml = (0, import_obsidian2.parseYaml)(match[1]);
     if (typeof yaml !== "object" || yaml === null) {
       return null;
     }
@@ -260,7 +257,7 @@ var HUGO_CONFIG_FILES = [
 async function findHugoConfigFile(app) {
   for (const filename of HUGO_CONFIG_FILES) {
     const file = app.vault.getAbstractFileByPath(filename);
-    if (file instanceof import_obsidian3.TFile) {
+    if (file instanceof import_obsidian2.TFile) {
       return file;
     }
   }
@@ -370,7 +367,7 @@ function tomlValue(value) {
 function parseHugoConfig(content, format) {
   if (format === "yaml") {
     try {
-      const parsed = (0, import_obsidian3.parseYaml)(content);
+      const parsed = (0, import_obsidian2.parseYaml)(content);
       return parsed || {};
     } catch (e) {
       return {};
@@ -380,20 +377,20 @@ function parseHugoConfig(content, format) {
 }
 function serializeHugoConfig(config, format) {
   if (format === "yaml") {
-    return (0, import_obsidian3.stringifyYaml)(config);
+    return (0, import_obsidian2.stringifyYaml)(config);
   }
   return serializeToml(config);
 }
 
 // src/HugoScanner.ts
-var HugoScanner = class extends import_obsidian4.Events {
+var HugoScanner = class extends import_obsidian3.Events {
   constructor(app, contentPaths) {
     super();
     this.contentCache = /* @__PURE__ */ new Map();
     this.folderCache = /* @__PURE__ */ new Set();
     this.app = app;
     this.contentPaths = contentPaths;
-    this.debouncedScanFile = (0, import_obsidian4.debounce)(
+    this.debouncedScanFile = (0, import_obsidian3.debounce)(
       (file) => this.scanFile(file),
       100,
       true
@@ -494,16 +491,16 @@ var HugoScanner = class extends import_obsidian4.Events {
    */
   watchFiles() {
     this.app.vault.on("modify", (file) => {
-      if (file instanceof import_obsidian4.TFile && file.extension === "md") {
+      if (file instanceof import_obsidian3.TFile && file.extension === "md") {
         this.debouncedScanFile(file);
         this.trigger("content-updated");
       }
     });
     this.app.vault.on("create", (file) => {
-      if (file instanceof import_obsidian4.TFile && file.extension === "md") {
+      if (file instanceof import_obsidian3.TFile && file.extension === "md") {
         this.debouncedScanFile(file);
         this.trigger("content-updated");
-      } else if (file instanceof import_obsidian4.TFolder) {
+      } else if (file instanceof import_obsidian3.TFolder) {
         if (this.isInContentPath(file.path)) {
           this.folderCache.add(file.path);
           this.trigger("content-updated");
@@ -511,20 +508,20 @@ var HugoScanner = class extends import_obsidian4.Events {
       }
     });
     this.app.vault.on("delete", (file) => {
-      if (file instanceof import_obsidian4.TFile) {
+      if (file instanceof import_obsidian3.TFile) {
         this.contentCache.delete(file.path);
         this.trigger("content-updated");
-      } else if (file instanceof import_obsidian4.TFolder) {
+      } else if (file instanceof import_obsidian3.TFolder) {
         this.folderCache.delete(file.path);
         this.trigger("content-updated");
       }
     });
     this.app.vault.on("rename", (file, oldPath) => {
-      if (file instanceof import_obsidian4.TFile && file.extension === "md") {
+      if (file instanceof import_obsidian3.TFile && file.extension === "md") {
         this.contentCache.delete(oldPath);
         this.debouncedScanFile(file);
         this.trigger("content-updated");
-      } else if (file instanceof import_obsidian4.TFolder) {
+      } else if (file instanceof import_obsidian3.TFolder) {
         this.folderCache.delete(oldPath);
         if (this.isInContentPath(file.path)) {
           this.folderCache.add(file.path);
@@ -689,9 +686,9 @@ var HugoScanner = class extends import_obsidian4.Events {
 };
 
 // src/SidebarView.ts
-var import_obsidian5 = require("obsidian");
+var import_obsidian4 = require("obsidian");
 var VIEW_TYPE_HUGO_SIDEBAR = "warped-hugo-sidebar";
-var HugoSidebarView = class extends import_obsidian5.ItemView {
+var HugoSidebarView = class extends import_obsidian4.ItemView {
   constructor(leaf, scanner, settings, onShowAbout, onOpenSettings, onOpenSiteSettings) {
     super(leaf);
     this.updateListener = null;
@@ -784,7 +781,7 @@ var HugoSidebarView = class extends import_obsidian5.ItemView {
     });
     menuBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>';
     menuBtn.addEventListener("click", (evt) => {
-      const menu = new import_obsidian5.Menu();
+      const menu = new import_obsidian4.Menu();
       menu.addItem((item) => {
         item.setTitle("Refresh").setIcon("refresh-cw").onClick(async () => {
           await this.scanner.scanVault();
@@ -1342,7 +1339,7 @@ var HugoSidebarView = class extends import_obsidian5.ItemView {
     await this.scanner.scanVault();
   }
 };
-var TitlePromptModal = class extends import_obsidian5.Modal {
+var TitlePromptModal = class extends import_obsidian4.Modal {
   constructor(app, onSubmit) {
     super(app);
     this.inputEl = null;
@@ -1411,8 +1408,8 @@ var DEFAULT_SETTINGS = {
 };
 
 // src/SiteSettingsModal.ts
-var import_obsidian6 = require("obsidian");
-var SiteSettingsModal = class extends import_obsidian6.Modal {
+var import_obsidian5 = require("obsidian");
+var SiteSettingsModal = class extends import_obsidian5.Modal {
   constructor(app) {
     super(app);
     this.config = {};
@@ -1456,7 +1453,7 @@ var SiteSettingsModal = class extends import_obsidian6.Modal {
     titleDisplay.createEl("span", { cls: "site-title-value", text: siteTitle });
     const scrollArea = container.createEl("div", { cls: "site-settings-scroll-area" });
     scrollArea.createEl("h3", { text: "Basic Settings" });
-    new import_obsidian6.Setting(scrollArea).setName("Site title").setDesc("The title of your Hugo site").addText(
+    new import_obsidian5.Setting(scrollArea).setName("Site title").setDesc("The title of your Hugo site").addText(
       (text) => text.setPlaceholder("My Hugo Site").setValue(this.config.title || "").onChange((value) => {
         this.config.title = value;
         this.hasChanges = true;
@@ -1466,26 +1463,26 @@ var SiteSettingsModal = class extends import_obsidian6.Modal {
         }
       })
     );
-    new import_obsidian6.Setting(scrollArea).setName("Base URL").setDesc("The base URL for your site (e.g., https://example.com/)").addText(
+    new import_obsidian5.Setting(scrollArea).setName("Base URL").setDesc("The base URL for your site (e.g., https://example.com/)").addText(
       (text) => text.setPlaceholder("https://example.com/").setValue(this.config.baseURL || "").onChange((value) => {
         this.config.baseURL = value;
         this.hasChanges = true;
       })
     );
-    new import_obsidian6.Setting(scrollArea).setName("Language code").setDesc("The language code for your site (e.g., en-us)").addText(
+    new import_obsidian5.Setting(scrollArea).setName("Language code").setDesc("The language code for your site (e.g., en-us)").addText(
       (text) => text.setPlaceholder("en-us").setValue(this.config.languageCode || "").onChange((value) => {
         this.config.languageCode = value;
         this.hasChanges = true;
       })
     );
-    new import_obsidian6.Setting(scrollArea).setName("Summary length").setDesc("Number of words in auto-generated summaries").addText(
+    new import_obsidian5.Setting(scrollArea).setName("Summary length").setDesc("Number of words in auto-generated summaries").addText(
       (text) => text.setPlaceholder("70").setValue(String(this.config.summaryLength || "")).onChange((value) => {
         const num = parseInt(value, 10);
         this.config.summaryLength = isNaN(num) ? void 0 : num;
         this.hasChanges = true;
       })
     );
-    new import_obsidian6.Setting(scrollArea).setName("Paginate").setDesc("Number of items per page in list pages").addText(
+    new import_obsidian5.Setting(scrollArea).setName("Paginate").setDesc("Number of items per page in list pages").addText(
       (text) => text.setPlaceholder("10").setValue(String(this.config.paginate || "")).onChange((value) => {
         const num = parseInt(value, 10);
         this.config.paginate = isNaN(num) ? void 0 : num;
@@ -1493,58 +1490,58 @@ var SiteSettingsModal = class extends import_obsidian6.Modal {
       })
     );
     scrollArea.createEl("h3", { text: "Author & Copyright" });
-    new import_obsidian6.Setting(scrollArea).setName("Author").setDesc("Site author name").addText(
+    new import_obsidian5.Setting(scrollArea).setName("Author").setDesc("Site author name").addText(
       (text) => text.setPlaceholder("Your Name").setValue(this.config.author || "").onChange((value) => {
         this.config.author = value;
         this.hasChanges = true;
       })
     );
-    new import_obsidian6.Setting(scrollArea).setName("Copyright").setDesc("Copyright notice for your site").addText(
+    new import_obsidian5.Setting(scrollArea).setName("Copyright").setDesc("Copyright notice for your site").addText(
       (text) => text.setPlaceholder("Copyright 2024").setValue(this.config.copyright || "").onChange((value) => {
         this.config.copyright = value;
         this.hasChanges = true;
       })
     );
     scrollArea.createEl("h3", { text: "Theme" });
-    new import_obsidian6.Setting(scrollArea).setName("Theme").setDesc("The Hugo theme to use").addText(
+    new import_obsidian5.Setting(scrollArea).setName("Theme").setDesc("The Hugo theme to use").addText(
       (text) => text.setPlaceholder("theme-name").setValue(this.config.theme || "").onChange((value) => {
         this.config.theme = value;
         this.hasChanges = true;
       })
     );
     scrollArea.createEl("h3", { text: "Build Settings" });
-    new import_obsidian6.Setting(scrollArea).setName("Build drafts").setDesc("Include draft content when building").addToggle(
+    new import_obsidian5.Setting(scrollArea).setName("Build drafts").setDesc("Include draft content when building").addToggle(
       (toggle) => toggle.setValue(Boolean(this.config.buildDrafts)).onChange((value) => {
         this.config.buildDrafts = value;
         this.hasChanges = true;
       })
     );
-    new import_obsidian6.Setting(scrollArea).setName("Build future").setDesc("Include content with future publish dates").addToggle(
+    new import_obsidian5.Setting(scrollArea).setName("Build future").setDesc("Include content with future publish dates").addToggle(
       (toggle) => toggle.setValue(Boolean(this.config.buildFuture)).onChange((value) => {
         this.config.buildFuture = value;
         this.hasChanges = true;
       })
     );
-    new import_obsidian6.Setting(scrollArea).setName("Build expired").setDesc("Include expired content").addToggle(
+    new import_obsidian5.Setting(scrollArea).setName("Build expired").setDesc("Include expired content").addToggle(
       (toggle) => toggle.setValue(Boolean(this.config.buildExpired)).onChange((value) => {
         this.config.buildExpired = value;
         this.hasChanges = true;
       })
     );
     scrollArea.createEl("h3", { text: "Features" });
-    new import_obsidian6.Setting(scrollArea).setName("Enable robots.txt").setDesc("Generate robots.txt file").addToggle(
+    new import_obsidian5.Setting(scrollArea).setName("Enable robots.txt").setDesc("Generate robots.txt file").addToggle(
       (toggle) => toggle.setValue(Boolean(this.config.enableRobotsTXT)).onChange((value) => {
         this.config.enableRobotsTXT = value;
         this.hasChanges = true;
       })
     );
-    new import_obsidian6.Setting(scrollArea).setName("Enable Git info").setDesc("Use Git for .Lastmod and other metadata").addToggle(
+    new import_obsidian5.Setting(scrollArea).setName("Enable Git info").setDesc("Use Git for .Lastmod and other metadata").addToggle(
       (toggle) => toggle.setValue(Boolean(this.config.enableGitInfo)).onChange((value) => {
         this.config.enableGitInfo = value;
         this.hasChanges = true;
       })
     );
-    new import_obsidian6.Setting(scrollArea).setName("Disable kinds").setDesc("Page kinds to disable (comma-separated: taxonomy, term, RSS, sitemap)").addText(
+    new import_obsidian5.Setting(scrollArea).setName("Disable kinds").setDesc("Page kinds to disable (comma-separated: taxonomy, term, RSS, sitemap)").addText(
       (text) => text.setPlaceholder("taxonomy, term").setValue(Array.isArray(this.config.disableKinds) ? this.config.disableKinds.join(", ") : "").onChange((value) => {
         this.config.disableKinds = value.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
         this.hasChanges = true;
@@ -1552,7 +1549,7 @@ var SiteSettingsModal = class extends import_obsidian6.Modal {
     );
     scrollArea.createEl("h3", { text: "Taxonomies" });
     const taxonomies = this.config.taxonomies || {};
-    new import_obsidian6.Setting(scrollArea).setName("Category taxonomy").setDesc("Plural name for category taxonomy").addText(
+    new import_obsidian5.Setting(scrollArea).setName("Category taxonomy").setDesc("Plural name for category taxonomy").addText(
       (text) => text.setPlaceholder("categories").setValue(taxonomies.category || "").onChange((value) => {
         if (!this.config.taxonomies)
           this.config.taxonomies = {};
@@ -1560,7 +1557,7 @@ var SiteSettingsModal = class extends import_obsidian6.Modal {
         this.hasChanges = true;
       })
     );
-    new import_obsidian6.Setting(scrollArea).setName("Tag taxonomy").setDesc("Plural name for tag taxonomy").addText(
+    new import_obsidian5.Setting(scrollArea).setName("Tag taxonomy").setDesc("Plural name for tag taxonomy").addText(
       (text) => text.setPlaceholder("tags").setValue(taxonomies.tag || "").onChange((value) => {
         if (!this.config.taxonomies)
           this.config.taxonomies = {};
@@ -1570,7 +1567,7 @@ var SiteSettingsModal = class extends import_obsidian6.Modal {
     );
     scrollArea.createEl("h3", { text: "Permalinks" });
     const permalinks = this.config.permalinks || {};
-    new import_obsidian6.Setting(scrollArea).setName("Posts permalink").setDesc("URL structure for posts (e.g., /:year/:month/:slug/)").addText(
+    new import_obsidian5.Setting(scrollArea).setName("Posts permalink").setDesc("URL structure for posts (e.g., /:year/:month/:slug/)").addText(
       (text) => text.setPlaceholder("/:year/:month/:slug/").setValue(permalinks.posts || permalinks.post || "").onChange((value) => {
         if (!this.config.permalinks)
           this.config.permalinks = {};
@@ -1619,7 +1616,7 @@ var SiteSettingsModal = class extends import_obsidian6.Modal {
   renderParamSetting(container, key, value) {
     const displayName = key.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase()).trim();
     if (typeof value === "boolean") {
-      new import_obsidian6.Setting(container).setName(displayName).setDesc(`params.${key}`).addToggle(
+      new import_obsidian5.Setting(container).setName(displayName).setDesc(`params.${key}`).addToggle(
         (toggle) => toggle.setValue(value).onChange((newValue) => {
           if (!this.config.params)
             this.config.params = {};
@@ -1628,7 +1625,7 @@ var SiteSettingsModal = class extends import_obsidian6.Modal {
         })
       );
     } else if (typeof value === "number") {
-      new import_obsidian6.Setting(container).setName(displayName).setDesc(`params.${key}`).addText(
+      new import_obsidian5.Setting(container).setName(displayName).setDesc(`params.${key}`).addText(
         (text) => text.setValue(String(value)).onChange((newValue) => {
           if (!this.config.params)
             this.config.params = {};
@@ -1638,7 +1635,7 @@ var SiteSettingsModal = class extends import_obsidian6.Modal {
         })
       );
     } else if (typeof value === "string") {
-      new import_obsidian6.Setting(container).setName(displayName).setDesc(`params.${key}`).addText(
+      new import_obsidian5.Setting(container).setName(displayName).setDesc(`params.${key}`).addText(
         (text) => text.setValue(value).onChange((newValue) => {
           if (!this.config.params)
             this.config.params = {};
@@ -1670,7 +1667,7 @@ var SiteSettingsModal = class extends import_obsidian6.Modal {
 };
 
 // main.ts
-var HugoCommandPlugin = class extends import_obsidian7.Plugin {
+var HugoCommandPlugin = class extends import_obsidian6.Plugin {
   async onload() {
     await this.loadSettings();
     this.sidebarManager = new SidebarManager(this.app, VIEW_TYPE_HUGO_SIDEBAR);
@@ -1748,7 +1745,7 @@ var HugoCommandPlugin = class extends import_obsidian7.Plugin {
     new SiteSettingsModal(this.app).open();
   }
 };
-var AboutModal = class extends import_obsidian7.Modal {
+var AboutModal = class extends import_obsidian6.Modal {
   constructor(app, version) {
     super(app);
     this.version = version;
@@ -1779,7 +1776,7 @@ var AboutModal = class extends import_obsidian7.Modal {
     this.contentEl.empty();
   }
 };
-var HugoCommandSettingTab = class extends import_obsidian7.PluginSettingTab {
+var HugoCommandSettingTab = class extends import_obsidian6.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -1805,32 +1802,32 @@ var HugoCommandSettingTab = class extends import_obsidian7.PluginSettingTab {
       href: "https://github.com/robotpony/obsidian-plugins"
     });
     containerEl.createEl("h3", { text: "Sidebar" });
-    new import_obsidian7.Setting(containerEl).setName("Show sidebar by default").setDesc("Show the Hugo sidebar when Obsidian starts").addToggle(
+    new import_obsidian6.Setting(containerEl).setName("Show sidebar by default").setDesc("Show the Hugo sidebar when Obsidian starts").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.showSidebarByDefault).onChange(async (value) => {
         this.plugin.settings.showSidebarByDefault = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian7.Setting(containerEl).setName("Default status filter").setDesc("Which posts to show by default when opening the sidebar").addDropdown(
+    new import_obsidian6.Setting(containerEl).setName("Default status filter").setDesc("Which posts to show by default when opening the sidebar").addDropdown(
       (dropdown) => dropdown.addOption("all", "All").addOption("published", "Published").addOption("draft", "Drafts").setValue(this.plugin.settings.defaultStatusFilter).onChange(async (value) => {
         this.plugin.settings.defaultStatusFilter = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian7.Setting(containerEl).setName("Default sort order").setDesc("How to sort content in the sidebar").addDropdown(
+    new import_obsidian6.Setting(containerEl).setName("Default sort order").setDesc("How to sort content in the sidebar").addDropdown(
       (dropdown) => dropdown.addOption("date-desc", "Date (newest first)").addOption("date-asc", "Date (oldest first)").addOption("title", "Title (A-Z)").setValue(this.plugin.settings.defaultSortOrder).onChange(async (value) => {
         this.plugin.settings.defaultSortOrder = value;
         await this.plugin.saveSettings();
       })
     );
     containerEl.createEl("h3", { text: "Content" });
-    new import_obsidian7.Setting(containerEl).setName("Content paths").setDesc("Folders to scan for Hugo content (one per line, e.g., content/posts)").addTextArea(
+    new import_obsidian6.Setting(containerEl).setName("Content paths").setDesc("Folders to scan for Hugo content (one per line, e.g., content/posts)").addTextArea(
       (text) => text.setPlaceholder("content\ncontent/posts").setValue(this.plugin.settings.contentPaths.join("\n")).onChange(async (value) => {
         this.plugin.settings.contentPaths = value.split("\n").map((p) => p.trim()).filter((p) => p.length > 0);
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian7.Setting(containerEl).setName("Trash folder").setDesc("Folder for trashed posts (relative to vault root)").addText(
+    new import_obsidian6.Setting(containerEl).setName("Trash folder").setDesc("Folder for trashed posts (relative to vault root)").addText(
       (text) => text.setPlaceholder("_trash").setValue(this.plugin.settings.trashFolder).onChange(async (value) => {
         this.plugin.settings.trashFolder = value.trim() || "_trash";
         await this.plugin.saveSettings();
