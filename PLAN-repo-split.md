@@ -141,25 +141,51 @@ cleanly as `warped-command` with the old `warped-todo` plugin id
 preserved (verified against 4 real vaults). `warped-reference/` and
 `warped-hugo/` still exist here, untouched, pending Phases 2/3.
 
-## Phase 2: warped-hugo → new repo
+## Phase 2: warped-hugo → new repo — done (2026-08-17)
 
 **Goal**: `warped-hugo` exists as a standalone repo, functionally
 unchanged.
 
-- New repo `robotpony/warped-hugo`, flat layout.
-- Copy `warped-hugo/*` in as the repo root; copy `shared/` into its own
-  source tree, update imports.
-- Single "initial import" commit; no history migration. Version stays
-  `0.8.0`.
-- Update `manifest.json`/`package.json`/README/CHANGELOG to drop any
-  mono-repo-relative references (e.g. links back to root `CLAUDE.md` or
-  `plugin-conventions.md` that no longer resolve).
-- Verify: `npm run build` passes; a real vault install behaves
-  identically to the copy still in this repo, before this repo's copy is
-  deleted in Phase 1b.
+**What was done**: new repo `robotpony/warped-hugo` (public, matching
+`warped-command`'s visibility), created at sibling path
+`/Users/mx/projects/warped-hugo/`, flat layout. `warped-hugo/*` copied in
+as the repo root (plain copy, not `git mv` — this is a fresh repo with
+its own history, not a rename-in-place like Phase 1a); `shared/` copied
+into `src/shared/`, imports updated the same way Phase 1a's were
+(`../shared`/`../../shared` → `./src/shared`/`./shared`);
+`src/shared/package.json` renamed to `@warped-hugo/shared` with the same
+drift-independently note Phase 1a's copy got. `install.sh` copied over
+verbatim — it was already fully generic (reads the plugin's `id`/`name`
+from `manifest.json`, nothing plugin-specific hardcoded) after a small
+Phase-2-motivated fix to `warped-command`'s own copy (its banner text was
+the one remaining hardcoded string; now reads `$DISPLAY_NAME` too). No
+test suite exists for this plugin, so no vitest config needed the
+Phase-1a-style exclude treatment.
 
-**Exit criteria**: new repo builds and installs standalone; nothing in it
-still points back at `obsidian-plugins`.
+**Two real bugs fixed in the move**, same pattern as Phase 1a's follow-up
+sweep: the About modal's GitHub link (both places it appears) and
+`manifest.json`'s `authorUrl` still pointed at
+`github.com/robotpony/obsidian-plugins`. Also fixed, found while checking
+the README against reality: its install instructions said to manually
+copy a folder named `hugo-command` — a stale, pre-`warped-hugo`-rename
+name that predates this split entirely — replaced with the same
+`./install.sh` instructions every other Warped plugin's README now has.
+
+**Left alone, on purpose**: the plugin's own "Hugo Command"/`H⌘`
+in-app branding (About modal, settings header, README title) — this
+plugin already has the same dual-naming pattern `warped-command` has
+with "␣⌘ Space Command" (formal manifest name "Warped Hugo", in-app
+nickname "Hugo Command"), predates this work, not in scope to unify.
+
+Single "initial import" commit, pushed. `npm run build` passes. Verified
+against a real vault (`~/writing/me`): installed manifest shows
+`id: "warped-hugo"` (unchanged) and the corrected `authorUrl`; the built
+`main.js`'s embedded GitHub link correctly reads
+`github.com/robotpony/warped-hugo` with no `obsidian-plugins` references
+left in it.
+
+**Exit criteria — met**: new repo builds and installs standalone; nothing
+in it still points back at `obsidian-plugins`.
 
 ## Phase 3: warped-reference → warped-gdrive, mechanical move only
 
