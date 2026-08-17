@@ -4,6 +4,28 @@ All notable changes to the ␣⌘ Space Command plugin will be documented in thi
 
 ## [0.35.0] - 2026-08-17
 
+### Changed — Projects reached from the TODO sidebar, not a ribbon icon
+
+The Projects sidebar had its own ribbon icon in the left rail, disconnected
+from the TODO sidebar's tab nav — no visible path between the two beyond
+that icon. The ribbon icon is gone; a new button sits beside the Ideas tab
+in the TODO sidebar's header (a left border sets it apart from the
+TODOs/Focus/Ideas tab cluster, since it navigates to a different view
+rather than switching tabs within this one). The Projects sidebar's header
+got the same button in reverse, so the path works both ways. The
+`toggle-projects-sidebar` command is unchanged for anyone using a hotkey.
+
+Three more connection points, all additive:
+
+- **Settings → Projects** has an "Open Projects sidebar" button, matching
+  the existing "Open team file" pattern in the Team section.
+- **Right-clicking a project tag pill** in the TODOs tag cloud now offers
+  "Show in Projects" alongside "Filter by" in its tag submenu — jumps the
+  Projects sidebar straight to that project's detail view.
+- **Right-clicking a TODO or idea that carries a project tag** offers the
+  same "Show in Projects" action. Left-click behaviour on tags and pills
+  (filtering) is unchanged either way.
+
 ### Changed — snoozed items are an ordinary tag, not a dedicated tab
 
 The Snoozed tab, its icon, and every special-case filter that hid

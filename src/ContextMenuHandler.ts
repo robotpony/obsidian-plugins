@@ -3,23 +3,41 @@ import { TodoItem, ProjectInfo } from "./types";
 import { TodoProcessor } from "./TodoProcessor";
 import { TodoScanner } from "./TodoScanner";
 import { MoveTargetModal } from "./MoveTargetModal";
+import { tallyProjectTags } from "./utils";
 
 export class ContextMenuHandler {
   private app: App;
   private processor: TodoProcessor;
   private priorityTags: string[];
   private getMoveHistory: () => string[];
+  // Optional: undefined for the Projects sidebar's own ContextMenuHandler,
+  // where "show in Projects" would just point back at the view you're
+  // already looking at. Only the TODOs sidebar wires this.
+  private onOpenProject?: (tag: string) => void;
 
   constructor(
     app: App,
     processor: TodoProcessor,
     priorityTags: string[],
-    getMoveHistory: () => string[]
+    getMoveHistory: () => string[],
+    onOpenProject?: (tag: string) => void
   ) {
     this.app = app;
     this.processor = processor;
     this.priorityTags = priorityTags;
     this.getMoveHistory = getMoveHistory;
+    this.onOpenProject = onOpenProject;
+  }
+
+  /**
+   * The item's own project tag, if it has exactly the kind of tag the tag
+   * cloud would show as a project pill. Reuses `tallyProjectTags`'s
+   * exclusion list so "project tag" means the same thing here as it does
+   * everywhere else in the sidebar.
+   */
+  private projectTagFor(item: TodoItem): string | null {
+    const tags = tallyProjectTags([item], this.priorityTags);
+    return tags.size > 0 ? tags.keys().next().value! : null;
   }
 
   /**
@@ -125,6 +143,20 @@ export class ContextMenuHandler {
           if (success) onRefresh();
         });
     });
+
+    // Show in Projects - jumps the Projects sidebar to this item's project,
+    // when it has one. Only offered where onOpenProject is wired (the TODOs
+    // sidebar), and only when the item actually carries a project tag.
+    const projectTag = this.onOpenProject ? this.projectTagFor(todo) : null;
+    if (projectTag) {
+      menu.addSeparator();
+      menu.addItem((item) => {
+        item
+          .setTitle("Show in Projects")
+          .setIcon("folder-git-2")
+          .onClick(() => this.onOpenProject!(projectTag));
+      });
+    }
 
     menu.showAtMouseEvent(evt);
   }
@@ -233,6 +265,14 @@ export class ContextMenuHandler {
             onFilterByTag(project.tag);
           });
       });
+      if (this.onOpenProject) {
+        submenu.addItem((subItem: any) => {
+          subItem
+            .setTitle("Show in Projects")
+            .setIcon("folder-git-2")
+            .onClick(() => this.onOpenProject!(project.tag));
+        });
+      }
     });
 
     menu.addSeparator();
@@ -334,6 +374,18 @@ export class ContextMenuHandler {
           if (success) onRefresh();
         });
     });
+
+    // Show in Projects - see showTodoMenu's identical block above.
+    const projectTag = this.onOpenProject ? this.projectTagFor(idea) : null;
+    if (projectTag) {
+      menu.addSeparator();
+      menu.addItem((item) => {
+        item
+          .setTitle("Show in Projects")
+          .setIcon("folder-git-2")
+          .onClick(() => this.onOpenProject!(projectTag));
+      });
+    }
 
     menu.showAtMouseEvent(evt);
   }

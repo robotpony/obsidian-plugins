@@ -215,7 +215,7 @@ export default class WarpedTodoPlugin extends Plugin {
           this.settings.makeLinksClickable,
           () => this.showAboutModal(),
           () => this.showStatsModal(),
-          () => this.projectsSidebarManager.activate(),
+          (tag?: string) => this.openProjectsSidebar(tag),
           () => this.settings.moveHistory,
           this.teamManager,
           this.settings.defaultAssignee,
@@ -414,7 +414,8 @@ export default class WarpedTodoPlugin extends Plugin {
             (this.app as any).setting.open();
             (this.app as any).setting.openTabById(this.manifest.id);
           },
-          () => this.showAboutModal()
+          () => this.showAboutModal(),
+          () => this.sidebarManager.activate()
         )
     );
 
@@ -488,6 +489,20 @@ export default class WarpedTodoPlugin extends Plugin {
   /** Refresh all sidebar views (delegates to SidebarManager). */
   refreshSidebar() {
     this.sidebarManager.refresh();
+  }
+
+  /**
+   * Opens/reveals the Projects sidebar. With a tag, jumps straight to that
+   * project's detail view — used by the TODO sidebar's "Open Projects" nav
+   * button and its "Show in Projects" context menu entries. Without one,
+   * just opens to whatever the sidebar last showed (list or detail).
+   */
+  async openProjectsSidebar(tag?: string) {
+    await this.projectsSidebarManager.activate();
+    if (tag) {
+      const view = this.projectsSidebarManager.getView<ProjectsSidebarView>();
+      await view?.showProject(tag);
+    }
   }
 
   showAboutModal() {
@@ -736,6 +751,15 @@ class WarpedTodoSettingTab extends PluginSettingTab {
 
     // Projects section
     containerEl.createEl("h3", { text: "Projects" });
+
+    new Setting(containerEl)
+      .setName("Projects sidebar")
+      .setDesc("Open the Projects sidebar directly from settings.")
+      .addButton((btn) =>
+        btn.setButtonText("Open Projects sidebar").onClick(() => {
+          this.plugin.openProjectsSidebar();
+        })
+      );
 
     new Setting(containerEl)
       .setName("Default projects folder")

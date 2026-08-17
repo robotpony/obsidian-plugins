@@ -69,7 +69,8 @@ export class ProjectsSidebarView extends ItemView {
     private contextMenuHandler: ContextMenuHandler,
     private getOptions: () => ProjectsSidebarOptions,
     private onOpenSettings: () => void,
-    private onShowAbout: () => void
+    private onShowAbout: () => void,
+    private onOpenTodos: () => void
   ) {
     super(leaf);
   }
@@ -178,6 +179,15 @@ export class ProjectsSidebarView extends ItemView {
     return null;
   }
 
+  /**
+   * Public entry point for other views to jump straight to a project's
+   * detail view — e.g. "Show in Projects" on a project tag's context menu
+   * in the TODO sidebar. Accepts the tag with or without its leading `#`.
+   */
+  async showProject(tag: string): Promise<void> {
+    await this.openProject(tag.replace(/^#/, ""));
+  }
+
   private async openProject(name: string): Promise<void> {
     const options = this.getOptions();
     const path = projectFilePath(options.projectsFolder, name);
@@ -242,6 +252,15 @@ export class ProjectsSidebarView extends ItemView {
         this.render();
       });
     }
+
+    // Mirrors the "Open Projects" button TodoSidebarView puts beside its
+    // Ideas tab, so the path between the two sidebars works both ways.
+    const todosBtn = tabNav.createEl("button", {
+      cls: "clickable-icon sidebar-nav-out-btn",
+      attr: { "aria-label": "Open TODOs" },
+    });
+    setIcon(todosBtn, "square-check-big");
+    todosBtn.addEventListener("click", () => this.onOpenTodos());
 
     const menuBtn = tabNav.createEl("button", {
       cls: "clickable-icon sidebar-menu-btn",

@@ -50,7 +50,9 @@ export class TodoSidebarView extends ItemView {
   private openInfoPopup: HTMLElement | null = null;
   private onShowAbout: () => void;
   private onShowStats: () => void;
-  private onOpenProjects: () => void;
+  // Optional tag: with one, jumps straight to that project's detail view;
+  // without, just opens/reveals the Projects sidebar at whatever it last showed.
+  private onOpenProjects: (tag?: string) => void;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -64,7 +66,7 @@ export class TodoSidebarView extends ItemView {
     makeLinksClickable: boolean,
     onShowAbout: () => void,
     onShowStats: () => void,
-    onOpenProjects: () => void,
+    onOpenProjects: (tag?: string) => void,
     getMoveHistory: () => string[] = () => [],
     teamManager?: TeamManager,
     defaultAssignee: string = "",
@@ -95,7 +97,8 @@ export class TodoSidebarView extends ItemView {
       this.app,
       processor,
       priorityTags,
-      getMoveHistory
+      getMoveHistory,
+      (tag: string) => this.onOpenProjects(tag)
     );
   }
 

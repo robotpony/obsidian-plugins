@@ -2994,7 +2994,7 @@ var GROUP_ORDER = [
   { heading: "Bugs", type: "bug", checkbox: true }
 ];
 var ProjectsSidebarView = class extends import_obsidian7.ItemView {
-  constructor(leaf, scanner, processor, projectManager, projectScanner, syncManager, contextMenuHandler, getOptions, onOpenSettings, onShowAbout) {
+  constructor(leaf, scanner, processor, projectManager, projectScanner, syncManager, contextMenuHandler, getOptions, onOpenSettings, onShowAbout, onOpenTodos) {
     super(leaf);
     this.scanner = scanner;
     this.processor = processor;
@@ -3005,6 +3005,7 @@ var ProjectsSidebarView = class extends import_obsidian7.ItemView {
     this.getOptions = getOptions;
     this.onOpenSettings = onOpenSettings;
     this.onShowAbout = onShowAbout;
+    this.onOpenTodos = onOpenTodos;
     this.mode = "list";
     this.activeProjectName = null;
     this.filterText = "";
@@ -3109,6 +3110,14 @@ var ProjectsSidebarView = class extends import_obsidian7.ItemView {
     }
     return null;
   }
+  /**
+   * Public entry point for other views to jump straight to a project's
+   * detail view — e.g. "Show in Projects" on a project tag's context menu
+   * in the TODO sidebar. Accepts the tag with or without its leading `#`.
+   */
+  async showProject(tag) {
+    await this.openProject(tag.replace(/^#/, ""));
+  }
   async openProject(name) {
     const options = this.getOptions();
     const path = projectFilePath(options.projectsFolder, name);
@@ -3159,6 +3168,12 @@ var ProjectsSidebarView = class extends import_obsidian7.ItemView {
         this.render();
       });
     }
+    const todosBtn = tabNav.createEl("button", {
+      cls: "clickable-icon sidebar-nav-out-btn",
+      attr: { "aria-label": "Open TODOs" }
+    });
+    (0, import_obsidian7.setIcon)(todosBtn, "square-check-big");
+    todosBtn.addEventListener("click", () => this.onOpenTodos());
     const menuBtn = tabNav.createEl("button", {
       cls: "clickable-icon sidebar-menu-btn",
       attr: { "aria-label": "Menu" }
@@ -3692,11 +3707,22 @@ var MoveTargetModal = class extends import_obsidian8.SuggestModal {
 
 // src/ContextMenuHandler.ts
 var ContextMenuHandler = class {
-  constructor(app, processor, priorityTags, getMoveHistory) {
+  constructor(app, processor, priorityTags, getMoveHistory, onOpenProject) {
     this.app = app;
     this.processor = processor;
     this.priorityTags = priorityTags;
     this.getMoveHistory = getMoveHistory;
+    this.onOpenProject = onOpenProject;
+  }
+  /**
+   * The item's own project tag, if it has exactly the kind of tag the tag
+   * cloud would show as a project pill. Reuses `tallyProjectTags`'s
+   * exclusion list so "project tag" means the same thing here as it does
+   * everywhere else in the sidebar.
+   */
+  projectTagFor(item) {
+    const tags = tallyProjectTags([item], this.priorityTags);
+    return tags.size > 0 ? tags.keys().next().value : null;
   }
   /**
    * Show context menu for an active TODO item
@@ -3773,6 +3799,13 @@ var ContextMenuHandler = class {
           onRefresh();
       });
     });
+    const projectTag = this.onOpenProject ? this.projectTagFor(todo) : null;
+    if (projectTag) {
+      menu.addSeparator();
+      menu.addItem((item) => {
+        item.setTitle("Show in Projects").setIcon("folder-git-2").onClick(() => this.onOpenProject(projectTag));
+      });
+    }
     menu.showAtMouseEvent(evt);
   }
   /**
@@ -3848,6 +3881,11 @@ var ContextMenuHandler = class {
           onFilterByTag(project.tag);
         });
       });
+      if (this.onOpenProject) {
+        submenu.addItem((subItem) => {
+          subItem.setTitle("Show in Projects").setIcon("folder-git-2").onClick(() => this.onOpenProject(project.tag));
+        });
+      }
     });
     menu.addSeparator();
     menu.addItem((item) => {
@@ -3915,6 +3953,13 @@ var ContextMenuHandler = class {
           onRefresh();
       });
     });
+    const projectTag = this.onOpenProject ? this.projectTagFor(idea) : null;
+    if (projectTag) {
+      menu.addSeparator();
+      menu.addItem((item) => {
+        item.setTitle("Show in Projects").setIcon("folder-git-2").onClick(() => this.onOpenProject(projectTag));
+      });
+    }
     menu.showAtMouseEvent(evt);
   }
 };
@@ -4364,7 +4409,7 @@ var TeamManager = class extends import_obsidian12.Events {
 var import_obsidian13 = require("obsidian");
 var VIEW_TYPE_TODO_SIDEBAR = "warped-todo-sidebar";
 var TodoSidebarView = class extends import_obsidian13.ItemView {
-  constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, activeTodosLimit, focusListLimit, makeLinksClickable, onShowAbout, onShowStats, getMoveHistory = () => [], teamManager, defaultAssignee = "", focusQueueLimit = 1, focusModeActive = false, setFocusModeActive = async () => {
+  constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, activeTodosLimit, focusListLimit, makeLinksClickable, onShowAbout, onShowStats, onOpenProjects, getMoveHistory = () => [], teamManager, defaultAssignee = "", focusQueueLimit = 1, focusModeActive = false, setFocusModeActive = async () => {
   }) {
     super(leaf);
     this.updateListener = null;
@@ -4417,6 +4462,7 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
     this.makeLinksClickable = makeLinksClickable;
     this.onShowAbout = onShowAbout;
     this.onShowStats = onShowStats;
+    this.onOpenProjects = onOpenProjects;
     this.teamManager = teamManager != null ? teamManager : new TeamManager(this.app, "team.md");
     this.defaultAssignee = defaultAssignee;
     this.priorityTags = priorityTags;
@@ -4427,7 +4473,8 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
       this.app,
       processor,
       priorityTags,
-      getMoveHistory
+      getMoveHistory,
+      (tag) => this.onOpenProjects(tag)
     );
   }
   getViewType() {
@@ -4817,6 +4864,12 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
     });
     ideasTab.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"></path><path d="M10 22h4"></path><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"></path></svg>';
     ideasTab.addEventListener("click", () => this.switchTab("ideas"));
+    const projectsNavBtn = tabNav.createEl("button", {
+      cls: "sidebar-tab-btn sidebar-nav-out-btn",
+      attr: { "aria-label": "Open Projects" }
+    });
+    projectsNavBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v5"></path><circle cx="13" cy="12" r="2"></circle><path d="M18 19c-2.8 0-5-2.2-5-5v8"></path><circle cx="20" cy="19" r="2"></circle></svg>';
+    projectsNavBtn.addEventListener("click", () => this.onOpenProjects());
     this.createSidebarMenuButton(headerDiv);
     const content = container.createEl("div", { cls: "sidebar-content" });
     if (this.focusModeActive) {
@@ -6614,6 +6667,7 @@ var WarpedTodoPlugin = class extends import_obsidian14.Plugin {
         this.settings.makeLinksClickable,
         () => this.showAboutModal(),
         () => this.showStatsModal(),
+        (tag) => this.openProjectsSidebar(tag),
         () => this.settings.moveHistory,
         this.teamManager,
         this.settings.defaultAssignee,
@@ -6783,7 +6837,8 @@ var WarpedTodoPlugin = class extends import_obsidian14.Plugin {
           this.app.setting.open();
           this.app.setting.openTabById(this.manifest.id);
         },
-        () => this.showAboutModal()
+        () => this.showAboutModal(),
+        () => this.sidebarManager.activate()
       )
     );
     this.addCommand({
@@ -6807,9 +6862,6 @@ var WarpedTodoPlugin = class extends import_obsidian14.Plugin {
     });
     this.addRibbonIcon("square-check-big", "Toggle TODO Sidebar", () => {
       this.sidebarManager.toggle();
-    });
-    this.addRibbonIcon("folder-git-2", "Toggle Projects Sidebar", () => {
-      this.projectsSidebarManager.toggle();
     });
     this.addSettingTab(new WarpedTodoSettingTab(this.app, this));
   }
@@ -6840,6 +6892,19 @@ var WarpedTodoPlugin = class extends import_obsidian14.Plugin {
   /** Refresh all sidebar views (delegates to SidebarManager). */
   refreshSidebar() {
     this.sidebarManager.refresh();
+  }
+  /**
+   * Opens/reveals the Projects sidebar. With a tag, jumps straight to that
+   * project's detail view — used by the TODO sidebar's "Open Projects" nav
+   * button and its "Show in Projects" context menu entries. Without one,
+   * just opens to whatever the sidebar last showed (list or detail).
+   */
+  async openProjectsSidebar(tag) {
+    await this.projectsSidebarManager.activate();
+    if (tag) {
+      const view = this.projectsSidebarManager.getView();
+      await (view == null ? void 0 : view.showProject(tag));
+    }
   }
   showAboutModal() {
     new AboutModal(this.app, this.manifest.version).open();
@@ -6996,6 +7061,11 @@ var WarpedTodoSettingTab = class extends import_obsidian14.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: "Projects" });
+    new import_obsidian14.Setting(containerEl).setName("Projects sidebar").setDesc("Open the Projects sidebar directly from settings.").addButton(
+      (btn) => btn.setButtonText("Open Projects sidebar").onClick(() => {
+        this.plugin.openProjectsSidebar();
+      })
+    );
     new import_obsidian14.Setting(containerEl).setName("Default projects folder").setDesc("Folder scanned for project files. TODOs here get automatic project tags if no explicit tag is set (e.g., projects/)").addText(
       (text) => text.setPlaceholder("projects/").setValue(this.plugin.settings.defaultProjectsFolder).onChange(async (value) => {
         this.plugin.settings.defaultProjectsFolder = value;
