@@ -10,6 +10,13 @@ import {
 import { TodoScanner } from "./src/TodoScanner";
 import { TodoProcessor } from "./src/TodoProcessor";
 import { ProjectManager } from "./src/ProjectManager";
+import { ProjectScanner } from "./src/ProjectScanner";
+import { ProjectSyncManager } from "./src/ProjectSyncManager";
+import {
+  ProjectsSidebarView,
+  VIEW_TYPE_PROJECTS_SIDEBAR,
+} from "./src/ProjectsSidebarView";
+import { ContextMenuHandler } from "./src/ContextMenuHandler";
 import { SlashCommandSuggest } from "./src/SlashCommandSuggest";
 import { AtSuggest } from "./src/AtSuggest";
 import { TeamManager } from "./src/TeamManager";
@@ -36,9 +43,12 @@ export default class WarpedTodoPlugin extends Plugin {
   scanner: TodoScanner;
   processor: TodoProcessor;
   projectManager: ProjectManager;
+  projectScanner: ProjectScanner;
+  projectSyncManager: ProjectSyncManager;
   tabLockManager: TabLockManager;
   teamManager: TeamManager;
   private sidebarManager: SidebarManager;
+  private projectsSidebarManager: SidebarManager;
 
   async onload() {
     await this.loadSettings();
@@ -50,8 +60,9 @@ export default class WarpedTodoPlugin extends Plugin {
       await this.saveSettings();
     }
 
-    // Initialize sidebar manager
+    // Initialize sidebar managers
     this.sidebarManager = new SidebarManager(this.app, VIEW_TYPE_TODO_SIDEBAR);
+    this.projectsSidebarManager = new SidebarManager(this.app, VIEW_TYPE_PROJECTS_SIDEBAR);
 
     // Initialize team manager
     this.teamManager = new TeamManager(this.app, this.settings.teamFilePath);
@@ -68,6 +79,19 @@ export default class WarpedTodoPlugin extends Plugin {
       this.settings.priorityTags,
       this.settings.excludeFoldersFromProjects
     );
+    this.projectScanner = new ProjectScanner();
+    // onSynced must apply results directly (applySyncResult), not go through
+    // SidebarManager.refresh()/view.reload() — reload() itself calls
+    // syncAll(), which would fire onSynced again: an unbounded loop. See
+    // ProjectsSidebarView.applySyncResult's doc comment for how this was found.
+    this.projectSyncManager = new ProjectSyncManager(this.app, this.projectScanner, (scanned) =>
+      this.projectsSidebarManager.forEach<ProjectsSidebarView>((view) => view.applySyncResult(scanned))
+    );
+    // Desktop-only feature (Node fs/child_process — see manifest.json's isDesktopOnly).
+    // Only starts watching if a base folder is actually configured.
+    if (this.settings.projectsBaseFolder) {
+      this.projectSyncManager.startWatching(this.projectsSyncOptions());
+    }
     // Initialize tab lock manager
     this.tabLockManager = new TabLockManager(this.app);
 
@@ -367,20 +391,88 @@ export default class WarpedTodoPlugin extends Plugin {
       })
     );
 
-    // Add ribbon icon
+    // Register Projects sidebar view
+    this.registerView(
+      VIEW_TYPE_PROJECTS_SIDEBAR,
+      (leaf) =>
+        new ProjectsSidebarView(
+          leaf,
+          this.scanner,
+          this.processor,
+          this.projectManager,
+          this.projectScanner,
+          this.projectSyncManager,
+          new ContextMenuHandler(
+            this.app,
+            this.processor,
+            this.settings.priorityTags,
+            () => this.settings.moveHistory
+          ),
+          () => this.projectsSyncOptions(),
+          () => {
+            (this.app as any).setting.open();
+            (this.app as any).setting.openTabById(this.manifest.id);
+          },
+          () => this.showAboutModal()
+        )
+    );
+
+    this.addCommand({
+      id: "toggle-projects-sidebar",
+      name: "Toggle Projects Sidebar",
+      callback: () => {
+        this.projectsSidebarManager.toggle();
+      },
+    });
+
+    this.addCommand({
+      id: "sync-projects",
+      name: "Sync Projects",
+      callback: async () => {
+        // Runs independent of whether the sidebar is open — onSynced (wired in
+        // the ProjectSyncManager constructor above) refreshes it automatically
+        // if it happens to be.
+        if (!this.settings.projectsBaseFolder) {
+          showNotice("No Projects base folder configured yet. Set one in settings.");
+          return;
+        }
+        await this.projectSyncManager.syncAll(this.projectsSyncOptions());
+        showNotice("Projects synced.");
+      },
+    });
+
+    // Add ribbon icons
     this.addRibbonIcon("square-check-big", "Toggle TODO Sidebar", () => {
       this.sidebarManager.toggle();
+    });
+    this.addRibbonIcon("folder-git-2", "Toggle Projects Sidebar", () => {
+      this.projectsSidebarManager.toggle();
     });
 
     // Add settings tab
     this.addSettingTab(new WarpedTodoSettingTab(this.app, this));
   }
 
+  /** Builds ProjectSyncManager's SyncOptions/ProjectsSidebarOptions from current settings. */
+  projectsSyncOptions() {
+    return {
+      baseFolder: this.settings.projectsBaseFolder,
+      projectsFolder: this.settings.defaultProjectsFolder,
+      excludeDirs: this.settings.projectsExcludeDirs,
+      scanDepth: this.settings.projectsScanDepth,
+      maxDepth: this.settings.projectsScanDepth,
+      defaultTodoneFile: this.settings.defaultTodoneFile,
+    };
+  }
+
   onunload() {
     // Detach all sidebar views
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_TODO_SIDEBAR);
+    this.app.workspace.detachLeavesOfType(VIEW_TYPE_PROJECTS_SIDEBAR);
     // Clean up tab lock manager
     this.tabLockManager.destroy();
+    // Stop the Projects file watcher (fs.watch doesn't clean itself up)
+    this.projectSyncManager?.stopWatching();
   }
 
   async loadSettings() {
@@ -712,6 +804,56 @@ class WarpedTodoSettingTab extends PluginSettingTab {
             );
 
             await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Projects base folder")
+      .setDesc("Folder of git repos scanned for project notes (e.g., /Users/you/projects). Leave blank to disable repo syncing.")
+      .addText((text) =>
+        text
+          .setPlaceholder("/Users/you/projects")
+          .setValue(this.plugin.settings.projectsBaseFolder)
+          .onChange(async (value) => {
+            this.plugin.settings.projectsBaseFolder = value;
+            await this.plugin.saveSettings();
+            if (value) {
+              this.plugin.projectSyncManager.startWatching(this.plugin.projectsSyncOptions());
+            } else {
+              this.plugin.projectSyncManager.stopWatching();
+            }
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Projects exclude directories")
+      .setDesc("Comma-separated directory names to skip while scanning for repos (e.g., node_modules, dist, build, archive)")
+      .addText((text) =>
+        text
+          .setPlaceholder("node_modules, dist, build, archive")
+          .setValue(this.plugin.settings.projectsExcludeDirs.join(", "))
+          .onChange(async (value) => {
+            this.plugin.settings.projectsExcludeDirs = value
+              .split(",")
+              .map((d) => d.trim())
+              .filter((d) => d.length > 0);
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Projects scan depth")
+      .setDesc("How many folder levels deep to look for repos under the base folder")
+      .addText((text) =>
+        text
+          .setPlaceholder("3")
+          .setValue(String(this.plugin.settings.projectsScanDepth))
+          .onChange(async (value) => {
+            const num = parseInt(value);
+            if (!isNaN(num) && num >= 0) {
+              this.plugin.settings.projectsScanDepth = num;
+              await this.plugin.saveSettings();
+            }
           })
       );
 

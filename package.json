@@ -1,0 +1,8 @@
+{
+  "name": "warped-command",
+  "version": "1.0.0",
+  "description": "Warped Command: a set of Obsidian plugins for writers who work in plain markdown (Warped Todo, Warped Hugo, Warped Reference).",
+  "private": true,
+  "author": "Bruce Alderson",
+  "license": "MIT"
+}

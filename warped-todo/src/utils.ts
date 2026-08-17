@@ -1,4 +1,5 @@
 import { App, MarkdownView, TFile, Vault, WorkspaceLeaf, moment } from "obsidian";
+import { readFile, writeFile } from "fs/promises";
 import { createNoticeFactory } from "../../shared";
 import type { FocusQueueResult, ItemDate, TodoItem } from "./types";
 
@@ -832,6 +833,50 @@ export async function modifyFileLine(
 
   lines[resolved] = transform(currentLine);
   await vault.modify(file, lines.join("\n"));
+}
+
+/**
+ * Same algorithm as `modifyFileLine`, for a file outside the vault (e.g. a repo's
+ * BUGS.md, referenced via `TodoItem.sourceFile`). Uses Node `fs` instead of the
+ * Obsidian Vault API — desktop only, matching `manifest.json`'s `isDesktopOnly: true`.
+ *
+ * Read-resolve-write happens in one call with no lock between read and write, same
+ * as `modifyFileLine`'s relationship to `vault.modify()`. A concurrent external edit
+ * (e.g. a commit landing) between the read and the write can still be lost; the
+ * fingerprint only protects against the line having *moved*, not against a second
+ * writer in the same instant. Acceptable for a single-user desktop plugin — see
+ * DESIGN.md's Projects Extension for the tracked limitation.
+ */
+export async function modifyExternalFileLine(
+  filePath: string,
+  lineNumber: number,
+  transform: (line: string) => string,
+  validate?: (line: string) => string | null,
+  fingerprint?: string
+): Promise<void> {
+  const content = await readFile(filePath, "utf-8");
+  const lines = content.split("\n");
+
+  const resolved = (fingerprint)
+    ? resolveLineNumber(lines, lineNumber, fingerprint)
+    : lineNumber;
+
+  if (resolved < 0 || resolved >= lines.length) {
+    throw new Error(
+      `Cannot locate line ${lineNumber} in ${filePath}` +
+      (fingerprint ? ` (fingerprint: "${fingerprint}")` : "")
+    );
+  }
+
+  const currentLine = lines[resolved];
+
+  if (validate) {
+    const error = validate(currentLine);
+    if (error) throw new Error(error);
+  }
+
+  lines[resolved] = transform(currentLine);
+  await writeFile(filePath, lines.join("\n"), "utf-8");
 }
 
 export function openFileAtLine(

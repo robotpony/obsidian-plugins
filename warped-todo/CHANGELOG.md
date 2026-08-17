@@ -2,6 +2,179 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.35.0] - 2026-08-17
+
+### Changed — snoozed items are an ordinary tag, not a dedicated tab
+
+The Snoozed tab, its icon, and every special-case filter that hid
+`#future`/`#snooze`/`#snoozed` items from the TODOs and Ideas tag clouds
+and lists are gone. A snoozed item now surfaces wherever its tags put it,
+same as `#p0` or a project tag — including the tag cloud and the active
+list. The one place still excludes them: Focus Mode's queue, so snoozed
+work doesn't get resurfaced there by default. Snoozing/unsnoozing an item
+from the context menu is unchanged.
+
+### Fixed — Focus mode's tab icon and title were inconsistent with the other tabs
+
+Clicking TODOs, Ideas, or (formerly) Snoozed always updated the sidebar
+title and moved the shared `active` styling to the clicked icon. Focus
+mode didn't: the title stayed pinned to " TODOs" no matter what, the eye
+icon used its own `focus-mode-active` styling instead of participating in
+the shared active/inactive pattern, and the other tab buttons went inert
+and heavily faded instead of staying clickable. Now the title reads
+" Focus" while focus mode is active, and clicking any other tab exits
+focus and switches in one click — same behaviour as switching between any
+two tabs. The eye icon keeps its distinctive yellow tint when active;
+that's the only intentional difference left.
+
+### Fixed — tag cloud showed pills with zero matching TODOs
+
+A header TODO whose only non-complete child was a bold subheading label
+(not a real task) could still show its project tags as clickable pills in
+the tag cloud — clicking one produced "No TODOs matching," dead-end noise.
+The tag cloud and the active-TODOs list used two different definitions of
+"does this header have real active work"; they now share one
+(`isActiveTodo`), so a pill only appears when there's something real
+behind it.
+
+## [0.34.1] - 2026-08-15
+
+### Fixed — Ideas had no checkbox in the Projects sidebar
+
+Found via screenshot review: synced Idea items rendered as plain text with
+no interactive control at all, unlike TODOs and Bugs. The main TODOs
+sidebar gives ideas a checkbox too (checking one there means "dismiss",
+not literally "done"); the Projects sidebar's synced-item groups just
+never turned it on for the Ideas group. Checking an idea there sets the
+same `[x]` on its line as a TODO/Bug would.
+
+## [0.34.0] - 2026-08-15
+
+### Fixed — Projects detail view UI review
+
+Found via screenshot review of the detail view:
+
+- **"peep" was showing three times**: Obsidian's own file-title display, a
+  duplicate `# peep` heading the plugin wrote into the note body, and the
+  sidebar's own header. The sidebar header now always reads "Projects"
+  (matching the list view) instead of repeating the project name, and new
+  project notes no longer get a redundant `# name` heading (existing notes
+  keep theirs — the note body is never rewritten by sync, so this only
+  applies going forward; delete the extra heading by hand if you want it
+  gone from a note created before this fix).
+- **Detail view now opens with the same summary block as its list row**
+  (name, branch, status, item-count breakdown) instead of a separately
+  hand-styled branch/status line — the detail view now reads as "the row
+  you clicked, expanded" rather than a different restatement of the same
+  facts.
+- **Remote link** now shows the actual browsable URL with the protocol
+  dropped (`github.com/robotpony/peep`) instead of the generic label
+  "Remote"; full URL still available on hover.
+- **"Reveal in Finder"** now shows the project's local path, home-relativized
+  (`~/projects/peep`) instead of the generic label "Reveal in Finder"; full
+  path still available on hover.
+- **Synced item group headings** (TODOs/Ideas/Bugs) were missing the
+  filename hint and `→` open-file arrow that hand-typed section headings
+  already had. Now shown whenever every item in a group came from the same
+  source file (e.g. `BUGS.md →`); clicking opens that file in the OS default
+  editor, since it's a plain filesystem path, not necessarily a vault file.
+
+## [0.33.0] - 2026-08-15
+
+### Fixed — Runaway project sync crashed Obsidian
+
+Found via live testing: a project note's `lastSynced` frontmatter value was
+updating roughly every 200ms, making the note unusable while open — and,
+left running, crashing Obsidian outright. Each ~200ms pass was
+re-appending the rendered item block into the note rather than cleanly
+replacing it, so the note grew by a full copy of that block every pass;
+at thousands of passes this bloated the note (and Obsidian's editor state
+for it) enough to bring the app down.
+
+Root cause: `main.ts` wired the sync manager's completion callback to a
+sidebar refresh method that itself triggered a full resync, which fired
+the same completion callback again — an unbounded loop, limited only by
+how fast a full scan-and-sync pass could complete. Fixed by having the
+completion callback pass its results directly to the sidebar (which just
+re-renders) instead of asking the sidebar to reload, which would resync.
+
+### Changed — Projects sidebar is now the only place synced items appear
+
+The vault note per project no longer gets a written-in listing of its
+`#todo`/`#idea`/`#bug` items. Two problems drove this: the write itself
+made most syncs touch a note that might be open for editing, and — found
+via live testing, screenshots showing tags appearing and disappearing
+across scans — the rendered `#todo` tag on a completed item collided with
+TodoScanner's own vault-wide checkbox-to-tag correction (checked box + `#todo`
+auto-corrects to `#todone`), which the render then "corrected" back on the
+next sync, an actual content-flicker loop.
+
+Project notes now carry frontmatter only (git facts: branch, status,
+remote, last synced) plus whatever body a user writes by hand. Every synced
+item — from the sidebar's list-view counts to its detail view — is read
+from `ProjectSyncManager`'s in-memory cache, populated straight from each
+repo's `BUGS.md`/`TODO.md`/etc., never from the note. Completing, focusing,
+or snoozing a synced item still writes back to the real repo file; it just
+no longer round-trips through the vault note to get there.
+
+## [0.32.0] - 2026-08-14
+
+### Added — Projects: a second sidebar for git repos
+
+Point the plugin at a folder of git repos and it finds every one, syncs a
+vault note per project (git facts in frontmatter), and surfaces each repo's
+`#todo`/`#idea`/`#bug` items — pulled from `BUGS.md`/`TODO.md`/etc. — in a
+dedicated sidebar. Full design in `OUTLINE.md`, `DESIGN.md`, and `PLAN.md`.
+
+- **New Projects sidebar**, alongside the existing TODOs sidebar. Lists
+  detected repos (branch, git status, open-item counts by type); selecting
+  one opens its note and switches to a detail view with pinned repo facts,
+  a merged item list (synced items plus anything hand-typed elsewhere in
+  the note), and the same complete/focus/snooze context menu as the TODOs
+  sidebar (no "move" — see below). See 0.33.0 below: items are read from
+  the sync cache, not written into the note.
+- **Settings**: base folder, exclude directories, scan depth, added to the
+  existing Projects section.
+- **Commands**: "Toggle Projects Sidebar", "Sync Projects". New ribbon icon.
+- Frontmatter is hidden in repo-matched project notes (the sidebar already
+  surfaces branch/status/remote/last-synced); tag-only project notes are
+  unaffected.
+- Completing a repo-sourced item writes back to the actual repo file
+  (`BUGS.md`/`TODO.md`/etc.), not just the vault note. This includes
+  prose-style bug write-ups (`### Title` under a `## Open`/`## Fixed`
+  section, this repo's own `BUGS.md` shape) — completing one moves its
+  whole write-up to the first matching closed section (creating `## Fixed`
+  if none exists), reversible the same way, refusing if the file has
+  uncommitted changes so a bad move is always recoverable via
+  `git checkout`.
+
+### Removed
+
+- The plugin-wide "Move to..." action is being phased out — dropped first
+  from the new Projects sidebar's context menu (moving a repo-synced item
+  elsewhere conflicts with it reappearing in its original note on the next
+  sync). Full removal from the TODOs sidebar tracked separately.
+
+### Changed
+
+- **Desktop only.** Project syncing needs Node `fs`/`child_process`
+  (reading repo files, running `git`), not available on mobile.
+  `isDesktopOnly` is now `true`.
+
+### Fixed — Notice flood while editing a project note
+
+Editing a project note could produce a rapid stack of Obsidian's own
+"modified externally, merging changes automatically" notices. The plugin
+was writing to that note far more often than it should: every sync bumped
+a `lastSynced` timestamp unconditionally, so even a no-op sync looked like
+a real change and triggered a write — and the file watcher could plausibly
+retrigger itself, since a plain `git status` can touch `.git/index`'s
+mtime with no real change, right inside the folder being watched. Fixed:
+a sync now only writes a note when something other than the timestamp
+actually changed, the watcher ignores events under excluded directories
+(it wasn't before), and watch events within 1.5s of a completed sync are
+ignored as likely side effects of that sync rather than real changes.
+
 ## [0.31.0] - 2026-05-11
 
 ### Fixed — Sidebar pixel polish

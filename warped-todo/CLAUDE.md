@@ -15,7 +15,7 @@ Build output is `main.js` at the repo root. To test in Obsidian, copy `main.js`,
 
 ## Architecture
 
-Warped Todo is an Obsidian plugin for tracking TODOs, Ideas, and Principles across a vault. Items are tagged in markdown files (`#todo`, `#idea`, `#principle`); the plugin scans the vault, indexes them, and surfaces them in a custom sidebar with priority/focus/snooze workflows.
+Warped Todo is an Obsidian plugin for tracking TODOs, Ideas, and Principles across a vault, plus a Projects sidebar that syncs vault notes with git repos on disk. Vault items are tagged in markdown files (`#todo`, `#idea`, `#principle`); the plugin scans the vault, indexes them, and surfaces them in a custom sidebar with priority/focus/snooze workflows. The Projects sidebar finds git repos under a configured base folder, syncs a note per project (frontmatter git facts + `#todo`/`#idea`/`#bug` items parsed from each repo's `BUGS.md`/`TODO.md`/etc.), and lets you act on those items from Obsidian, writing back to the repo file. Desktop only (`isDesktopOnly: true`) — Projects needs Node `fs`/`child_process`. Full Projects design: [OUTLINE.md](OUTLINE.md), [DESIGN.md](DESIGN.md), [PLAN.md](PLAN.md).
 
 ### Entry point
 
@@ -23,8 +23,9 @@ Warped Todo is an Obsidian plugin for tracking TODOs, Ideas, and Principles acro
 
 - Initializes `TodoScanner` (vault scan + file watchers)
 - Wires `TodoProcessor` for completion/priority mutations
-- Builds `ProjectManager` for tag-based grouping
-- Registers the sidebar view
+- Builds `ProjectManager` for tag-based grouping, merged with repo-derived data
+- Builds `ProjectScanner`/`ProjectSyncManager` and starts the Projects file watcher (if a base folder is configured)
+- Registers both sidebar views (TODOs and Projects)
 - Registers `SlashCommandSuggest` (`/todo`, `/idea`, etc.) and `AtSuggest` (`@today`, `@handle`)
 - Registers CodeMirror extensions for header sort and checkbox/tag sync
 - Registers commands and the settings tab
@@ -36,7 +37,7 @@ Warped Todo is an Obsidian plugin for tracking TODOs, Ideas, and Principles acro
 | [TodoScanner.ts](src/TodoScanner.ts) | Scans vault for `#todo`/`#todone`/`#idea`/`#principle`. Maintains per-file caches, watches file changes, emits `todos-updated` events. |
 | [TodoProcessor.ts](src/TodoProcessor.ts) | Mutations: complete TODO (`#todo` → `#todone @date`, append to TODONE log), change priority, snooze, move file. |
 | [ProjectManager.ts](src/ProjectManager.ts) | Aggregates items by project tag (excludes `#focus`/priority/lifecycle tags). Reads project description from project files. |
-| [SidebarView.ts](src/SidebarView.ts) | Custom `ItemView` with TODOs / Ideas / Snoozed tabs, tag cloud, immersive Focus Mode, summary stats. |
+| [SidebarView.ts](src/SidebarView.ts) | Custom `ItemView` with TODOs / Ideas tabs, tag cloud, immersive Focus Mode, summary stats. Snoozed items are an ordinary tag (no dedicated tab), excluded only from the Focus Mode queue. |
 | [ContextMenuHandler.ts](src/ContextMenuHandler.ts) | Right-click menu on sidebar rows: priority, focus, snooze, move, copy, delete. |
 | [SlashCommandSuggest.ts](src/SlashCommandSuggest.ts) | Editor suggester for `/` at column 0: `/todo`, `/todos`, `/idea`, `/ideas`, `/today`, `/tomorrow`, `/callout`. |
 | [AtSuggest.ts](src/AtSuggest.ts) | Editor suggester for `@`: dates (`@today`, `@tomorrow`, `@yesterday`, `@<date>`) and team mentions (`@<handle>`). |
@@ -48,7 +49,13 @@ Warped Todo is an Obsidian plugin for tracking TODOs, Ideas, and Principles acro
 | [SlackConverter.ts](src/SlackConverter.ts) | Converts markdown → Slack mrkdwn for clipboard copy. |
 | [NotionConverter.ts](src/NotionConverter.ts) | Converts Obsidian markdown → plain markdown for Notion paste. |
 | [types.ts](src/types.ts) | `TodoItem`, `ProjectInfo`, `SpaceCommandSettings`, `DEFAULT_SETTINGS`. |
-| [utils.ts](src/utils.ts) | Shared helpers: tag extraction, date formatting, priority math, checkbox parsing. |
+| [utils.ts](src/utils.ts) | Shared helpers: tag extraction, date formatting, priority math, checkbox parsing, `modifyExternalFileLine` (single-line writes outside the vault). |
+| [ProjectScanner.ts](src/ProjectScanner.ts) | Recursively finds git repos under a base folder (directory-`.git` only, submodules skipped); reads branch/status/remote via `git` (`execFile`). |
+| [StructuredFileParser.ts](src/StructuredFileParser.ts) | Parses `BUGS.md`/`TODO.md`/etc. into `ParsedProjectItem[]`. Filename-based default type, explicit-tag override, flat-list or header-report shape (`###`-presence decides), item `shape` for completion routing. |
+| [ProjectSyncManager.ts](src/ProjectSyncManager.ts) | Keeps each repo-matched project note in sync: frontmatter merge (sync-owned keys + `cssclasses`), delimited-block rewrite (preserves non-owned tags across resync by fingerprint match), `fs.watch`, manual sync entry point. |
+| [ProjectItemMutator.ts](src/ProjectItemMutator.ts) | Mutates a `ParsedProjectItem`'s source line directly (external file, not the vault) — completion (by item `shape`), priority, add/remove tag. Mirrors `TodoProcessor`'s vault-item methods. |
+| [HeaderBlockMover.ts](src/HeaderBlockMover.ts) | Multi-line block-move for `headerNested` items: cuts a `###` block and reinserts it under the first matching `##` status section (creating one if none exists), gated on a clean `git status` for that file. |
+| [ProjectsSidebarView.ts](src/ProjectsSidebarView.ts) | Second sidebar: project list + per-project detail view (auto-follows the active file), merged synced/hand-typed item list, context menu (no "move"). |
 
 ### Data flow
 

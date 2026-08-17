@@ -28,7 +28,7 @@ export class TodoSidebarView extends ItemView {
   private summaryExpanded: boolean = false;
   private focusListLimit: number;
   private makeLinksClickable: boolean;
-  private activeTab: 'todos' | 'ideas' | 'snoozed' = 'todos';
+  private activeTab: 'todos' | 'ideas' = 'todos';
   private activeTagFilter: string | null = null;
   private activeAssigneeFilter: string | null = null;
   // Crossfade transition for filter changes — guards against overlapping
@@ -43,7 +43,7 @@ export class TodoSidebarView extends ItemView {
   private focusQueue: FocusQueueState | null = null;
   private setFocusModeActive: (active: boolean) => Promise<void>;
   // Snapshot for restoring sidebar position on Exit.
-  private prevActiveTab: 'todos' | 'ideas' | 'snoozed' | null = null;
+  private prevActiveTab: 'todos' | 'ideas' | null = null;
   private prevScrollTop: number = 0;
   private openDropdown: HTMLElement | null = null;
   private openDropdownTrigger: HTMLElement | null = null;
@@ -104,7 +104,6 @@ export class TodoSidebarView extends ItemView {
     switch (this.activeTab) {
       case 'todos': return "TODOs";
       case 'ideas': return "IDEAs";
-      case 'snoozed': return "Snoozed";
     }
   }
 
@@ -581,34 +580,34 @@ export class TodoSidebarView extends ItemView {
     container.removeClass("sidebar-focus-mode-active");
 
     // Header — always rendered in full so the button positions stay fixed
-    // whether focus mode is on or off. The eye button becomes the exit toggle
-    // when focus is active; other tab buttons are faded and inert.
+    // whether focus mode is on or off. The eye button toggles focus mode;
+    // the other three behave exactly like normal tab buttons even while
+    // focus is active — clicking one exits focus and switches in one click,
+    // same as switching between any two of them normally. The only
+    // intentional difference for focus mode is the eye icon's colour when
+    // active (yellow, via focus-mode-active) — see switchTab().
     const headerDiv = container.createEl("div", { cls: "sidebar-header" });
     const titleEl = headerDiv.createEl("h4", { cls: "sidebar-title" });
     const logoEl = titleEl.createEl("span", { cls: "warped-todo-logo clickable-logo", text: "␣⌘" });
     logoEl.addEventListener("click", () => this.onShowAbout());
     if (this.focusModeActive) {
-      titleEl.appendText(" TODOs");
+      titleEl.appendText(" Focus");
     } else {
       switch (this.activeTab) {
         case 'todos': titleEl.appendText(" TODOs"); break;
         case 'ideas': titleEl.appendText(" IDEAs"); break;
-        case 'snoozed': titleEl.appendText(" Snoozed"); break;
       }
     }
 
     // Tab navigation
     const tabNav = headerDiv.createEl("div", { cls: "sidebar-tab-nav" });
-    const tabDisabledCls = this.focusModeActive ? " focus-mode-disabled" : "";
 
     const todosTab = tabNav.createEl("button", {
-      cls: `sidebar-tab-btn${!this.focusModeActive && this.activeTab === 'todos' ? ' active' : ''}${tabDisabledCls}`,
+      cls: `sidebar-tab-btn${!this.focusModeActive && this.activeTab === 'todos' ? ' active' : ''}`,
       attr: { "aria-label": "TODOs" },
     });
     todosTab.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.5"/><path d="m9 11 3 3L22 4"/></svg>';
-    if (!this.focusModeActive) {
-      todosTab.addEventListener("click", () => { this.activeTab = 'todos'; this.render(); });
-    }
+    todosTab.addEventListener("click", () => this.switchTab('todos'));
 
     // Eye icon — toggles focus mode. Active (yellow) when focus is on so the
     // user can click the same spot to exit without moving the mouse.
@@ -626,22 +625,11 @@ export class TodoSidebarView extends ItemView {
     });
 
     const ideasTab = tabNav.createEl("button", {
-      cls: `sidebar-tab-btn${!this.focusModeActive && this.activeTab === 'ideas' ? ' active' : ''}${tabDisabledCls}`,
+      cls: `sidebar-tab-btn${!this.focusModeActive && this.activeTab === 'ideas' ? ' active' : ''}`,
       attr: { "aria-label": "Ideas" },
     });
     ideasTab.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"></path><path d="M10 22h4"></path><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"></path></svg>';
-    if (!this.focusModeActive) {
-      ideasTab.addEventListener("click", () => { this.activeTab = 'ideas'; this.render(); });
-    }
-
-    const snoozedTab = tabNav.createEl("button", {
-      cls: `sidebar-tab-btn${!this.focusModeActive && this.activeTab === 'snoozed' ? ' active' : ''}${tabDisabledCls}`,
-      attr: { "aria-label": "Snoozed" },
-    });
-    snoozedTab.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>';
-    if (!this.focusModeActive) {
-      snoozedTab.addEventListener("click", () => { this.activeTab = 'snoozed'; this.render(); });
-    }
+    ideasTab.addEventListener("click", () => this.switchTab('ideas'));
 
     // Kebab menu stays accessible in all modes (refresh, stats, about)
     this.createSidebarMenuButton(headerDiv);
@@ -658,7 +646,6 @@ export class TodoSidebarView extends ItemView {
     switch (this.activeTab) {
       case 'todos':  this.renderTodosContent(content); break;
       case 'ideas':  this.renderIdeasContent(content); break;
-      case 'snoozed': this.renderSnoozedContent(content); break;
     }
   }
 
@@ -679,131 +666,12 @@ export class TodoSidebarView extends ItemView {
     // Principles are still scanned and surface in the project-info popup,
     // but they no longer get their own section here.
 
-    // Tag cloud built from active (non-snoozed) ideas. Clicking a pill
-    // applies activeTagFilter, which renderActiveIdeas already respects.
-    const activeIdeas = this.scanner.getIdeas().filter(i =>
-      !i.tags.includes("#future") &&
-      !i.tags.includes("#snooze") &&
-      !i.tags.includes("#snoozed")
-    );
-    this.renderSimpleTagCloud(container, activeIdeas);
+    // Tag cloud built from all ideas — snoozed ideas surface here like any
+    // other tagged item now (no dedicated Snoozed tab; see BUGS.md). Clicking
+    // a pill applies activeTagFilter, which renderActiveIdeas already respects.
+    this.renderSimpleTagCloud(container, this.scanner.getIdeas());
 
     this.renderActiveIdeas(container);
-  }
-
-  private renderSnoozedContent(container: HTMLElement): void {
-    // Tag cloud at top, built from all snoozed items (todos + ideas combined,
-    // since both lists render under it). The same activeTagFilter feeds
-    // renderSnoozedTodos and renderSnoozedIdeas.
-    const snoozedTodos = this.scanner.getTodos().filter(t =>
-      t.tags.includes("#future") ||
-      t.tags.includes("#snooze") ||
-      t.tags.includes("#snoozed")
-    );
-    const snoozedIdeas = this.scanner.getIdeas().filter(i =>
-      i.tags.includes("#future") ||
-      i.tags.includes("#snooze") ||
-      i.tags.includes("#snoozed")
-    );
-    this.renderSimpleTagCloud(container, [...snoozedTodos, ...snoozedIdeas]);
-
-    // Snoozed TODOs section
-    this.renderSnoozedTodos(container);
-
-    // Snoozed Ideas section
-    this.renderSnoozedIdeas(container);
-  }
-
-  private renderSnoozedTodos(container: HTMLElement): void {
-    let todos = this.scanner.getTodos();
-
-    // Keep only snoozed items (#future, #snooze, #snoozed)
-    todos = todos.filter(todo =>
-      todo.tags.includes("#future") ||
-      todo.tags.includes("#snooze") ||
-      todo.tags.includes("#snoozed")
-    );
-
-    // Filter out #idea items
-    todos = todos.filter(todo =>
-      !todo.tags.includes("#idea") &&
-      !todo.tags.includes("#ideas") &&
-      !todo.tags.includes("#ideation")
-    );
-
-    // Filter out child items (they'll be rendered under their parent header)
-    todos = todos.filter(todo => todo.parentLineNumber === undefined);
-
-    // Apply tag filter if active (keeps headers whose children match)
-    todos = this.filterByActiveTag(todos, this.scanner.getTodos());
-
-    // Sort by priority
-    todos = this.sortTodosByPriority(todos);
-
-    const section = container.createEl("div", { cls: "snoozed-todos-section" });
-
-    // Header carries the filter pill only — no title (snoozed-tab name is
-    // enough; checkbox styling distinguishes these from snoozed ideas below).
-    const header = section.createEl("div", {
-      cls: "todo-section-header snoozed-todos-header",
-    });
-    this.renderFilterIndicator(header);
-
-    if (todos.length === 0) {
-      section.createEl("div", {
-        text: this.activeTagFilter ? `No snoozed TODOs matching ${this.activeTagFilter}` : "No snoozed TODOs",
-        cls: "todo-empty",
-      });
-      return;
-    }
-
-    const list = section.createEl("ul", { cls: "todo-list" });
-
-    for (const todo of todos) {
-      this.renderListItem(list, todo, this.todoConfig);
-    }
-  }
-
-  private renderSnoozedIdeas(container: HTMLElement): void {
-    let ideas = this.scanner.getIdeas();
-
-    // Keep only snoozed items (#future, #snooze, #snoozed)
-    ideas = ideas.filter(idea =>
-      idea.tags.includes("#future") ||
-      idea.tags.includes("#snooze") ||
-      idea.tags.includes("#snoozed")
-    );
-
-    // Filter out child items
-    ideas = ideas.filter(idea => idea.parentLineNumber === undefined);
-
-    // Apply tag filter if active (keeps headers whose children match)
-    ideas = this.filterByActiveTag(ideas, this.scanner.getIdeas());
-
-    // Sort by priority
-    ideas = this.sortTodosByPriority(ideas);
-
-    const section = container.createEl("div", { cls: "snoozed-ideas-section" });
-
-    // Header carries the filter pill only — no title.
-    const header = section.createEl("div", {
-      cls: "todo-section-header snoozed-ideas-header",
-    });
-    this.renderFilterIndicator(header);
-
-    if (ideas.length === 0) {
-      section.createEl("div", {
-        text: this.activeTagFilter ? `No snoozed ideas matching ${this.activeTagFilter}` : "No snoozed ideas",
-        cls: "todo-empty",
-      });
-      return;
-    }
-
-    const list = section.createEl("ul", { cls: "idea-list" });
-
-    for (const idea of ideas) {
-      this.renderListItem(list, idea, this.ideaConfig);
-    }
   }
 
   private sortTodosByPriority(todos: TodoItem[], allTodosForChildLookup?: TodoItem[]): TodoItem[] {
@@ -881,16 +749,16 @@ export class TodoSidebarView extends ItemView {
 
     const todos = this.scanner.getTodos();
 
-    // Active count per tag — used to skip project pills that would only match
-    // snoozed items (clicking them yields "No TODOs matching", which is just
-    // noise). Pinned tags (#focus / #p0) are intentionally NOT gated by this:
-    // they're priority indicators, not project filters, and should appear
-    // whenever any TODO carries them.
-    const activeTodos = todos.filter(t =>
-      !t.tags.includes("#future") &&
-      !t.tags.includes("#snooze") &&
-      !t.tags.includes("#snoozed")
-    );
+    // Active count per tag — used to skip project pills for a header whose
+    // own tags are live but has no real active child (clicking it would
+    // yield "No TODOs matching", which is just noise). Shares `isActiveTodo`
+    // with `renderActiveTodos` so the cloud and the list always agree on
+    // what counts as active — see BUGS.md's "tag cloud shows pills with
+    // zero matching TODOs". Pinned tags (#focus / #p0) are intentionally
+    // NOT gated by this: they're priority indicators, not project filters,
+    // and should appear whenever any TODO carries them.
+    const allTodones = this.scanner.getTodones();
+    const activeTodos = todos.filter(t => this.isActiveTodo(t, allTodones, todos));
     const activeTagCounts = new Map<string, number>();
     for (const t of activeTodos) {
       for (const tag of t.tags) {
@@ -913,8 +781,9 @@ export class TodoSidebarView extends ItemView {
     });
     for (const p of sortedProjects) {
       const activeCount = activeTagCounts.get(p.tag) ?? 0;
-      // Skip projects whose only references are snoozed — they'd just empty
-      // out on click. Obsidian's tag search already covers the all-up view.
+      // Skip projects with no active work (see isActiveTodo) — they'd just
+      // empty out on click. Obsidian's tag search already covers the
+      // all-up view.
       if (activeCount === 0) continue;
       entries.push({ tag: p.tag, project: p, pinned: false, activeCount });
     }
@@ -1006,15 +875,15 @@ export class TodoSidebarView extends ItemView {
   }
 
   /**
-   * Lightweight tag cloud for tabs without project metadata (Ideas, Snoozed).
-   * Builds entries from the items' own tags using the same exclusion rules
+   * Lightweight tag cloud for tabs without project metadata (Ideas). Builds
+   * entries from the items' own tags using the same exclusion rules
    * `ProjectManager` uses for the TODOs cloud. Pills route through the same
-   * `setTagFilterWithCrossfade` flow, so filtering on these tabs feels and
+   * `setTagFilterWithCrossfade` flow, so filtering on this tab feels and
    * persists identically.
    *
    * Renders nothing (not even an empty-state message) when there are no
-   * project-style tags to show — Ideas and Snoozed lists may legitimately
-   * contain only untagged entries.
+   * project-style tags to show — the Ideas list may legitimately contain
+   * only untagged entries.
    */
   private renderSimpleTagCloud(container: HTMLElement, items: TodoItem[]): void {
     const counts = tallyProjectTags(items, this.priorityTags);
@@ -1065,8 +934,8 @@ export class TodoSidebarView extends ItemView {
 
     // Tooltip surfaces both numbers when they differ so the user knows the
     // pill represents a curated active subset, not the full historical count.
-    // For non-project clouds (Ideas, Snoozed), `activeCount` is the only number
-    // we have — show it as a plain item count.
+    // For non-project clouds (Ideas), `activeCount` is the only number we
+    // have — show it as a plain item count.
     let title = tag;
     if (project) {
       const total = project.count;
@@ -1257,15 +1126,44 @@ export class TodoSidebarView extends ItemView {
     }
   }
 
+  /**
+   * Whether a TODO counts as active work — shared by `renderActiveTodos`
+   * (the list) and `renderProjects` (the tag cloud) so the two agree on
+   * what's live. Snoozed items (`#future`/`#snooze`/`#snoozed`) are an
+   * ordinary tag here, not a filter — see BUGS.md's "demote snoozed to an
+   * ordinary tag"; the Focus queue is the one place that still excludes
+   * them (`getActiveTodosForFocus`, below). A non-header
+   * item always counts. A header additionally needs at least one real
+   * active child: complete, non-existent, or bold-subheading children
+   * don't count, even though the header's own line may still carry live
+   * tags — see BUGS.md's "tag cloud shows pills with zero matching TODOs"
+   * for why this used to disagree between the two callers.
+   */
+  private isActiveTodo(todo: TodoItem, allTodones: TodoItem[], allTodos: TodoItem[]): boolean {
+    if (!todo.isHeader) return true; // Not a header, its own tags are enough
+    if (!todo.childLineNumbers) return true; // Standalone header, no child list to check
+    if (todo.childLineNumbers.length === 0) return false; // All children were empty/skipped
+
+    // Check if there are any active children (not complete, and exists)
+    return todo.childLineNumbers.some(childLine => {
+      // Check if child is complete
+      const isComplete = allTodones.some(t => t.filePath === todo.filePath && t.lineNumber === childLine);
+      if (isComplete) return false;
+      // Check if child exists in todos
+      const childItem = allTodos.find(t => t.filePath === todo.filePath && t.lineNumber === childLine);
+      if (!childItem) {
+        return false;
+      }
+      // Subheading labels are not tasks — skip them
+      if (childItem.isSubheading) {
+        return false;
+      }
+      return true; // Child is active
+    });
+  }
+
   private renderActiveTodos(container: HTMLElement): void {
     let todos = this.scanner.getTodos();
-
-    // Filter out snoozed TODOs (#future, #snooze, #snoozed)
-    todos = todos.filter(todo =>
-      !todo.tags.includes("#future") &&
-      !todo.tags.includes("#snooze") &&
-      !todo.tags.includes("#snoozed")
-    );
 
     // Filter out #idea items (they should only appear in Ideas tab)
     todos = todos.filter(todo =>
@@ -1277,44 +1175,13 @@ export class TodoSidebarView extends ItemView {
     // Filter out child items (they'll be rendered under their parent header).
     todos = todos.filter(todo => todo.parentLineNumber === undefined);
 
-    // Filter out header TODOs where all children are complete, snoozed, or non-existent
-    // This prevents users from having to mark headers done redundantly
-    // Also handles case where child lines are empty/filtered out by scanner
+    // Filter out header TODOs with no real active child (complete/
+    // non-existent/subheading-only children). This prevents users from
+    // having to mark headers done redundantly, and also handles the case
+    // where child lines are empty/filtered out by the scanner.
     const allTodones = this.scanner.getTodones();
     const allTodosForChildLookup = this.scanner.getTodos();
-    todos = todos.filter(todo => {
-      if (!todo.isHeader) {
-        return true; // Not a header, keep it
-      }
-      if (!todo.childLineNumbers) {
-        return true; // Header without childLineNumbers array (standalone), keep it
-      }
-      if (todo.childLineNumbers.length === 0) {
-        return false; // Header with empty children array - all children were empty/skipped, filter out
-      }
-      // Check if there are any active children (not complete, not snoozed, and exists)
-      const hasActiveChild = todo.childLineNumbers.some(childLine => {
-        // Check if child is complete
-        const isComplete = allTodones.some(t => t.filePath === todo.filePath && t.lineNumber === childLine);
-        if (isComplete) return false;
-        // Check if child exists in todos
-        const childItem = allTodosForChildLookup.find(t => t.filePath === todo.filePath && t.lineNumber === childLine);
-        if (!childItem) {
-          return false;
-        }
-        // Subheading labels are not tasks — skip them
-        if (childItem.isSubheading) {
-          return false;
-        }
-        // Check if child is snoozed
-        const isSnoozed = childItem.tags.includes("#future") ||
-                          childItem.tags.includes("#snooze") ||
-                          childItem.tags.includes("#snoozed");
-        if (isSnoozed) return false;
-        return true; // Child is active
-      });
-      return hasActiveChild; // Keep header only if it has at least one active child
-    });
+    todos = todos.filter(todo => this.isActiveTodo(todo, allTodones, allTodosForChildLookup));
 
     // Apply tag filter if active (keeps headers whose children match)
     todos = this.filterByActiveTag(todos, this.scanner.getTodos());
@@ -1654,14 +1521,9 @@ export class TodoSidebarView extends ItemView {
   }
 
   private renderActiveIdeas(container: HTMLElement): void {
+    // Snoozed ideas (#future/#snooze/#snoozed) are an ordinary tag now — no
+    // dedicated Snoozed tab, no exclusion here; see BUGS.md.
     let ideas = this.scanner.getIdeas();
-
-    // Filter out snoozed ideas (#future, #snooze, #snoozed)
-    ideas = ideas.filter(idea =>
-      !idea.tags.includes("#future") &&
-      !idea.tags.includes("#snooze") &&
-      !idea.tags.includes("#snoozed")
-    );
 
     // Keep reference to full list for child priority lookup
     const allIdeasForChildLookup = ideas;
@@ -2032,6 +1894,25 @@ export class TodoSidebarView extends ItemView {
       result.push(tag);
     }
     return result;
+  }
+
+  /**
+   * Switch to a normal tab (TODOs/Ideas), implicitly exiting focus mode
+   * if it's active — one click, same as switching between any two
+   * normal tabs. Unlike handleFocusExit (used by the eye icon and the
+   * focus card's own "Exit" controls), this doesn't restore the previous
+   * tab/scroll position: the user just explicitly picked a destination, so
+   * there's nothing to restore.
+   */
+  private switchTab(tab: 'todos' | 'ideas'): void {
+    if (this.focusModeActive) {
+      this.focusModeActive = false;
+      this.focusQueue = null;
+      this.prevActiveTab = null;
+      void this.setFocusModeActive(false);
+    }
+    this.activeTab = tab;
+    this.render();
   }
 
   private handleFocusEnter(): void {

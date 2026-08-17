@@ -32,6 +32,10 @@ export interface TodoItem {
   // Inferred file-level tag derived from filename (e.g., "api-tasks.md" → "#api-tasks")
   inferredFileTag?: string;
   mentions: string[];
+  // Absolute filesystem path outside the vault (e.g. a repo's BUGS.md). When set,
+  // mutations write to this path via Node fs instead of the Obsidian vault API.
+  // See warped-todo/OUTLINE.md and DESIGN.md's Projects Extension.
+  sourceFile?: string;
 }
 
 export interface TodoFilters {
@@ -51,6 +55,13 @@ export interface ProjectInfo {
   hasFocusItems: boolean;
   /** Colour index 0-6 based on weighted average priority of project's tasks */
   colourIndex: number;
+  // Repo-derived fields, present only when this project's tag matches a
+  // detected git repo (see ProjectManager.getProjects()'s merge with
+  // ProjectScanner output). Absent for tag-only projects.
+  localPath?: string;
+  remote?: string;
+  branch?: string;
+  gitStatus?: string;
 }
 
 /**
@@ -136,6 +147,11 @@ export interface WarpedTodoSettings {
   teamFilePath: string;
   // Default assignee for unattributed tasks ("" = none, "me" = @me, or a handle)
   defaultAssignee: string;
+  // Projects extension: base folder scanned for git repos (ProjectScanner).
+  // Data model only for now — settings tab UI lands with ProjectsSidebarView.
+  projectsBaseFolder: string;
+  projectsExcludeDirs: string[];
+  projectsScanDepth: number;
 }
 
 export const DEFAULT_SETTINGS: WarpedTodoSettings = {
@@ -162,4 +178,8 @@ export const DEFAULT_SETTINGS: WarpedTodoSettings = {
   teamFilePath: "team.md",
   // Default assignee
   defaultAssignee: "",
+  // Projects extension
+  projectsBaseFolder: "",
+  projectsExcludeDirs: ["node_modules", "dist", "build", "archive"],
+  projectsScanDepth: 3,
 };

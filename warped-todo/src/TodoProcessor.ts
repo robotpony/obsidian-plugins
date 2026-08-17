@@ -3,6 +3,7 @@ import { TodoItem } from "./types";
 import {
   formatDate,
   modifyFileLine,
+  modifyExternalFileLine,
   replaceTodoWithTodone,
   replaceTodoWithMoved,
   markCheckboxComplete,
@@ -57,11 +58,16 @@ export class TodoProcessor {
       // Step 1: Update the source file
       await this.updateSourceFile(todo, today);
 
-      // Step 2: Append to TODONE log file
-      await this.appendToTodoneFile(todo, todoneFilePath, today);
+      // Step 2: Append to TODONE log file (source-file items have no vault-side
+      // TODONE log of their own yet — that's a Phase 3/4 concern, not this spike's)
+      if (!todo.sourceFile) {
+        await this.appendToTodoneFile(todo, todoneFilePath, today);
+      }
 
-      // Step 3: Immediately rescan the file to update cache (don't wait for debounced watcher)
-      if (this.scanner) {
+      // Step 3: Immediately rescan the file to update cache (don't wait for debounced watcher).
+      // Source-file items aren't in the vault scanner's cache yet — TodoScanner doesn't read
+      // external files until Phase 3 — so there's nothing to rescan here.
+      if (this.scanner && !todo.sourceFile) {
         await this.scanner.scanFile(todo.file);
       }
 
@@ -86,8 +92,8 @@ export class TodoProcessor {
 
       // Note: We do NOT remove from the TODONE log file as it serves as history
 
-      // Immediately rescan the file to update cache
-      if (this.scanner) {
+      // Immediately rescan the file to update cache (vault items only — see completeTodo)
+      if (this.scanner && !todo.sourceFile) {
         await this.scanner.scanFile(todo.file);
       }
 
@@ -213,54 +219,56 @@ export class TodoProcessor {
   }
 
   private async revertSourceFile(todo: TodoItem): Promise<void> {
-    await modifyFileLine(
-      this.app.vault,
-      todo.file,
-      todo.lineNumber,
-      (line) => {
-        let updated = replaceTodoneWithTodo(line);
-        if (todo.hasCheckbox) updated = markCheckboxIncomplete(updated);
-        return updated;
-      },
-      (line) => {
-        if (!line.includes("#todone")) {
-          return `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todone tag. File may have been modified.`;
-        }
-        return null;
-      },
-      todo.fingerprint
-    );
+    const transform = (line: string) => {
+      let updated = replaceTodoneWithTodo(line);
+      if (todo.hasCheckbox) updated = markCheckboxIncomplete(updated);
+      return updated;
+    };
+    const validate = (line: string) => {
+      if (!line.includes("#todone")) {
+        return `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todone tag. File may have been modified.`;
+      }
+      return null;
+    };
+
+    if (todo.sourceFile) {
+      await modifyExternalFileLine(todo.sourceFile, todo.lineNumber, transform, validate, todo.fingerprint);
+      return;
+    }
+
+    await modifyFileLine(this.app.vault, todo.file, todo.lineNumber, transform, validate, todo.fingerprint);
   }
 
   private async updateSourceFile(todo: TodoItem, date: string): Promise<void> {
     const isChildItem = todo.parentLineNumber !== undefined;
 
-    await modifyFileLine(
-      this.app.vault,
-      todo.file,
-      todo.lineNumber,
-      (line) => {
-        let updated: string;
-        if (line.includes("#todo")) {
-          updated = replaceTodoWithTodone(line, date);
-        } else {
-          // Child item without explicit #todo tag
-          updated = line.trimEnd() + ` #todone @${date}`;
-        }
-        if (todo.hasCheckbox) updated = markCheckboxComplete(updated);
-        return updated;
-      },
-      (line) => {
-        if (line.includes("#todone")) {
-          return `Line ${todo.lineNumber} in ${todo.filePath} already contains #todone tag. File may have been modified.`;
-        }
-        if (!line.includes("#todo") && !isChildItem) {
-          return `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todo tag. File may have been modified.`;
-        }
-        return null;
-      },
-      todo.fingerprint
-    );
+    const transform = (line: string) => {
+      let updated: string;
+      if (line.includes("#todo")) {
+        updated = replaceTodoWithTodone(line, date);
+      } else {
+        // Child item without explicit #todo tag
+        updated = line.trimEnd() + ` #todone @${date}`;
+      }
+      if (todo.hasCheckbox) updated = markCheckboxComplete(updated);
+      return updated;
+    };
+    const validate = (line: string) => {
+      if (line.includes("#todone")) {
+        return `Line ${todo.lineNumber} in ${todo.filePath} already contains #todone tag. File may have been modified.`;
+      }
+      if (!line.includes("#todo") && !isChildItem) {
+        return `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todo tag. File may have been modified.`;
+      }
+      return null;
+    };
+
+    if (todo.sourceFile) {
+      await modifyExternalFileLine(todo.sourceFile, todo.lineNumber, transform, validate, todo.fingerprint);
+      return;
+    }
+
+    await modifyFileLine(this.app.vault, todo.file, todo.lineNumber, transform, validate, todo.fingerprint);
   }
 
   private async appendToTodoneFile(

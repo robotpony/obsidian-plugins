@@ -25,7 +25,7 @@ Space Command is a task management plugin that scans markdown files for tagged i
 │                        Rendering Layer                            │
 │  ┌──────────────────────────────────────────────────────────────┐ │
 │  │                      SidebarView                             │ │
-│  │   TODOs / Ideas / Snoozed tabs · tag cloud · focus mode      │ │
+│  │   TODOs / Ideas tabs · tag cloud · focus mode                │ │
 │  └──────────────────────────────────────────────────────────────┘ │
 └───────────────────────────────────────────────────────────────────┘
 ```
@@ -56,7 +56,10 @@ private principlesCache: Map<string, TodoItem[]>
 Handles all file mutations:
 
 - Complete/uncomplete TODOs (replace tags, mark checkboxes, log to TODONE file)
-- Complete header TODOs with their child items
+- Refuses to complete a header TODO that has children directly (`completeTodo`
+  shows a notice instead) — children must be completed individually. Avoids
+  accidentally cascading a single click into a whole block; see "Header-Child
+  Relationships" below
 - Convert ideas to TODOs
 - Manage priority tags (#p0-#p4, #focus, #future)
 - Batch operations for project-level actions
@@ -71,25 +74,239 @@ Groups TODOs by project tags:
 - Falls back to inferred file tags when no explicit tags exist
 - Calculates per-project statistics (count, last activity, highest priority)
 - Sorts projects by activity score
+- Merges in repo-derived facts from `ProjectScanner` when a project tag matches a detected git repo (see Projects Extension)
+- Owns project note creation/lookup (`getProjectFilePath`, `openProjectFile`, `createProjectFile`); repo-matched projects get the frontmatter-only template (see ProjectSyncManager below), tag-only projects keep the original simple template
+
+### ProjectScanner (`src/ProjectScanner.ts`)
+
+Recursively walks the configured base folder (external filesystem path,
+distinct from any vault folder) for git repos:
+
+- A directory counts as a project when it has a `.git` **directory**, not a `.git` file (submodules/worktrees have a `.git` file and are skipped as projects, but the walk still recurses past them). Once a repo is found, the walk doesn't recurse into it — a repo's own tree isn't scanned for further nested projects
+- Default depth cap 3 (configurable), default excludes `node_modules`/`dist`/`build` (configurable)
+- Per repo, shells to `git` via `child_process.execFile` (same pattern as `DriveProvider.ts`'s `rclone` calls) for branch, status, and remote URL — no external tool dependency
+
+### ProjectSyncManager (`src/ProjectSyncManager.ts`)
+
+Keeps each repo-matched project note's **frontmatter** in sync with disk, and
+maintains an in-memory item cache the Projects sidebar reads from directly.
+The note body is never written to for items — see "Item list" below for why
+this changed from the original delimited-block design.
+
+- `syncAll(options)`: runs `ProjectScanner`, reads each project's structured files off disk, parses them via `StructuredFileParser`, and calls `syncProject()` for each. This is the manual "Sync projects" entry point (`main.ts`'s "Sync Projects" command) and what a completed watch-debounce cycle calls.
+- `syncProject(scanned, items, projectsFolder)`: finds/creates the note via `projectFilePath()` — a helper extracted from `ProjectManager` (not `createProjectFile()`, which is coupled to an interactive create-confirmation modal that shouldn't fire during an automatic background sync; see PLAN.md's Phase 4 notes). Updates the item cache (`getCachedItems()`/`updateCachedItems()`) regardless of whether the note itself needs writing.
+- Merges `ProjectScanner`-derived frontmatter keys (`project`, `repo`, `remote`, `branch`, `gitStatus`, `lastSynced`) into any existing frontmatter, rather than replacing it; unrecognized keys are preserved in their original order. **Only writes the note when something other than `lastSynced` actually changed** — bumping the timestamp unconditionally made every sync a write, which flooded Obsidian's own "modified externally" notice on a note open for editing; found via live testing, see PLAN.md. Since items no longer touch the note body, a sync where only the item list changed (the common case) now never writes the note at all.
+- `startWatching()`/`stopWatching()`: a single recursive `fs.watch` on the base folder, debounced 300ms, ignoring events under an excluded directory (`isUnderExcludedDir()`, same list the scan uses) and events within 1500ms of the last completed sync (absorbs `git status` touching `.git/index`, which sits inside the watched tree). Recursive `fs.watch` is only reliable on macOS/Windows, not Linux, which is fine given the macOS-only scope decision
+- Calls `onSynced(scanned)` once per `syncAll()` batch, passing the fresh scan results directly. Callers **must not** respond by triggering another `syncAll()` (e.g. a sidebar "full reload" method) — `main.ts` learned this the hard way: wiring `onSynced` through a view's `reload()` (which itself calls `syncAll()`) is an unbounded loop, found via live testing as a project note's `lastSynced` updating roughly every 200ms. `onSynced` exists only to hand fresh data to an already-open sidebar for a re-render.
+
+### ProjectsSidebarView (`src/ProjectsSidebarView.ts`)
+
+**Follows the same conventions as `SidebarView.ts`, not a fresh pattern:**
+`ItemView` with the same `getViewType()`/`getDisplayText()`/`getIcon()`
+shape and a `VIEW_TYPE_PROJECTS_SIDEBAR` constant alongside the existing
+`VIEW_TYPE_TODO_SIDEBAR`; its own `addRibbonIcon()` toggle command,
+registered next to the existing "Toggle TODO Sidebar" one in `main.ts`.
+Settings land in the *existing* `WarpedTodoSettingTab`'s "Projects" `h3`
+section (already holds `defaultProjectsFolder`/`excludeFoldersFromProjects`
+for the tag-based flow) — the new repo-scan fields (base folder, exclude
+dirs, scan depth) are added there, not a new section, since it's the same
+underlying "Projects" concept now that tag- and repo-derived `ProjectInfo`
+are unified. No separate "About" panel exists in this plugin today (just
+the settings tab's `h2` title), so nothing new needed there.
+
+Second sidebar `ItemView`, alongside the existing TODOs sidebar. Flat list,
+sorted projects-with-tracked-items first (alphabetical within each group,
+no separate section headers — chosen over grouping/collapsing after seeing
+real data: only 2 of 26 real repos had anything tracked, but a flat sort
+with the busy ones on top reads fine without extra UI state). Each row
+opens its vault note on click (same target `ProjectManager` already
+resolves via `getProjectFilePath()`).
+
+```
+Projects                                              [⟳ Sync]
+
+  Filter: [________________________]
+
+  peep .............................. main [M]
+    4 todo · 3 idea · 2 bug ................ synced 2m ago
+
+  widget-tool ........................ main [✓]
+    1 todo .................................. synced 5m ago
+
+  obsidian-plugins .................... main [M?]
+  scorekeep ............................ main [-]
+  thwarter ............................. main [-]
+  ... (22 more)
+```
+
+- Projects with at least one tracked item get two lines: name/branch/status,
+  then a per-type breakdown (`4 todo · 3 idea · 2 bug`, only non-zero types
+  shown) plus relative `lastSynced` time. Breakdown over a bare aggregate
+  count — the three types call for different attention, and it was cheap
+  once the row already has two lines.
+- Projects with nothing tracked collapse to one line: name, branch, git
+  status only. Keeps the common case (most repos, most of the time) from
+  dominating the sidebar.
+- Filter box matches on project name only (not item content) — consistent
+  with `ProjectManager`'s existing tag-based filtering elsewhere.
+- Empty state (no `projectsBaseFolder` configured): an inline message plus
+  an "Open settings" button that jumps straight to this plugin's settings
+  tab (`app.setting.open()` + `app.setting.openTabById()`), not a blank list.
+- `[⟳ Sync]` calls `ProjectSyncManager.syncAll()` — the same manual entry
+  point a command palette action uses.
+
+#### Detail view
+
+Selecting a project (click in the list, or opening its note any other
+way — Quick Switcher, a link) is unified: the note opens in the main pane
+*and* the sidebar swaps from the list to that project's detail view, same
+"replace sidebar content" pattern Focus Mode already uses. The sidebar
+auto-follows the active file the same way Obsidian's core Backlinks/
+Outline panels do — open a different project note, the sidebar follows;
+switch to a non-project file, it reverts to the list. An explicit back
+control at the top of the detail view always works too, independent of
+what's in the main pane.
+
+```
+< Back                                            [⟳ Sync]
+
+  peep
+  main [M] · synced 2m ago              [📁 reveal] [🔗 remote]
+
+  ### TODOs
+  - [x] Add error handling for malformed files
+  - [ ] Add caching mechanism for git operations
+
+  ### Ideas
+  - Review documentation
+
+  ### Bugs
+  - Issue: Bug/Issue tracking logic scans image files
+
+  Notes
+  - [ ] Write a proper getting-started doc #todo
+```
+
+The `### TODOs`/`### Ideas`/`### Bugs` groups above are sidebar UI only —
+nothing with those headings is written into the note. The last group
+("Notes" here) is whatever the user hand-typed into the note itself, under
+its own real heading.
+
+Pinned fields (from frontmatter, not the full set): branch + git status,
+remote as a clickable link (opens the browsable URL), relative last-synced
+time, local path as a "reveal in Finder" action rather than raw text.
+
+**Frontmatter is hidden in the note itself for repo-matched projects** —
+the plugin applies a CSS class so the YAML block never renders in Reading/
+Live Preview view for these notes specifically (not a general Obsidian
+Properties-panel setting change), since the sidebar already surfaces the
+fields that matter. Tag-only project notes are unaffected.
+
+**Item list — two sources, no reverse-mapping.** The list is two things
+concatenated, each already knowing how to mutate itself correctly without
+needing to track the other. This changed from the original design (see
+PLAN.md's round-4 write-up): items were originally rendered into a
+delimited block in the note body, rewritten on every sync; that block
+caused a genuine content-flicker loop against `TodoScanner`'s own
+checkbox↔tag correction, and — combined with a separate runaway-sync bug —
+crashed Obsidian by stacking duplicate copies of the block into the note.
+The note body is no longer touched for items at all:
+
+1. **Synced items** — `ProjectSyncManager.getCachedItems()`, the actual
+   `ParsedProjectItem[]` from the last sync, held in memory only. Grouped
+   under `### TODOs`/`### Ideas`/`### Bugs` directly from `itemType`.
+   Mutations route to `sourceFile` (the external repo file), per Phase 1,
+   then update the cache directly (`updateCachedItems()`) — no vault write,
+   nothing to resync.
+2. **Hand-typed items** — anything in the note tagged `#todo`/`#idea`/
+   `#bug`, found by scanning the vault note through `TodoScanner` as usual,
+   with real section labels (`## Overview`, or whatever heading they're
+   actually under) from the scanner's existing header-context logic.
+   Mutations go through the normal vault `TodoProcessor` path — no
+   `sourceFile`.
+
+No visual marker distinguishes the two — the header itself
+(TODOs/Ideas/Bugs vs. anything else) already communicates it.
+
+**Context menu**: full parity with the TODOs sidebar (priority, focus,
+snooze, complete) for both sources, **except "move"**, which is dropped
+from this view entirely — for either source, not just synced items. A
+synced item moved elsewhere would just reappear in its original note on
+the next sync; keeping "move" only for hand-typed items was considered
+and rejected as an inconsistent half-measure. (Separately, the plugin's
+existing vault-wide move feature — `MoveTargetModal.ts`, `moveTodo()`,
+the move history setting — is being removed entirely; unrelated to
+Projects, tracked as its own task, not a Phase 5/6 deliverable.)
+
+**Tags added via the context menu survive resync** for free now, with no
+carry-forward logic needed: `#focus`/`#p0`/etc. added to a synced item are
+written straight into the actual repo file (via `addProjectItemTag()`,
+same as completion), so the next sync's parse of that file picks them up
+as part of the item's own tags. There's no separate rendered copy that
+could fall out of sync with the source.
+
+**Completing an item** depends on what its source line actually looks
+like:
+- Has a checkbox already → toggle it (Phase 1's `sourceFile` write path,
+  unchanged).
+- No checkbox, no tag at all (the common case for a plain bullet in a
+  real `TODO.md`) → a checkbox is added and checked in the same edit —
+  `- Add caching mechanism` becomes `- [x] Add caching mechanism`.
+- A `###`-nested header-report item (this repo's own `BUGS.md` shape) has
+  no line to toggle at all; "complete" moves the whole multi-line block to
+  under the first closed-vocabulary `##` section (creating `## Fixed` at
+  the end of the file if none exists), gated on a clean `git status` for
+  that file. Built as `HeaderBlockMover.ts` — see PLAN.md's Phase 6.
+- A standalone `##` item heading (`peep/ISSUES.md`'s `## Issue: ...` shape)
+  completes by appending `" ✅ RESOLVED"` to its own heading line — no move,
+  just Phase 1's single-line write path again.
+
+### StructuredFileParser (`src/StructuredFileParser.ts`)
+
+Standalone parser, not part of `TodoScanner`: `parseStructuredFile(filename,
+content, sourceFile) => ParsedProjectItem[]`. Deliberately its own type
+rather than `TodoItem` — see "Known limitation" note below and PLAN.md's
+Phase 3 for why. Implements the filename-default-type table and the
+`###`-presence-based shape selection described under Structured-file
+parsing, below.
 
 ### SidebarView (`src/SidebarView.ts`)
 
 Custom Obsidian sidebar panel:
 
-- Two tabs: TODOs and IDEAS
-- TODOs tab: Active items, projects list, recent completions
-- IDEAS tab: Focused ideas, active ideas, principles
-- Interactive list items with context menus
-- Project filtering
+- Two tabs, TODOs and Ideas (`activeTab`), plus a separate Focus Mode
+  overlay toggled by the eye icon — not a third tab; see "Immersive Focus
+  Mode" below for how it composes with the two real tabs.
+- **TODOs tab** (`renderTodosContent`): tag cloud (`renderProjects`,
+  `#focus`/`#p0` pinned first), the active TODO list grouped by header
+  where applicable (`renderActiveTodos`), then a collapsible **Summary**
+  section (priority counts, assignee stats, top backlogs, a Done
+  today/week/month preview, and a link straight to the TODONE log file).
+- **Ideas tab** (`renderIdeasContent`): its own tag cloud built from all
+  ideas, then a single list sorted focus-first (`renderActiveIdeas`).
+  Principles are scanned but don't get their own section here — they only
+  surface inside a project's info popup.
+- Snoozed items (`#future`/`#snooze`/`#snoozed`) are an ordinary tag in
+  both tabs — no dedicated tab or exclusion, except Focus Mode's queue
+  (see below).
+- Interactive list items with context menus; tag-cloud pills drive
+  `activeTagFilter`.
 
 ### ContextMenuHandler (`src/ContextMenuHandler.ts`)
 
 Manages right-click menus:
 
-- TODO menu: Focus/Later/Snooze/Copy actions
-- Idea menu: Convert to TODO, Focus, Copy
-- Principle menu: Copy only
-- Project menu: Batch operations on all items with tag
+- **TODO menu** (`showTodoMenu`): Copy, Move to... (omitted when the
+  caller passes `includeMove: false`, e.g. the Projects sidebar),
+  Focus/Unfocus, Later/Unlater, Snooze/Unsnooze.
+- **Idea menu** (`showIdeaMenu`): Add to TODOs (converts `#idea` →
+  `#todo`), Copy, Focus/Unfocus.
+- **Project menu** (`showProjectMenu`): tag submenu with "Filter by",
+  then batch Focus/Unfocus, Later/Unlater, Snooze/Unsnooze applied to
+  every TODO carrying that project's tag.
+- No dedicated principle menu — principles render read-only (via
+  `MarkdownRenderer`) inside a project's info popup, with no right-click
+  actions of their own.
 
 ## Data Flow
 
@@ -100,11 +317,15 @@ Manages right-click menus:
 2. Handler calls processor.completeTodo()
 3. Processor reads file, updates line (#todo → #todone @date)
 4. Marks checkbox [x]
-5. Appends to TODONE file
-6. Triggers rescan
+5. Appends to TODONE file (skipped for sourceFile items — no vault-side log yet)
+6. Triggers rescan (skipped for sourceFile items — not in the vault scanner's cache)
 7. Scanner emits todos-updated
 8. UI components re-render
 ```
+
+If `todo.isHeader` and it has children, step 2 short-circuits: `completeTodo`
+shows a notice and returns `false` instead of running steps 3-8 — see
+"Header-Child Relationships" below.
 
 ### Priority Change
 
@@ -126,84 +347,143 @@ interface TodoItem {
   filePath: string;
   folder: string;
   lineNumber: number;           // 0-indexed line in file
+  fingerprint: string;          // text stripped of tags/dates/markdown markers — stale line-number recovery
   text: string;                 // Full line text
   hasCheckbox: boolean;
   tags: string[];
   dateCreated: number;
-  isHeader?: boolean;
+  isHeader?: boolean;            // Header line (##)
+  isSubheading?: boolean;        // Bold subheading label within a header block — not a task
   headerLevel?: number;
   parentLineNumber?: number;    // If this is a child item
   childLineNumbers?: number[];  // If this is a header with children
+  sectionLabel?: string;         // Nearest heading/bold-subheading text, for orphan (non-child) items
+  sectionLineNumber?: number;
   itemType?: 'todo' | 'todone' | 'idea' | 'principle';
   inferredFileTag?: string;
+  mentions: string[];
+  sourceFile?: string;           // Absolute path outside the vault, for repo-sourced items
 }
 ```
 
+```typescript
+interface ProjectInfo {
+  tag: string;
+  count: number;
+  lastActivity: number;
+  highestPriority: number;
+  hasFocusItems: boolean;
+  colourIndex: number;
+  // Repo-derived, present only when the tag matches a detected git repo
+  localPath?: string;
+  remote?: string;
+  branch?: string;
+  gitStatus?: string;
+}
+```
+
+`lastSynced` is not a `ProjectInfo` field — it only ever lives as a string
+in the project note's frontmatter (`ProjectSyncManager`'s `SYNC_KEY_ORDER`),
+not on the in-memory type.
+
 ## Priority System
 
-Priority is encoded numerically for sorting (lower value = higher priority):
+Sort order is two-dimensional, not a single numeric scale: a `#focus` tier
+(boolean) always sorts first, and within each tier `getPriorityValue()`
+(`src/utils.ts`) breaks ties — `#focus` isn't one of its values, it's a
+separate, higher-precedence check layered on top by `compareTodoItems`/
+`compareWithEffectivePriority`.
 
-| Tag              | Value | Meaning                              |
-|------------------|-------|--------------------------------------|
-| `#today`         | 1     | Time-sensitive, due today            |
-| `#p0`            | 2     | Highest priority                     |
-| `#p1`            | 3     | High priority                        |
-| `#p2`            | 4     | Medium-high priority                 |
-| `#p3`            | 5     | Medium-low priority                  |
-| `#p4`            | 6     | Low priority                         |
-| `#focus` (alone) | 7     | Focused but no explicit priority     |
-| No priority      | 8     | Unmarked items                       |
-| `#future`/`#snooze` | 9  | Snoozed/deferred items               |
+**`getPriorityValue()` — 8 values, lower sorts first:**
+
+| Tag                        | Value | Meaning                        |
+|-----------------------------|-------|---------------------------------|
+| `#today`                    | 1     | Time-sensitive, due today       |
+| `#p0`                        | 2     | Highest priority                |
+| `#p1`                        | 3     | High priority                   |
+| `#p2`                        | 4     | Medium-high priority            |
+| `#p3`                        | 5     | Medium-low priority             |
+| `#p4`                        | 6     | Low priority                    |
+| No priority tag              | 7     | Unmarked items (`#focus` alone included — it isn't checked here) |
+| `#future`/`#snooze`/`#snoozed` | 8   | Snoozed/deferred items          |
+
+**Then the `#focus` tier**, checked separately and first: items tagged
+`#focus` (or, via `isEffectivelyFocused`, a header whose child carries
+`#focus`) always sort above non-focused items, regardless of priority
+value. An item with both `#focus` and a priority tag (e.g. `#focus #p0`)
+sorts above other focused items by that priority value — the tag doesn't
+change which of the 8 values it gets, it just wins the tier check first.
+
+**Tag count breaks remaining ties**, descending (more tags = higher).
 
 ### Key behaviours
 
-**`#focus` is a preference for the focus queue.** The `#focus` tag marks items as candidates for the immersive Focus Mode card — it's what you want to work on now. If no `#focus` items exist, focus mode falls back to the highest-priority active TODOs (with a hint shown on the card). If an item has both `#focus` and a priority tag (e.g., `#focus #p0`), the priority tag determines order within the focus queue.
+**`#focus` is a preference for the focus queue**, not a priority value. The `#focus` tag marks items as candidates for the immersive Focus Mode card — it's what you want to work on now. If no `#focus` items exist, focus mode falls back to the highest-priority active TODOs (with a hint shown on the card). If an item has both `#focus` and a priority tag (e.g., `#focus #p0`), the priority tag determines order within the focus queue.
 
-**Header TODOs sort by average child priority.** A header like `## Project #todo` with children sorts based on the average priority of its active child items, not the tags on the header line. This prevents high-priority standalone items from being buried below low-priority header blocks.
+**Header TODOs sort by the better of their own priority or their children's average.** `getEffectivePriority()` computes the average `getPriorityValue()` across active (non-snoozed) children, then takes `Math.min()` of that average and the header's own tag-based priority — whichever is better (lower) wins. This prevents high-priority standalone items from being buried below low-priority header blocks, and lets a header's own explicit tag override a weak child average when it's the better signal.
 
-**Unprioritized items sort low.** Items without any priority tag sort after `#p4` but before snoozed items. This encourages explicit prioritization.
+**Unprioritized items sort low.** Items without any priority tag get value 7 — after `#p4` (6) but before snoozed items (8). This encourages explicit prioritization.
 
 ### Immersive Focus Mode
 
-A sidebar-replacing single-task surface. When toggled on, the sidebar's normal content (tabs, summary, project list, TODO list) is hidden and replaced by a focus card showing one TODO at a time. Done advances the queue; Skip rotates the active item to the back of the queue; the in-card **Exit focus mode** link restores the sidebar.
+A sidebar-replacing single-task surface. When toggled on, the content area (tag cloud, active list, summary) is replaced by a focus card showing one TODO at a time; the header — title, tab nav, eye icon — stays visible throughout, only its title text and the eye icon's colour change (see "Entry and exit" below). Done advances the queue; Skip rotates the active item to the back of the queue; the in-card **Exit focus mode** link restores the sidebar.
 
 #### Entry and exit
 
-- **Entry:** Eye icon in the TODOs tab's Projects section header. Single-click flips `focusModeActive` and re-renders.
-- **Exit:** "Exit focus mode" text link below the Done/Skip actions inside the focus card. Sets `focusModeActive` to `false`, restores the prior tab and scroll position.
+- **Entry:** Eye icon in the tab nav, beside TODOs/Ideas. Single-click flips `focusModeActive` and re-renders.
+- **Exit, restoring position:** "Exit focus mode" text link below the Done/Skip actions inside the focus card, or clicking the eye icon again. Sets `focusModeActive` to `false`, restores the prior tab and scroll position.
+- **Exit, switching directly:** clicking the TODOs or Ideas tab button while focus is active exits focus and switches to that tab in one click — same as switching between any two normal tabs (`switchTab()` in `SidebarView.ts`). No position restore here, since the user picked an explicit destination.
 
-The eye icon never appears in active state — when focus mode is on, the entire sidebar chrome (including the icon) is hidden. The icon is only visible from the normal sidebar, where it always means "enter focus mode."
+The header chrome (title, tab nav, eye icon) stays visible in both states — only the content area swaps between the tab list and the focus card. The eye icon shows its normal colour when off and an amber pill when focus mode is on, the one intentional visual difference from how the other tab icons indicate "active."
 
 #### Queue computation
 
-Queue construction lives in `buildFocusQueue` (`src/utils.ts`). Pseudocode:
+Queue construction lives in `buildFocusQueue` (`src/utils.ts`). Pseudocode
+(matches the real implementation, not the two-function split an earlier
+version of this doc described):
 
 ```
-queue = activeTodos
-  .filter(t => t.parentLineNumber === undefined && !isSnoozed(t.tags))
+candidates = activeTodos.filter(t =>
+  !isSnoozed(t.tags) &&
+  !t.isSubheading &&
+  !(t.isHeader && t.childLineNumbers?.length > 0)  // header-with-children: children stand in for it
+)
 
-if queue.empty:
+if candidates.empty:
   return { items: [], source: 'empty' }
 
 if not options.forceFallback:
-  focused = queue.filter(t => isEffectivelyFocused(t, allTodos))
+  focused = candidates.filter(t => hasTag(t.tags, '#focus'))  // direct tag only, not isEffectivelyFocused
   if focused.nonEmpty:
     return {
-      items: focused.sort(compareWithEffectivePriority).slice(0, limit),
+      items: focused.sort(compareInMainListWalkOrder).slice(0, limit),
       source: 'focus-tagged',
     }
 
 return {
-  items: queue.sort(comparePriorityOnly).slice(0, limit),
+  items: candidates.sort(compareInMainListWalkOrder).slice(0, limit),
   source: 'priority-fallback',
 }
 ```
 
 Notes:
 
-- Only top-level items are queue candidates — children of headers are never independent entries. A header TODO with focused children is one queue entry; the children render inline inside the card.
-- Snoozed items (`#future`, `#snooze`, `#snoozed`) are excluded.
-- `compareWithEffectivePriority` keeps `#focus` items above non-focused ones; `comparePriorityOnly` is focus-tier-agnostic and is used only by the priority-fallback path so `#focus`-tagged items don't dominate when continuing into priority.
+- **Children of headers are eligible candidates**, standalone — the focus
+  card shows their parent header's text as context (`getFocusSourceHeading`).
+  Only a header *with children* is excluded as its own entry, since its
+  children represent it individually; a leaf header (no children) is a
+  normal candidate.
+- Snoozed items (`#future`, `#snooze`, `#snoozed`) and bold-subheading
+  divider lines are excluded.
+- The `focused` filter checks the item's own `#focus` tag directly — it
+  does not use `isEffectivelyFocused` (that function, which also credits a
+  header for a focused child, is used elsewhere: inside
+  `compareInMainListWalkOrder`'s tier check and `compareWithEffectivePriority`).
+- Sorting goes through `compareInMainListWalkOrder`, which resolves each
+  item to its top-level ancestor and orders by `compareWithEffectivePriority`
+  (focus-tagged path) or `comparePriorityOnly` (priority-fallback path,
+  `respectFocusTier: false`) — so `#focus`-tagged items don't dominate when
+  continuing into priority via "Continue with next priority task."
 - `forceFallback: true` skips the curated `#focus` filter entirely. Used by the "Continue with next priority task" path.
 
 #### State machine
@@ -216,7 +496,8 @@ Notes:
 [active, completion state] -- Exit --> [off]
 [active, completion state] -- Continue --> [active, priority queue (forceFallback)]
 [active, priority-fallback] -- Done on last item --> [active, empty state]
-[active, *] -- Exit --> [off]
+[active, *] -- Exit (eye icon or in-card link) --> [off], restores prior tab/scroll
+[active, *] -- click TODOs or Ideas tab --> [off], switches to that tab (switchTab(), no restore)
 [active] -- Skip --> [active] (head rotates to tail; rotateQueue helper)
 ```
 
@@ -234,11 +515,11 @@ Priority fallback is always on (no setting). When the queue source is `priority-
 
 #### Class and file touchpoints
 
-- `src/utils.ts`: `buildFocusQueue`, `getItemDate`, `comparePriorityOnly`, `rotateQueue`, `isEffectivelyFocused`.
+- `src/utils.ts`: `buildFocusQueue`, `getItemDate`, `comparePriorityOnly`, `compareWithEffectivePriority`, `compareInMainListWalkOrder`, `rotateQueue`, `isEffectivelyFocused`.
 - `src/types.ts`: `FocusQueueResult`, `FocusQueueSource`, `FocusQueueState`, `ItemDate`, `ItemDateKind`.
-- `src/SidebarView.ts`: `renderFocusCard`, `renderFocusItem`, `renderFocusCompletion`, `renderFocusEmpty`, `getActiveTodosForFocus`, `rebuildFocusQueue`, `getFocusVisibleTags`, plus `handleFocusEnter` / `handleFocusExit` / `handleFocusSkip` / `handleFocusContinue` / `handleFocusDone`.
+- `src/SidebarView.ts`: `renderFocusCard`, `renderFocusItem`, `renderFocusCompletion`, `renderFocusEmpty`, `getActiveTodosForFocus`, `rebuildFocusQueue`, `getFocusVisibleTags`, `switchTab` (exits focus when the user picks TODOs/Ideas directly), plus `handleFocusEnter` / `handleFocusExit` / `handleFocusSkip` / `handleFocusContinue` / `handleFocusDone`.
 - `main.ts`: `setFocusModeActive` callback that writes to settings and saves; load-time reset for `focusModePersist=false`.
-- `styles.css`: `.sidebar-focus-mode-active` (font scale + chrome hidden via not-rendered, not via CSS) and `.focus-card-*` classes.
+- `styles.css`: `.sidebar-focus-mode-active` — a font-size scale (`1.4em`) on the content wrapper only. The header (title, tab nav, eye icon) is a separate element outside this class and is never hidden; `.focus-card-*` classes style the card itself.
 
 #### Out of scope (v1)
 
@@ -274,23 +555,118 @@ This decouples components — the scanner doesn't know about the sidebar, and co
 
 Two suggester classes provide inline editing assistance:
 
-- **SlashCommandSuggest**: `/todo`, `/today`, `/callout` commands at line start
-- **DateSuggest**: `@date`, `@today`, `@tomorrow` date insertion
+- **SlashCommandSuggest** (`src/SlashCommandSuggest.ts`): `/todo`, `/todos`,
+  `/idea`, `/ideas`, `/today`, `/tomorrow`, `/callout` — triggered at
+  line start.
+- **AtSuggest** (`src/AtSuggest.ts`): `@`-triggered, two purposes in one
+  suggester — dates (`@today`, `@tomorrow`, `@yesterday`, `@<date>`) and
+  team mentions (`@<handle>`, resolved against `team.md` via
+  `TeamManager`). There is no separate `DateSuggest` class.
+
+## Projects Extension
+
+Adds a second sidebar (Projects) that treats a folder of git repos as
+projects: repo facts sync into frontmatter on the same per-project vault
+note `ProjectManager` already owns, and tagged `#todo`/`#idea`/`#bug`
+items are read from disk into an in-memory cache the sidebar displays
+directly (never written into the note — see "Item list" above for why).
+Full rationale in [IDEAS.md](IDEAS.md); spec in [OUTLINE.md](OUTLINE.md).
+Desktop only —
+`ProjectScanner`/`ProjectSyncManager` need Node `fs`/`child_process`, so
+`manifest.json` moves to `isDesktopOnly: true`.
+
+### Data flow
+
+```
+1. Discover : ProjectScanner walks the base folder, finds repos,
+              reads git facts (execFile git ...) per repo
+2. Parse    : StructuredFileParser reads each repo's structured files
+              for #todo/#idea/#bug items (contextual defaults, below)
+3. Sync     : ProjectSyncManager merges frontmatter into the project
+              note (item-only changes never touch the note) and
+              updates its in-memory item cache; calls onSynced(scanned)
+4. Watch    : fs.watch on structured files + base folder triggers
+              re-sync of the affected project; manual command forces
+              a full rescan
+5. Mutate   : sidebar action -> writes to sourceFile (Node fs) if a
+              synced item, TodoProcessor + vault API if hand-typed ->
+              cache update (synced) or vault rescan (hand-typed)
+```
+
+Step 5 reuses the existing line-number mutation algorithm (see
+Design Decisions, "Line-Number Based Mutations") — only the I/O layer
+changes based on whether `sourceFile` is set.
+
+### Structured-file parsing (contextual defaults)
+
+Explicit `#todo`/`#idea`/`#bug` tags always win. Untagged content falls
+back to a default type by filename:
+
+| Filename | Default type |
+|----------|---------------|
+| `BUGS.md`, `ISSUES.md` | `bug` |
+| `TODO.md`, `TODOS.md` | `todo` |
+| `IDEAS.md` | `idea` |
+
+Item boundaries — selected by `###` heading presence, checked first:
+
+1. **Header-per-item reports** — if the file has any `###` heading, each one nested under a `## Open`/`## Fixed`-style status section is one item; flat-list parsing is skipped for the whole file (covers this repo's own `BUGS.md`, including the incidental `-` bullets inside one bug's root-cause paragraph — `###` presence wins over those).
+2. **Flat list items** — only when there are no `###` headings at all: top-level `- ...`/`- [ ] ...` lines, one item each (covers `peep/TODO.md`).
+
+A file matching neither shape contributes nothing.
+
+### Project note shape
+
+```markdown
+---
+project: peep
+repo: /Users/mx/projects/peep
+remote: https://github.com/robotpony/peep
+branch: main
+gitStatus: M
+lastSynced: 2026-08-14T15:30:00Z
+cssclasses: warped-todo-project-note
+---
+
+# peep
+
+#peep
+
+## Overview
+
+Notes you write here survive every sync untouched — the whole body does,
+in fact: sync only ever touches the frontmatter block above.
+```
+
+Synced `#todo`/`#idea`/`#bug` items don't appear in the note at all — see
+"Item list" above for where they live instead (the Projects sidebar's
+detail view, sourced from `ProjectSyncManager`'s in-memory cache). This is
+a change from the original design, which rendered a delimited
+`<!-- warped-todo:sync:start -->...<!-- warped-todo:sync:end -->` block of
+items directly into the note; see PLAN.md's round-4 write-up for why that
+was removed (a content-flicker bug against `TodoScanner`'s own tag
+correction, and a runaway-sync bug that crashed Obsidian by stacking
+duplicate copies of that block into the note on every pass).
 
 ## File Organization
 
 ```
-space-command/
+warped-todo/
 ├── main.ts              # Plugin entry, initialization
 ├── src/
-│   ├── TodoScanner.ts        # Vault scanning & caching
-│   ├── TodoProcessor.ts      # File mutations
-│   ├── ProjectManager.ts     # Project grouping
-│   ├── SidebarView.ts        # Sidebar UI
+│   ├── TodoScanner.ts        # Vault + repo file scanning & caching
+│   ├── TodoProcessor.ts      # File mutations (vault or external sourceFile)
+│   ├── ProjectManager.ts     # Project grouping (tag- and repo-derived)
+│   ├── ProjectScanner.ts     # Git repo discovery & git fact-gathering
+│   ├── StructuredFileParser.ts # BUGS.md/TODO.md/etc. → ParsedProjectItem[]
+│   ├── ProjectSyncManager.ts # Vault note sync, fs.watch, manual sync command
+│   ├── ProjectItemMutator.ts # Mutates a ParsedProjectItem's source line/block
+│   ├── HeaderBlockMover.ts   # Multi-line block-move (Phase 6 Case 1)
+│   ├── SidebarView.ts        # TODOs sidebar UI
+│   ├── ProjectsSidebarView.ts # Projects sidebar UI
 │   ├── ContextMenuHandler.ts # Right-click menus
 │   ├── SlashCommandSuggest.ts # / commands
-│   ├── AtSuggest.ts          # @ mentions and dates
-│   ├── DateSuggest.ts        # Date helpers
+│   ├── AtSuggest.ts          # @ mentions and dates (no separate DateSuggest.ts)
 │   ├── TeamManager.ts        # Team file parsing
 │   ├── MoveTargetModal.ts    # File picker
 │   ├── TabLockManager.ts     # Tab lock buttons
@@ -324,7 +700,21 @@ All rendering uses DOM methods (`createEl`, `appendText`) rather than innerHTML 
 
 ### Header-Child Relationships
 
-Header TODOs (e.g., `## Task Name #todo`) can have child list items. Completing the header completes all children.
+Header TODOs (e.g., `## Task Name #todo`) can have child list items. The
+header itself has no checkbox and `completeTodo` refuses to complete one
+directly (shows a notice instead) — completing used to cascade to every
+child from a single click, and that made accidental bulk-completion too
+easy. Children are ticked individually; the whole block disappears from
+the active list automatically once every live child is done (see
+`isActiveTodo` in `SidebarView.ts`).
+
+### No New Runtime Dependencies
+
+Git facts use `child_process.execFile` (matching `DriveProvider.ts`'s existing `rclone` pattern) instead of shelling out to an external tool like `p` — `git` itself is the only assumption. File watching uses native `fs.watch` rather than adding `chokidar`. Frontmatter is hand-parsed/generated the same way `warped-hugo/src/utils.ts` already does it, no YAML library added. Consistent with how the rest of this repo avoids dependencies where a small amount of native code covers the need.
+
+### Delimited Sync Regions
+
+`ProjectSyncManager` regenerates only a marked block in each project note, plus a defined set of frontmatter keys, rather than the whole file. A full-file regenerate is simpler but would silently discard anything written outside the synced items — including the `## Overview` section `ProjectManager`'s template already creates. Considered and rejected for that reason.
 
 ## Extension Points
 

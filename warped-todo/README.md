@@ -35,7 +35,7 @@ That's it. Everything below is optional.
 |---------------------------|------------------------------------------------------|
 | `#focus`                  | The one thing to do next (highlighted, always first) |
 | `#p0` – `#p4`             | Priority levels (`#p0` is highest)                   |
-| `#future` / `#snooze`     | Snoozed — hidden from active list, lives in Snoozed tab |
+| `#future` / `#snooze`     | Snoozed — an ordinary tag; still shows in the active list and tag cloud, just excluded from Focus Mode's queue |
 
 Items sort by: focus → priority → tag count (more tags = more context = higher).
 
@@ -48,7 +48,7 @@ Items sort by: focus → priority → tag count (more tags = more context = high
 
 Click a tag in the cloud to filter the list. Click again to clear. The cloud only shows tags with at least one active TODO — empty tags are hidden so you can always click and see results. Pinned `#focus` and `#p0` lead the cloud when they're in use.
 
-The Ideas and Snoozed tabs have their own tag clouds built from items in those tabs (no `#focus` / `#p0` pinning — those are TODO concepts). The active filter persists across tabs, so clicking `#api` on TODOs and switching to Snoozed shows you what's queued vs. parked under the same label.
+The Ideas tab has its own tag cloud built from items in that tab (no `#focus` / `#p0` pinning — those are TODO concepts). The active filter persists across tabs, so clicking `#api` on TODOs and switching to Ideas keeps you on the same label.
 
 Right-click any TODO row for quick actions: Focus, Later, Snooze, Copy, Move to.
 
@@ -60,21 +60,22 @@ Click the eye icon next to the TODOs tab to enter immersive Focus Mode. The side
 - **Skip** rotates the current item to the back of the queue
 - **Exit focus mode →** link at the bottom returns to the normal sidebar
 
-The header stays visible when focus mode is on. The eye icon turns amber to signal the active state; clicking it again exits focus mode without moving the mouse. The other tab buttons are faded and inert while focus is active.
+The header stays visible when focus mode is on, and the title reads "Focus." The eye icon turns amber to signal the active state; clicking it again exits focus mode without moving the mouse. The other tab buttons stay clickable — clicking one exits focus and switches straight to that tab, same as switching between any two tabs normally.
 
 The queue is built from `#focus`-tagged TODOs first; if none exist, it falls back to your top-priority items. When the queue empties, you can choose **Continue with next priority task** to keep going.
 
 Mode state persists across sessions by default; configure via the `focusQueueLimit` (1–5, default 1) and `focusModePersist` settings.
 
-## Three tabs
+## Two tabs
 
-The sidebar has three tabs:
+The sidebar has two tabs:
 
 | Tab     | Shows                                                                                  |
 |---------|----------------------------------------------------------------------------------------|
-| TODOs   | Active (non-snoozed) `#todo` items, grouped by header where applicable. Default tab.   |
+| TODOs   | Active `#todo` items, grouped by header where applicable. Default tab.                |
 | Ideas   | Active `#idea` / `#ideas` / `#ideation` items                                          |
-| Snoozed | `#future` / `#snooze` / `#snoozed` TODOs and Ideas — review and unsnooze when ready    |
+
+Snoozed items (`#future` / `#snooze` / `#snoozed`) show up in both tabs like any other tag — right-click a row to Snooze/Unsnooze it. The only place snoozed items are excluded is Focus Mode's queue.
 
 Below the lists, the **Summary** section shows priority breakdown, completion velocity (today / week / month), top backlogs, and a link to your TODONE log file.
 
@@ -123,7 +124,7 @@ Tag a heading with `#todo` (or `#todos`) and the list items underneath become ch
 - Bold lines like `**Diagnostics (P0)**` carry through as in-block subheadings, so you can label sections without breaking the parent relationship.
 - The header itself has no checkbox — completing a block used to cascade to all children, and it was too easy to do by accident.
 
-**Completion is per-child.** Tick children as you finish them. When the last live child is done (or snoozed), the whole header block disappears from the active list automatically. No "mark the header done" step.
+**Completion is per-child.** Tick children as you finish them. When the last live child is done, the whole header block disappears from the active list automatically. No "mark the header done" step.
 
 **Filtering keeps headers visible.** Click a tag like `#api` in the cloud and the header stays in view even if only its children carry the tag — you see the matching work in its original context, not stripped of its parent.
 
@@ -204,6 +205,8 @@ Date keywords take priority over user handles. Unknown handles are auto-added to
 | Move TODO to another file      | —                    | Open the file picker; relocates the line at cursor      |
 | Copy as Slack Markdown         | `Cmd/Ctrl+Shift+C`   | Converts selected text to Slack's mrkdwn (headings → bold, adjusted emphasis) |
 | Copy as Notion Markdown        | `Cmd/Ctrl+Shift+N`   | Strips Obsidian-specific syntax (wiki links, embeds, plugin tags) for clean Notion paste |
+| Toggle Projects sidebar        | —                    | Show or hide the Projects sidebar                       |
+| Sync Projects                  | —                    | Re-scan every repo under the configured base folder and update their notes |
 
 The ribbon icon toggles the sidebar; right-click in the sidebar's header gear menu for **Stats**, **Refresh**, and other utilities.
 
@@ -212,6 +215,49 @@ The ribbon icon toggles the sidebar; right-click in the sidebar's header gear me
 - **Stats** — chart icon (or right-click menu) opens a modal showing counts of active TODOs, focused items, snoozed items, ideas, and principles.
 - **Clickable links** — wiki links (`[[page]]`) and external links in TODOs, ideas, and principles are clickable in the sidebar. Disable in Settings → "Make links clickable in lists."
 - **Tab lock** — enable in Settings → "Show tab lock buttons." Click the padlock icon on any tab header; locked tabs force links to open in new tabs instead of replacing the current view.
+
+## Projects
+
+A second sidebar, separate from the TODOs one, for tracking work across a
+folder of git repos rather than vault notes.
+
+Point it at a folder in Settings → Projects → "Projects base folder" (e.g.
+`/Users/you/projects`). It finds every git repo underneath (skipping
+`node_modules`, `dist`, `build`, `archive`, and anything else you add to
+"Projects exclude directories"), and for each one:
+
+- Creates or updates a vault note with the repo's branch, git status,
+  remote, and last-synced time in the frontmatter.
+- Pulls in `#todo`/`#idea`/`#bug` items from the repo's `BUGS.md`,
+  `TODO.md`, `TODOS.md`, `IDEAS.md`, or `ISSUES.md` — tagged explicitly or
+  not (an untagged line in `BUGS.md` is assumed to be a bug, in `TODO.md` a
+  todo, and so on).
+
+Click a project in the list to open its note and see a detail view: repo
+facts pinned at the top, and every tracked item grouped by type. Completing
+an item there writes back to the actual file in the repo, not just the
+vault note — the same familiar focus/snooze/priority actions from the
+TODOs sidebar work here too (no "move," since moving a synced item
+elsewhere would just have it reappear in its original note on the next
+sync).
+
+Prose-style bug write-ups (a `### Title` under a `## Open`/`## Fixed`
+heading, rather than a flat checklist) complete the same way: the whole
+write-up moves to the first section that reads as "done" (creating one if
+the file doesn't have one yet), and moves back just as easily if you
+uncheck it. This refuses if the file has changes it hasn't committed yet —
+commit or stash first — so a mistake is always one `git checkout` away
+from undone.
+
+Structured files stay in sync automatically (a background watcher picks up
+changes on disk), or trigger a sync manually with the sidebar's **Sync**
+button or the "Sync Projects" command. Requires the plugin's desktop build
+(`git` and filesystem access aren't available on mobile).
+
+Frontmatter is hidden in the note's editor view for these project notes —
+the sidebar already shows the fields that matter, so the raw YAML would
+just be noise. Note content you write by hand (an `## Overview` section,
+your own notes) is never touched by syncing.
 
 ## Installation
 

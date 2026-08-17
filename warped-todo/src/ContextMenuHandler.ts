@@ -25,7 +25,14 @@ export class ContextMenuHandler {
   /**
    * Show context menu for an active TODO item
    */
-  showTodoMenu(evt: MouseEvent, todo: TodoItem, onRefresh: () => void): void {
+  /**
+   * `includeMove` defaults to true for the existing TODOs sidebar. The Projects
+   * sidebar passes false: moving a project-note item elsewhere conflicts with it
+   * reappearing in its original note on the next sync (see DESIGN.md's Projects
+   * Extension detail-view notes; the plugin-wide move feature is separately
+   * tracked for removal in PLAN.md, unrelated to Projects).
+   */
+  showTodoMenu(evt: MouseEvent, todo: TodoItem, onRefresh: () => void, includeMove: boolean = true): void {
     const menu = new Menu();
 
     const currentPriority = this.getCurrentPriority(todo);
@@ -44,22 +51,24 @@ export class ContextMenuHandler {
     });
 
     // Move to... - move TODO to another file
-    menu.addItem((item) => {
-      item
-        .setTitle("Move to...")
-        .setIcon("arrow-right")
-        .onClick(() => {
-          new MoveTargetModal(
-            this.app,
-            this.getMoveHistory(),
-            todo.filePath,
-            async (file: TFile) => {
-              const success = await this.processor.moveTodo(todo, file.path);
-              if (success) onRefresh();
-            }
-          ).open();
-        });
-    });
+    if (includeMove) {
+      menu.addItem((item) => {
+        item
+          .setTitle("Move to...")
+          .setIcon("arrow-right")
+          .onClick(() => {
+            new MoveTargetModal(
+              this.app,
+              this.getMoveHistory(),
+              todo.filePath,
+              async (file: TFile) => {
+                const success = await this.processor.moveTodo(todo, file.path);
+                if (success) onRefresh();
+              }
+            ).open();
+          });
+      });
+    }
 
     // Focus - Toggle: if has #focus, remove it; otherwise add #focus + increase priority
     menu.addItem((item) => {

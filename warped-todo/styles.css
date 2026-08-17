@@ -1031,13 +1031,6 @@
   opacity: 1 !important;
 }
 
-/* Other tab buttons while focus is active — faded and inert */
-.sidebar-tab-btn.focus-mode-disabled {
-  opacity: 0.2;
-  pointer-events: none;
-  cursor: default;
-}
-
 /* When inside the tab nav, neutralize Obsidian's default <button> chrome the
    same way .sidebar-tab-btn does, so it sits flush with the tabs. */
 .sidebar-tab-nav .focus-mode-toggle-btn {
@@ -2057,3 +2050,141 @@
   font-size: 0.8em;
   color: var(--text-muted);
 }
+
+/* ===== Projects sidebar (Phase 5) ===== */
+
+/* Hides the Properties/frontmatter panel for repo-matched project notes —
+   the sidebar already surfaces branch/status/remote/last-synced, so the raw
+   YAML is just noise in the editor. Applied via the `cssclasses` frontmatter
+   key ProjectSyncManager sets (see DESIGN.md's Projects Extension).
+   Live Preview/editing and Reading view use different mechanisms: Live
+   Preview's Properties widget lives inside .cm-editor and responds to plain
+   display:none; Reading view's responds to a CSS custom property instead —
+   found via live testing that the first rule alone didn't cover both. */
+.warped-todo-project-note .metadata-container {
+  display: none;
+}
+.warped-todo-project-note {
+  --metadata-display-reading: none;
+}
+
+/* Header itself (logo, title, back/kebab buttons) reuses .sidebar-header,
+   .sidebar-title, .sidebar-tab-nav, .clickable-icon — the exact classes the
+   TODOs sidebar already defines — rather than parallel warped-todo-projects-*
+   rules, so this view's header matches by construction. See
+   ProjectsSidebarView.ts's renderHeader(). */
+
+.warped-todo-projects-filter {
+  width: calc(100% - var(--size-4-4));
+  margin: 0 var(--size-4-2) var(--size-4-2);
+}
+
+.warped-todo-projects-empty,
+.warped-todo-projects-empty-msg {
+  color: var(--text-muted);
+  padding: var(--size-4-4) var(--size-4-2);
+  text-align: center;
+}
+
+.warped-todo-projects-empty button {
+  margin-top: var(--size-4-2);
+}
+
+.warped-todo-project-row {
+  padding: var(--size-4-2);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+/* Only the list view's rows navigate on click — the same block reused as
+   the detail view's framing header (renderProjectSummary) isn't a link to
+   itself, so it shouldn't look like one. */
+.warped-todo-project-row.is-clickable {
+  cursor: pointer;
+}
+
+.warped-todo-project-row.is-clickable:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.warped-todo-project-row-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--size-4-2);
+}
+
+.warped-todo-project-name {
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.warped-todo-project-branch {
+  color: var(--text-muted);
+  font-size: 0.85em;
+}
+
+.warped-todo-project-status {
+  color: var(--text-accent);
+  font-size: 0.85em;
+  font-family: var(--font-monospace);
+}
+
+.warped-todo-project-row-counts {
+  color: var(--text-muted);
+  font-size: 0.85em;
+  margin-top: var(--size-2-1);
+}
+
+.warped-todo-project-info {
+  border-bottom: 1px solid var(--background-modifier-border);
+  margin-bottom: var(--size-4-2);
+}
+
+/* Horizontal padding lives here (and on .warped-todo-project-row above it),
+   not on .warped-todo-project-info itself — the summary row supplies its
+   own, and doubling up on the container would widen the left/right margins
+   past what the row uses. */
+.warped-todo-project-info-actions {
+  display: flex;
+  gap: var(--size-4-3);
+  padding: 0 var(--size-4-2) var(--size-4-2);
+  margin-top: var(--size-2-2);
+  font-size: 0.85em;
+}
+
+/* Replaces the earlier raw-emoji, unstyled <a> links — those fell back to
+   the vault theme's default external-link styling (bold small-caps, in the
+   screenshot that was reviewed) since they carried no class of their own. */
+.warped-todo-project-info-action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--size-2-1);
+  color: var(--text-muted);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.warped-todo-project-info-action:hover {
+  color: var(--text-accent);
+}
+
+.warped-todo-project-info-action svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Card grouping, matching the TODOs sidebar's same-source background block
+   (e.g. "August grind" + "Obsidian plugins mini plan" sharing one card since
+   both come from the same file). */
+.warped-todo-project-item-group {
+  padding: var(--size-4-2);
+  margin-bottom: var(--size-4-2);
+  background-color: var(--background-secondary);
+  border-radius: var(--radius-m);
+}
+
+/* Group heading and item rows reuse the TODOs sidebar's own classes
+   (.todo-orphan-section*, .todo-item, .todo-checkbox*, .todo-text) — see
+   ProjectsSidebarView.ts's renderGroupHeading/renderSyncedItemRow/
+   renderHandTypedItemRow. No separate rules needed here for those; this
+   file only adds the .warped-todo-project-item-row hook in case something
+   Projects-specific needs to target it later — no rule needed until then. */

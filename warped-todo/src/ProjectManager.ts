@@ -2,6 +2,17 @@ import { App, Modal, TFile } from "obsidian";
 import { TodoScanner } from "./TodoScanner";
 import { ProjectInfo, TodoItem } from "./types";
 import { getPriorityValue, hasTag } from "./utils";
+import { ScannedProject } from "./ProjectScanner";
+
+/**
+ * Shared by ProjectManager (interactive, tag-click flow) and ProjectSyncManager
+ * (automatic, repo-sync flow) — both resolve a project tag to the same vault note
+ * path, so the join logic lives in one place rather than being duplicated.
+ */
+export function projectFilePath(projectsFolder: string, tag: string): string {
+  const filename = tag.replace(/^#/, "") + ".md";
+  return projectsFolder + filename;
+}
 
 export class ProjectManager {
   private app: App;
@@ -24,7 +35,16 @@ export class ProjectManager {
     this.excludeFolders = excludeFolders;
   }
 
-  getProjects(): ProjectInfo[] {
+  /**
+   * `scannedProjects` merges in repo-derived facts (branch, status, remote,
+   * local path) for any tag that matches a detected git repo's folder name —
+   * a repo with zero tracked items still gets an entry, and a tag-only project
+   * (no matching repo) is unaffected. Synchronous: callers are expected to pass
+   * the most recent `ProjectScanner`/`ProjectSyncManager.syncAll()` result
+   * rather than triggering a fresh scan here (scanning shells out to `git` per
+   * repo — not something render-path code should trigger on its own).
+   */
+  getProjects(scannedProjects: ScannedProject[] = []): ProjectInfo[] {
     const todos = this.scanner.getTodos();
     // Track projects with priority sum for weighted average calculation
     const projectMap = new Map<string, ProjectInfo & { prioritySum: number }>();
@@ -108,7 +128,7 @@ export class ProjectManager {
       });
     }
 
-    return projects;
+    return mergeScannedProjects(projects, scannedProjects);
   }
 
   getFocusProjects(limit?: number): ProjectInfo[] {
@@ -137,8 +157,7 @@ export class ProjectManager {
   }
 
   getProjectFilePath(tag: string): string {
-    const filename = tag.replace(/^#/, "") + ".md";
-    return this.projectsFolder + filename;
+    return projectFilePath(this.projectsFolder, tag);
   }
 
   async getProjectFileInfo(tag: string): Promise<{ description: string; principles: string[]; filepath: string } | null> {
@@ -382,4 +401,48 @@ export class ProjectManager {
     const leaf = this.app.workspace.getLeaf(false);
     await leaf.openFile(file);
   }
+}
+
+/**
+ * Merges repo-derived facts into tag-derived ProjectInfo by name (tag minus
+ * `#` === repo folder name). A scanned repo with no matching tag-derived entry
+ * (no tracked items yet, or none hand-tagged) still gets its own entry — the
+ * Projects sidebar should show every detected repo, not just ones with existing
+ * vault activity.
+ */
+function mergeScannedProjects(projects: ProjectInfo[], scannedProjects: ScannedProject[]): ProjectInfo[] {
+  if (scannedProjects.length === 0) return projects;
+
+  const scannedByName = new Map(scannedProjects.map((p) => [p.name, p]));
+  const merged = new Map<string, ProjectInfo>();
+
+  for (const project of projects) {
+    const name = project.tag.replace(/^#/, "");
+    const scanned = scannedByName.get(name);
+    merged.set(name, scanned ? { ...project, ...repoFields(scanned) } : project);
+  }
+
+  for (const [name, scanned] of scannedByName) {
+    if (merged.has(name)) continue;
+    merged.set(name, {
+      tag: `#${name}`,
+      count: 0,
+      lastActivity: 0,
+      highestPriority: 8, // unmarked-item value, matches getPriorityValue's default
+      hasFocusItems: false,
+      colourIndex: 4,
+      ...repoFields(scanned),
+    });
+  }
+
+  return [...merged.values()];
+}
+
+function repoFields(scanned: ScannedProject): Pick<ProjectInfo, "localPath" | "remote" | "branch" | "gitStatus"> {
+  return {
+    localPath: scanned.localPath,
+    remote: scanned.remote,
+    branch: scanned.branch,
+    gitStatus: scanned.gitStatus,
+  };
 }

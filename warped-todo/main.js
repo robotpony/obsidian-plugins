@@ -27,13 +27,14 @@ __export(main_exports, {
   default: () => WarpedTodoPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian12 = require("obsidian");
+var import_obsidian14 = require("obsidian");
 
 // src/TodoScanner.ts
 var import_obsidian3 = require("obsidian");
 
 // src/utils.ts
 var import_obsidian2 = require("obsidian");
+var import_promises = require("fs/promises");
 
 // ../shared/ui/Notice.ts
 var import_obsidian = require("obsidian");
@@ -379,8 +380,8 @@ function extractMentions(text) {
   }
   return mentions;
 }
-function filenameToTag(basename) {
-  return "#" + basename.toLowerCase().replace(/\s+/g, "-").replace(/[^\w-]/g, "").replace(/-+/g, "-").replace(/^-|-$/g, "");
+function filenameToTag(basename3) {
+  return "#" + basename3.toLowerCase().replace(/\s+/g, "-").replace(/[^\w-]/g, "").replace(/-+/g, "-").replace(/^-|-$/g, "");
 }
 function hasCheckboxFormat(text) {
   return /^-\s*\[[ x]\]/i.test(text.trim());
@@ -403,8 +404,8 @@ function replaceTodoWithMoved(text, date) {
   }
   return text.replace(/#todo\b/, `#moved @${date}`);
 }
-function extractDateFromFilename(basename) {
-  const match = basename.match(/(\d{4}-\d{2}-\d{2})/);
+function extractDateFromFilename(basename3) {
+  const match = basename3.match(/(\d{4}-\d{2}-\d{2})/);
   return match ? match[1] : null;
 }
 function replaceTodoneWithTodo(text) {
@@ -536,6 +537,24 @@ async function modifyFileLine(vault, file, lineNumber, transform, validate, fing
   }
   lines[resolved] = transform(currentLine);
   await vault.modify(file, lines.join("\n"));
+}
+async function modifyExternalFileLine(filePath, lineNumber, transform, validate, fingerprint) {
+  const content = await (0, import_promises.readFile)(filePath, "utf-8");
+  const lines = content.split("\n");
+  const resolved = fingerprint ? resolveLineNumber(lines, lineNumber, fingerprint) : lineNumber;
+  if (resolved < 0 || resolved >= lines.length) {
+    throw new Error(
+      `Cannot locate line ${lineNumber} in ${filePath}` + (fingerprint ? ` (fingerprint: "${fingerprint}")` : "")
+    );
+  }
+  const currentLine = lines[resolved];
+  if (validate) {
+    const error = validate(currentLine);
+    if (error)
+      throw new Error(error);
+  }
+  lines[resolved] = transform(currentLine);
+  await (0, import_promises.writeFile)(filePath, lines.join("\n"), "utf-8");
 }
 function openFileAtLine(app, file, line, blockEndLine) {
   let leaf = null;
@@ -1109,8 +1128,10 @@ var TodoProcessor = class {
     try {
       const today = formatDate(/* @__PURE__ */ new Date(), this.dateFormat);
       await this.updateSourceFile(todo, today);
-      await this.appendToTodoneFile(todo, todoneFilePath, today);
-      if (this.scanner) {
+      if (!todo.sourceFile) {
+        await this.appendToTodoneFile(todo, todoneFilePath, today);
+      }
+      if (this.scanner && !todo.sourceFile) {
         await this.scanner.scanFile(todo.file);
       }
       if (this.onComplete) {
@@ -1127,7 +1148,7 @@ var TodoProcessor = class {
   async uncompleteTodo(todo) {
     try {
       await this.revertSourceFile(todo);
-      if (this.scanner) {
+      if (this.scanner && !todo.sourceFile) {
         await this.scanner.scanFile(todo.file);
       }
       if (this.onComplete) {
@@ -1193,9 +1214,9 @@ var TodoProcessor = class {
       if (this.onComplete) {
         this.onComplete();
       }
-      const basename = ((_a = destinationPath.split("/").pop()) == null ? void 0 : _a.replace(/\.md$/, "")) || destinationPath;
+      const basename3 = ((_a = destinationPath.split("/").pop()) == null ? void 0 : _a.replace(/\.md$/, "")) || destinationPath;
       const childCount = todo.isHeader && ((_b = todo.childLineNumbers) == null ? void 0 : _b.length) || 0;
-      const message = childCount > 0 ? `Moved to ${basename} (including ${childCount} child item${childCount > 1 ? "s" : ""})` : `Moved to ${basename}`;
+      const message = childCount > 0 ? `Moved to ${basename3} (including ${childCount} child item${childCount > 1 ? "s" : ""})` : `Moved to ${basename3}`;
       showNotice2(message);
       return true;
     } catch (error) {
@@ -1227,53 +1248,51 @@ ${text}` : text;
     await this.app.vault.modify(file, newContent);
   }
   async revertSourceFile(todo) {
-    await modifyFileLine(
-      this.app.vault,
-      todo.file,
-      todo.lineNumber,
-      (line) => {
-        let updated = replaceTodoneWithTodo(line);
-        if (todo.hasCheckbox)
-          updated = markCheckboxIncomplete(updated);
-        return updated;
-      },
-      (line) => {
-        if (!line.includes("#todone")) {
-          return `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todone tag. File may have been modified.`;
-        }
-        return null;
-      },
-      todo.fingerprint
-    );
+    const transform = (line) => {
+      let updated = replaceTodoneWithTodo(line);
+      if (todo.hasCheckbox)
+        updated = markCheckboxIncomplete(updated);
+      return updated;
+    };
+    const validate = (line) => {
+      if (!line.includes("#todone")) {
+        return `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todone tag. File may have been modified.`;
+      }
+      return null;
+    };
+    if (todo.sourceFile) {
+      await modifyExternalFileLine(todo.sourceFile, todo.lineNumber, transform, validate, todo.fingerprint);
+      return;
+    }
+    await modifyFileLine(this.app.vault, todo.file, todo.lineNumber, transform, validate, todo.fingerprint);
   }
   async updateSourceFile(todo, date) {
     const isChildItem = todo.parentLineNumber !== void 0;
-    await modifyFileLine(
-      this.app.vault,
-      todo.file,
-      todo.lineNumber,
-      (line) => {
-        let updated;
-        if (line.includes("#todo")) {
-          updated = replaceTodoWithTodone(line, date);
-        } else {
-          updated = line.trimEnd() + ` #todone @${date}`;
-        }
-        if (todo.hasCheckbox)
-          updated = markCheckboxComplete(updated);
-        return updated;
-      },
-      (line) => {
-        if (line.includes("#todone")) {
-          return `Line ${todo.lineNumber} in ${todo.filePath} already contains #todone tag. File may have been modified.`;
-        }
-        if (!line.includes("#todo") && !isChildItem) {
-          return `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todo tag. File may have been modified.`;
-        }
-        return null;
-      },
-      todo.fingerprint
-    );
+    const transform = (line) => {
+      let updated;
+      if (line.includes("#todo")) {
+        updated = replaceTodoWithTodone(line, date);
+      } else {
+        updated = line.trimEnd() + ` #todone @${date}`;
+      }
+      if (todo.hasCheckbox)
+        updated = markCheckboxComplete(updated);
+      return updated;
+    };
+    const validate = (line) => {
+      if (line.includes("#todone")) {
+        return `Line ${todo.lineNumber} in ${todo.filePath} already contains #todone tag. File may have been modified.`;
+      }
+      if (!line.includes("#todo") && !isChildItem) {
+        return `Line ${todo.lineNumber} in ${todo.filePath} no longer contains #todo tag. File may have been modified.`;
+      }
+      return null;
+    };
+    if (todo.sourceFile) {
+      await modifyExternalFileLine(todo.sourceFile, todo.lineNumber, transform, validate, todo.fingerprint);
+      return;
+    }
+    await modifyFileLine(this.app.vault, todo.file, todo.lineNumber, transform, validate, todo.fingerprint);
   }
   async appendToTodoneFile(todo, todoneFilePath, date) {
     let todoneFile = this.app.vault.getAbstractFileByPath(todoneFilePath);
@@ -1779,6 +1798,10 @@ ${todoneText}` : todoneText;
 
 // src/ProjectManager.ts
 var import_obsidian5 = require("obsidian");
+function projectFilePath(projectsFolder, tag) {
+  const filename = tag.replace(/^#/, "") + ".md";
+  return projectsFolder + filename;
+}
 var ProjectManager = class {
   constructor(app, scanner, projectsFolder, priorityTags, excludeFolders = []) {
     this.app = app;
@@ -1787,7 +1810,16 @@ var ProjectManager = class {
     this.priorityTags = priorityTags;
     this.excludeFolders = excludeFolders;
   }
-  getProjects() {
+  /**
+   * `scannedProjects` merges in repo-derived facts (branch, status, remote,
+   * local path) for any tag that matches a detected git repo's folder name —
+   * a repo with zero tracked items still gets an entry, and a tag-only project
+   * (no matching repo) is unaffected. Synchronous: callers are expected to pass
+   * the most recent `ProjectScanner`/`ProjectSyncManager.syncAll()` result
+   * rather than triggering a fresh scan here (scanning shells out to `git` per
+   * repo — not something render-path code should trigger on its own).
+   */
+  getProjects(scannedProjects = []) {
     const todos = this.scanner.getTodos();
     const projectMap = /* @__PURE__ */ new Map();
     for (const todo of todos) {
@@ -1864,7 +1896,7 @@ var ProjectManager = class {
         colourIndex
       });
     }
-    return projects;
+    return mergeScannedProjects(projects, scannedProjects);
   }
   getFocusProjects(limit) {
     const projects = this.getProjects();
@@ -1884,8 +1916,7 @@ var ProjectManager = class {
     return projects;
   }
   getProjectFilePath(tag) {
-    const filename = tag.replace(/^#/, "") + ".md";
-    return this.projectsFolder + filename;
+    return projectFilePath(this.projectsFolder, tag);
   }
   async getProjectFileInfo(tag) {
     var _a, _b;
@@ -2074,9 +2105,1813 @@ ${tag}
     await leaf.openFile(file);
   }
 };
+function mergeScannedProjects(projects, scannedProjects) {
+  if (scannedProjects.length === 0)
+    return projects;
+  const scannedByName = new Map(scannedProjects.map((p) => [p.name, p]));
+  const merged = /* @__PURE__ */ new Map();
+  for (const project of projects) {
+    const name = project.tag.replace(/^#/, "");
+    const scanned = scannedByName.get(name);
+    merged.set(name, scanned ? { ...project, ...repoFields(scanned) } : project);
+  }
+  for (const [name, scanned] of scannedByName) {
+    if (merged.has(name))
+      continue;
+    merged.set(name, {
+      tag: `#${name}`,
+      count: 0,
+      lastActivity: 0,
+      highestPriority: 8,
+      // unmarked-item value, matches getPriorityValue's default
+      hasFocusItems: false,
+      colourIndex: 4,
+      ...repoFields(scanned)
+    });
+  }
+  return [...merged.values()];
+}
+function repoFields(scanned) {
+  return {
+    localPath: scanned.localPath,
+    remote: scanned.remote,
+    branch: scanned.branch,
+    gitStatus: scanned.gitStatus
+  };
+}
+
+// src/ProjectScanner.ts
+var import_child_process = require("child_process");
+var import_fs = require("fs");
+var import_promises2 = require("fs/promises");
+var import_path = require("path");
+var MAX_BUFFER = 10 * 1024 * 1024;
+var TAG = "[Warped Todo]";
+var GIT_SEARCH_PATHS = [
+  "/usr/bin/git",
+  // macOS Xcode Command Line Tools
+  "/opt/homebrew/bin/git",
+  // macOS ARM Homebrew
+  "/usr/local/bin/git",
+  // macOS Intel Homebrew / manual install
+  "git"
+  // fallback: bare name (works if PATH is set)
+];
+var DEFAULT_EXCLUDE_DIRS = ["node_modules", "dist", "build", "archive"];
+var DEFAULT_MAX_DEPTH = 3;
+var ProjectScanner = class {
+  constructor() {
+    this.gitPath = null;
+  }
+  async scan(options) {
+    var _a, _b;
+    if (!options.baseFolder)
+      return [];
+    if (!await this.resolveGitPath()) {
+      console.error(TAG, "git binary not found in any search path:", GIT_SEARCH_PATHS.join(", "));
+      return [];
+    }
+    const maxDepth = (_a = options.maxDepth) != null ? _a : DEFAULT_MAX_DEPTH;
+    const excludeDirs = new Set((_b = options.excludeDirs) != null ? _b : DEFAULT_EXCLUDE_DIRS);
+    const repoPaths = [];
+    await this.walk(options.baseFolder, 0, maxDepth, excludeDirs, repoPaths);
+    const projects = [];
+    for (const repoPath of repoPaths) {
+      try {
+        projects.push(await this.readProject(repoPath));
+      } catch (error) {
+        console.error(TAG, `Failed to read git facts for ${repoPath}:`, error);
+      }
+    }
+    return projects;
+  }
+  /**
+   * Walks `dir` for git repos. A directory-`.git` entry marks a full repo and stops
+   * recursion there — a repo's own working tree isn't scanned for further nested
+   * projects, so an incidental clone vendored inside one repo doesn't surface as a
+   * top-level project of its own. A `.git` *file* marks a submodule or worktree
+   * checkout — not a project on its own, but the walk still recurses past it to
+   * find real repos nested deeper (see OUTLINE.md's submodule-skip decision).
+   */
+  async walk(dir, depth, maxDepth, excludeDirs, found) {
+    if (depth > maxDepth)
+      return;
+    let entries;
+    try {
+      entries = await (0, import_promises2.readdir)(dir, { withFileTypes: true });
+    } catch (e) {
+      return;
+    }
+    const gitEntry = entries.find((e) => e.name === ".git");
+    if (gitEntry) {
+      if (gitEntry.isDirectory()) {
+        found.push(dir);
+        return;
+      }
+    }
+    for (const entry of entries) {
+      if (!entry.isDirectory())
+        continue;
+      if (entry.name === ".git" || excludeDirs.has(entry.name))
+        continue;
+      await this.walk((0, import_path.join)(dir, entry.name), depth + 1, maxDepth, excludeDirs, found);
+    }
+  }
+  async readProject(repoPath) {
+    const [branch, statusLines, remote] = await Promise.all([
+      this.run(["branch", "--show-current"], repoPath).then((out) => out.trim()),
+      this.run(["status", "--porcelain"], repoPath).then(
+        (out) => out.split("\n").filter((line) => line.length > 0)
+      ),
+      this.run(["remote", "get-url", "origin"], repoPath).then((out) => out.trim()).catch(() => "")
+      // no remote configured — not an error
+    ]);
+    const hasModified = statusLines.some((line) => !line.startsWith("??"));
+    const hasUntracked = statusLines.some((line) => line.startsWith("??"));
+    const gitStatus = `${hasModified ? "M" : ""}${hasUntracked ? "?" : ""}`;
+    return {
+      name: (0, import_path.basename)(repoPath),
+      localPath: repoPath,
+      branch,
+      gitStatus,
+      remote
+    };
+  }
+  /**
+   * True if `filePath` (absolute, inside the repo at `repoPath`) has no
+   * uncommitted changes. Phase 6's safety net for the header-block move —
+   * a bad move is always recoverable via `git checkout -- <file>` as long as
+   * this was true beforehand. Returns false (refuse) if git can't be
+   * resolved at all, rather than assuming clean.
+   */
+  async isFileClean(repoPath, filePath) {
+    if (!await this.resolveGitPath())
+      return false;
+    try {
+      const output = await this.run(["status", "--porcelain", "--", filePath], repoPath);
+      return output.trim().length === 0;
+    } catch (e) {
+      return false;
+    }
+  }
+  async resolveGitPath() {
+    if (this.gitPath)
+      return true;
+    for (const candidate of GIT_SEARCH_PATHS) {
+      if (candidate.includes("/") && !(0, import_fs.existsSync)(candidate))
+        continue;
+      try {
+        await this.tryBinary(candidate);
+        this.gitPath = candidate;
+        return true;
+      } catch (e) {
+      }
+    }
+    return false;
+  }
+  tryBinary(bin) {
+    return new Promise((resolve, reject) => {
+      (0, import_child_process.execFile)(bin, ["--version"], { maxBuffer: MAX_BUFFER }, (err) => {
+        if (err)
+          return reject(err);
+        resolve();
+      });
+    });
+  }
+  run(args, cwd) {
+    if (!this.gitPath) {
+      return Promise.reject(new Error("git path not resolved \u2014 call scan() first."));
+    }
+    return new Promise((resolve, reject) => {
+      (0, import_child_process.execFile)(this.gitPath, args, { cwd, maxBuffer: MAX_BUFFER }, (err, stdout, stderr) => {
+        if (err) {
+          const detail = (stderr == null ? void 0 : stderr.trim()) || err.message;
+          reject(new Error(`git ${args[0]} failed in ${cwd}: ${detail}`));
+          return;
+        }
+        resolve(stdout);
+      });
+    });
+  }
+};
+
+// src/ProjectSyncManager.ts
+var import_obsidian6 = require("obsidian");
+var import_fs2 = require("fs");
+var import_promises3 = require("fs/promises");
+var import_path2 = require("path");
+
+// src/StructuredFileParser.ts
+var FILENAME_DEFAULT_TYPE = {
+  "BUGS.md": "bug",
+  "ISSUES.md": "bug",
+  "TODO.md": "todo",
+  "TODOS.md": "todo",
+  "IDEAS.md": "idea"
+};
+var CLOSED_SECTION_WORDS = ["fixed", "resolved", "completed", "done", "closed"];
+var OPEN_SECTION_WORDS = ["open", "todo", "active", "future", "enhancement"];
+function parseStructuredFile(filename, content, sourceFile) {
+  const defaultType = FILENAME_DEFAULT_TYPE[filename];
+  if (!defaultType)
+    return [];
+  const lines = content.split("\n");
+  return hasHeaderReportShape(lines) ? parseHeaderReport(lines, defaultType, sourceFile) : parseFlatList(lines, defaultType, sourceFile);
+}
+function hasHeaderReportShape(lines) {
+  let inCodeBlock = false;
+  for (const line of lines) {
+    if (/^```/.test(line.trim())) {
+      inCodeBlock = !inCodeBlock;
+      continue;
+    }
+    if (inCodeBlock)
+      continue;
+    if (/^###\s+/.test(line))
+      return true;
+  }
+  return false;
+}
+function parseFlatList(lines, defaultType, sourceFile) {
+  const items = [];
+  let nearestSectionCompleted = null;
+  let inCodeBlock = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (/^```/.test(line.trim())) {
+      inCodeBlock = !inCodeBlock;
+      continue;
+    }
+    if (inCodeBlock)
+      continue;
+    const headingMatch = line.match(/^#{1,6}\s+(.*)$/);
+    if (headingMatch) {
+      nearestSectionCompleted = classifySectionHeading(headingMatch[1]);
+      continue;
+    }
+    const bulletMatch = line.match(/^-\s+(.*)$/);
+    if (!bulletMatch)
+      continue;
+    const rest = bulletMatch[1];
+    const checkboxMatch = rest.match(/^\[([ xX])\]\s*/);
+    const hasCheckbox = !!checkboxMatch;
+    let completed;
+    if (hasCheckbox) {
+      completed = checkboxMatch[1].toLowerCase() === "x";
+    } else if (/^✓\s+/.test(rest)) {
+      completed = true;
+    } else {
+      completed = nearestSectionCompleted != null ? nearestSectionCompleted : false;
+    }
+    items.push(buildItem(line, i, hasCheckbox, completed, defaultType, sourceFile));
+  }
+  return items;
+}
+function parseHeaderReport(lines, defaultType, sourceFile) {
+  const items = [];
+  let inCodeBlock = false;
+  let inStatusSection = false;
+  let sectionCompleted = null;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (/^```/.test(line.trim())) {
+      inCodeBlock = !inCodeBlock;
+      continue;
+    }
+    if (inCodeBlock)
+      continue;
+    const h2Match = line.match(/^##\s+(.*)$/);
+    if (h2Match) {
+      const headingText2 = h2Match[1].trim();
+      const status = isStatusSectionHeading(headingText2);
+      if (status !== null) {
+        inStatusSection = true;
+        sectionCompleted = status;
+        continue;
+      }
+      inStatusSection = false;
+      items.push(buildHeaderItem(lines, i, headingText2, /^##\s+/, defaultType, sourceFile, "headerStandalone"));
+      continue;
+    }
+    const h3Match = line.match(/^###\s+(.*)$/);
+    if (!h3Match || !inStatusSection)
+      continue;
+    const headingText = h3Match[1].trim();
+    items.push({
+      ...buildHeaderItem(lines, i, headingText, /^#{2,3}\s+/, defaultType, sourceFile, "headerNested"),
+      completed: sectionCompleted != null ? sectionCompleted : false
+    });
+  }
+  return items;
+}
+function buildHeaderItem(lines, headingLine, headingText, boundaryPattern, defaultType, sourceFile, shape) {
+  let bodyEnd = headingLine + 1;
+  while (bodyEnd < lines.length && !boundaryPattern.test(lines[bodyEnd])) {
+    bodyEnd++;
+  }
+  const bodyText = stripFencedCode(lines.slice(headingLine, bodyEnd).join("\n"));
+  const explicitType = extractExplicitType(bodyText);
+  return {
+    sourceFile,
+    lineNumber: headingLine,
+    fingerprint: createFingerprint(headingText),
+    text: headingText,
+    hasCheckbox: false,
+    itemType: explicitType != null ? explicitType : defaultType,
+    completed: classifySectionHeading(headingText) === true,
+    // e.g. a heading ending "✅ RESOLVED"
+    tags: extractTags(bodyText),
+    shape
+  };
+}
+function buildItem(line, lineNumber, hasCheckbox, completed, defaultType, sourceFile) {
+  const explicitType = extractExplicitType(line);
+  return {
+    sourceFile,
+    lineNumber,
+    fingerprint: createFingerprint(line),
+    text: line.trim(),
+    hasCheckbox,
+    itemType: explicitType != null ? explicitType : defaultType,
+    completed,
+    tags: extractTags(line),
+    shape: hasCheckbox ? "checkbox" : "plainBullet"
+  };
+}
+function extractExplicitType(text) {
+  for (const tag of extractTags(text)) {
+    const lower = tag.toLowerCase();
+    if (lower === "#todo" || lower === "#todos")
+      return "todo";
+    if (lower === "#idea" || lower === "#ideas")
+      return "idea";
+    if (lower === "#bug" || lower === "#bugs")
+      return "bug";
+  }
+  return null;
+}
+function classifySectionHeading(headingText) {
+  const lower = headingText.toLowerCase();
+  if (CLOSED_SECTION_WORDS.some((w) => lower.includes(w)))
+    return true;
+  if (OPEN_SECTION_WORDS.some((w) => lower.includes(w)))
+    return false;
+  return null;
+}
+var SECTION_VOCAB_PATTERN = new RegExp(
+  [...CLOSED_SECTION_WORDS, ...OPEN_SECTION_WORDS].join("|"),
+  "gi"
+);
+function isStatusSectionHeading(headingText) {
+  const status = classifySectionHeading(headingText);
+  if (status === null)
+    return null;
+  const stripped = headingText.replace(SECTION_VOCAB_PATTERN, "").replace(/[✓✅*:.\s]/g, "");
+  return stripped.length === 0 ? status : null;
+}
+function stripFencedCode(text) {
+  return text.replace(/```[\s\S]*?```/g, "");
+}
+
+// src/ProjectSyncManager.ts
+var TAG2 = "[Warped Todo]";
+var STRUCTURED_FILENAMES = ["BUGS.md", "TODO.md", "TODOS.md", "IDEAS.md", "ISSUES.md"];
+var WATCH_DEBOUNCE_MS = 300;
+var WATCH_COOLDOWN_MS = 1500;
+var PROJECT_NOTE_CSS_CLASS = "warped-todo-project-note";
+var SYNC_KEY_ORDER = ["project", "repo", "remote", "branch", "gitStatus", "lastSynced"];
+var SYNC_KEYS = new Set(SYNC_KEY_ORDER);
+var ProjectSyncManager = class {
+  constructor(app, scanner = new ProjectScanner(), onSynced) {
+    this.app = app;
+    this.scanner = scanner;
+    this.onSynced = onSynced;
+    this.watcher = null;
+    this.debounceTimer = null;
+    // Set at the end of every syncAll() (manual or watch-triggered) — see
+    // WATCH_COOLDOWN_MS above for why watch events are ignored for a bit after.
+    this.lastSyncCompletedAt = 0;
+    // Items from the most recent syncAll() pass, keyed by localPath — this is
+    // the actual data source for the Projects sidebar's synced-item display
+    // (list-view counts and the detail view), not the vault note.
+    this.lastItemsByPath = /* @__PURE__ */ new Map();
+  }
+  /** Discovers projects under `baseFolder`, reads their structured files, and syncs each note's frontmatter. */
+  async syncAll(options) {
+    var _a;
+    const scanned = await this.scanner.scan({
+      baseFolder: options.baseFolder,
+      maxDepth: options.maxDepth,
+      excludeDirs: options.excludeDirs
+    });
+    const projects = dedupeByName(scanned);
+    for (const project of projects) {
+      const items = await readProjectItems(project.localPath);
+      await this.syncProject(project, items, options.projectsFolder);
+    }
+    this.lastSyncCompletedAt = Date.now();
+    (_a = this.onSynced) == null ? void 0 : _a.call(this, projects);
+    return projects;
+  }
+  /** Cached items from the most recent syncAll() (or updateCachedItems) — see the class-level comment on lastItemsByPath. */
+  getCachedItems(localPath) {
+    var _a;
+    return (_a = this.lastItemsByPath.get(localPath)) != null ? _a : [];
+  }
+  /**
+   * Updates the cache without any vault I/O — for a caller (the sidebar's
+   * detail view) that just mutated a synced item's source file and wants the
+   * next render to reflect it immediately, without the cost (and vault write)
+   * of a full syncProject() just to refresh an in-memory cache.
+   */
+  updateCachedItems(localPath, items) {
+    this.lastItemsByPath.set(localPath, items);
+  }
+  /** Syncs one project's note: create it (frontmatter only) if missing, otherwise merge frontmatter. Body is never touched. */
+  async syncProject(scanned, items, projectsFolder) {
+    this.lastItemsByPath.set(scanned.localPath, items);
+    const filePath = projectFilePath(projectsFolder, scanned.name);
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    const existing = this.app.vault.getAbstractFileByPath(filePath);
+    if (!(existing instanceof import_obsidian6.TFile)) {
+      await this.ensureFolderExists(filePath);
+      const frontmatter = serializeFrontmatter(mergeFrontmatter(/* @__PURE__ */ new Map(), scanned, now));
+      const body2 = `
+#${scanned.name}
+
+## Overview
+
+`;
+      await this.app.vault.create(filePath, frontmatter + body2);
+      return;
+    }
+    const content = await this.app.vault.read(existing);
+    const { entries, body } = parseFrontmatter(content);
+    const mergedEntries = mergeFrontmatter(entries, scanned, now);
+    const previousLastSynced = entries.get("lastSynced");
+    if (previousLastSynced !== void 0) {
+      const unchanged = new Map(mergedEntries);
+      unchanged.set("lastSynced", previousLastSynced);
+      if (serializeFrontmatter(unchanged) + body === content)
+        return;
+    }
+    const updated = serializeFrontmatter(mergedEntries) + body;
+    if (updated !== content) {
+      await this.app.vault.modify(existing, updated);
+    }
+  }
+  /**
+   * Watches the base folder recursively for changes (new/removed repos, edited
+   * structured files) and re-syncs on a debounce. Recursive `fs.watch` is only
+   * reliable on macOS/Windows, not Linux — acceptable given the macOS-only scope
+   * decision in OUTLINE.md/IDEAS.md. Events under an excluded directory (same
+   * list `ProjectScanner` skips while walking) are ignored here too — the walk
+   * skipping them doesn't stop the raw watch from seeing activity inside, e.g.
+   * a large `node_modules` tree churning on every `npm install`.
+   */
+  startWatching(options) {
+    var _a;
+    this.stopWatching();
+    if (!options.baseFolder || !(0, import_fs2.existsSync)(options.baseFolder))
+      return;
+    const excludeDirs = new Set((_a = options.excludeDirs) != null ? _a : []);
+    try {
+      this.watcher = (0, import_fs2.watch)(options.baseFolder, { recursive: true }, (_event, filename) => {
+        if (filename && isUnderExcludedDir(filename, excludeDirs))
+          return;
+        this.scheduleSyncAll(options);
+      });
+    } catch (error) {
+      console.error(TAG2, "Failed to watch base folder for Projects sync:", error);
+    }
+  }
+  stopWatching() {
+    if (this.watcher) {
+      this.watcher.close();
+      this.watcher = null;
+    }
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+    }
+  }
+  scheduleSyncAll(options) {
+    if (this.debounceTimer)
+      clearTimeout(this.debounceTimer);
+    this.debounceTimer = setTimeout(() => {
+      if (Date.now() - this.lastSyncCompletedAt < WATCH_COOLDOWN_MS)
+        return;
+      this.syncAll(options).catch(
+        (error) => console.error(TAG2, "Watch-triggered project sync failed:", error)
+      );
+    }, WATCH_DEBOUNCE_MS);
+  }
+  /**
+   * Fresh `ParsedProjectItem[]` for one project's structured files, for callers
+   * (the Projects sidebar's detail view) that need synced items on demand
+   * without waiting for or triggering a full `syncAll()` pass.
+   */
+  async getProjectItems(localPath) {
+    return readProjectItems(localPath);
+  }
+  async ensureFolderExists(filePath) {
+    const folderPath = filePath.substring(0, filePath.lastIndexOf("/"));
+    if (folderPath && !this.app.vault.getAbstractFileByPath(folderPath)) {
+      await this.app.vault.createFolder(folderPath);
+    }
+  }
+};
+function dedupeByName(projects) {
+  var _a;
+  const byName = /* @__PURE__ */ new Map();
+  for (const project of projects) {
+    const group = (_a = byName.get(project.name)) != null ? _a : [];
+    group.push(project);
+    byName.set(project.name, group);
+  }
+  const result = [];
+  for (const [name, group] of byName) {
+    if (group.length === 1) {
+      result.push(group[0]);
+      continue;
+    }
+    const sorted = [...group].sort((a, b) => {
+      const depthDiff = a.localPath.split("/").length - b.localPath.split("/").length;
+      return depthDiff !== 0 ? depthDiff : a.localPath.length - b.localPath.length;
+    });
+    result.push(sorted[0]);
+    console.warn(
+      TAG2,
+      `Multiple repos named "${name}" found \u2014 syncing ${sorted[0].localPath}, skipping: ${sorted.slice(1).map((p) => p.localPath).join(", ")}`
+    );
+  }
+  return result;
+}
+function isUnderExcludedDir(filename, excludeDirs) {
+  return filename.split(/[\\/]/).some((segment) => excludeDirs.has(segment));
+}
+async function readProjectItems(localPath) {
+  const items = [];
+  for (const filename of STRUCTURED_FILENAMES) {
+    const filePath = (0, import_path2.join)(localPath, filename);
+    if (!(0, import_fs2.existsSync)(filePath))
+      continue;
+    try {
+      const content = await (0, import_promises3.readFile)(filePath, "utf-8");
+      items.push(...parseStructuredFile(filename, content, filePath));
+    } catch (error) {
+      console.error(TAG2, `Failed to read ${filePath}:`, error);
+    }
+  }
+  return items;
+}
+function parseFrontmatter(content) {
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+  if (!match) {
+    return { entries: /* @__PURE__ */ new Map(), body: content };
+  }
+  const entries = /* @__PURE__ */ new Map();
+  for (const line of match[1].split("\n")) {
+    const idx = line.indexOf(":");
+    if (idx === -1)
+      continue;
+    const key = line.slice(0, idx).trim();
+    const value = line.slice(idx + 1).trim();
+    if (key)
+      entries.set(key, value);
+  }
+  return { entries, body: content.slice(match[0].length) };
+}
+function mergeFrontmatter(existing, scanned, lastSynced) {
+  const merged = /* @__PURE__ */ new Map();
+  merged.set("project", quote(scanned.name));
+  merged.set("repo", quote(scanned.localPath));
+  merged.set("remote", quote(scanned.remote));
+  merged.set("branch", quote(scanned.branch));
+  merged.set("gitStatus", quote(scanned.gitStatus));
+  merged.set("lastSynced", quote(lastSynced));
+  if (!existing.has("cssclasses")) {
+    merged.set("cssclasses", quote(PROJECT_NOTE_CSS_CLASS));
+  }
+  for (const [key, value] of existing) {
+    if (key === "cssclasses" || !SYNC_KEYS.has(key))
+      merged.set(key, value);
+  }
+  return merged;
+}
+function quote(value) {
+  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+function serializeFrontmatter(entries) {
+  const lines = [...entries.entries()].map(([key, value]) => `${key}: ${value}`);
+  return `---
+${lines.join("\n")}
+---
+`;
+}
+
+// src/ProjectsSidebarView.ts
+var import_obsidian7 = require("obsidian");
+
+// src/HeaderBlockMover.ts
+var import_promises4 = require("fs/promises");
+var import_path3 = require("path");
+var TAG3 = "[Warped Todo]";
+var DEFAULT_CLOSED_SECTION = "## Fixed";
+var DEFAULT_OPEN_SECTION = "## Open";
+async function moveHeaderBlock(item, targetCompleted, repoPath, scanner) {
+  if (item.shape !== "headerNested") {
+    return { ok: false, reason: "This item isn't a header-report entry." };
+  }
+  const clean = await scanner.isFileClean(repoPath, item.sourceFile);
+  if (!clean) {
+    return {
+      ok: false,
+      reason: `Commit or stash changes to ${(0, import_path3.basename)(item.sourceFile)} before completing this item.`
+    };
+  }
+  let content;
+  try {
+    content = await (0, import_promises4.readFile)(item.sourceFile, "utf-8");
+  } catch (error) {
+    console.error(TAG3, `Failed to read ${item.sourceFile}:`, error);
+    return { ok: false, reason: "Couldn't read the file. See console for details." };
+  }
+  const lines = content.split("\n");
+  const headingLine = resolveLineNumber(lines, item.lineNumber, item.fingerprint);
+  if (headingLine < 0 || headingLine >= lines.length || !/^###\s+/.test(lines[headingLine])) {
+    return { ok: false, reason: "Couldn't find that item \u2014 the file may have changed. Try syncing again." };
+  }
+  let blockEnd = headingLine + 1;
+  while (blockEnd < lines.length && !/^#{2,3}\s+/.test(lines[blockEnd]))
+    blockEnd++;
+  const block = lines.slice(headingLine, blockEnd);
+  const withoutBlock = [...lines.slice(0, headingLine), ...lines.slice(blockEnd)];
+  const relocated = targetCompleted ? insertIntoClosedSection(withoutBlock, block) : insertIntoOpenSection(withoutBlock, block);
+  const final = collapseBlankRuns(relocated);
+  try {
+    await (0, import_promises4.writeFile)(item.sourceFile, final.join("\n"), "utf-8");
+  } catch (error) {
+    console.error(TAG3, `Failed to write ${item.sourceFile}:`, error);
+    return { ok: false, reason: "Failed to write the file. See console for details." };
+  }
+  return { ok: true };
+}
+function findSectionHeadingIndex(lines, wantClosed) {
+  for (let i = 0; i < lines.length; i++) {
+    const match = lines[i].match(/^##\s+(.*)$/);
+    if (!match)
+      continue;
+    if (isStatusSectionHeading(match[1].trim()) === wantClosed)
+      return i;
+  }
+  return -1;
+}
+function sectionEndIndex(lines, sectionHeadingIndex) {
+  let end = sectionHeadingIndex + 1;
+  while (end < lines.length && !/^##\s+/.test(lines[end]))
+    end++;
+  return end;
+}
+function insertIntoClosedSection(lines, block) {
+  const sectionIdx = findSectionHeadingIndex(lines, true);
+  if (sectionIdx === -1)
+    return appendNewSection(lines, DEFAULT_CLOSED_SECTION, block);
+  return insertAt(lines, sectionEndIndex(lines, sectionIdx), block);
+}
+function insertIntoOpenSection(lines, block) {
+  const sectionIdx = findSectionHeadingIndex(lines, false);
+  if (sectionIdx === -1)
+    return prependNewSection(lines, DEFAULT_OPEN_SECTION, block);
+  return insertAt(lines, sectionEndIndex(lines, sectionIdx), block);
+}
+function insertAt(lines, index, block) {
+  const before = lines.slice(0, index);
+  while (before.length > 0 && before[before.length - 1] === "")
+    before.pop();
+  const after = lines.slice(index);
+  while (after.length > 0 && after[0] === "")
+    after.shift();
+  return [...before, "", ...block, "", ...after];
+}
+function appendNewSection(lines, heading, block) {
+  const trimmed = [...lines];
+  while (trimmed.length > 0 && trimmed[trimmed.length - 1] === "")
+    trimmed.pop();
+  return [...trimmed, "", heading, "", ...block, ""];
+}
+function prependNewSection(lines, heading, block) {
+  var _a;
+  let insertPoint = 0;
+  if (/^#\s+/.test((_a = lines[0]) != null ? _a : "")) {
+    insertPoint = 1;
+    while (insertPoint < lines.length && lines[insertPoint] === "")
+      insertPoint++;
+  }
+  const before = lines.slice(0, insertPoint);
+  const after = lines.slice(insertPoint);
+  while (after.length > 0 && after[0] === "")
+    after.shift();
+  return [...before, heading, "", ...block, "", ...after];
+}
+function collapseBlankRuns(lines) {
+  const result = [];
+  for (const line of lines) {
+    if (line === "" && result[result.length - 1] === "")
+      continue;
+    result.push(line);
+  }
+  return result;
+}
+
+// src/ProjectItemMutator.ts
+var TAG4 = "[Warped Todo]";
+var RESOLVED_MARKER_PATTERN = /\s*✅?\s*\*{0,2}RESOLVED\*{0,2}\s*$/i;
+async function setProjectItemCompletion(item, completed, context) {
+  switch (item.shape) {
+    case "checkbox":
+      return applyCheckboxToggle(item, completed);
+    case "plainBullet":
+      return applyPlainBulletCompletion(item, completed);
+    case "headerStandalone":
+      return applyResolvedMarkerToggle(item, completed);
+    case "headerNested":
+      return applyHeaderBlockMove(item, completed, context);
+  }
+}
+async function applyCheckboxToggle(item, completed) {
+  try {
+    await modifyExternalFileLine(
+      item.sourceFile,
+      item.lineNumber,
+      (line) => line.replace(/\[[ xX]\]/, completed ? "[x]" : "[ ]"),
+      void 0,
+      item.fingerprint
+    );
+    return true;
+  } catch (error) {
+    console.error(TAG4, "Failed to toggle checkbox:", error);
+    showNotice2("Failed to update item. See console for details.");
+    return false;
+  }
+}
+async function applyPlainBulletCompletion(item, completed) {
+  if (!completed) {
+    showNotice2(
+      "Can't un-complete this item \u2014 its completion comes from the section it's under, not its own line. Edit the file directly."
+    );
+    return false;
+  }
+  try {
+    await modifyExternalFileLine(
+      item.sourceFile,
+      item.lineNumber,
+      (line) => line.replace(/^-\s+/, "- [x] "),
+      (line) => /^-\s+\[[ xX]\]/.test(line) ? "Item already has a checkbox." : null,
+      item.fingerprint
+    );
+    return true;
+  } catch (error) {
+    console.error(TAG4, "Failed to complete item:", error);
+    showNotice2("Failed to update item. See console for details.");
+    return false;
+  }
+}
+async function applyResolvedMarkerToggle(item, completed) {
+  try {
+    await modifyExternalFileLine(
+      item.sourceFile,
+      item.lineNumber,
+      (line) => {
+        const stripped = line.replace(RESOLVED_MARKER_PATTERN, "");
+        return completed ? `${stripped} \u2705 RESOLVED` : stripped;
+      },
+      void 0,
+      item.fingerprint
+    );
+    return true;
+  } catch (error) {
+    console.error(TAG4, "Failed to update item status:", error);
+    showNotice2("Failed to update item. See console for details.");
+    return false;
+  }
+}
+async function applyHeaderBlockMove(item, completed, context) {
+  var _a;
+  if (!context) {
+    showNotice2(
+      "Can't complete this from the sidebar yet \u2014 it needs moving to a different section. Edit the file directly for now."
+    );
+    return false;
+  }
+  const result = await moveHeaderBlock(item, completed, context.repoPath, context.scanner);
+  if (!result.ok) {
+    showNotice2((_a = result.reason) != null ? _a : "Failed to move item. See console for details.");
+    return false;
+  }
+  return true;
+}
+async function setProjectItemPriority(item, newTag, addFocus = false) {
+  try {
+    await modifyExternalFileLine(
+      item.sourceFile,
+      item.lineNumber,
+      (line) => {
+        line = line.replace(/#p[0-4]\b/g, "").replace(/#future\b/g, "").replace(/#today\b/g, "");
+        line = line.replace(/\s+/g, " ").trim() + ` ${newTag}`;
+        if (addFocus && !line.includes("#focus"))
+          line = line + " #focus";
+        return line;
+      },
+      void 0,
+      item.fingerprint
+    );
+    return true;
+  } catch (error) {
+    console.error(TAG4, "Failed to set priority:", error);
+    showNotice2("Failed to set priority. See console for details.");
+    return false;
+  }
+}
+async function addProjectItemTag(item, tag) {
+  try {
+    await modifyExternalFileLine(
+      item.sourceFile,
+      item.lineNumber,
+      (line) => line.trimEnd() + ` ${tag}`,
+      (line) => {
+        const escapedTag = tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const tagPattern = new RegExp(`${escapedTag}\\b`);
+        return tagPattern.test(line) ? "already present" : null;
+      },
+      item.fingerprint
+    );
+    return true;
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (msg.includes("already present"))
+      return true;
+    console.error(TAG4, "Failed to add tag:", error);
+    showNotice2("Failed to add tag. See console for details.");
+    return false;
+  }
+}
+async function removeProjectItemTag(item, tag) {
+  try {
+    await modifyExternalFileLine(
+      item.sourceFile,
+      item.lineNumber,
+      (line) => {
+        const escapedTag = tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const tagPattern = new RegExp(`${escapedTag}\\b\\s*`, "g");
+        return line.replace(tagPattern, "").replace(/\s+/g, " ").trim();
+      },
+      void 0,
+      item.fingerprint
+    );
+    return true;
+  } catch (error) {
+    console.error(TAG4, "Failed to remove tag:", error);
+    showNotice2("Failed to remove tag. See console for details.");
+    return false;
+  }
+}
+
+// src/ProjectsSidebarView.ts
+var VIEW_TYPE_PROJECTS_SIDEBAR = "warped-todo-projects-sidebar";
+var GROUP_ORDER = [
+  { heading: "TODOs", type: "todo", checkbox: true },
+  { heading: "Ideas", type: "idea", checkbox: true },
+  { heading: "Bugs", type: "bug", checkbox: true }
+];
+var ProjectsSidebarView = class extends import_obsidian7.ItemView {
+  constructor(leaf, scanner, processor, projectManager, projectScanner, syncManager, contextMenuHandler, getOptions, onOpenSettings, onShowAbout) {
+    super(leaf);
+    this.scanner = scanner;
+    this.processor = processor;
+    this.projectManager = projectManager;
+    this.projectScanner = projectScanner;
+    this.syncManager = syncManager;
+    this.contextMenuHandler = contextMenuHandler;
+    this.getOptions = getOptions;
+    this.onOpenSettings = onOpenSettings;
+    this.onShowAbout = onShowAbout;
+    this.mode = "list";
+    this.activeProjectName = null;
+    this.filterText = "";
+    this.scannedProjects = [];
+    this.updateListener = null;
+    // Tracks the active file's path so handleActiveFileChange can tell "the
+    // active file genuinely changed" from "some workspace event fired for the
+    // same file" (Obsidian fires these often, for reasons unrelated to
+    // navigation). Without this, clicking "< Back" while the project note is
+    // still open in the main pane got silently undone by the very next such
+    // event, since auto-follow would just re-derive "detail" mode from the
+    // still-active file — requiring several clicks before one happened to land
+    // in a gap between events. Found via live testing.
+    this.lastKnownActiveFilePath = null;
+  }
+  getViewType() {
+    return VIEW_TYPE_PROJECTS_SIDEBAR;
+  }
+  getDisplayText() {
+    return "Projects";
+  }
+  getIcon() {
+    return "folder-git-2";
+  }
+  async onOpen() {
+    this.updateListener = () => this.render();
+    this.scanner.on("todos-updated", this.updateListener);
+    this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.handleActiveFileChange()));
+    this.registerEvent(this.app.workspace.on("file-open", () => this.handleActiveFileChange()));
+    await this.reload();
+  }
+  async onClose() {
+    if (this.updateListener) {
+      this.scanner.off("todos-updated", this.updateListener);
+      this.updateListener = null;
+    }
+  }
+  /** Full rescan + resync of every project, then re-render. Manual "Sync" button and initial load. */
+  async reload() {
+    const options = this.getOptions();
+    if (options.baseFolder) {
+      try {
+        this.scannedProjects = await this.syncManager.syncAll({
+          baseFolder: options.baseFolder,
+          projectsFolder: options.projectsFolder,
+          maxDepth: options.scanDepth,
+          excludeDirs: options.excludeDirs
+        });
+      } catch (error) {
+        console.error("[Warped Todo]", "Project sync failed:", error);
+        new import_obsidian7.Notice("Project sync failed. See console for details.");
+      }
+    }
+    this.render();
+  }
+  /**
+   * Applies scan results this view didn't itself request — from a
+   * watch-triggered background sync, or the "Sync projects" command, both of
+   * which call `syncManager.syncAll()` directly. Just stores and re-renders;
+   * must NOT call back into `syncAll()`/`reload()`, or a view wired to run
+   * this on every sync completion would trigger another sync completion,
+   * forever. Found via live testing: `main.ts` used to route `onSynced`
+   * through `reload()`, which re-ran `syncAll()`, which fired `onSynced`
+   * again — an unbounded loop limited only by how fast a full scan could
+   * complete (observed retriggering roughly every 200ms against a real base
+   * folder, visible as `lastSynced` updating that often in the Properties
+   * panel).
+   */
+  applySyncResult(scanned) {
+    this.scannedProjects = scanned;
+    this.render();
+  }
+  // ===== Sidebar/pane sync (auto-follow) =====
+  async handleActiveFileChange() {
+    var _a;
+    const activeFile = this.app.workspace.getActiveFile();
+    const currentPath = (_a = activeFile == null ? void 0 : activeFile.path) != null ? _a : null;
+    if (currentPath === this.lastKnownActiveFilePath)
+      return;
+    this.lastKnownActiveFilePath = currentPath;
+    const projectName = activeFile ? this.projectNameForNotePath(activeFile.path) : null;
+    if (projectName) {
+      if (this.mode === "detail" && this.activeProjectName === projectName)
+        return;
+      this.mode = "detail";
+      this.activeProjectName = projectName;
+      this.render();
+    } else if (this.mode === "detail") {
+      this.mode = "list";
+      this.activeProjectName = null;
+      this.render();
+    }
+  }
+  projectNameForNotePath(filePath) {
+    const options = this.getOptions();
+    for (const project of this.projectManager.getProjects(this.scannedProjects)) {
+      if (!project.localPath)
+        continue;
+      const name = project.tag.replace(/^#/, "");
+      if (projectFilePath(options.projectsFolder, name) === filePath)
+        return name;
+    }
+    return null;
+  }
+  async openProject(name) {
+    const options = this.getOptions();
+    const path = projectFilePath(options.projectsFolder, name);
+    this.lastKnownActiveFilePath = path;
+    this.mode = "detail";
+    this.activeProjectName = name;
+    this.render();
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (file instanceof import_obsidian7.TFile) {
+      await this.app.workspace.getLeaf(false).openFile(file);
+    }
+  }
+  // ===== Rendering =====
+  render() {
+    const container = this.containerEl.children[1];
+    container.empty();
+    container.addClass("warped-todo-projects-view");
+    if (this.mode === "detail" && this.activeProjectName) {
+      this.renderDetail(container, this.activeProjectName);
+    } else {
+      this.renderList(container);
+    }
+  }
+  /**
+   * Shared by list and detail view — same header slot the TODOs sidebar uses
+   * (logo + title, clickable-icon buttons on the right), rather than the
+   * plain unbranded buttons this view had before. "Sync" lives in the kebab
+   * menu here, same treatment TODOs sidebar gives "Refresh" — not a
+   * standalone always-visible button. Found via live testing that the
+   * original plain-button header read as unstyled/off-brand.
+   */
+  renderHeader(container, title, showBack) {
+    const headerDiv = container.createDiv({ cls: "sidebar-header" });
+    const titleEl = headerDiv.createEl("h4", { cls: "sidebar-title" });
+    const logoEl = titleEl.createSpan({ cls: "warped-todo-logo clickable-logo", text: "\u2423\u2318" });
+    logoEl.addEventListener("click", () => this.onShowAbout());
+    titleEl.appendText(` ${title}`);
+    const tabNav = headerDiv.createDiv({ cls: "sidebar-tab-nav" });
+    if (showBack) {
+      const backBtn = tabNav.createEl("button", {
+        cls: "clickable-icon",
+        attr: { "aria-label": "Back to project list" }
+      });
+      (0, import_obsidian7.setIcon)(backBtn, "arrow-left");
+      backBtn.addEventListener("click", () => {
+        this.mode = "list";
+        this.activeProjectName = null;
+        this.render();
+      });
+    }
+    const menuBtn = tabNav.createEl("button", {
+      cls: "clickable-icon sidebar-menu-btn",
+      attr: { "aria-label": "Menu" }
+    });
+    (0, import_obsidian7.setIcon)(menuBtn, "more-vertical");
+    menuBtn.addEventListener("click", (evt) => {
+      const menu = new import_obsidian7.Menu();
+      menu.addItem((item) => {
+        item.setTitle("Sync").setIcon("refresh-cw").onClick(async () => {
+          menuBtn.addClass("rotating");
+          await this.reload();
+          setTimeout(() => menuBtn.removeClass("rotating"), 500);
+        });
+      });
+      menu.showAtMouseEvent(evt);
+    });
+  }
+  renderList(container) {
+    const options = this.getOptions();
+    this.renderHeader(container, "Projects", false);
+    if (!options.baseFolder) {
+      const empty = container.createDiv({ cls: "warped-todo-projects-empty" });
+      empty.createEl("p", { text: "No base folder configured yet." });
+      const btn = empty.createEl("button", { text: "Open settings" });
+      btn.addEventListener("click", () => this.onOpenSettings());
+      return;
+    }
+    const filterInput = container.createEl("input", {
+      type: "text",
+      placeholder: "Filter\u2026",
+      cls: "warped-todo-projects-filter"
+    });
+    filterInput.value = this.filterText;
+    const listEl = container.createDiv({ cls: "warped-todo-projects-list" });
+    filterInput.addEventListener("input", () => {
+      this.filterText = filterInput.value;
+      this.renderProjectRows(listEl);
+    });
+    this.renderProjectRows(listEl);
+  }
+  renderProjectRows(listEl) {
+    listEl.empty();
+    const filterLower = this.filterText.toLowerCase();
+    const projects = this.projectManager.getProjects(this.scannedProjects).filter((p) => p.localPath).filter((p) => !filterLower || p.tag.toLowerCase().includes(filterLower)).sort((a, b) => {
+      const aActive = this.itemCounts(a).total > 0 ? 1 : 0;
+      const bActive = this.itemCounts(b).total > 0 ? 1 : 0;
+      if (aActive !== bActive)
+        return bActive - aActive;
+      return a.tag.localeCompare(b.tag);
+    });
+    if (projects.length === 0) {
+      listEl.createEl("p", { text: "No projects found.", cls: "warped-todo-projects-empty-msg" });
+      return;
+    }
+    for (const project of projects)
+      this.renderProjectRow(listEl, project);
+  }
+  itemCounts(project) {
+    if (!project.localPath)
+      return { todo: 0, idea: 0, bug: 0, total: 0 };
+    const items = this.syncManager.getCachedItems(project.localPath).filter((i) => !i.completed);
+    const counts = { todo: 0, idea: 0, bug: 0, total: 0 };
+    for (const item of items) {
+      counts[item.itemType]++;
+      counts.total++;
+    }
+    return counts;
+  }
+  renderProjectRow(listEl, project) {
+    const name = project.tag.replace(/^#/, "");
+    const row = this.renderProjectSummary(listEl, project);
+    row.addClass("is-clickable");
+    row.addEventListener("click", () => this.openProject(name));
+  }
+  /**
+   * name/branch/status + item-count breakdown — the same block used both as
+   * a clickable row in the list view and, unclickable, as the framing header
+   * atop the detail view (see renderDetail). Sharing this one renderer is
+   * the point: the detail view's top should look like the list row you just
+   * clicked, not introduce a second, differently-styled summary of the same
+   * three facts. Found via live testing that a separate hand-styled
+   * "branch · status" line in the detail view read as visually disconnected
+   * from the list it followed from.
+   */
+  renderProjectSummary(container, project) {
+    const name = project.tag.replace(/^#/, "");
+    const counts = this.itemCounts(project);
+    const row = container.createDiv({ cls: "warped-todo-project-row" });
+    const titleLine = row.createDiv({ cls: "warped-todo-project-row-title" });
+    titleLine.createSpan({ text: name, cls: "warped-todo-project-name" });
+    if (project.branch)
+      titleLine.createSpan({ text: project.branch, cls: "warped-todo-project-branch" });
+    if (project.gitStatus)
+      titleLine.createSpan({ text: project.gitStatus, cls: "warped-todo-project-status" });
+    if (counts.total > 0) {
+      const parts = [];
+      if (counts.todo > 0)
+        parts.push(`${counts.todo} todo`);
+      if (counts.idea > 0)
+        parts.push(`${counts.idea} idea`);
+      if (counts.bug > 0)
+        parts.push(`${counts.bug} bug`);
+      row.createDiv({ text: parts.join(" \xB7 "), cls: "warped-todo-project-row-counts" });
+    }
+    return row;
+  }
+  // ===== Detail view =====
+  renderDetail(container, name) {
+    const projects = this.projectManager.getProjects(this.scannedProjects);
+    const project = projects.find((p) => p.tag.replace(/^#/, "") === name);
+    this.renderHeader(container, "Projects", true);
+    if (!project || !project.localPath) {
+      container.createEl("p", { text: `"${name}" is no longer a detected project.` });
+      return;
+    }
+    const info = container.createDiv({ cls: "warped-todo-project-info" });
+    this.renderProjectSummary(info, project);
+    const actions = info.createDiv({ cls: "warped-todo-project-info-actions" });
+    if (project.remote) {
+      const url = browsableUrl(project.remote);
+      const link = actions.createEl("a", {
+        cls: "warped-todo-project-info-action",
+        href: url,
+        attr: { title: url }
+      });
+      (0, import_obsidian7.setIcon)(link.createSpan(), "external-link");
+      link.createSpan({ text: url.replace(/^https?:\/\//, "") });
+      link.setAttr("target", "_blank");
+    }
+    const revealBtn = actions.createEl("a", {
+      cls: "warped-todo-project-info-action",
+      attr: { title: project.localPath }
+    });
+    (0, import_obsidian7.setIcon)(revealBtn.createSpan(), "folder-open");
+    revealBtn.createSpan({ text: homeRelativePath(project.localPath) });
+    revealBtn.addEventListener("click", () => this.revealInFinder(project.localPath));
+    const itemsContainer = container.createDiv({ cls: "warped-todo-project-items" });
+    this.renderItemGroups(itemsContainer, project);
+  }
+  revealInFinder(path) {
+    var _a, _b;
+    try {
+      const electron = require("electron");
+      const shell = (_b = (_a = electron.remote) == null ? void 0 : _a.shell) != null ? _b : electron.shell;
+      shell.showItemInFolder(path);
+    } catch (error) {
+      console.error("[Warped Todo]", "Failed to reveal folder:", error);
+      new import_obsidian7.Notice("Couldn't open Finder. See console for details.");
+    }
+  }
+  /** Opens a synced item's source file (a plain filesystem path, not necessarily inside the vault) in the OS default editor — the external-file equivalent of openFileAtLine for a vault TFile. */
+  openExternalFile(path) {
+    var _a, _b;
+    try {
+      const electron = require("electron");
+      const shell = (_b = (_a = electron.remote) == null ? void 0 : _a.shell) != null ? _b : electron.shell;
+      shell.openPath(path);
+    } catch (error) {
+      console.error("[Warped Todo]", "Failed to open file:", error);
+      new import_obsidian7.Notice("Couldn't open file. See console for details.");
+    }
+  }
+  /**
+   * Two sources, concatenated — see DESIGN.md's "Item list — two sources, no
+   * reverse-mapping": synced items come from `syncManager.getCachedItems()`
+   * (parsed straight from each repo's BUGS.md/TODO.md/etc., not from the vault
+   * note — the note's body is never written to for items, see
+   * ProjectSyncManager's class doc comment); hand-typed items come from a
+   * normal TodoScanner vault scan of this same note's `## Overview` (or
+   * anywhere else in it).
+   *
+   * Group headings and item rows reuse the TODOs sidebar's own CSS classes
+   * (`.todo-orphan-section*`, `.todo-checkbox*`, `.todo-text`) rather than
+   * parallel ones, so this view is styled identically by construction instead
+   * of by trying to hand-match colours/weights — found via live testing that
+   * the earlier hand-rolled styling didn't actually match.
+   */
+  renderItemGroups(container, project) {
+    const name = project.tag.replace(/^#/, "");
+    const syncedItems = this.syncManager.getCachedItems(project.localPath);
+    for (const group of GROUP_ORDER) {
+      const groupItems = syncedItems.filter((i) => i.itemType === group.type);
+      if (groupItems.length === 0)
+        continue;
+      const groupEl = container.createDiv({ cls: "warped-todo-project-item-group" });
+      this.renderGroupHeading(groupEl, group.heading, this.syncedGroupFileHint(groupItems));
+      for (const item of groupItems) {
+        this.renderSyncedItemRow(groupEl, item, name, group.checkbox, project.localPath);
+      }
+    }
+    const handTypedGroups = this.buildHandTypedGroups(name);
+    for (const group of handTypedGroups) {
+      const groupEl = container.createDiv({ cls: "warped-todo-project-item-group" });
+      this.renderGroupHeading(groupEl, group.label, {
+        displayName: group.file.name,
+        path: group.file.path,
+        onOpen: () => openFileAtLine(this.app, group.file, group.lineNumber)
+      });
+      for (const item of group.items)
+        this.renderHandTypedItemRow(groupEl, item);
+    }
+    if (syncedItems.length === 0 && handTypedGroups.length === 0) {
+      container.createEl("p", { text: "No tracked items.", cls: "warped-todo-projects-empty-msg" });
+    }
+  }
+  /**
+   * A group's file hint, when every item in it came from the same source
+   * file (the common case — one BUGS.md or TODO.md per repo). Omitted, not
+   * guessed, when a group spans more than one file, so the hint never points
+   * at the wrong one.
+   */
+  syncedGroupFileHint(items) {
+    var _a;
+    const paths = new Set(items.map((i) => i.sourceFile));
+    if (paths.size !== 1)
+      return void 0;
+    const path = items[0].sourceFile;
+    return {
+      displayName: (_a = path.split("/").pop()) != null ? _a : path,
+      path,
+      onOpen: () => this.openExternalFile(path)
+    };
+  }
+  /**
+   * `fileHint` supplies the visible filename + click-through arrow — same
+   * affordance the main TODOs sidebar gives a header-with-children row
+   * (`.header-filename` + `→`, see SidebarView.ts's renderTodoItem). Missing
+   * here before this pass (found via live testing/screenshot review): group
+   * headings rendered a bare label with no indication of, or way to jump to,
+   * the source file.
+   */
+  renderGroupHeading(groupEl, label, fileHint) {
+    const heading = groupEl.createDiv({ cls: "todo-orphan-section" });
+    heading.createSpan({ cls: "todo-orphan-section-text", text: label });
+    if (!fileHint)
+      return;
+    heading.createSpan({
+      cls: "header-filename",
+      text: fileHint.displayName,
+      attr: { title: fileHint.path }
+    });
+    const link = heading.createEl("a", {
+      cls: "todo-orphan-section-link",
+      text: "\u2192",
+      href: "#",
+      attr: { "aria-label": `Open ${fileHint.path}` }
+    });
+    link.addEventListener("click", (evt) => {
+      evt.preventDefault();
+      fileHint.onOpen();
+    });
+  }
+  /**
+   * Groups hand-typed items the same way the TODOs sidebar itself does: a
+   * header TODO's children belong under it (labelled with the header's own
+   * text, cleaned — not rendered as a checkbox row itself, since a header
+   * with children can't be completed directly), and true orphans (no parent
+   * header) group by `sectionLabel`. Getting this wrong was the actual bug —
+   * treating every scanned item as an independent checkbox row showed a
+   * header's raw markdown text (`### bugs #todo #project`) as its own row,
+   * on top of its children, with no connection between the two.
+   */
+  buildHandTypedGroups(projectName) {
+    return groupHandTypedItems(this.handTypedItems(projectName));
+  }
+  /** Vault-scanned #todo/#idea items hand-typed into this note (the whole note — there's no sync-owned region to exclude anymore). */
+  handTypedItems(projectName) {
+    const options = this.getOptions();
+    const notePath = projectFilePath(options.projectsFolder, projectName);
+    return [...this.scanner.getTodos(), ...this.scanner.getIdeas()].filter(
+      (t) => t.filePath === notePath
+    );
+  }
+  renderSyncedItemRow(container, item, projectName, checkbox, repoPath) {
+    const row = container.createDiv({ cls: "warped-todo-project-item-row todo-item" });
+    if (checkbox) {
+      const wrap = row.createDiv({ cls: "todo-checkbox-wrap" });
+      const cb = wrap.createEl("input", { type: "checkbox", cls: "todo-checkbox" });
+      cb.checked = item.completed;
+      cb.addEventListener("click", async (evt) => {
+        evt.stopPropagation();
+        const ok = await setProjectItemCompletion(item, !item.completed, {
+          repoPath,
+          scanner: this.projectScanner
+        });
+        if (ok)
+          await this.resyncActiveProject();
+      });
+    }
+    row.createSpan({ text: cleanDisplayText(item.text), cls: "todo-text" });
+    row.addEventListener("contextmenu", (evt) => {
+      evt.preventDefault();
+      this.showSyncedItemMenu(evt, item);
+    });
+  }
+  renderHandTypedItemRow(container, item) {
+    const row = container.createDiv({ cls: "warped-todo-project-item-row todo-item" });
+    if (item.hasCheckbox) {
+      const wrap = row.createDiv({ cls: "todo-checkbox-wrap" });
+      const cb = wrap.createEl("input", { type: "checkbox", cls: "todo-checkbox" });
+      cb.checked = false;
+      cb.addEventListener("click", async (evt) => {
+        evt.stopPropagation();
+        const ok = await this.processor.completeTodo(item, this.getOptions().defaultTodoneFile);
+        if (ok)
+          this.render();
+      });
+    }
+    row.createSpan({ text: cleanDisplayText(item.text), cls: "todo-text" });
+    row.addEventListener("contextmenu", (evt) => {
+      evt.preventDefault();
+      this.contextMenuHandler.showTodoMenu(evt, item, () => this.render(), false);
+    });
+  }
+  showSyncedItemMenu(evt, item) {
+    var _a;
+    const menu = new import_obsidian7.Menu();
+    const hasFocus = item.tags.includes("#focus");
+    const hasFuture = item.tags.includes("#future");
+    const currentPriority = (_a = item.tags.find((t) => /^#p[0-4]$/.test(t))) != null ? _a : null;
+    const hasLaterPriority = currentPriority !== null && /^#p[3-4]$/.test(currentPriority);
+    menu.addItem((mi) => {
+      mi.setTitle("Copy").setIcon("copy").onClick(async () => {
+        await navigator.clipboard.writeText(item.text);
+      });
+    });
+    menu.addItem((mi) => {
+      mi.setTitle(hasFocus ? "Unfocus" : "Focus").setIcon("zap").onClick(async () => {
+        const ok = hasFocus ? await removeProjectItemTag(item, "#focus") : await setProjectItemPriority(item, calculateFocusPriority(currentPriority), true);
+        if (ok)
+          await this.resyncActiveProject();
+      });
+    });
+    menu.addItem((mi) => {
+      mi.setTitle(hasLaterPriority ? "Unlater" : "Later").setIcon("clock").onClick(async () => {
+        const ok = hasLaterPriority ? await removeProjectItemTag(item, currentPriority) : await setProjectItemPriority(item, calculateLaterPriority(currentPriority));
+        if (ok)
+          await this.resyncActiveProject();
+      });
+    });
+    menu.addItem((mi) => {
+      mi.setTitle(hasFuture ? "Unsnooze" : "Snooze").setIcon("moon").onClick(async () => {
+        const ok = hasFuture ? await removeProjectItemTag(item, "#future") : await addProjectItemTag(item, "#future");
+        if (ok)
+          await this.resyncActiveProject();
+      });
+    });
+    menu.showAtMouseEvent(evt);
+  }
+  /**
+   * Re-reads the active project's structured files after a mutation and
+   * updates the sidebar's item cache directly, so the change is visible
+   * immediately without a vault write — items live only in the sidebar's
+   * cache now, not in the note body, so there's nothing in the vault that
+   * needs rewriting just to reflect a completion/priority/tag change.
+   */
+  async resyncActiveProject() {
+    if (!this.activeProjectName)
+      return;
+    const scanned = this.scannedProjects.find((p) => p.name === this.activeProjectName);
+    if (!scanned)
+      return;
+    const items = await this.syncManager.getProjectItems(scanned.localPath);
+    this.syncManager.updateCachedItems(scanned.localPath, items);
+    this.render();
+  }
+};
+function calculateFocusPriority(currentPriority) {
+  if (!currentPriority || currentPriority === "#future")
+    return "#p0";
+  const match = currentPriority.match(/^#p([0-4])$/);
+  if (match) {
+    const num = parseInt(match[1]);
+    return num > 0 ? `#p${num - 1}` : "#p0";
+  }
+  return "#p0";
+}
+function calculateLaterPriority(currentPriority) {
+  if (!currentPriority || currentPriority === "#future")
+    return "#p4";
+  const match = currentPriority.match(/^#p([0-4])$/);
+  if (match) {
+    const num = parseInt(match[1]);
+    return num < 4 ? `#p${num + 1}` : "#p4";
+  }
+  return "#p4";
+}
+function cleanDisplayText(text) {
+  return text.replace(/^#{1,6}\s+/, "").replace(/^-\s*/, "").replace(/^\[[ xX]?\]\s*/, "").replace(/#[\w-]+/g, "").trim().replace(/\s+/g, " ");
+}
+function browsableUrl(remote) {
+  const sshMatch = remote.match(/^git@([^:]+):(.+?)(\.git)?$/);
+  if (sshMatch)
+    return `https://${sshMatch[1]}/${sshMatch[2]}`;
+  return remote.replace(/\.git$/, "");
+}
+function homeRelativePath(path) {
+  const home = require("os").homedir();
+  return path === home || path.startsWith(home + "/") ? "~" + path.slice(home.length) : path;
+}
+function isHeaderWithChildren(item) {
+  return item.isHeader === true && !!item.childLineNumbers && item.childLineNumbers.length > 0;
+}
+function groupHandTypedItems(items) {
+  var _a;
+  const headerGroups = /* @__PURE__ */ new Map();
+  for (const item of items) {
+    if (isHeaderWithChildren(item)) {
+      headerGroups.set(item.lineNumber, {
+        label: cleanDisplayText(item.text),
+        file: item.file,
+        lineNumber: item.lineNumber,
+        items: []
+      });
+    }
+  }
+  const orphanGroups = /* @__PURE__ */ new Map();
+  for (const item of items) {
+    if (isHeaderWithChildren(item))
+      continue;
+    if (item.parentLineNumber !== void 0 && headerGroups.has(item.parentLineNumber)) {
+      headerGroups.get(item.parentLineNumber).items.push(item);
+      continue;
+    }
+    const label = item.sectionLabel || "Notes";
+    if (!orphanGroups.has(label)) {
+      orphanGroups.set(label, {
+        label,
+        file: item.file,
+        lineNumber: (_a = item.sectionLineNumber) != null ? _a : item.lineNumber,
+        items: []
+      });
+    }
+    orphanGroups.get(label).items.push(item);
+  }
+  return [...headerGroups.values(), ...orphanGroups.values()].filter((g) => g.items.length > 0);
+}
+
+// src/ContextMenuHandler.ts
+var import_obsidian9 = require("obsidian");
+
+// src/MoveTargetModal.ts
+var import_obsidian8 = require("obsidian");
+var MoveTargetModal = class extends import_obsidian8.SuggestModal {
+  constructor(app, moveHistory, excludePath, onChoose) {
+    super(app);
+    this.moveHistory = moveHistory;
+    this.excludePath = excludePath;
+    this.onChoose = onChoose;
+    this.setPlaceholder("Move to file...");
+  }
+  getSuggestions(query) {
+    const lowerQuery = query.toLowerCase();
+    const seen = /* @__PURE__ */ new Set();
+    const suggestions = [];
+    const addIfMatch = (file, source) => {
+      if (seen.has(file.path))
+        return;
+      if (file.path === this.excludePath)
+        return;
+      if (lowerQuery && !file.path.toLowerCase().includes(lowerQuery))
+        return;
+      seen.add(file.path);
+      suggestions.push({ file, source });
+    };
+    const bookmarks = this.getBookmarkedFiles();
+    for (const file of bookmarks) {
+      addIfMatch(file, "pinned");
+    }
+    const openFiles = this.getOpenFiles();
+    for (const file of openFiles) {
+      addIfMatch(file, "open");
+    }
+    for (const path of this.moveHistory) {
+      const file = this.app.vault.getAbstractFileByPath(path);
+      if (file instanceof import_obsidian8.TFile) {
+        addIfMatch(file, "recent");
+      }
+    }
+    if (lowerQuery) {
+      const allFiles = this.app.vault.getMarkdownFiles();
+      for (const file of allFiles) {
+        addIfMatch(file, "all");
+      }
+    }
+    return suggestions;
+  }
+  renderSuggestion(suggestion, el) {
+    const icon = suggestion.source === "pinned" ? "\u{1F4CC} " : suggestion.source === "open" ? "\u{1F4C4} " : suggestion.source === "recent" ? "\u{1F550} " : "";
+    el.createEl("div", { text: icon + suggestion.file.path, cls: "suggestion-title" });
+  }
+  onChooseSuggestion(suggestion) {
+    this.onChoose(suggestion.file);
+  }
+  getBookmarkedFiles() {
+    var _a, _b, _c;
+    const files = [];
+    try {
+      const bookmarksPlugin = (_b = (_a = this.app.internalPlugins) == null ? void 0 : _a.getPluginById) == null ? void 0 : _b.call(_a, "bookmarks");
+      if (!(bookmarksPlugin == null ? void 0 : bookmarksPlugin.enabled))
+        return files;
+      const items = (_c = bookmarksPlugin.instance) == null ? void 0 : _c.items;
+      if (!Array.isArray(items))
+        return files;
+      for (const item of items) {
+        if (item.type === "file" && item.path) {
+          const file = this.app.vault.getAbstractFileByPath(item.path);
+          if (file instanceof import_obsidian8.TFile && file.extension === "md") {
+            files.push(file);
+          }
+        }
+      }
+    } catch (e) {
+    }
+    return files;
+  }
+  getOpenFiles() {
+    const files = [];
+    const seen = /* @__PURE__ */ new Set();
+    this.app.workspace.iterateAllLeaves((leaf) => {
+      var _a;
+      const file = (_a = leaf.view) == null ? void 0 : _a.file;
+      if (file instanceof import_obsidian8.TFile && file.extension === "md" && !seen.has(file.path)) {
+        seen.add(file.path);
+        files.push(file);
+      }
+    });
+    return files;
+  }
+};
+
+// src/ContextMenuHandler.ts
+var ContextMenuHandler = class {
+  constructor(app, processor, priorityTags, getMoveHistory) {
+    this.app = app;
+    this.processor = processor;
+    this.priorityTags = priorityTags;
+    this.getMoveHistory = getMoveHistory;
+  }
+  /**
+   * Show context menu for an active TODO item
+   */
+  /**
+   * `includeMove` defaults to true for the existing TODOs sidebar. The Projects
+   * sidebar passes false: moving a project-note item elsewhere conflicts with it
+   * reappearing in its original note on the next sync (see DESIGN.md's Projects
+   * Extension detail-view notes; the plugin-wide move feature is separately
+   * tracked for removal in PLAN.md, unrelated to Projects).
+   */
+  showTodoMenu(evt, todo, onRefresh, includeMove = true) {
+    const menu = new import_obsidian9.Menu();
+    const currentPriority = this.getCurrentPriority(todo);
+    const hasFocus = todo.tags.includes("#focus");
+    const hasFuture = todo.tags.includes("#future");
+    const hasLaterPriority = currentPriority && /^#p[3-4]$/.test(currentPriority);
+    menu.addItem((item) => {
+      item.setTitle("Copy").setIcon("copy").onClick(async () => {
+        await navigator.clipboard.writeText(todo.text);
+      });
+    });
+    if (includeMove) {
+      menu.addItem((item) => {
+        item.setTitle("Move to...").setIcon("arrow-right").onClick(() => {
+          new MoveTargetModal(
+            this.app,
+            this.getMoveHistory(),
+            todo.filePath,
+            async (file) => {
+              const success = await this.processor.moveTodo(todo, file.path);
+              if (success)
+                onRefresh();
+            }
+          ).open();
+        });
+      });
+    }
+    menu.addItem((item) => {
+      item.setTitle(hasFocus ? "Unfocus" : "Focus").setIcon("zap").onClick(async () => {
+        let success;
+        if (hasFocus) {
+          success = await this.processor.removeTag(todo, "#focus");
+        } else {
+          const newPriority = this.calculateFocusPriority(currentPriority);
+          success = await this.processor.setPriorityTag(todo, newPriority, true);
+        }
+        if (success)
+          onRefresh();
+      });
+    });
+    menu.addItem((item) => {
+      item.setTitle(hasLaterPriority ? "Unlater" : "Later").setIcon("clock").onClick(async () => {
+        let success;
+        if (hasLaterPriority) {
+          success = await this.processor.removeTag(todo, currentPriority);
+        } else {
+          const newPriority = this.calculateLaterPriority(currentPriority);
+          success = await this.processor.setPriorityTag(todo, newPriority);
+        }
+        if (success)
+          onRefresh();
+      });
+    });
+    menu.addItem((item) => {
+      item.setTitle(hasFuture ? "Unsnooze" : "Snooze").setIcon("moon").onClick(async () => {
+        let success;
+        if (hasFuture) {
+          success = await this.processor.removeTag(todo, "#future");
+        } else {
+          success = await this.processor.setPriorityTag(todo, "#future");
+        }
+        if (success)
+          onRefresh();
+      });
+    });
+    menu.showAtMouseEvent(evt);
+  }
+  /**
+   * Extract current priority tag from TODO
+   */
+  getCurrentPriority(todo) {
+    if (todo.tags.includes("#future")) {
+      return "#future";
+    }
+    for (const tag of todo.tags) {
+      if (/^#p[0-4]$/.test(tag)) {
+        return tag;
+      }
+    }
+    return null;
+  }
+  /**
+   * Calculate new priority for Focus action
+   * If no priority or #future → #p0
+   * If #pN → #p(N-1), but #p0 stays #p0
+   */
+  calculateFocusPriority(currentPriority) {
+    if (!currentPriority || currentPriority === "#future") {
+      return "#p0";
+    }
+    const match = currentPriority.match(/^#p([0-4])$/);
+    if (match) {
+      const num = parseInt(match[1]);
+      return num > 0 ? `#p${num - 1}` : "#p0";
+    }
+    return "#p0";
+  }
+  /**
+   * Calculate new priority for Later action
+   * If no priority or #future → #p4
+   * If #pN → #p(N+1), but #p4 stays #p4
+   */
+  calculateLaterPriority(currentPriority) {
+    if (!currentPriority || currentPriority === "#future") {
+      return "#p4";
+    }
+    const match = currentPriority.match(/^#p([0-4])$/);
+    if (match) {
+      const num = parseInt(match[1]);
+      return num < 4 ? `#p${num + 1}` : "#p4";
+    }
+    return "#p4";
+  }
+  /**
+   * Show context menu for a project (focus list item)
+   * Operations apply to all TODOs matching the project tag
+   */
+  showProjectMenu(evt, project, scanner, onRefresh, onFilterByTag) {
+    const menu = new import_obsidian9.Menu();
+    const getTodosForProject = () => {
+      return scanner.getTodos().filter((todo) => todo.tags.includes(project.tag));
+    };
+    const todos = getTodosForProject();
+    const anyHasFocus = todos.some((t) => t.tags.includes("#focus"));
+    const anyHasFuture = todos.some((t) => t.tags.includes("#future"));
+    const anyHasLaterPriority = todos.some((t) => {
+      for (const tag of t.tags) {
+        if (/^#p[3-4]$/.test(tag))
+          return true;
+      }
+      return false;
+    });
+    menu.addItem((item) => {
+      item.setTitle(project.tag).setIcon("tag");
+      const submenu = item.setSubmenu();
+      submenu.addItem((subItem) => {
+        subItem.setTitle("Filter by").setIcon("filter").onClick(() => {
+          onFilterByTag(project.tag);
+        });
+      });
+    });
+    menu.addSeparator();
+    menu.addItem((item) => {
+      item.setTitle(anyHasFocus ? "Unfocus" : "Focus").setIcon("zap").onClick(async () => {
+        const currentTodos = getTodosForProject();
+        if (anyHasFocus) {
+          await this.processor.unfocusAllWithTag(currentTodos);
+        } else {
+          await this.processor.focusAllWithTag(currentTodos);
+        }
+        onRefresh();
+      });
+    });
+    menu.addItem((item) => {
+      item.setTitle(anyHasLaterPriority ? "Unlater" : "Later").setIcon("clock").onClick(async () => {
+        const currentTodos = getTodosForProject();
+        if (anyHasLaterPriority) {
+          await this.processor.unlaterAllWithTag(currentTodos);
+        } else {
+          await this.processor.laterAllWithTag(currentTodos);
+        }
+        onRefresh();
+      });
+    });
+    menu.addItem((item) => {
+      item.setTitle(anyHasFuture ? "Unsnooze" : "Snooze").setIcon("moon").onClick(async () => {
+        const currentTodos = getTodosForProject();
+        if (anyHasFuture) {
+          await this.processor.unsnoozeAllWithTag(currentTodos);
+        } else {
+          await this.processor.snoozeAllWithTag(currentTodos);
+        }
+        onRefresh();
+      });
+    });
+    menu.showAtMouseEvent(evt);
+  }
+  /**
+   * Show context menu for an idea item
+   */
+  showIdeaMenu(evt, idea, onRefresh) {
+    const menu = new import_obsidian9.Menu();
+    const hasFocus = idea.tags.includes("#focus");
+    menu.addItem((item) => {
+      item.setTitle("Add to TODOs").setIcon("check-square").onClick(async () => {
+        const success = await this.processor.convertIdeaToTodo(idea);
+        if (success)
+          onRefresh();
+      });
+    });
+    menu.addItem((item) => {
+      item.setTitle("Copy").setIcon("copy").onClick(async () => {
+        await navigator.clipboard.writeText(idea.text);
+      });
+    });
+    menu.addItem((item) => {
+      item.setTitle(hasFocus ? "Unfocus" : "Focus").setIcon("zap").onClick(async () => {
+        let success;
+        if (hasFocus) {
+          success = await this.processor.removeTag(idea, "#focus");
+        } else {
+          success = await this.processor.addFocusToIdea(idea);
+        }
+        if (success)
+          onRefresh();
+      });
+    });
+    menu.showAtMouseEvent(evt);
+  }
+};
 
 // src/SlashCommandSuggest.ts
-var import_obsidian6 = require("obsidian");
+var import_obsidian10 = require("obsidian");
 var CALLOUT_TYPES = [
   { id: "info", name: "Info", icon: "\u2139\uFE0F" },
   { id: "tip", name: "Tip", icon: "\u{1F4A1}" },
@@ -2091,7 +3926,7 @@ var CALLOUT_TYPES = [
   { id: "question", name: "Question", icon: "\u2753" },
   { id: "failure", name: "Failure", icon: "\u274C" }
 ];
-var SlashCommandSuggest = class extends import_obsidian6.EditorSuggest {
+var SlashCommandSuggest = class extends import_obsidian10.EditorSuggest {
   constructor(app, settings) {
     super(app);
     this.inCalloutMenu = false;
@@ -2252,8 +4087,8 @@ var SlashCommandSuggest = class extends import_obsidian6.EditorSuggest {
 };
 
 // src/AtSuggest.ts
-var import_obsidian7 = require("obsidian");
-var AtSuggest = class extends import_obsidian7.EditorSuggest {
+var import_obsidian11 = require("obsidian");
+var AtSuggest = class extends import_obsidian11.EditorSuggest {
   constructor(app, settings, teamManager) {
     super(app);
     this.settings = settings;
@@ -2394,15 +4229,15 @@ var AtSuggest = class extends import_obsidian7.EditorSuggest {
 };
 
 // src/TeamManager.ts
-var import_obsidian8 = require("obsidian");
+var import_obsidian12 = require("obsidian");
 var TEAM_LINE_REGEX = /^-\s+@([\w][\w.-]*)\s*(?:—|-)\s*(.+)$/;
 var ME_SUFFIX = /\s*\(me\)\s*$/i;
-var TeamManager = class extends import_obsidian8.Events {
+var TeamManager = class extends import_obsidian12.Events {
   constructor(app, filePath) {
     super();
     this.members = [];
     this.pendingAdds = /* @__PURE__ */ new Set();
-    this.debouncedFlushAdds = (0, import_obsidian8.debounce)(() => this.flushPendingAdds(), 500, true);
+    this.debouncedFlushAdds = (0, import_obsidian12.debounce)(() => this.flushPendingAdds(), 500, true);
     this.app = app;
     this.filePath = filePath;
   }
@@ -2448,7 +4283,7 @@ var TeamManager = class extends import_obsidian8.Events {
     const handles = [...this.pendingAdds];
     this.pendingAdds.clear();
     const file = this.app.vault.getAbstractFileByPath(this.filePath);
-    if (!(file instanceof import_obsidian8.TFile))
+    if (!(file instanceof import_obsidian12.TFile))
       return;
     const content = await this.app.vault.read(file);
     const newLines = handles.filter((h) => !this.members.some((m) => m.handle === h)).map((h) => `- @${h} \u2014 ${h}`);
@@ -2473,17 +4308,17 @@ var TeamManager = class extends import_obsidian8.Events {
   }
   watchFile() {
     this.app.vault.on("modify", (file) => {
-      if (file instanceof import_obsidian8.TFile && file.path === this.filePath) {
+      if (file instanceof import_obsidian12.TFile && file.path === this.filePath) {
         this.parse();
       }
     });
     this.app.vault.on("create", (file) => {
-      if (file instanceof import_obsidian8.TFile && file.path === this.filePath) {
+      if (file instanceof import_obsidian12.TFile && file.path === this.filePath) {
         this.parse();
       }
     });
     this.app.vault.on("delete", (file) => {
-      if (file instanceof import_obsidian8.TFile && file.path === this.filePath) {
+      if (file instanceof import_obsidian12.TFile && file.path === this.filePath) {
         this.members = [];
         this.trigger("team-updated");
       }
@@ -2491,7 +4326,7 @@ var TeamManager = class extends import_obsidian8.Events {
   }
   async parse() {
     const file = this.app.vault.getAbstractFileByPath(this.filePath);
-    if (!(file instanceof import_obsidian8.TFile)) {
+    if (!(file instanceof import_obsidian12.TFile)) {
       this.members = [];
       this.trigger("team-updated");
       return;
@@ -2517,324 +4352,9 @@ var TeamManager = class extends import_obsidian8.Events {
 };
 
 // src/SidebarView.ts
-var import_obsidian11 = require("obsidian");
-
-// src/ContextMenuHandler.ts
-var import_obsidian10 = require("obsidian");
-
-// src/MoveTargetModal.ts
-var import_obsidian9 = require("obsidian");
-var MoveTargetModal = class extends import_obsidian9.SuggestModal {
-  constructor(app, moveHistory, excludePath, onChoose) {
-    super(app);
-    this.moveHistory = moveHistory;
-    this.excludePath = excludePath;
-    this.onChoose = onChoose;
-    this.setPlaceholder("Move to file...");
-  }
-  getSuggestions(query) {
-    const lowerQuery = query.toLowerCase();
-    const seen = /* @__PURE__ */ new Set();
-    const suggestions = [];
-    const addIfMatch = (file, source) => {
-      if (seen.has(file.path))
-        return;
-      if (file.path === this.excludePath)
-        return;
-      if (lowerQuery && !file.path.toLowerCase().includes(lowerQuery))
-        return;
-      seen.add(file.path);
-      suggestions.push({ file, source });
-    };
-    const bookmarks = this.getBookmarkedFiles();
-    for (const file of bookmarks) {
-      addIfMatch(file, "pinned");
-    }
-    const openFiles = this.getOpenFiles();
-    for (const file of openFiles) {
-      addIfMatch(file, "open");
-    }
-    for (const path of this.moveHistory) {
-      const file = this.app.vault.getAbstractFileByPath(path);
-      if (file instanceof import_obsidian9.TFile) {
-        addIfMatch(file, "recent");
-      }
-    }
-    if (lowerQuery) {
-      const allFiles = this.app.vault.getMarkdownFiles();
-      for (const file of allFiles) {
-        addIfMatch(file, "all");
-      }
-    }
-    return suggestions;
-  }
-  renderSuggestion(suggestion, el) {
-    const icon = suggestion.source === "pinned" ? "\u{1F4CC} " : suggestion.source === "open" ? "\u{1F4C4} " : suggestion.source === "recent" ? "\u{1F550} " : "";
-    el.createEl("div", { text: icon + suggestion.file.path, cls: "suggestion-title" });
-  }
-  onChooseSuggestion(suggestion) {
-    this.onChoose(suggestion.file);
-  }
-  getBookmarkedFiles() {
-    var _a, _b, _c;
-    const files = [];
-    try {
-      const bookmarksPlugin = (_b = (_a = this.app.internalPlugins) == null ? void 0 : _a.getPluginById) == null ? void 0 : _b.call(_a, "bookmarks");
-      if (!(bookmarksPlugin == null ? void 0 : bookmarksPlugin.enabled))
-        return files;
-      const items = (_c = bookmarksPlugin.instance) == null ? void 0 : _c.items;
-      if (!Array.isArray(items))
-        return files;
-      for (const item of items) {
-        if (item.type === "file" && item.path) {
-          const file = this.app.vault.getAbstractFileByPath(item.path);
-          if (file instanceof import_obsidian9.TFile && file.extension === "md") {
-            files.push(file);
-          }
-        }
-      }
-    } catch (e) {
-    }
-    return files;
-  }
-  getOpenFiles() {
-    const files = [];
-    const seen = /* @__PURE__ */ new Set();
-    this.app.workspace.iterateAllLeaves((leaf) => {
-      var _a;
-      const file = (_a = leaf.view) == null ? void 0 : _a.file;
-      if (file instanceof import_obsidian9.TFile && file.extension === "md" && !seen.has(file.path)) {
-        seen.add(file.path);
-        files.push(file);
-      }
-    });
-    return files;
-  }
-};
-
-// src/ContextMenuHandler.ts
-var ContextMenuHandler = class {
-  constructor(app, processor, priorityTags, getMoveHistory) {
-    this.app = app;
-    this.processor = processor;
-    this.priorityTags = priorityTags;
-    this.getMoveHistory = getMoveHistory;
-  }
-  /**
-   * Show context menu for an active TODO item
-   */
-  showTodoMenu(evt, todo, onRefresh) {
-    const menu = new import_obsidian10.Menu();
-    const currentPriority = this.getCurrentPriority(todo);
-    const hasFocus = todo.tags.includes("#focus");
-    const hasFuture = todo.tags.includes("#future");
-    const hasLaterPriority = currentPriority && /^#p[3-4]$/.test(currentPriority);
-    menu.addItem((item) => {
-      item.setTitle("Copy").setIcon("copy").onClick(async () => {
-        await navigator.clipboard.writeText(todo.text);
-      });
-    });
-    menu.addItem((item) => {
-      item.setTitle("Move to...").setIcon("arrow-right").onClick(() => {
-        new MoveTargetModal(
-          this.app,
-          this.getMoveHistory(),
-          todo.filePath,
-          async (file) => {
-            const success = await this.processor.moveTodo(todo, file.path);
-            if (success)
-              onRefresh();
-          }
-        ).open();
-      });
-    });
-    menu.addItem((item) => {
-      item.setTitle(hasFocus ? "Unfocus" : "Focus").setIcon("zap").onClick(async () => {
-        let success;
-        if (hasFocus) {
-          success = await this.processor.removeTag(todo, "#focus");
-        } else {
-          const newPriority = this.calculateFocusPriority(currentPriority);
-          success = await this.processor.setPriorityTag(todo, newPriority, true);
-        }
-        if (success)
-          onRefresh();
-      });
-    });
-    menu.addItem((item) => {
-      item.setTitle(hasLaterPriority ? "Unlater" : "Later").setIcon("clock").onClick(async () => {
-        let success;
-        if (hasLaterPriority) {
-          success = await this.processor.removeTag(todo, currentPriority);
-        } else {
-          const newPriority = this.calculateLaterPriority(currentPriority);
-          success = await this.processor.setPriorityTag(todo, newPriority);
-        }
-        if (success)
-          onRefresh();
-      });
-    });
-    menu.addItem((item) => {
-      item.setTitle(hasFuture ? "Unsnooze" : "Snooze").setIcon("moon").onClick(async () => {
-        let success;
-        if (hasFuture) {
-          success = await this.processor.removeTag(todo, "#future");
-        } else {
-          success = await this.processor.setPriorityTag(todo, "#future");
-        }
-        if (success)
-          onRefresh();
-      });
-    });
-    menu.showAtMouseEvent(evt);
-  }
-  /**
-   * Extract current priority tag from TODO
-   */
-  getCurrentPriority(todo) {
-    if (todo.tags.includes("#future")) {
-      return "#future";
-    }
-    for (const tag of todo.tags) {
-      if (/^#p[0-4]$/.test(tag)) {
-        return tag;
-      }
-    }
-    return null;
-  }
-  /**
-   * Calculate new priority for Focus action
-   * If no priority or #future → #p0
-   * If #pN → #p(N-1), but #p0 stays #p0
-   */
-  calculateFocusPriority(currentPriority) {
-    if (!currentPriority || currentPriority === "#future") {
-      return "#p0";
-    }
-    const match = currentPriority.match(/^#p([0-4])$/);
-    if (match) {
-      const num = parseInt(match[1]);
-      return num > 0 ? `#p${num - 1}` : "#p0";
-    }
-    return "#p0";
-  }
-  /**
-   * Calculate new priority for Later action
-   * If no priority or #future → #p4
-   * If #pN → #p(N+1), but #p4 stays #p4
-   */
-  calculateLaterPriority(currentPriority) {
-    if (!currentPriority || currentPriority === "#future") {
-      return "#p4";
-    }
-    const match = currentPriority.match(/^#p([0-4])$/);
-    if (match) {
-      const num = parseInt(match[1]);
-      return num < 4 ? `#p${num + 1}` : "#p4";
-    }
-    return "#p4";
-  }
-  /**
-   * Show context menu for a project (focus list item)
-   * Operations apply to all TODOs matching the project tag
-   */
-  showProjectMenu(evt, project, scanner, onRefresh, onFilterByTag) {
-    const menu = new import_obsidian10.Menu();
-    const getTodosForProject = () => {
-      return scanner.getTodos().filter((todo) => todo.tags.includes(project.tag));
-    };
-    const todos = getTodosForProject();
-    const anyHasFocus = todos.some((t) => t.tags.includes("#focus"));
-    const anyHasFuture = todos.some((t) => t.tags.includes("#future"));
-    const anyHasLaterPriority = todos.some((t) => {
-      for (const tag of t.tags) {
-        if (/^#p[3-4]$/.test(tag))
-          return true;
-      }
-      return false;
-    });
-    menu.addItem((item) => {
-      item.setTitle(project.tag).setIcon("tag");
-      const submenu = item.setSubmenu();
-      submenu.addItem((subItem) => {
-        subItem.setTitle("Filter by").setIcon("filter").onClick(() => {
-          onFilterByTag(project.tag);
-        });
-      });
-    });
-    menu.addSeparator();
-    menu.addItem((item) => {
-      item.setTitle(anyHasFocus ? "Unfocus" : "Focus").setIcon("zap").onClick(async () => {
-        const currentTodos = getTodosForProject();
-        if (anyHasFocus) {
-          await this.processor.unfocusAllWithTag(currentTodos);
-        } else {
-          await this.processor.focusAllWithTag(currentTodos);
-        }
-        onRefresh();
-      });
-    });
-    menu.addItem((item) => {
-      item.setTitle(anyHasLaterPriority ? "Unlater" : "Later").setIcon("clock").onClick(async () => {
-        const currentTodos = getTodosForProject();
-        if (anyHasLaterPriority) {
-          await this.processor.unlaterAllWithTag(currentTodos);
-        } else {
-          await this.processor.laterAllWithTag(currentTodos);
-        }
-        onRefresh();
-      });
-    });
-    menu.addItem((item) => {
-      item.setTitle(anyHasFuture ? "Unsnooze" : "Snooze").setIcon("moon").onClick(async () => {
-        const currentTodos = getTodosForProject();
-        if (anyHasFuture) {
-          await this.processor.unsnoozeAllWithTag(currentTodos);
-        } else {
-          await this.processor.snoozeAllWithTag(currentTodos);
-        }
-        onRefresh();
-      });
-    });
-    menu.showAtMouseEvent(evt);
-  }
-  /**
-   * Show context menu for an idea item
-   */
-  showIdeaMenu(evt, idea, onRefresh) {
-    const menu = new import_obsidian10.Menu();
-    const hasFocus = idea.tags.includes("#focus");
-    menu.addItem((item) => {
-      item.setTitle("Add to TODOs").setIcon("check-square").onClick(async () => {
-        const success = await this.processor.convertIdeaToTodo(idea);
-        if (success)
-          onRefresh();
-      });
-    });
-    menu.addItem((item) => {
-      item.setTitle("Copy").setIcon("copy").onClick(async () => {
-        await navigator.clipboard.writeText(idea.text);
-      });
-    });
-    menu.addItem((item) => {
-      item.setTitle(hasFocus ? "Unfocus" : "Focus").setIcon("zap").onClick(async () => {
-        let success;
-        if (hasFocus) {
-          success = await this.processor.removeTag(idea, "#focus");
-        } else {
-          success = await this.processor.addFocusToIdea(idea);
-        }
-        if (success)
-          onRefresh();
-      });
-    });
-    menu.showAtMouseEvent(evt);
-  }
-};
-
-// src/SidebarView.ts
+var import_obsidian13 = require("obsidian");
 var VIEW_TYPE_TODO_SIDEBAR = "warped-todo-sidebar";
-var TodoSidebarView = class extends import_obsidian11.ItemView {
+var TodoSidebarView = class extends import_obsidian13.ItemView {
   constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, activeTodosLimit, focusListLimit, makeLinksClickable, onShowAbout, onShowStats, getMoveHistory = () => [], teamManager, defaultAssignee = "", focusQueueLimit = 1, focusModeActive = false, setFocusModeActive = async () => {
   }) {
     super(leaf);
@@ -2910,8 +4430,6 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
         return "TODOs";
       case "ideas":
         return "IDEAs";
-      case "snoozed":
-        return "Snoozed";
     }
   }
   getIcon() {
@@ -3249,7 +4767,7 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
     const logoEl = titleEl.createEl("span", { cls: "warped-todo-logo clickable-logo", text: "\u2423\u2318" });
     logoEl.addEventListener("click", () => this.onShowAbout());
     if (this.focusModeActive) {
-      titleEl.appendText(" TODOs");
+      titleEl.appendText(" Focus");
     } else {
       switch (this.activeTab) {
         case "todos":
@@ -3258,24 +4776,15 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
         case "ideas":
           titleEl.appendText(" IDEAs");
           break;
-        case "snoozed":
-          titleEl.appendText(" Snoozed");
-          break;
       }
     }
     const tabNav = headerDiv.createEl("div", { cls: "sidebar-tab-nav" });
-    const tabDisabledCls = this.focusModeActive ? " focus-mode-disabled" : "";
     const todosTab = tabNav.createEl("button", {
-      cls: `sidebar-tab-btn${!this.focusModeActive && this.activeTab === "todos" ? " active" : ""}${tabDisabledCls}`,
+      cls: `sidebar-tab-btn${!this.focusModeActive && this.activeTab === "todos" ? " active" : ""}`,
       attr: { "aria-label": "TODOs" }
     });
     todosTab.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.5"/><path d="m9 11 3 3L22 4"/></svg>';
-    if (!this.focusModeActive) {
-      todosTab.addEventListener("click", () => {
-        this.activeTab = "todos";
-        this.render();
-      });
-    }
+    todosTab.addEventListener("click", () => this.switchTab("todos"));
     const focusModeTopBtn = tabNav.createEl("button", {
       cls: `sidebar-tab-btn focus-mode-toggle-btn${this.focusModeActive ? " focus-mode-active" : ""}`,
       attr: { "aria-label": this.focusModeActive ? "Exit focus mode" : "Enter focus mode" }
@@ -3289,27 +4798,11 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
       }
     });
     const ideasTab = tabNav.createEl("button", {
-      cls: `sidebar-tab-btn${!this.focusModeActive && this.activeTab === "ideas" ? " active" : ""}${tabDisabledCls}`,
+      cls: `sidebar-tab-btn${!this.focusModeActive && this.activeTab === "ideas" ? " active" : ""}`,
       attr: { "aria-label": "Ideas" }
     });
     ideasTab.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"></path><path d="M10 22h4"></path><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"></path></svg>';
-    if (!this.focusModeActive) {
-      ideasTab.addEventListener("click", () => {
-        this.activeTab = "ideas";
-        this.render();
-      });
-    }
-    const snoozedTab = tabNav.createEl("button", {
-      cls: `sidebar-tab-btn${!this.focusModeActive && this.activeTab === "snoozed" ? " active" : ""}${tabDisabledCls}`,
-      attr: { "aria-label": "Snoozed" }
-    });
-    snoozedTab.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>';
-    if (!this.focusModeActive) {
-      snoozedTab.addEventListener("click", () => {
-        this.activeTab = "snoozed";
-        this.render();
-      });
-    }
+    ideasTab.addEventListener("click", () => this.switchTab("ideas"));
     this.createSidebarMenuButton(headerDiv);
     const content = container.createEl("div", { cls: "sidebar-content" });
     if (this.focusModeActive) {
@@ -3324,9 +4817,6 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
       case "ideas":
         this.renderIdeasContent(content);
         break;
-      case "snoozed":
-        this.renderSnoozedContent(content);
-        break;
     }
   }
   renderTodosContent(container) {
@@ -3335,75 +4825,8 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
     this.renderSummary(container);
   }
   renderIdeasContent(container) {
-    const activeIdeas = this.scanner.getIdeas().filter(
-      (i) => !i.tags.includes("#future") && !i.tags.includes("#snooze") && !i.tags.includes("#snoozed")
-    );
-    this.renderSimpleTagCloud(container, activeIdeas);
+    this.renderSimpleTagCloud(container, this.scanner.getIdeas());
     this.renderActiveIdeas(container);
-  }
-  renderSnoozedContent(container) {
-    const snoozedTodos = this.scanner.getTodos().filter(
-      (t) => t.tags.includes("#future") || t.tags.includes("#snooze") || t.tags.includes("#snoozed")
-    );
-    const snoozedIdeas = this.scanner.getIdeas().filter(
-      (i) => i.tags.includes("#future") || i.tags.includes("#snooze") || i.tags.includes("#snoozed")
-    );
-    this.renderSimpleTagCloud(container, [...snoozedTodos, ...snoozedIdeas]);
-    this.renderSnoozedTodos(container);
-    this.renderSnoozedIdeas(container);
-  }
-  renderSnoozedTodos(container) {
-    let todos = this.scanner.getTodos();
-    todos = todos.filter(
-      (todo) => todo.tags.includes("#future") || todo.tags.includes("#snooze") || todo.tags.includes("#snoozed")
-    );
-    todos = todos.filter(
-      (todo) => !todo.tags.includes("#idea") && !todo.tags.includes("#ideas") && !todo.tags.includes("#ideation")
-    );
-    todos = todos.filter((todo) => todo.parentLineNumber === void 0);
-    todos = this.filterByActiveTag(todos, this.scanner.getTodos());
-    todos = this.sortTodosByPriority(todos);
-    const section = container.createEl("div", { cls: "snoozed-todos-section" });
-    const header = section.createEl("div", {
-      cls: "todo-section-header snoozed-todos-header"
-    });
-    this.renderFilterIndicator(header);
-    if (todos.length === 0) {
-      section.createEl("div", {
-        text: this.activeTagFilter ? `No snoozed TODOs matching ${this.activeTagFilter}` : "No snoozed TODOs",
-        cls: "todo-empty"
-      });
-      return;
-    }
-    const list = section.createEl("ul", { cls: "todo-list" });
-    for (const todo of todos) {
-      this.renderListItem(list, todo, this.todoConfig);
-    }
-  }
-  renderSnoozedIdeas(container) {
-    let ideas = this.scanner.getIdeas();
-    ideas = ideas.filter(
-      (idea) => idea.tags.includes("#future") || idea.tags.includes("#snooze") || idea.tags.includes("#snoozed")
-    );
-    ideas = ideas.filter((idea) => idea.parentLineNumber === void 0);
-    ideas = this.filterByActiveTag(ideas, this.scanner.getIdeas());
-    ideas = this.sortTodosByPriority(ideas);
-    const section = container.createEl("div", { cls: "snoozed-ideas-section" });
-    const header = section.createEl("div", {
-      cls: "todo-section-header snoozed-ideas-header"
-    });
-    this.renderFilterIndicator(header);
-    if (ideas.length === 0) {
-      section.createEl("div", {
-        text: this.activeTagFilter ? `No snoozed ideas matching ${this.activeTagFilter}` : "No snoozed ideas",
-        cls: "todo-empty"
-      });
-      return;
-    }
-    const list = section.createEl("ul", { cls: "idea-list" });
-    for (const idea of ideas) {
-      this.renderListItem(list, idea, this.ideaConfig);
-    }
   }
   sortTodosByPriority(todos, allTodosForChildLookup) {
     const lookupList = allTodosForChildLookup || todos;
@@ -3467,9 +4890,8 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
     const section = container.createEl("div", { cls: "projects-section tag-cloud-section" });
     const entries = [];
     const todos = this.scanner.getTodos();
-    const activeTodos = todos.filter(
-      (t) => !t.tags.includes("#future") && !t.tags.includes("#snooze") && !t.tags.includes("#snoozed")
-    );
+    const allTodones = this.scanner.getTodones();
+    const activeTodos = todos.filter((t) => this.isActiveTodo(t, allTodones, todos));
     const activeTagCounts = /* @__PURE__ */ new Map();
     for (const t of activeTodos) {
       for (const tag of t.tags) {
@@ -3573,15 +4995,15 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
     });
   }
   /**
-   * Lightweight tag cloud for tabs without project metadata (Ideas, Snoozed).
-   * Builds entries from the items' own tags using the same exclusion rules
+   * Lightweight tag cloud for tabs without project metadata (Ideas). Builds
+   * entries from the items' own tags using the same exclusion rules
    * `ProjectManager` uses for the TODOs cloud. Pills route through the same
-   * `setTagFilterWithCrossfade` flow, so filtering on these tabs feels and
+   * `setTagFilterWithCrossfade` flow, so filtering on this tab feels and
    * persists identically.
    *
    * Renders nothing (not even an empty-state message) when there are no
-   * project-style tags to show — Ideas and Snoozed lists may legitimately
-   * contain only untagged entries.
+   * project-style tags to show — the Ideas list may legitimately contain
+   * only untagged entries.
    */
   renderSimpleTagCloud(container, items) {
     const counts = tallyProjectTags(items, this.priorityTags);
@@ -3674,9 +5096,9 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
       title.appendText(project.tag);
       if (info.description) {
         const desc = popup.createEl("div", { cls: "project-info-description" });
-        const component = new import_obsidian11.Component();
+        const component = new import_obsidian13.Component();
         component.load();
-        await import_obsidian11.MarkdownRenderer.render(this.app, info.description, desc, info.filepath, component);
+        await import_obsidian13.MarkdownRenderer.render(this.app, info.description, desc, info.filepath, component);
       } else {
         const desc = popup.createEl("div", { cls: "project-info-description project-info-empty" });
         desc.appendText("No description available.");
@@ -3693,9 +5115,9 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
           const li = principlesList.createEl("li", { cls: "project-info-principle-item" });
           let displayText = principle.text.replace(/#principles?\b/gi, "").replace(new RegExp(project.tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "gi"), "").replace(/\s+/g, " ").trim();
           displayText = displayText.replace(/^[-*+]\s*/, "");
-          const principleComponent = new import_obsidian11.Component();
+          const principleComponent = new import_obsidian13.Component();
           principleComponent.load();
-          await import_obsidian11.MarkdownRenderer.render(this.app, displayText, li, (info == null ? void 0 : info.filepath) || "", principleComponent);
+          await import_obsidian13.MarkdownRenderer.render(this.app, displayText, li, (info == null ? void 0 : info.filepath) || "", principleComponent);
         }
       }
       if (info.principles.length > 0) {
@@ -3720,7 +5142,7 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
         this.closeInfoPopup();
         const filepath = this.projectManager.getProjectFilePath(project.tag);
         const file = this.app.vault.getAbstractFileByPath(filepath);
-        if (file instanceof import_obsidian11.TFile) {
+        if (file instanceof import_obsidian13.TFile) {
           const leaf = this.app.workspace.getLeaf("tab");
           await leaf.openFile(file);
         }
@@ -3752,46 +5174,50 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
       this.openInfoPopup = null;
     }
   }
+  /**
+   * Whether a TODO counts as active work — shared by `renderActiveTodos`
+   * (the list) and `renderProjects` (the tag cloud) so the two agree on
+   * what's live. Snoozed items (`#future`/`#snooze`/`#snoozed`) are an
+   * ordinary tag here, not a filter — see BUGS.md's "demote snoozed to an
+   * ordinary tag"; the Focus queue is the one place that still excludes
+   * them (`getActiveTodosForFocus`, below). A non-header
+   * item always counts. A header additionally needs at least one real
+   * active child: complete, non-existent, or bold-subheading children
+   * don't count, even though the header's own line may still carry live
+   * tags — see BUGS.md's "tag cloud shows pills with zero matching TODOs"
+   * for why this used to disagree between the two callers.
+   */
+  isActiveTodo(todo, allTodones, allTodos) {
+    if (!todo.isHeader)
+      return true;
+    if (!todo.childLineNumbers)
+      return true;
+    if (todo.childLineNumbers.length === 0)
+      return false;
+    return todo.childLineNumbers.some((childLine) => {
+      const isComplete = allTodones.some((t) => t.filePath === todo.filePath && t.lineNumber === childLine);
+      if (isComplete)
+        return false;
+      const childItem = allTodos.find((t) => t.filePath === todo.filePath && t.lineNumber === childLine);
+      if (!childItem) {
+        return false;
+      }
+      if (childItem.isSubheading) {
+        return false;
+      }
+      return true;
+    });
+  }
   renderActiveTodos(container) {
     var _a, _b;
     let todos = this.scanner.getTodos();
-    todos = todos.filter(
-      (todo) => !todo.tags.includes("#future") && !todo.tags.includes("#snooze") && !todo.tags.includes("#snoozed")
-    );
     todos = todos.filter(
       (todo) => !todo.tags.includes("#idea") && !todo.tags.includes("#ideas") && !todo.tags.includes("#ideation")
     );
     todos = todos.filter((todo) => todo.parentLineNumber === void 0);
     const allTodones = this.scanner.getTodones();
     const allTodosForChildLookup = this.scanner.getTodos();
-    todos = todos.filter((todo) => {
-      if (!todo.isHeader) {
-        return true;
-      }
-      if (!todo.childLineNumbers) {
-        return true;
-      }
-      if (todo.childLineNumbers.length === 0) {
-        return false;
-      }
-      const hasActiveChild = todo.childLineNumbers.some((childLine) => {
-        const isComplete = allTodones.some((t) => t.filePath === todo.filePath && t.lineNumber === childLine);
-        if (isComplete)
-          return false;
-        const childItem = allTodosForChildLookup.find((t) => t.filePath === todo.filePath && t.lineNumber === childLine);
-        if (!childItem) {
-          return false;
-        }
-        if (childItem.isSubheading) {
-          return false;
-        }
-        const isSnoozed2 = childItem.tags.includes("#future") || childItem.tags.includes("#snooze") || childItem.tags.includes("#snoozed");
-        if (isSnoozed2)
-          return false;
-        return true;
-      });
-      return hasActiveChild;
-    });
+    todos = todos.filter((todo) => this.isActiveTodo(todo, allTodones, allTodosForChildLookup));
     todos = this.filterByActiveTag(todos, this.scanner.getTodos());
     if (this.activeAssigneeFilter) {
       const meHandle = this.teamManager.resolveMe();
@@ -3927,7 +5353,7 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
       e.preventDefault();
       e.stopPropagation();
       const file = this.app.vault.getAbstractFileByPath(this.defaultTodoneFile);
-      if (file instanceof import_obsidian11.TFile) {
+      if (file instanceof import_obsidian13.TFile) {
         await this.app.workspace.getLeaf(false).openFile(file);
       }
     });
@@ -3947,7 +5373,7 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
     const todos = this.scanner.getTodos();
     const openCount = todos.filter((t) => t.parentLineNumber === void 0).length;
     const todones = this.scanner.getTodones();
-    const m = import_obsidian11.moment;
+    const m = import_obsidian13.moment;
     const todayStr = m().format("YYYY-MM-DD");
     const weekStart = m().startOf("isoWeek").format("YYYY-MM-DD");
     const monthStart = m().startOf("month").format("YYYY-MM-DD");
@@ -4080,9 +5506,6 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
   }
   renderActiveIdeas(container) {
     let ideas = this.scanner.getIdeas();
-    ideas = ideas.filter(
-      (idea) => !idea.tags.includes("#future") && !idea.tags.includes("#snooze") && !idea.tags.includes("#snoozed")
-    );
     const allIdeasForChildLookup = ideas;
     ideas = ideas.filter((idea) => idea.parentLineNumber === void 0);
     ideas = this.filterByActiveTag(ideas, allIdeasForChildLookup);
@@ -4267,7 +5690,7 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
   }
   /** Format an ISO date as `D/M/YYYY` (e.g. `5/5/2026`). */
   formatFocusDate(iso) {
-    return (0, import_obsidian11.moment)(iso).format("D/M/YYYY");
+    return (0, import_obsidian13.moment)(iso).format("D/M/YYYY");
   }
   /**
    * Build the sidebar's kebab (vertical-dots) menu button and append it to
@@ -4281,7 +5704,7 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
     });
     menuBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>';
     menuBtn.addEventListener("click", (evt) => {
-      const menu = new import_obsidian11.Menu();
+      const menu = new import_obsidian13.Menu();
       menu.addItem((item) => {
         item.setTitle("Refresh").setIcon("refresh-cw").onClick(async () => {
           menuBtn.addClass("rotating");
@@ -4370,6 +5793,24 @@ var TodoSidebarView = class extends import_obsidian11.ItemView {
       result.push(tag);
     }
     return result;
+  }
+  /**
+   * Switch to a normal tab (TODOs/Ideas), implicitly exiting focus mode
+   * if it's active — one click, same as switching between any two
+   * normal tabs. Unlike handleFocusExit (used by the eye icon and the
+   * focus card's own "Exit" controls), this doesn't restore the previous
+   * tab/scroll position: the user just explicitly picked a destination, so
+   * there's nothing to restore.
+   */
+  switchTab(tab) {
+    if (this.focusModeActive) {
+      this.focusModeActive = false;
+      this.focusQueue = null;
+      this.prevActiveTab = null;
+      void this.setFocusModeActive(false);
+    }
+    this.activeTab = tab;
+    this.render();
   }
   handleFocusEnter() {
     var _a;
@@ -4520,7 +5961,11 @@ var DEFAULT_SETTINGS = {
   // Team file
   teamFilePath: "team.md",
   // Default assignee
-  defaultAssignee: ""
+  defaultAssignee: "",
+  // Projects extension
+  projectsBaseFolder: "",
+  projectsExcludeDirs: ["node_modules", "dist", "build", "archive"],
+  projectsScanDepth: 3
 };
 
 // src/SlackConverter.ts
@@ -5044,7 +6489,7 @@ function createHeaderChecklistExtension() {
 }
 
 // main.ts
-var WarpedTodoPlugin = class extends import_obsidian12.Plugin {
+var WarpedTodoPlugin = class extends import_obsidian14.Plugin {
   async onload() {
     await this.loadSettings();
     if (!this.settings.focusModePersist && this.settings.focusModeActive) {
@@ -5052,6 +6497,7 @@ var WarpedTodoPlugin = class extends import_obsidian12.Plugin {
       await this.saveSettings();
     }
     this.sidebarManager = new SidebarManager(this.app, VIEW_TYPE_TODO_SIDEBAR);
+    this.projectsSidebarManager = new SidebarManager(this.app, VIEW_TYPE_PROJECTS_SIDEBAR);
     this.teamManager = new TeamManager(this.app, this.settings.teamFilePath);
     this.teamManager.watchFile();
     this.scanner = new TodoScanner(this.app);
@@ -5064,6 +6510,15 @@ var WarpedTodoPlugin = class extends import_obsidian12.Plugin {
       this.settings.priorityTags,
       this.settings.excludeFoldersFromProjects
     );
+    this.projectScanner = new ProjectScanner();
+    this.projectSyncManager = new ProjectSyncManager(
+      this.app,
+      this.projectScanner,
+      (scanned) => this.projectsSidebarManager.forEach((view) => view.applySyncResult(scanned))
+    );
+    if (this.settings.projectsBaseFolder) {
+      this.projectSyncManager.startWatching(this.projectsSyncOptions());
+    }
     this.tabLockManager = new TabLockManager(this.app);
     if (this.settings.showTabLockButton) {
       this.app.workspace.onLayoutReady(() => {
@@ -5206,7 +6661,7 @@ var WarpedTodoPlugin = class extends import_obsidian12.Plugin {
           showNotice2("Cursor is not on a #todo line");
           return;
         }
-        const file = (_a = this.app.workspace.getActiveViewOfType(import_obsidian12.MarkdownView)) == null ? void 0 : _a.file;
+        const file = (_a = this.app.workspace.getActiveViewOfType(import_obsidian14.MarkdownView)) == null ? void 0 : _a.file;
         if (!file)
           return;
         const todos = this.scanner.getTodos();
@@ -5288,14 +6743,73 @@ var WarpedTodoPlugin = class extends import_obsidian12.Plugin {
         }
       })
     );
+    this.registerView(
+      VIEW_TYPE_PROJECTS_SIDEBAR,
+      (leaf) => new ProjectsSidebarView(
+        leaf,
+        this.scanner,
+        this.processor,
+        this.projectManager,
+        this.projectScanner,
+        this.projectSyncManager,
+        new ContextMenuHandler(
+          this.app,
+          this.processor,
+          this.settings.priorityTags,
+          () => this.settings.moveHistory
+        ),
+        () => this.projectsSyncOptions(),
+        () => {
+          this.app.setting.open();
+          this.app.setting.openTabById(this.manifest.id);
+        },
+        () => this.showAboutModal()
+      )
+    );
+    this.addCommand({
+      id: "toggle-projects-sidebar",
+      name: "Toggle Projects Sidebar",
+      callback: () => {
+        this.projectsSidebarManager.toggle();
+      }
+    });
+    this.addCommand({
+      id: "sync-projects",
+      name: "Sync Projects",
+      callback: async () => {
+        if (!this.settings.projectsBaseFolder) {
+          showNotice2("No Projects base folder configured yet. Set one in settings.");
+          return;
+        }
+        await this.projectSyncManager.syncAll(this.projectsSyncOptions());
+        showNotice2("Projects synced.");
+      }
+    });
     this.addRibbonIcon("square-check-big", "Toggle TODO Sidebar", () => {
       this.sidebarManager.toggle();
     });
+    this.addRibbonIcon("folder-git-2", "Toggle Projects Sidebar", () => {
+      this.projectsSidebarManager.toggle();
+    });
     this.addSettingTab(new WarpedTodoSettingTab(this.app, this));
   }
+  /** Builds ProjectSyncManager's SyncOptions/ProjectsSidebarOptions from current settings. */
+  projectsSyncOptions() {
+    return {
+      baseFolder: this.settings.projectsBaseFolder,
+      projectsFolder: this.settings.defaultProjectsFolder,
+      excludeDirs: this.settings.projectsExcludeDirs,
+      scanDepth: this.settings.projectsScanDepth,
+      maxDepth: this.settings.projectsScanDepth,
+      defaultTodoneFile: this.settings.defaultTodoneFile
+    };
+  }
   onunload() {
+    var _a;
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_TODO_SIDEBAR);
+    this.app.workspace.detachLeavesOfType(VIEW_TYPE_PROJECTS_SIDEBAR);
     this.tabLockManager.destroy();
+    (_a = this.projectSyncManager) == null ? void 0 : _a.stopWatching();
   }
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
@@ -5314,7 +6828,7 @@ var WarpedTodoPlugin = class extends import_obsidian12.Plugin {
     new StatsModal(this.app, this.scanner).open();
   }
 };
-var AboutModal = class extends import_obsidian12.Modal {
+var AboutModal = class extends import_obsidian14.Modal {
   constructor(app, version) {
     super(app);
     this.version = version;
@@ -5345,7 +6859,7 @@ var AboutModal = class extends import_obsidian12.Modal {
     this.contentEl.empty();
   }
 };
-var StatsModal = class extends import_obsidian12.Modal {
+var StatsModal = class extends import_obsidian14.Modal {
   constructor(app, scanner) {
     super(app);
     this.scanner = scanner;
@@ -5394,7 +6908,7 @@ var StatsModal = class extends import_obsidian12.Modal {
     this.contentEl.empty();
   }
 };
-var WarpedTodoSettingTab = class extends import_obsidian12.PluginSettingTab {
+var WarpedTodoSettingTab = class extends import_obsidian14.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -5420,13 +6934,13 @@ var WarpedTodoSettingTab = class extends import_obsidian12.PluginSettingTab {
       href: "https://github.com/robotpony/obsidian-plugins"
     });
     containerEl.createEl("h3", { text: "Sidebar" });
-    new import_obsidian12.Setting(containerEl).setName("Show sidebar by default").setDesc("Show the TODO sidebar when Obsidian starts").addToggle(
+    new import_obsidian14.Setting(containerEl).setName("Show sidebar by default").setDesc("Show the TODO sidebar when Obsidian starts").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.showSidebarByDefault).onChange(async (value) => {
         this.plugin.settings.showSidebarByDefault = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian12.Setting(containerEl).setName("Show tab lock buttons").setDesc("Add lock buttons to tab headers. Locked tabs force links to open in new tabs.").addToggle(
+    new import_obsidian14.Setting(containerEl).setName("Show tab lock buttons").setDesc("Add lock buttons to tab headers. Locked tabs force links to open in new tabs.").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.showTabLockButton).onChange(async (value) => {
         this.plugin.settings.showTabLockButton = value;
         if (value) {
@@ -5437,7 +6951,7 @@ var WarpedTodoSettingTab = class extends import_obsidian12.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian12.Setting(containerEl).setName("Make links clickable in lists").setDesc("Render wiki links and markdown links as clickable in the sidebar. When disabled, links display as plain text without markdown syntax.").addToggle(
+    new import_obsidian14.Setting(containerEl).setName("Make links clickable in lists").setDesc("Render wiki links and markdown links as clickable in the sidebar. When disabled, links display as plain text without markdown syntax.").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.makeLinksClickable).onChange(async (value) => {
         this.plugin.settings.makeLinksClickable = value;
         await this.plugin.saveSettings();
@@ -5445,13 +6959,13 @@ var WarpedTodoSettingTab = class extends import_obsidian12.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: "TODOs" });
-    new import_obsidian12.Setting(containerEl).setName("Default TODONE file").setDesc("Default file path for logging completed TODOs").addText(
+    new import_obsidian14.Setting(containerEl).setName("Default TODONE file").setDesc("Default file path for logging completed TODOs").addText(
       (text) => text.setPlaceholder("todos/done.md").setValue(this.plugin.settings.defaultTodoneFile).onChange(async (value) => {
         this.plugin.settings.defaultTodoneFile = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian12.Setting(containerEl).setName("Date format").setDesc("Format for completion dates. e.g. YYYY-MM-DD \u2192 2026-05-09, D/M/YYYY \u2192 9/5/2026").addText(
+    new import_obsidian14.Setting(containerEl).setName("Date format").setDesc("Format for completion dates. e.g. YYYY-MM-DD \u2192 2026-05-09, D/M/YYYY \u2192 9/5/2026").addText(
       (text) => text.setPlaceholder("YYYY-MM-DD").setValue(this.plugin.settings.dateFormat).onChange(async (value) => {
         this.plugin.settings.dateFormat = value;
         this.plugin.processor = new TodoProcessor(
@@ -5462,13 +6976,13 @@ var WarpedTodoSettingTab = class extends import_obsidian12.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: "Projects" });
-    new import_obsidian12.Setting(containerEl).setName("Default projects folder").setDesc("Folder scanned for project files. TODOs here get automatic project tags if no explicit tag is set (e.g., projects/)").addText(
+    new import_obsidian14.Setting(containerEl).setName("Default projects folder").setDesc("Folder scanned for project files. TODOs here get automatic project tags if no explicit tag is set (e.g., projects/)").addText(
       (text) => text.setPlaceholder("projects/").setValue(this.plugin.settings.defaultProjectsFolder).onChange(async (value) => {
         this.plugin.settings.defaultProjectsFolder = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian12.Setting(containerEl).setName("Project list limit").setDesc("Maximum number of projects to show in the tag cloud").addText(
+    new import_obsidian14.Setting(containerEl).setName("Project list limit").setDesc("Maximum number of projects to show in the tag cloud").addText(
       (text) => text.setPlaceholder("5").setValue(String(this.plugin.settings.focusListLimit)).onChange(async (value) => {
         const num = parseInt(value);
         if (!isNaN(num) && num > 0) {
@@ -5477,7 +6991,7 @@ var WarpedTodoSettingTab = class extends import_obsidian12.PluginSettingTab {
         }
       })
     );
-    new import_obsidian12.Setting(containerEl).setName("Active TODOs limit").setDesc("Maximum number of TODOs to show in sidebar (0 for unlimited)").addText(
+    new import_obsidian14.Setting(containerEl).setName("Active TODOs limit").setDesc("Maximum number of TODOs to show in sidebar (0 for unlimited)").addText(
       (text) => text.setPlaceholder("5").setValue(String(this.plugin.settings.activeTodosLimit)).onChange(async (value) => {
         const num = parseInt(value);
         if (!isNaN(num) && num >= 0) {
@@ -5486,7 +7000,7 @@ var WarpedTodoSettingTab = class extends import_obsidian12.PluginSettingTab {
         }
       })
     );
-    new import_obsidian12.Setting(containerEl).setName("Exclude folders from projects").setDesc("Comma-separated folders to exclude from inferred project tags (e.g., log, archive)").addText(
+    new import_obsidian14.Setting(containerEl).setName("Exclude folders from projects").setDesc("Comma-separated folders to exclude from inferred project tags (e.g., log, archive)").addText(
       (text) => text.setPlaceholder("log").setValue(this.plugin.settings.excludeFoldersFromProjects.join(", ")).onChange(async (value) => {
         const folders = value.split(",").map((f) => f.trim()).filter((f) => f.length > 0);
         this.plugin.settings.excludeFoldersFromProjects = folders;
@@ -5500,21 +7014,47 @@ var WarpedTodoSettingTab = class extends import_obsidian12.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
+    new import_obsidian14.Setting(containerEl).setName("Projects base folder").setDesc("Folder of git repos scanned for project notes (e.g., /Users/you/projects). Leave blank to disable repo syncing.").addText(
+      (text) => text.setPlaceholder("/Users/you/projects").setValue(this.plugin.settings.projectsBaseFolder).onChange(async (value) => {
+        this.plugin.settings.projectsBaseFolder = value;
+        await this.plugin.saveSettings();
+        if (value) {
+          this.plugin.projectSyncManager.startWatching(this.plugin.projectsSyncOptions());
+        } else {
+          this.plugin.projectSyncManager.stopWatching();
+        }
+      })
+    );
+    new import_obsidian14.Setting(containerEl).setName("Projects exclude directories").setDesc("Comma-separated directory names to skip while scanning for repos (e.g., node_modules, dist, build, archive)").addText(
+      (text) => text.setPlaceholder("node_modules, dist, build, archive").setValue(this.plugin.settings.projectsExcludeDirs.join(", ")).onChange(async (value) => {
+        this.plugin.settings.projectsExcludeDirs = value.split(",").map((d) => d.trim()).filter((d) => d.length > 0);
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian14.Setting(containerEl).setName("Projects scan depth").setDesc("How many folder levels deep to look for repos under the base folder").addText(
+      (text) => text.setPlaceholder("3").setValue(String(this.plugin.settings.projectsScanDepth)).onChange(async (value) => {
+        const num = parseInt(value);
+        if (!isNaN(num) && num >= 0) {
+          this.plugin.settings.projectsScanDepth = num;
+          await this.plugin.saveSettings();
+        }
+      })
+    );
     containerEl.createEl("h3", { text: "Focus Mode" });
-    new import_obsidian12.Setting(containerEl).setName("Focus queue limit").setDesc("How many items to show at once in Focus Mode (1\u20135). 1 means strict single-task focus.").addSlider(
+    new import_obsidian14.Setting(containerEl).setName("Focus queue limit").setDesc("How many items to show at once in Focus Mode (1\u20135). 1 means strict single-task focus.").addSlider(
       (slider) => slider.setLimits(1, 5, 1).setValue(this.plugin.settings.focusQueueLimit).setDynamicTooltip().onChange(async (value) => {
         this.plugin.settings.focusQueueLimit = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian12.Setting(containerEl).setName("Persist focus mode across sessions").setDesc("When on, Focus Mode stays active after closing and reopening Obsidian.").addToggle(
+    new import_obsidian14.Setting(containerEl).setName("Persist focus mode across sessions").setDesc("When on, Focus Mode stays active after closing and reopening Obsidian.").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.focusModePersist).onChange(async (value) => {
         this.plugin.settings.focusModePersist = value;
         await this.plugin.saveSettings();
       })
     );
     containerEl.createEl("h3", { text: "Team" });
-    new import_obsidian12.Setting(containerEl).setName("Team file path").setDesc("Path to the team definition file in your vault").addText(
+    new import_obsidian14.Setting(containerEl).setName("Team file path").setDesc("Path to the team definition file in your vault").addText(
       (text) => text.setPlaceholder("team.md").setValue(this.plugin.settings.teamFilePath).onChange(async (value) => {
         this.plugin.settings.teamFilePath = value;
         this.plugin.teamManager.setFilePath(value);
@@ -5523,8 +7063,8 @@ var WarpedTodoSettingTab = class extends import_obsidian12.PluginSettingTab {
       })
     );
     const teamFile = this.app.vault.getAbstractFileByPath(this.plugin.settings.teamFilePath);
-    const teamButtonSetting = new import_obsidian12.Setting(containerEl);
-    if (teamFile instanceof import_obsidian12.TFile) {
+    const teamButtonSetting = new import_obsidian14.Setting(containerEl);
+    if (teamFile instanceof import_obsidian14.TFile) {
       teamButtonSetting.setName("Manage team file").addButton(
         (btn) => btn.setButtonText("Open team file").onClick(async () => {
           await this.app.workspace.getLeaf(false).openFile(teamFile);
@@ -5550,7 +7090,7 @@ var WarpedTodoSettingTab = class extends import_obsidian12.PluginSettingTab {
           entry.createEl("span", { cls: "sc-team-me-badge", text: "(me)" });
         }
       }
-      new import_obsidian12.Setting(containerEl).setName("Default assignee").setDesc("Unattributed tasks are treated as belonging to this person when filtering").addDropdown((dropdown) => {
+      new import_obsidian14.Setting(containerEl).setName("Default assignee").setDesc("Unattributed tasks are treated as belonging to this person when filtering").addDropdown((dropdown) => {
         dropdown.addOption("", "None");
         dropdown.addOption("me", "@me");
         for (const member of team) {
