@@ -2,6 +2,24 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.35.1] - 2026-08-17
+
+### Fixed — Projects nav button had a stray border and couldn't be closed
+
+Two bugs found via screenshot review of 0.35.0's new Projects nav button:
+the button had a faint border around its icon after being clicked, a
+Chromium focus ring left over because (unlike the other tab buttons) it
+never gets `.active` styling to mask it — fixed by clearing `outline` on
+`:focus-visible`, the same treatment `.tag-cloud-pill` already uses.
+Separately, the button only opened the Projects sidebar, never closed it:
+it called `activate()`, where the ribbon icon it replaced called
+`toggle()`, so once opened there was no way back except closing the pane
+by hand. Reported as the Projects icon "installing" itself in the ribbon
+with no way to dismiss it. Both nav buttons (Projects → TODOs and back)
+now toggle when called with no target; the "Show in Projects"
+context-menu entries, which pass a specific project tag, still always
+open (never close) since their intent is "show me this."
+
 ## [0.35.0] - 2026-08-17
 
 ### Changed — Projects reached from the TODO sidebar, not a ribbon icon

@@ -50,8 +50,10 @@ export class TodoSidebarView extends ItemView {
   private openInfoPopup: HTMLElement | null = null;
   private onShowAbout: () => void;
   private onShowStats: () => void;
-  // Optional tag: with one, jumps straight to that project's detail view;
-  // without, just opens/reveals the Projects sidebar at whatever it last showed.
+  // Optional tag: with one, jumps straight to that project's detail view
+  // (and never closes it); without one (the header nav button), toggles
+  // the Projects sidebar open/closed, matching the ribbon-icon convention
+  // it replaced.
   private onOpenProjects: (tag?: string) => void;
 
   constructor(

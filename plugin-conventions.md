@@ -466,8 +466,6 @@ this.addCommand({
 this.addRibbonIcon("{icon-name}", "Open Plugin Name", () => this.sidebarManager.toggle());
 ```
 
-Existing hotkey letters: `Space` (space-command), `H` (hugo-command), `N` (notate-command).
-
 ---
 
 ## File Layout

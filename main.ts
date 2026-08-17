@@ -415,7 +415,7 @@ export default class WarpedTodoPlugin extends Plugin {
             (this.app as any).setting.openTabById(this.manifest.id);
           },
           () => this.showAboutModal(),
-          () => this.sidebarManager.activate()
+          () => this.sidebarManager.toggle()
         )
     );
 
@@ -492,17 +492,26 @@ export default class WarpedTodoPlugin extends Plugin {
   }
 
   /**
-   * Opens/reveals the Projects sidebar. With a tag, jumps straight to that
-   * project's detail view — used by the TODO sidebar's "Open Projects" nav
-   * button and its "Show in Projects" context menu entries. Without one,
-   * just opens to whatever the sidebar last showed (list or detail).
+   * Opens/reveals the Projects sidebar, or — called with no tag — toggles
+   * it closed if it's already open. The toggle matters: this is also what
+   * the TODO sidebar's "Open Projects" nav button calls, and that button
+   * replaced the old ribbon icon, which toggled. Without it, that button
+   * could only ever open the sidebar, leaving it pinned open with no way
+   * to dismiss it from the same spot — reported via screenshot as the
+   * Projects icon "installing" itself with no way back.
+   *
+   * With a tag (the "Show in Projects" context-menu entries), always opens
+   * and jumps straight to that project's detail view — never closes, since
+   * the intent there is "show me this," not "toggle."
    */
   async openProjectsSidebar(tag?: string) {
-    await this.projectsSidebarManager.activate();
-    if (tag) {
-      const view = this.projectsSidebarManager.getView<ProjectsSidebarView>();
-      await view?.showProject(tag);
+    if (!tag) {
+      await this.projectsSidebarManager.toggle();
+      return;
     }
+    await this.projectsSidebarManager.activate();
+    const view = this.projectsSidebarManager.getView<ProjectsSidebarView>();
+    await view?.showProject(tag);
   }
 
   showAboutModal() {

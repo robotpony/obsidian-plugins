@@ -267,6 +267,15 @@
   opacity: 0.8;
 }
 
+/* Chromium/Electron leaves a focus ring on a button after it's clicked,
+   not just after keyboard tabbing to it. Every other tab button masks this
+   with its .active background; this one (sidebar-nav-out-btn) never gets
+   .active, so the ring was the only thing visible — read as a stray
+   border around the Projects icon. Same fix .tag-cloud-pill already uses. */
+.sidebar-tab-btn:focus-visible {
+  outline: none;
+}
+
 .sidebar-tab-btn.active {
   opacity: 1;
   background-color: var(--background-modifier-hover) !important;

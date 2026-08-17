@@ -710,7 +710,7 @@ the active list automatically once every live child is done (see
 
 ### No New Runtime Dependencies
 
-Git facts use `child_process.execFile` (matching `DriveProvider.ts`'s existing `rclone` pattern) instead of shelling out to an external tool like `p` — `git` itself is the only assumption. File watching uses native `fs.watch` rather than adding `chokidar`. Frontmatter is hand-parsed/generated the same way `warped-hugo/src/utils.ts` already does it, no YAML library added. Consistent with how the rest of this repo avoids dependencies where a small amount of native code covers the need.
+Git facts use `child_process.execFile` (matching `warped-gdrive`'s `DriveProvider.ts` and its existing `rclone` pattern) instead of shelling out to an external tool like `p` — `git` itself is the only assumption. File watching uses native `fs.watch` rather than adding `chokidar`. Frontmatter is hand-parsed/generated the same way `warped-hugo`'s `src/utils.ts` already does it, no YAML library added. Both are sibling repos post-split (PLAN-repo-split.md), not paths in this one. Consistent with how the rest of this repo avoids dependencies where a small amount of native code covers the need.
 
 ### Delimited Sync Regions
 

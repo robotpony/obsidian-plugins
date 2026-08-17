@@ -6,9 +6,11 @@ after the four sidebar bugs (fixed and pushed 2026-08-17) in what was
 split itself is a pure move-and-rename with no behaviour change riding
 along.
 
-**Phase 1a is done** (2026-08-17) — see its section below for what
-actually happened, including two conflicts surfaced and resolved during
-execution that aren't reflected in the original plan text above.
+**Phases 1a, 2, and 3 are done** (2026-08-17) — see their sections below
+for what actually happened, including conflicts surfaced and resolved
+during execution that aren't reflected in the original plan text above.
+**Phase 1b is ready to execute** — its only blocker (2 and 3 existing as
+real repos) is cleared. Phase 4 stays unscoped.
 
 ## Decisions
 
@@ -237,6 +239,32 @@ correct manifest: `id`/`name` unchanged, `authorUrl` fixed.
 both halves (Obsidian plugin + MCP server) work exactly as they did in
 `obsidian-plugins/warped-reference/` — no functional change, just a new
 home and a new repo/package name.
+
+## Phase 1b: delete the old plugin directories — ready to execute
+
+**Goal**: `warped-hugo/` and `warped-reference/` are gone from this repo.
+Both now exist as standalone, verified-working repos (Phases 2 and 3), so
+nothing here still depends on these copies.
+
+**What's left**:
+
+- Delete `warped-hugo/` and `warped-reference/` (via `git rm -r`, so the
+  removal is a normal tracked commit, not just a working-tree change).
+- `tsconfig.json`: drop `"warped-hugo"` and `"warped-reference"` from
+  `exclude` — once the directories are gone there's nothing left for that
+  entry to guard against.
+- `vitest.config.mjs`: drop the `"warped-hugo/**"` and
+  `"warped-reference/**"` lines from `exclude`, and the comment above them
+  explaining why they're there (references Phase 1b directly — remove
+  together).
+- Sweep for anything else still pointing at either directory by path
+  (`grep -rn "warped-hugo\|warped-reference"`, excluding the two
+  directories themselves and this plan's own history sections below,
+  which describe what already happened and should stay as-is).
+
+**Exit criteria**: `npm run build` and `npm test` pass with both configs'
+temporary excludes gone; `git status` shows no trace of either directory;
+the sweep above turns up nothing outside this plan's history.
 
 ## Phase 4: CLI/MCP-first conversion for warped-gdrive (unscoped)
 
