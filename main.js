@@ -5704,6 +5704,26 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       titleLine.createSpan({ text: project.branch, cls: "warped-todo-project-branch" });
     if (project.gitStatus)
       titleLine.createSpan({ text: project.gitStatus, cls: "warped-todo-project-status" });
+    const notePath = projectFilePath(this.getProjectsOptions().projectsFolder, name);
+    const noteFile = this.app.vault.getAbstractFileByPath(notePath);
+    if (noteFile instanceof import_obsidian12.TFile) {
+      titleLine.createSpan({
+        cls: "header-filename",
+        text: noteFile.name,
+        attr: { title: noteFile.path }
+      });
+      const link = titleLine.createEl("a", {
+        cls: "todo-orphan-section-link",
+        text: "\u2192",
+        href: "#",
+        attr: { "aria-label": `Open ${noteFile.path}` }
+      });
+      link.addEventListener("click", (evt) => {
+        evt.preventDefault();
+        evt.stopPropagation();
+        openFileAtLine(this.app, noteFile, 0);
+      });
+    }
     if (counts.total > 0) {
       const parts = [];
       if (counts.todo > 0)

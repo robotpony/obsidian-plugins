@@ -2,6 +2,60 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.35.6] - 2026-08-17
+
+### Fixed — Projects list still didn't match TODOs: spacing and missing file link
+
+Screenshot comparison against the TODOs tab (side by side, with a grid
+overlay) found two more real gaps:
+
+- **Filter sat flush against the header**, tighter than TODOs' tag cloud.
+  `.sidebar-content > div:first-child { margin-top: 1em }` gives every
+  tab's first section that breathing room, but the selector only matches
+  `div`s — the filter is an `input`, so it never qualified. Set explicitly
+  on the filter instead of broadening the shared selector.
+- **Project rows had no source-file link.** TODOs shows the file a
+  header/section came from as a muted filename + → arrow at the row's
+  right edge; project rows had nothing pointing at their own note.
+  Added, using the same `.header-filename` + arrow markup, pushed right
+  via `margin-left: auto`. Click opens the note without switching into
+  detail mode (`stopPropagation` keeps it separate from the row's own
+  click, which does switch); omitted, not guessed, if that project's note
+  hasn't synced into the vault yet.
+
+A third reported difference — background colour between the two panels —
+isn't a plugin CSS issue: neither tab sets a background on
+`.sidebar-content`, and both render through the same `TodoSidebarView`
+class post-0.35.3, so there's nothing left in this plugin's stylesheet
+that could differ between them. Likely Obsidian's own leaf-background
+handling (sidebar dock vs. main pane, or active vs. inactive leaf) rather
+than anything this plugin controls — see the reply for what to check.
+
+## [0.35.5] - 2026-08-17
+
+### Fixed — Projects filter border looked crooked when focused
+
+Side effect of 0.35.4's fix: removing the filter's own margin put it
+directly against `.sidebar-content`'s padding, which is asymmetric on
+purpose (4px left, 8px right — extra room for the scrollbar gutter).
+Invisible on plain dividers and text; obvious on this input's own visible
+border, especially focused, where the right side sat twice as far from
+the edge as the left. Extends 4px into that reserved gutter so the border
+sits the same visual distance from both edges.
+
+## [0.35.4] - 2026-08-17
+
+### Fixed — Projects list filter box inset further than the header and rows
+
+The filter input had its own `margin: 0 8px 8px` on top of
+`.sidebar-content`'s own padding (4px left, 8px right, reserved for the
+scrollbar), stacking to a 12px/16px inset instead of matching the 4px/8px
+every other element in this view uses — `.sidebar-header`, `.projects-section`
+(the TODOs tab's tag cloud), and `.warped-todo-project-row` all rely on the
+container's padding alone for their outer gutter, none add their own.
+Reported via screenshot as a visible gap around the search box. Filter now
+spans full width with no horizontal margin, matching that pattern.
+
 ## [0.35.3] - 2026-08-17
 
 ### Changed — Projects folded into the TODO sidebar as a tab, not a separate view

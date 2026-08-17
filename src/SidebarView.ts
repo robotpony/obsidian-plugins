@@ -2409,6 +2409,34 @@ export class TodoSidebarView extends ItemView {
     if (project.branch) titleLine.createSpan({ text: project.branch, cls: "warped-todo-project-branch" });
     if (project.gitStatus) titleLine.createSpan({ text: project.gitStatus, cls: "warped-todo-project-status" });
 
+    // Filename + arrow to the project's own note — the same "which file is
+    // this?" affordance TODOs' header/orphan-section rows give their source
+    // file. Reported missing here via screenshot comparison. Omitted (not
+    // guessed) if the note hasn't been synced into the vault yet.
+    // stopPropagation matters in the list view, where the row itself is
+    // also clickable (opens detail mode) — otherwise this arrow's click
+    // would bubble up and trigger that too, on top of opening the file.
+    const notePath = projectFilePath(this.getProjectsOptions().projectsFolder, name);
+    const noteFile = this.app.vault.getAbstractFileByPath(notePath);
+    if (noteFile instanceof TFile) {
+      titleLine.createSpan({
+        cls: "header-filename",
+        text: noteFile.name,
+        attr: { title: noteFile.path },
+      });
+      const link = titleLine.createEl("a", {
+        cls: "todo-orphan-section-link",
+        text: "→",
+        href: "#",
+        attr: { "aria-label": `Open ${noteFile.path}` },
+      });
+      link.addEventListener("click", (evt) => {
+        evt.preventDefault();
+        evt.stopPropagation();
+        openFileAtLine(this.app, noteFile, 0);
+      });
+    }
+
     if (counts.total > 0) {
       const parts: string[] = [];
       if (counts.todo > 0) parts.push(`${counts.todo} todo`);

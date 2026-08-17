@@ -2084,9 +2084,28 @@
    rules, so this view's header matches by construction. See
    ProjectsSidebarView.ts's renderHeader(). */
 
+/* No horizontal margin — .sidebar-content's own padding already supplies
+   the outer gutter, same as .projects-section (the TODOs tab's tag cloud)
+   and .warped-todo-project-row below. Adding one here on top of that
+   stacked an extra 8px on each side, insetting the filter box noticeably
+   further than the header and rows around it — reported via screenshot.
+   .sidebar-content's padding is itself asymmetric on purpose (4px left,
+   8px right — extra room for the scrollbar gutter), invisible on plain
+   dividers/text but visible as a crooked-looking focus ring on this
+   input's own border, reported via a second screenshot. Extending 4px
+   into that reserved gutter puts the border the same visual distance from
+   both edges; the scrollbar itself only overlays a couple of px at the
+   very edge and isn't a click target here.
+   Top margin: `.sidebar-content > div:first-child { margin-top: 1em }`
+   gives every other tab's first section its breathing room below the
+   header, but that selector only matches `div`s — this is an `input`, so
+   it never qualified and sat flush against the header. Reported via
+   screenshot as tighter than TODOs. Set explicitly here instead of
+   broadening the shared selector, which risks pulling in some other
+   non-div first-child elsewhere in the sidebar. */
 .warped-todo-projects-filter {
-  width: calc(100% - var(--size-4-4));
-  margin: 0 var(--size-4-2) var(--size-4-2);
+  width: calc(100% + 4px);
+  margin: 1em -4px var(--size-4-2) 0;
 }
 
 .warped-todo-projects-empty,
@@ -2120,6 +2139,15 @@
   display: flex;
   align-items: baseline;
   gap: var(--size-4-2);
+}
+
+/* Pushes the note-filename + arrow (when present) to the row's far right,
+   same affordance TODOs' own header/orphan-section rows give their source
+   file — everything before it (name/branch/status) keeps its normal gap,
+   `margin-left: auto` eats the rest of the row's width on its own.
+   Reported missing here via screenshot comparison against TODOs. */
+.warped-todo-project-row-title .header-filename {
+  margin-left: auto;
 }
 
 .warped-todo-project-name {
