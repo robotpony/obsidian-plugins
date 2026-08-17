@@ -49,6 +49,30 @@ export function hasTag(tags: string[], tag: string): boolean {
 }
 
 /**
+ * Whether an item belongs to a tag-based scope (a project filter, most
+ * commonly) — either it carries the tag explicitly, or it lives in a file
+ * whose name maps to that tag (`ProjectManager`'s `inferredFileTag`
+ * fallback, e.g. `projects/peep.md` → `#peep`). Shared by list filtering
+ * (`filterByActiveTag` in SidebarView.ts) and the focus queue
+ * (`buildFocusQueue` below) so scoping to a project behaves identically
+ * whichever surface you're looking at it from — see PLAN.md's Phase 7.
+ *
+ * Unlike `ProjectManager.getProjects()`'s own use of `inferredFileTag`
+ * (which only counts it inside the configured projects folder, excluding
+ * excluded folders), this checks it unconditionally — `TodoScanner` sets
+ * `inferredFileTag` on every item regardless of location, and threading
+ * folder config through every call site here (including the pure
+ * `buildFocusQueue`) isn't worth it for what should be a narrow edge case:
+ * an unrelated note outside the projects folder happening to share a
+ * project's exact tag name as its filename. Accepted trade-off, not an
+ * oversight — revisit only if it turns out to bite in practice.
+ */
+export function itemMatchesTagFilter(item: { tags: string[]; inferredFileTag?: string }, tag: string): boolean {
+  if (hasTag(item.tags, tag)) return true;
+  return item.inferredFileTag?.toLowerCase() === tag.toLowerCase();
+}
+
+/**
  * Tag colour info for semantic colouring.
  */
 export interface TagColourInfo {
@@ -355,9 +379,16 @@ export function compareInMainListWalkOrder(
  *   from top-priority active items. Used for the "Continue with next priority task"
  *   path when the curated #focus queue has been exhausted; the resulting source
  *   will be `priority-fallback` so the card shows the priority hint.
+ * - `tagFilter`: scope the queue to items matching this tag (or its file's
+ *   inferred tag — see `itemMatchesTagFilter`), same as the TODOs/Ideas
+ *   lists' `activeTagFilter`. A header-with-children is never a candidate
+ *   itself regardless, so this only needs to check standalone items and
+ *   leaf headers directly — their children are checked individually, not
+ *   via a parent-match rule like the list view needs.
  */
 export interface BuildFocusQueueOptions {
   forceFallback?: boolean;
+  tagFilter?: string | null;
 }
 
 /**
@@ -377,7 +408,8 @@ export interface BuildFocusQueueOptions {
  *
  * The caller is responsible for filtering out completed items (#todone) before
  * passing them in. Snoozed items (#future / #snooze / #snoozed), header items
- * with children, and bold subheading dividers are filtered here.
+ * with children, bold subheading dividers, and (when `options.tagFilter` is
+ * set) items outside the active project/tag scope are filtered here.
  */
 export function buildFocusQueue(
   activeTodos: TodoItem[],
@@ -393,6 +425,9 @@ export function buildFocusQueue(
     if (isSnoozed(t.tags)) return false;
     if (t.isSubheading) return false;
     if (t.isHeader && t.childLineNumbers && t.childLineNumbers.length > 0) {
+      return false;
+    }
+    if (options.tagFilter && !itemMatchesTagFilter(t, options.tagFilter)) {
       return false;
     }
     return true;

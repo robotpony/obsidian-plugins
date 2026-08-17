@@ -15,6 +15,7 @@ interface MakeTodoOpts {
   parentLineNumber?: number;
   childLineNumbers?: number[];
   mtime?: number;
+  inferredFileTag?: string;
 }
 
 function makeTodo(opts: MakeTodoOpts = {}): TodoItem {
@@ -42,6 +43,7 @@ function makeTodo(opts: MakeTodoOpts = {}): TodoItem {
     childLineNumbers: opts.childLineNumbers,
     itemType: "todo",
     mentions: [],
+    inferredFileTag: opts.inferredFileTag,
   };
 }
 
@@ -297,6 +299,78 @@ describe("buildFocusQueue", () => {
       "A1 plain", // HeaderA's children in document order
       "A2 p1",
     ]);
+  });
+
+  // -------------------------------------------------------------------------
+  // tagFilter (PLAN.md's Phase 7: focus mode respects the project scope)
+  // -------------------------------------------------------------------------
+
+  it("scopes the queue to items matching tagFilter", () => {
+    const items = [
+      makeTodo({ text: "In scope", tags: ["#todo", "#peep"], lineNumber: 0 }),
+      makeTodo({ text: "Out of scope", tags: ["#todo", "#other"], lineNumber: 1 }),
+    ];
+    const result = buildFocusQueue(items, 10, { tagFilter: "#peep" });
+    expect(result.items.map(i => i.text)).toEqual(["In scope"]);
+  });
+
+  it("matches tagFilter via inferredFileTag when there's no explicit tag", () => {
+    const items = [
+      makeTodo({ text: "Untagged in project note", tags: ["#todo"], inferredFileTag: "#peep", lineNumber: 0 }),
+      makeTodo({ text: "Untagged elsewhere", tags: ["#todo"], lineNumber: 1 }),
+    ];
+    const result = buildFocusQueue(items, 10, { tagFilter: "#peep" });
+    expect(result.items.map(i => i.text)).toEqual(["Untagged in project note"]);
+  });
+
+  it("explicit tag and inferredFileTag both matching doesn't double the item", () => {
+    const items = [
+      makeTodo({ text: "Both", tags: ["#todo", "#peep"], inferredFileTag: "#peep", lineNumber: 0 }),
+    ];
+    const result = buildFocusQueue(items, 10, { tagFilter: "#peep" });
+    expect(result.items.map(i => i.text)).toEqual(["Both"]);
+  });
+
+  it("still excludes a focused item outside the scope from the focus-tagged queue", () => {
+    const items = [
+      makeTodo({ text: "Focused, wrong project", tags: ["#todo", "#focus", "#other"], lineNumber: 0 }),
+      makeTodo({ text: "Plain, right project", tags: ["#todo", "#peep"], lineNumber: 1 }),
+    ];
+    const result = buildFocusQueue(items, 10, { tagFilter: "#peep" });
+    expect(result.source).toBe("priority-fallback");
+    expect(result.items.map(i => i.text)).toEqual(["Plain, right project"]);
+  });
+
+  it("returns empty when nothing matches the scope", () => {
+    const items = [makeTodo({ text: "Wrong project", tags: ["#todo", "#other"] })];
+    const result = buildFocusQueue(items, 10, { tagFilter: "#peep" });
+    expect(result).toEqual({ items: [], source: "empty" });
+  });
+
+  it("a header-with-children outside the scope still doesn't leak its out-of-scope child in", () => {
+    // Header itself untagged; one child in scope, one not. The out-of-scope
+    // child must not appear even though its sibling and parent are examined
+    // together during effective-priority resolution.
+    const header = makeTodo({
+      text: "Header",
+      tags: ["#todo"],
+      isHeader: true,
+      childLineNumbers: [1, 2],
+      lineNumber: 0,
+    });
+    const inScope = makeTodo({ text: "In scope child", tags: ["#todo", "#peep"], lineNumber: 1, parentLineNumber: 0 });
+    const outOfScope = makeTodo({ text: "Out of scope child", tags: ["#todo", "#other"], lineNumber: 2, parentLineNumber: 0 });
+    const result = buildFocusQueue([header, inScope, outOfScope], 10, { tagFilter: "#peep" });
+    expect(result.items.map(i => i.text)).toEqual(["In scope child"]);
+  });
+
+  it("no tagFilter (undefined or null) behaves exactly as before", () => {
+    const items = [
+      makeTodo({ text: "A", tags: ["#todo", "#peep"], lineNumber: 0 }),
+      makeTodo({ text: "B", tags: ["#todo", "#other"], lineNumber: 1 }),
+    ];
+    expect(buildFocusQueue(items, 10).items.map(i => i.text)).toEqual(["A", "B"]);
+    expect(buildFocusQueue(items, 10, { tagFilter: null }).items.map(i => i.text)).toEqual(["A", "B"]);
   });
 });
 

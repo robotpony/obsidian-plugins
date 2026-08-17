@@ -162,6 +162,12 @@ function hasTag(tags, tag) {
   const lowerTag = tag.toLowerCase();
   return tags.some((t) => t.toLowerCase() === lowerTag);
 }
+function itemMatchesTagFilter(item, tag) {
+  var _a;
+  if (hasTag(item.tags, tag))
+    return true;
+  return ((_a = item.inferredFileTag) == null ? void 0 : _a.toLowerCase()) === tag.toLowerCase();
+}
 function getTagColourInfo(tag, projectColourMap) {
   var _a;
   const normalizedTag = tag.toLowerCase();
@@ -312,6 +318,9 @@ function buildFocusQueue(activeTodos, limit, options = {}) {
     if (t.isSubheading)
       return false;
     if (t.isHeader && t.childLineNumbers && t.childLineNumbers.length > 0) {
+      return false;
+    }
+    if (options.tagFilter && !itemMatchesTagFilter(t, options.tagFilter)) {
       return false;
     }
     return true;
@@ -4702,6 +4711,11 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
    * its tagged children — leaving the user staring at "No items matching"
    * even though matching items clearly exist. Mirrors the parent-match
    * pattern the assignee filter already uses.
+   *
+   * Matching goes through `itemMatchesTagFilter` (explicit tag or
+   * `inferredFileTag`), shared with the focus queue's own tag scoping —
+   * see PLAN.md's Phase 7 — so a project's untagged note items are scoped
+   * consistently everywhere, not just counted in `ProjectManager`'s stats.
    */
   filterByActiveTag(items, allItemsForChildLookup) {
     if (!this.activeTagFilter)
@@ -4709,14 +4723,14 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
     const tag = this.activeTagFilter;
     return items.filter((item) => {
       var _a;
-      if (item.tags.includes(tag))
+      if (itemMatchesTagFilter(item, tag))
         return true;
       if (item.isHeader && ((_a = item.childLineNumbers) == null ? void 0 : _a.length)) {
         return item.childLineNumbers.some((childLine) => {
           const child = allItemsForChildLookup.find(
             (t) => t.filePath === item.filePath && t.lineNumber === childLine
           );
-          return !!child && child.tags.includes(tag);
+          return !!child && itemMatchesTagFilter(child, tag);
         });
       }
       return false;
@@ -5543,13 +5557,18 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
       (t) => !t.tags.includes("#future") && !t.tags.includes("#snooze") && !t.tags.includes("#snoozed") && !t.tags.includes("#idea") && !t.tags.includes("#ideas") && !t.tags.includes("#ideation")
     );
   }
-  /** Build the focus queue from current scanner data; respects continue-mode. */
+  /**
+   * Build the focus queue from current scanner data; respects continue-mode
+   * and the active project/tag scope (PLAN.md's Phase 7) — scoping to a
+   * project and opening Focus Mode only surfaces that project's items.
+   */
   rebuildFocusQueue() {
     var _a;
     const active = this.getActiveTodosForFocus();
     const inContinueMode = ((_a = this.focusQueue) == null ? void 0 : _a.inContinueMode) === true;
     const result = buildFocusQueue(active, this.focusQueueLimit, {
-      forceFallback: inContinueMode
+      forceFallback: inContinueMode,
+      tagFilter: this.activeTagFilter
     });
     this.focusQueue = {
       items: result.items,
@@ -5875,7 +5894,8 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
     var _a;
     const active = this.getActiveTodosForFocus();
     const result = buildFocusQueue(active, Number.MAX_SAFE_INTEGER, {
-      forceFallback: ((_a = this.focusQueue) == null ? void 0 : _a.inContinueMode) === true
+      forceFallback: ((_a = this.focusQueue) == null ? void 0 : _a.inContinueMode) === true,
+      tagFilter: this.activeTagFilter
     });
     return result.items;
   }

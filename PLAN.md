@@ -676,6 +676,184 @@ already-https remotes), the https-stripped display form, and
 outside the home dir, and the sibling-directory-prefix false-positive case —
 `/Users/mxavier` must not be treated as inside `/Users/mx`).
 
+## Phase 7: fold Projects into the TODO sidebar as a scope, not a screen
+
+**Goal**: retire `ProjectsSidebarView` as a separate sidebar with its own
+item-rendering. A project becomes a filter applied to the TODOs/Ideas/
+Focus surfaces that already exist, the same way clicking a tag-cloud pill
+already filters today — extended to reach Focus mode, and to know about
+synced (repo-file) items, which it currently doesn't.
+
+**Why** (from a live design discussion, 2026-08-17): the plugin had grown
+three overlapping "project" mechanisms — tag-based grouping
+(`ProjectManager`/`activeTagFilter`, TODOs/Ideas only), repo-matched
+enrichment (`ProjectScanner`, git facts), and the Projects sidebar's own
+item model (hand-typed items by file path, synced items via a type
+`TodoScanner` never sees). Looking at one project meant leaving the
+TODOs/Ideas/Focus tabs for a fourth, structurally different view. The
+request was explicit: the Projects icon belongs in the same tab nav as
+TODOs/Ideas/Focus, nowhere else, and drilling into a project should work
+from any of those lists — "projects are a way to look at tasks, focus,
+ideas, etc., for ONE PROJECT," not a separate category of content.
+
+**Decisions**:
+- **One shared scope field.** Selecting a project sets `activeTagFilter`
+  — the same field a tag-cloud pill already sets — not a parallel
+  `activeProjectTag`. A project *is* a tag (`ProjectInfo.tag`); two fields
+  that could disagree was never worth the conceptual separation.
+- **Landing tab: TODOs, scoped.** Clicking a project in the Projects tab
+  sets the scope and switches to the TODOs tab, already filtered. The
+  Projects tab itself never grows its own item-rendering — it stays a
+  picker plus repo-facts panel.
+- **Bugs get a lightweight visual distinction, not a separate tab or
+  concept.** A synced `bug`-type item renders inline in the TODOs list
+  (there's nowhere else for it to go — the sidebar has no Bugs tab and
+  isn't getting one) but keeps a small badge/marker so it doesn't read as
+  an ordinary task. Vault-native items were never part of this — `#bug`
+  isn't a `TodoScanner` concept, only `StructuredFileParser`'s
+  `ParsedProjectItem.itemType` is.
+- **Hand-typed note items match by tag, not file path.** The old detail
+  view found "items in this project's note" by literal file-path
+  comparison, independent of tags. Going forward, matching is tag-based
+  everywhere, closing a real gap first: `filterByActiveTag` currently only
+  checks `item.tags.includes(tag)`, not `item.inferredFileTag` —
+  `ProjectManager.getProjects()`'s count already credits an untagged item
+  in `projects/peep.md` to `#peep` via filename inference, but the actual
+  filtered *list* doesn't show it, since the filter predicate never checks
+  `inferredFileTag`. Fixing that one gap means tag-based scoping already
+  covers the common case (a project note named after its own tag, which
+  `getProjectFilePath()` always produces) without a second matching rule.
+  Edge case accepted: a hand-renamed note that no longer matches its own
+  tag stops being auto-scoped. Rare enough not to design around.
+
+### Phase 7a: Focus mode respects the active scope — done (2026-08-17)
+
+**Goal**: the one genuinely-missing piece of plumbing, shippable
+independently of everything else below.
+
+**What was built**: a new shared `itemMatchesTagFilter(item, tag)` in
+`utils.ts` (explicit tag match, or `inferredFileTag` match) — used by both
+`filterByActiveTag` (SidebarView.ts, list filtering) and a new
+`tagFilter` option on `buildFocusQueue` (utils.ts). `rebuildFocusQueue()`
+and `buildFullFocusCandidateList()` both pass `tagFilter:
+this.activeTagFilter`. Header-with-children candidates were already
+excluded from the focus queue by an earlier rule, so — unlike
+`filterByActiveTag`'s list view, which needs a parent-match branch to keep
+a header visible when only its children match — the focus queue's
+candidate check only needs a direct match on standalone items and leaf
+headers; each child is checked individually regardless of its parent.
+
+**Deviation, disclosed rather than silently decided**: `inferredFileTag`
+matching is *not* gated to the configured projects folder the way
+`ProjectManager.getProjects()`'s own use of it is (`TodoScanner` sets
+`inferredFileTag` on every item regardless of location; threading folder
+config through a pure utility function used by both the list filter and
+`buildFocusQueue` wasn't worth it for what should be a rare edge case — an
+unrelated note outside the projects folder happening to share a project's
+exact tag as its filename). Documented in `itemMatchesTagFilter`'s
+docstring as an accepted trade-off to revisit if it bites in practice.
+
+**Tests** (7 new, `focusQueue.test.ts`): scoping to a tag; matching via
+`inferredFileTag` alone; both matching at once (no duplicate); a
+`#focus`-tagged item outside the scope correctly excluded from the
+focus-tagged queue (falls through to priority-fallback, scoped); empty
+result when nothing matches; a header-with-children outside the scope
+doesn't leak an out-of-scope child through; no `tagFilter` (undefined or
+`null`) behaves exactly as before.
+
+**Exit criteria — met**: scoping to a project and opening Focus mode only
+shows that project's `#focus`/priority items; clearing the scope restores
+the full queue. No UI change in this phase — pure plumbing. `npm run
+build`/`npm test` pass (246 tests).
+
+### Phase 7b: Projects tab in the shared tab nav
+
+**Goal**: one entry point, no separate sidebar.
+
+- `activeTab` gains `'projects'` (now `'todos' | 'ideas' | 'projects'`),
+  wired through the same icon/title/`switchTab` pattern the other three
+  values already use. `switchTab`'s signature widens to accept it, so
+  clicking Projects while Focus is active exits focus and switches in one
+  click, same as TODOs/Ideas already do.
+- Move `ProjectsSidebarView`'s list rendering (`renderList`/
+  `renderProjectRows`/`renderProjectRow`/`renderProjectSummary`/
+  `itemCounts`) into `SidebarView.ts` as `renderProjectsContent()`. Reuses
+  `ProjectManager.getProjects()` plus the scanned-project data the view
+  currently gets from `ProjectSyncManager`'s `onSynced` callback — that
+  wiring moves from `main.ts`'s `ProjectsSidebarView` constructor call to
+  the `TodoSidebarView` one.
+- A project row's click handler: `this.activeTagFilter = project.tag;
+  this.switchTab('todos')` (reusing `switchTab`'s crossfade, not a bare
+  reassignment).
+- Delete `ProjectsSidebarView.ts`, `VIEW_TYPE_PROJECTS_SIDEBAR`, its
+  ribbon icon (`"Toggle Projects Sidebar"`), and its toggle command from
+  `main.ts`. The `"Sync Projects"` command stays — independent of any
+  sidebar being open.
+- Tests: Projects tab renders the project list (reuse existing
+  `ProjectsSidebarView` list-rendering tests, ported to exercise the new
+  location); clicking a row sets the filter and switches tabs; build
+  succeeds with `ProjectsSidebarView.ts` gone (no dangling imports).
+
+**Exit criteria**: Projects is a tab, not a sidebar. No ribbon icon, no
+toggle command, no second `ItemView` registration left anywhere.
+
+### Phase 7c: repo facts surface when scoped
+
+**Goal**: branch/status/remote/reveal-in-Finder need a home now that
+there's no detail view to hold them.
+
+- When `activeTagFilter` matches a repo-matched project's tag, render a
+  compact summary strip (reusing `renderProjectSummary()`) above the item
+  list — TODOs and Ideas tabs only. Focus mode keeps just the existing
+  filter-indicator chip; the single-task card is the wrong place for a
+  git-status strip.
+- Tag-only projects (no matching repo) show the same plain filter chip
+  they do today — no strip, nothing to show.
+- Tests: strip appears for a repo-matched scope, absent for tag-only and
+  for no scope at all.
+
+**Exit criteria**: scoping to `peep` shows branch/status/remote/reveal
+above the TODOs list; scoping to a plain tag shows only the filter chip.
+
+### Phase 7d: synced items surface inline
+
+**Goal**: the biggest remaining gap — `ProjectSyncManager.getCachedItems()`
+still isn't visible anywhere once the detail view is gone.
+
+- TODOs tab, when scoped to a repo-matched project: append that project's
+  cached `todo`- and `bug`-type items to the rendered list (reusing
+  `renderSyncedItemRow`'s row rendering and its `ProjectItemMutator`-based
+  context menu). `bug`-type rows get the lightweight badge decided above.
+  Only rendered when a project scope is active — unscoped, showing every
+  repo's synced items interleaved with vault todos with no clear
+  attribution would be more confusing than useful.
+- Ideas tab, same mechanism, `idea`-type items.
+- Mutating a synced row (complete/priority/tag) routes through
+  `ProjectItemMutator` as before, then resyncs just that project and
+  updates the cache — mirrors `ProjectsSidebarView.resyncActiveProject()`,
+  relocated rather than rewritten.
+- Tests: synced todo/idea/bug items appear only when their project is the
+  active scope; mutating one round-trips through resync correctly;
+  clearing the scope hides them again (no leak into the unscoped view).
+
+**Exit criteria**: scoping to `peep` shows its vault-tagged items *and*
+its `BUGS.md`/`TODO.md` items in one list; clearing the scope shows only
+vault-native items again, same as before this phase existed.
+
+### Cross-cutting for Phase 7
+
+- Update `DESIGN.md`'s `ProjectsSidebarView` section (currently a large
+  standalone entry) to describe the folded-in tab instead; update
+  `CLAUDE.md`'s file table to drop the `ProjectsSidebarView.ts` row;
+  check `README.md` for any description of a separate Projects sidebar.
+- Settings tab's "Projects" section (base folder, exclude dirs, scan
+  depth) is unaffected — still configures the same `ProjectScanner`/
+  `ProjectSyncManager`, just consumed by the TODO sidebar now instead of
+  a second one.
+- Do 7a-7d as separate commits, each with passing `npm run build`/
+  `npm test` — 7a is safe to ship alone; 7b-7d build on each other in
+  order.
+
 ## Separate, unrelated task: remove the plugin-wide move feature
 
 Not part of Projects. Confirmed during the Phase 5 design pass (a Projects-

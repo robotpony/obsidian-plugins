@@ -5,7 +5,7 @@ import { ProjectManager } from "./ProjectManager";
 import { TeamManager } from "./TeamManager";
 import { TodoItem, ProjectInfo, ItemRenderConfig, FocusQueueState } from "./types";
 import { ContextMenuHandler } from "./ContextMenuHandler";
-import { getPriorityValue, compareTodoItems, compareWithEffectivePriority, hasTag, openFileAtLine, extractMentions, resolveMentions, resolveEffectiveMentions, showNotice, getTagColourInfo, extractCompletionDate, buildFocusQueue, getItemDate, tallyProjectTags } from "./utils";
+import { getPriorityValue, compareTodoItems, compareWithEffectivePriority, hasTag, openFileAtLine, extractMentions, resolveMentions, resolveEffectiveMentions, showNotice, getTagColourInfo, extractCompletionDate, buildFocusQueue, getItemDate, tallyProjectTags, itemMatchesTagFilter } from "./utils";
 
 export const VIEW_TYPE_TODO_SIDEBAR = "warped-todo-sidebar";
 
@@ -513,18 +513,23 @@ export class TodoSidebarView extends ItemView {
    * its tagged children — leaving the user staring at "No items matching"
    * even though matching items clearly exist. Mirrors the parent-match
    * pattern the assignee filter already uses.
+   *
+   * Matching goes through `itemMatchesTagFilter` (explicit tag or
+   * `inferredFileTag`), shared with the focus queue's own tag scoping —
+   * see PLAN.md's Phase 7 — so a project's untagged note items are scoped
+   * consistently everywhere, not just counted in `ProjectManager`'s stats.
    */
   private filterByActiveTag(items: TodoItem[], allItemsForChildLookup: TodoItem[]): TodoItem[] {
     if (!this.activeTagFilter) return items;
     const tag = this.activeTagFilter;
     return items.filter(item => {
-      if (item.tags.includes(tag)) return true;
+      if (itemMatchesTagFilter(item, tag)) return true;
       if (item.isHeader && item.childLineNumbers?.length) {
         return item.childLineNumbers.some(childLine => {
           const child = allItemsForChildLookup.find(
             t => t.filePath === item.filePath && t.lineNumber === childLine
           );
-          return !!child && child.tags.includes(tag);
+          return !!child && itemMatchesTagFilter(child, tag);
         });
       }
       return false;
@@ -1588,12 +1593,17 @@ export class TodoSidebarView extends ItemView {
     );
   }
 
-  /** Build the focus queue from current scanner data; respects continue-mode. */
+  /**
+   * Build the focus queue from current scanner data; respects continue-mode
+   * and the active project/tag scope (PLAN.md's Phase 7) — scoping to a
+   * project and opening Focus Mode only surfaces that project's items.
+   */
   private rebuildFocusQueue(): void {
     const active = this.getActiveTodosForFocus();
     const inContinueMode = this.focusQueue?.inContinueMode === true;
     const result = buildFocusQueue(active, this.focusQueueLimit, {
       forceFallback: inContinueMode,
+      tagFilter: this.activeTagFilter,
     });
     this.focusQueue = {
       items: result.items,
@@ -1997,6 +2007,7 @@ export class TodoSidebarView extends ItemView {
     const active = this.getActiveTodosForFocus();
     const result = buildFocusQueue(active, Number.MAX_SAFE_INTEGER, {
       forceFallback: this.focusQueue?.inContinueMode === true,
+      tagFilter: this.activeTagFilter,
     });
     return result.items;
   }
