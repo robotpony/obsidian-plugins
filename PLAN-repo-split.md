@@ -1,11 +1,14 @@
 # Repo split: plan
 
 Splits this mono-repo into three standalone repos, one per plugin. Runs
-after the four sidebar bugs in [warped-todo/BUGS.md](warped-todo/BUGS.md)
-are fixed and shipped (fixed as of 2026-08-17; not yet committed/pushed —
-do that before starting Phase 1b, since Phase 1a can run independently of
-it). The split itself is a pure move-and-rename with no behaviour change
-riding along.
+after the four sidebar bugs (fixed and pushed 2026-08-17) in what was
+`warped-todo/BUGS.md`, now `BUGS.md` at the repo root post-Phase-1a. The
+split itself is a pure move-and-rename with no behaviour change riding
+along.
+
+**Phase 1a is done** (2026-08-17) — see its section below for what
+actually happened, including two conflicts surfaced and resolved during
+execution that aren't reflected in the original plan text above.
 
 ## Decisions
 
@@ -65,34 +68,78 @@ Real order: **1a → 2 → 3 → 1b**. Phase 4 is unscoped and comes whenever
 you're ready to design it — no dependency on 1b beyond `warped-gdrive`
 existing as a repo.
 
-## Phase 1a: rename this repo to warped-command
+## Phase 1a: rename this repo to warped-command — done (2026-08-17)
 
 **Goal**: this repo's own plugin is fully renamed and cleaned up. Doesn't
 touch `warped-reference/` or `warped-hugo/` yet — safe to run anytime,
 independent of Phases 2/3.
 
-- Commit and push the sidebar bug fixes (BUGS.md's four fixes) first —
-  the plan's own gating condition, not yet done as of this writing.
-- Rename: GitHub repo `obsidian-plugins` → `warped-command`;
-  `package.json` `name` → `warped-command`; `manifest.json` `name` →
-  `"Warped Command"` (`id` stays `"warped-todo"`); README, CHANGELOG
-  header, `authorUrl`.
-- Move `warped-todo/*` up to the repo root (flat layout).
-- Copy `shared/` into the plugin's own source tree (e.g. `src/shared/`);
-  update relative imports (`../shared` → local path).
-- Simplify `install.sh`: drop multi-plugin selection, keep vault
-  discovery/caching (`.install-vaults`) and the file-copy step.
-- Update root `CLAUDE.md` and `plugin-conventions.md` to describe a
-  single-plugin repo instead of a mono-repo (or fold their content into
-  the plugin's own `CLAUDE.md` if a separate root doc no longer earns its
-  place).
-- Verify: `npm run build` and `npm test` pass; a real Obsidian vault
-  reinstall (uninstall old `warped-todo` plugin folder, install the
-  renamed one) behaves identically — same `id`, so settings carry over.
+**Two conflicts surfaced during execution, both resolved before touching
+any files** (not anticipated by the plan text above):
 
-**Exit criteria**: this repo builds, tests pass, and installs cleanly as
-`warped-command` with the old `warped-todo` plugin id preserved.
-`warped-reference/` and `warped-hugo/` still exist here, untouched.
+1. An untracked root `package.json` (`name: "warped-command"`, swept into
+   the "Bug fixes." commit by `git add`) and — much more substantially —
+   the existing root `README.md`, titled "Warped Command" since commit
+   `87711c6` (May 9, 2026), framed the whole three-plugin mono-repo as one
+   suite under that name. Both predated this plan and directly conflicted
+   with "warped-command" becoming just the TODO plugin's new identity.
+   Resolved: drop the umbrella-brand framing entirely: `warped-command`
+   becomes the TODO/Projects plugin as planned, and the suite-level
+   README content (feature write-ups for Hugo and Reference) isn't
+   preserved elsewhere — each plugin's own README already covers its own
+   features.
+2. `tsconfig.json`'s `include` (`**/*.ts`) and `vitest.config.mjs`'s
+   default test discovery, once `warped-todo/*` moved to the repo root,
+   started also picking up `warped-hugo/` and (worse) silently running
+   `warped-reference/`'s 6-file test suite under this repo's vitest
+   config rather than its own. Fixed with explicit `exclude` entries for
+   `warped-hugo`/`warped-reference` in both configs — **temporary**,
+   remove them as part of Phase 1b once those directories are deleted.
+
+**What was done**:
+
+- GitHub repo `obsidian-plugins` → `warped-command` (via `gh repo rename`;
+  local `origin` remote updated automatically). Repo description updated
+  to match.
+- `package.json` `name` → `warped-command`; `manifest.json` `name` →
+  `"Warped Command"` (`id` stayed `"warped-todo"`); `authorUrl` updated to
+  the new repo URL.
+- `warped-todo/*` moved to the repo root via `git mv` (preserved as
+  renames in history, not delete+add) — flat layout, as decided.
+- `shared/` copied into `src/shared/`; `main.ts` and `src/utils.ts`'s
+  relative imports updated (`../shared`/`../../shared` → `./src/shared`/
+  `./shared`); `vitest.config.mjs`'s test-stub alias updated to match.
+- `install.sh` simplified: dropped plugin selection/discovery entirely
+  (reads the one plugin's `id`/`name` straight from `manifest.json` now,
+  rather than deriving a name from a directory listing); kept vault
+  discovery, `-p`/`--previous` caching, and the build+copy steps.
+  Verified against 4 real cached vaults — builds, installs correctly to
+  `.obsidian/plugins/warped-todo/` (the unchanged `id`), display name
+  shows "Warped Command".
+- `CLAUDE.md`: merged (root's mono-repo version retired, the plugin's own
+  promoted in its place); added back the `install.sh` usage block the old
+  root version had; fixed two pre-existing stale references unrelated to
+  this split (`SpaceCommandSettings`/`SpaceCommandSettingTab` → the
+  actual current names, `WarpedTodoSettings`/`WarpedTodoSettingTab` — a
+  historical rename, per `CHANGELOG.md`, that this file never picked up);
+  re-added the `plugin-conventions.md` link.
+- `plugin-conventions.md`: kept (507 lines of still-useful sidebar/CSS/TS
+  convention reference), lightly edited — dropped the cross-plugin
+  branding-colour registry (`hugo-command`, `notate-command` rows) and
+  reframed the intro as single-plugin-scoped rather than "all plugins in
+  this repo."
+- Not done, out of scope for this phase: renaming internal TypeScript
+  identifiers (`WarpedTodoPlugin`, `WarpedTodoSettingTab`,
+  `WarpedTodoSettings`) to match `WarpedCommand*`. Purely internal, not
+  user-visible, touches many files — a separate cleanup task if wanted,
+  not implied by "rename everywhere" (which was scoped to what users see
+  and the repo/package identity).
+- `npm run build` and `npm test` both pass (239 tests).
+
+**Exit criteria — met**: this repo builds, tests pass, and installs
+cleanly as `warped-command` with the old `warped-todo` plugin id
+preserved (verified against 4 real vaults). `warped-reference/` and
+`warped-hugo/` still exist here, untouched, pending Phases 2/3.
 
 ## Phase 2: warped-hugo → new repo
 

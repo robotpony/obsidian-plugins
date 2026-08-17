@@ -36,7 +36,7 @@ import { MoveTargetModal } from "./src/MoveTargetModal";
 import { TabLockManager } from "./src/TabLockManager";
 import { createHeaderSortPlugin } from "./src/HeaderSortExtension";
 import { createHeaderChecklistExtension } from "./src/HeaderChecklistExtension";
-import { SidebarManager } from "../shared";
+import { SidebarManager } from "./src/shared";
 
 export default class WarpedTodoPlugin extends Plugin {
   settings: WarpedTodoSettings;

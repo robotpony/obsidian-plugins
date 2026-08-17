@@ -18,5 +18,6 @@
       "obsidian": ["./node_modules/obsidian"]
     }
   },
-  "include": ["**/*.ts", "../shared/**/*.ts"]
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules", "warped-hugo", "warped-reference"]
 }

@@ -1,6 +1,6 @@
 import { App, MarkdownView, TFile, Vault, WorkspaceLeaf, moment } from "obsidian";
 import { readFile, writeFile } from "fs/promises";
-import { createNoticeFactory } from "../../shared";
+import { createNoticeFactory } from "./shared";
 import type { FocusQueueResult, ItemDate, TodoItem } from "./types";
 
 /** Logo prefix for Notice messages */

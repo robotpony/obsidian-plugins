@@ -1,18 +1,18 @@
 # Plugin Conventions
 
-Conventions and UI patterns used across all plugins in this repo. Reference this when building new plugins or extending existing ones.
+UI and code conventions for this plugin. Predates the repo split
+(PLAN-repo-split.md) — written when this repo held three plugins and a
+shared branding/colour registry made sense across them. `warped-hugo` and
+`warped-gdrive` carry their own copies of whatever's still relevant to
+them into their own repos; this copy is scoped to Warped Command only.
 
 ## Branding
 
-Each plugin has a unique logo badge: coloured background, white text, `border-radius: 4px`.
+Logo badge: coloured background, white text, `border-radius: 4px`.
 
-| Plugin | Logo text | Colour |
-|--------|-----------|--------|
-| space-command | `␣⌘` | `#689fd6` (blue) |
-| hugo-command | `H⌘` | `#d97706` (orange) |
-| notate-command | `N⌘` | `#8b5cf6` (purple) |
-
-New plugins MUST pick a unique colour not already in use above.
+| Logo text | Colour |
+|-----------|--------|
+| `␣⌘` | `#689fd6` (blue) |
 
 Logo CSS:
 

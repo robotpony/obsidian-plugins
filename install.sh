@@ -1,7 +1,7 @@
 #!/bin/zsh
 
-# Obsidian Plugin Installer
-# Discovers vaults and plugins, builds and installs interactively
+# Warped Command Installer
+# Builds the plugin and installs it into selected Obsidian vaults
 
 set -e
 
@@ -16,6 +16,11 @@ NC='\033[0m' # No colour
 
 SCRIPT_DIR="${0:A:h}"
 CONFIG_FILE="$SCRIPT_DIR/.install-vaults"
+# Read from manifest.json — not the local clone's directory name, which is
+# arbitrary. PLUGIN_NAME (the "id") is what Obsidian expects the installed
+# plugin's folder to be called; DISPLAY_NAME is just for messages.
+PLUGIN_NAME=$(grep -o '"id"[[:space:]]*:[[:space:]]*"[^"]*"' "$SCRIPT_DIR/manifest.json" | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
+DISPLAY_NAME=$(grep -o '"name"[[:space:]]*:[[:space:]]*"[^"]*"' "$SCRIPT_DIR/manifest.json" | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
 
 # Spinner frames
 SPINNER_FRAMES=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
@@ -24,7 +29,6 @@ SPINNER_FRAMES=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
 typeset -ga SELECTED_ITEMS
 
 # Command line options
-USE_ALL_PLUGINS=false
 USE_PREVIOUS_VAULTS=false
 SEARCH_DEPTH=""
 
@@ -32,13 +36,12 @@ show_help() {
     echo "Usage: ./install.sh [options]"
     echo ""
     echo "Options:"
-    echo "  -a, --all        Install all plugins (skip plugin prompt)"
     echo "  -p, --previous   Use previously selected vaults (skip vault prompt)"
     echo "  -d, --depth N    Override vault search depth (default: 3-5 depending on location)"
     echo "  -h, --help       Show this help message"
     echo ""
     echo "Examples:"
-    echo "  ./install.sh -a -p      Quick reinstall: all plugins to cached vaults"
+    echo "  ./install.sh -p         Quick reinstall to cached vaults"
     echo "  ./install.sh -d 2       Shallow search (faster, finds fewer vaults)"
     echo "  ./install.sh -d 8       Deep search (slower, finds nested vaults)"
     echo ""
@@ -76,23 +79,6 @@ clear_spinner() {
 }
 
 # --- Discovery functions ---
-
-find_plugins() {
-    local -a plugins
-    for dir in "$SCRIPT_DIR"/*/; do
-        if [[ -f "${dir}manifest.json" ]]; then
-            plugins+=("${dir%/}")
-        fi
-    done
-    print -l "${plugins[@]}"
-}
-
-get_plugin_info() {
-    local plugin_dir="$1"
-    local name=$(basename "$plugin_dir")
-    local version=$(grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' "$plugin_dir/manifest.json" | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
-    echo "$name (v$version)"
-}
 
 find_vaults() {
     local -a vaults
@@ -218,24 +204,22 @@ show_error_block() {
 }
 
 build_plugin() {
-    local plugin_dir="$1"
-    local plugin_name=$(basename "$plugin_dir")
     local output
 
-    echo -n "Building ${BOLD}$plugin_name${NC}... "
+    echo -n "Building ${BOLD}$DISPLAY_NAME${NC}... "
 
-    if [[ ! -f "$plugin_dir/package.json" ]]; then
+    if [[ ! -f "$SCRIPT_DIR/package.json" ]]; then
         print_error "No package.json found"
         return 1
     fi
 
-    output=$( (cd "$plugin_dir" && npm install 2>&1) ) || {
+    output=$( (cd "$SCRIPT_DIR" && npm install 2>&1) ) || {
         print_error "npm install failed"
         show_error_block "npm install" "$output"
         return 1
     }
 
-    output=$( (cd "$plugin_dir" && npm run build 2>&1) ) || {
+    output=$( (cd "$SCRIPT_DIR" && npm run build 2>&1) ) || {
         print_error "Build failed"
         show_error_block "npm run build" "$output"
         return 1
@@ -245,17 +229,15 @@ build_plugin() {
 }
 
 install_plugin() {
-    local plugin_dir="$1"
-    local vault_dir="$2"
-    local plugin_name=$(basename "$plugin_dir")
-    local target_dir="$vault_dir/.obsidian/plugins/$plugin_name"
+    local vault_dir="$1"
+    local target_dir="$vault_dir/.obsidian/plugins/$PLUGIN_NAME"
 
     mkdir -p "$target_dir"
 
     local files_copied=0
     for file in main.js manifest.json styles.css; do
-        if [[ -f "$plugin_dir/$file" ]]; then
-            cp "$plugin_dir/$file" "$target_dir/"
+        if [[ -f "$SCRIPT_DIR/$file" ]]; then
+            cp "$SCRIPT_DIR/$file" "$target_dir/"
             ((files_copied++)) || true
         fi
     done
@@ -275,10 +257,6 @@ main() {
     # Parse command line arguments
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            -a|--all)
-                USE_ALL_PLUGINS=true
-                shift
-                ;;
             -p|--previous)
                 USE_PREVIOUS_VAULTS=true
                 shift
@@ -307,59 +285,11 @@ main() {
         esac
     done
 
-    echo "${BOLD}${BLUE}Obsidian Plugin Installer${NC}"
+    echo "${BOLD}${BLUE}Warped Command Installer${NC}"
 
-    # Find plugins
-    print_header "Searching for plugins..."
-    local -a plugin_dirs
-    while IFS= read -r line; do
-        [[ -n "$line" ]] && plugin_dirs+=("$line")
-    done < <(find_plugins)
-
-    if [[ ${#plugin_dirs[@]} -eq 0 ]]; then
-        print_error "No plugins found (looking for directories with manifest.json)"
-        exit 1
-    fi
-
-    local -a plugin_names
-    for dir in "${plugin_dirs[@]}"; do
-        plugin_names+=("$(get_plugin_info "$dir")")
-    done
-
-    local -a plugins_to_install
-
-    if [[ "$USE_ALL_PLUGINS" == "true" ]]; then
-        print_header "Installing all ${#plugin_dirs[@]} plugins:"
-        plugins_to_install=("${plugin_dirs[@]}")
-        for name in "${plugin_names[@]}"; do
-            echo "  ${CYAN}•${NC} $name"
-        done
-    else
-        print_header "Found ${#plugin_dirs[@]} plugins:"
-        select_items "Select plugins to install" "${plugin_names[@]}"
-        local -a selected_plugins=("${SELECTED_ITEMS[@]}")
-
-        if [[ ${#selected_plugins[@]} -eq 0 ]]; then
-            print_warn "No plugins selected"
-            exit 0
-        fi
-
-        # Map selected names back to directories
-        for selected in "${selected_plugins[@]}"; do
-            for i in {1..${#plugin_names[@]}}; do
-                if [[ "${plugin_names[$i]}" == "$selected" ]]; then
-                    plugins_to_install+=("${plugin_dirs[$i]}")
-                    break
-                fi
-            done
-        done
-    fi
-
-    # Build selected plugins
+    # Build
     print_header "Building..."
-    for plugin_dir in "${plugins_to_install[@]}"; do
-        build_plugin "$plugin_dir" || exit 1
-    done
+    build_plugin || exit 1
 
     # Handle vaults
     local -a vaults_to_install
@@ -426,13 +356,10 @@ main() {
 
     # Install
     print_header "Installing..."
-    for plugin_dir in "${plugins_to_install[@]}"; do
-        local plugin_name=$(basename "$plugin_dir")
-        echo "${BOLD}$plugin_name${NC} →"
-        for vault_dir in "${vaults_to_install[@]}"; do
-            echo -n "  "
-            install_plugin "$plugin_dir" "$vault_dir"
-        done
+    echo "${BOLD}$DISPLAY_NAME${NC} →"
+    for vault_dir in "${vaults_to_install[@]}"; do
+        echo -n "  "
+        install_plugin "$vault_dir"
     done
 
     echo ""

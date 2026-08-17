@@ -36,7 +36,7 @@ var import_obsidian3 = require("obsidian");
 var import_obsidian2 = require("obsidian");
 var import_promises = require("fs/promises");
 
-// ../shared/ui/Notice.ts
+// src/shared/ui/Notice.ts
 var import_obsidian = require("obsidian");
 function showNotice(logoPrefix, logoClass, message, timeout) {
   const fragment = document.createDocumentFragment();
@@ -51,7 +51,7 @@ function createNoticeFactory(logoPrefix, logoClass) {
   return (message, timeout) => showNotice(logoPrefix, logoClass, message, timeout);
 }
 
-// ../shared/plugin/SidebarManager.ts
+// src/shared/plugin/SidebarManager.ts
 var SidebarManager = class {
   constructor(app, viewType) {
     this.app = app;
