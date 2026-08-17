@@ -269,9 +269,10 @@
 
 /* Chromium/Electron leaves a focus ring on a button after it's clicked,
    not just after keyboard tabbing to it. Every other tab button masks this
-   with its .active background; this one (sidebar-nav-out-btn) never gets
-   .active, so the ring was the only thing visible — read as a stray
-   border around the Projects icon. Same fix .tag-cloud-pill already uses. */
+   with its .active background; the Projects tab button briefly didn't get
+   .active (back when it was a nav button to a separate view rather than a
+   tab), so the ring was the only thing visible — read as a stray border
+   around its icon. Kept for the same reason .tag-cloud-pill does this. */
 .sidebar-tab-btn:focus-visible {
   outline: none;
 }
@@ -279,16 +280,6 @@
 .sidebar-tab-btn.active {
   opacity: 1;
   background-color: var(--background-modifier-hover) !important;
-}
-
-/* Marks a tab-nav button that navigates to a different sidebar view
-   (Projects) rather than switching tabs within this one. A left border
-   sets it apart from the TODOs/Focus/Ideas cluster so it doesn't read as a
-   fourth tab that never lights up active. */
-.sidebar-nav-out-btn {
-  margin-left: 4px;
-  padding-left: 6px;
-  border-left: 1px solid var(--background-modifier-border) !important;
 }
 
 /* Hamburger menu button */

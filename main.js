@@ -27,7 +27,7 @@ __export(main_exports, {
   default: () => WarpedTodoPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian14 = require("obsidian");
+var import_obsidian13 = require("obsidian");
 
 // src/TodoScanner.ts
 var import_obsidian3 = require("obsidian");
@@ -2719,8 +2719,449 @@ ${lines.join("\n")}
 `;
 }
 
-// src/ProjectsSidebarView.ts
+// src/SlashCommandSuggest.ts
 var import_obsidian7 = require("obsidian");
+var CALLOUT_TYPES = [
+  { id: "info", name: "Info", icon: "\u2139\uFE0F" },
+  { id: "tip", name: "Tip", icon: "\u{1F4A1}" },
+  { id: "note", name: "Note", icon: "\u{1F4DD}" },
+  { id: "warning", name: "Warning", icon: "\u26A0\uFE0F" },
+  { id: "danger", name: "Danger", icon: "\u{1F534}" },
+  { id: "bug", name: "Bug", icon: "\u{1F41B}" },
+  { id: "example", name: "Example", icon: "\u{1F4CB}" },
+  { id: "quote", name: "Quote", icon: "\u{1F4AC}" },
+  { id: "abstract", name: "Abstract", icon: "\u{1F4C4}" },
+  { id: "success", name: "Success", icon: "\u2705" },
+  { id: "question", name: "Question", icon: "\u2753" },
+  { id: "failure", name: "Failure", icon: "\u274C" }
+];
+var SlashCommandSuggest = class extends import_obsidian7.EditorSuggest {
+  constructor(app, settings) {
+    super(app);
+    this.inCalloutMenu = false;
+    this.triggerStart = null;
+    this.settings = settings;
+  }
+  getCommands() {
+    return [
+      {
+        id: "todo",
+        name: "Todo",
+        description: "Insert a TODO item",
+        icon: "\u2610",
+        action: (editor, start, end) => {
+          editor.replaceRange("- [ ] #todo ", start, end);
+          editor.setCursor({ line: start.line, ch: start.ch + 12 });
+        }
+      },
+      {
+        id: "todos",
+        name: "Todos",
+        description: "Insert a TODO list with heading",
+        icon: "\u2630",
+        action: (editor, start, end) => {
+          const text = "## TODOs #todos\n\n- [ ] ";
+          editor.replaceRange(text, start, end);
+          editor.setCursor({ line: start.line + 2, ch: 6 });
+        }
+      },
+      {
+        id: "idea",
+        name: "Idea",
+        description: "Insert an idea item",
+        icon: "\u{1F4A1}",
+        action: (editor, start, end) => {
+          editor.replaceRange("- [ ] #idea ", start, end);
+          editor.setCursor({ line: start.line, ch: start.ch + 12 });
+        }
+      },
+      {
+        id: "ideas",
+        name: "Ideas",
+        description: "Insert an Ideas list with heading",
+        icon: "\u{1F4A1}",
+        action: (editor, start, end) => {
+          const text = "## Ideas #ideas\n\n- [ ] ";
+          editor.replaceRange(text, start, end);
+          editor.setCursor({ line: start.line + 2, ch: 6 });
+        }
+      },
+      {
+        id: "today",
+        name: "Today",
+        description: "Insert today's date",
+        icon: "\u{1F4C5}",
+        action: (editor, start, end) => {
+          const date = formatDate(/* @__PURE__ */ new Date(), this.settings.dateFormat);
+          editor.replaceRange(date, start, end);
+          editor.setCursor({ line: start.line, ch: start.ch + date.length });
+        }
+      },
+      {
+        id: "tomorrow",
+        name: "Tomorrow",
+        description: "Insert tomorrow's date",
+        icon: "\u{1F4C6}",
+        action: (editor, start, end) => {
+          const tomorrow = /* @__PURE__ */ new Date();
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          const date = formatDate(tomorrow, this.settings.dateFormat);
+          editor.replaceRange(date, start, end);
+          editor.setCursor({ line: start.line, ch: start.ch + date.length });
+        }
+      },
+      {
+        id: "callout",
+        name: "Callout",
+        description: "Insert a callout block",
+        icon: "\u{1F4E2}",
+        action: () => {
+        }
+      }
+    ];
+  }
+  onTrigger(cursor, editor, file) {
+    const line = editor.getLine(cursor.line);
+    const beforeCursor = line.substring(0, cursor.ch);
+    const match = beforeCursor.match(/^(\s*)\/(\S*)$/);
+    if (!match) {
+      this.inCalloutMenu = false;
+      return null;
+    }
+    const whitespace = match[1];
+    const query = match[2];
+    this.triggerStart = { line: cursor.line, ch: whitespace.length };
+    return {
+      start: this.triggerStart,
+      end: cursor,
+      query
+    };
+  }
+  getSuggestions(context) {
+    const query = context.query.toLowerCase();
+    if (this.inCalloutMenu) {
+      return CALLOUT_TYPES.filter(
+        (type) => type.id.includes(query) || type.name.toLowerCase().includes(query)
+      );
+    }
+    const commands = this.getCommands();
+    if (!query) {
+      return commands;
+    }
+    return commands.filter(
+      (cmd) => cmd.id.includes(query) || cmd.name.toLowerCase().includes(query)
+    );
+  }
+  renderSuggestion(item, el) {
+    el.addClass("warped-todo-suggestion");
+    const iconSpan = el.createEl("span", { cls: "suggestion-icon" });
+    iconSpan.textContent = item.icon;
+    const textContainer = el.createEl("div", { cls: "suggestion-content" });
+    textContainer.createEl("span", {
+      cls: "suggestion-name",
+      text: item.name
+    });
+    if ("description" in item) {
+      textContainer.createEl("span", {
+        cls: "suggestion-description",
+        text: item.description
+      });
+    }
+  }
+  selectSuggestion(item, evt) {
+    var _a;
+    const editor = (_a = this.context) == null ? void 0 : _a.editor;
+    if (!editor || !this.context)
+      return;
+    const start = this.context.start;
+    const end = this.context.end;
+    if (this.inCalloutMenu) {
+      const calloutType = item;
+      const calloutText = `> [!${calloutType.id}]
+> `;
+      editor.replaceRange(calloutText, start, end);
+      editor.setCursor({ line: start.line + 1, ch: 2 });
+      this.inCalloutMenu = false;
+    } else if ("action" in item) {
+      const command = item;
+      if (command.id === "callout") {
+        this.inCalloutMenu = true;
+        editor.replaceRange("/", start, end);
+        editor.setCursor({ line: start.line, ch: start.ch + 1 });
+      } else {
+        command.action(editor, start, end);
+      }
+    }
+  }
+};
+
+// src/AtSuggest.ts
+var import_obsidian8 = require("obsidian");
+var AtSuggest = class extends import_obsidian8.EditorSuggest {
+  constructor(app, settings, teamManager) {
+    super(app);
+    this.settings = settings;
+    this.teamManager = teamManager;
+  }
+  getDateOptions() {
+    return [
+      {
+        kind: "date",
+        id: "date",
+        label: "@date",
+        description: "Today's date",
+        icon: "\u{1F4C5}",
+        getDate: () => /* @__PURE__ */ new Date()
+      },
+      {
+        kind: "date",
+        id: "today",
+        label: "@today",
+        description: "Today's date",
+        icon: "\u{1F4C5}",
+        getDate: () => /* @__PURE__ */ new Date()
+      },
+      {
+        kind: "date",
+        id: "tomorrow",
+        label: "@tomorrow",
+        description: "Tomorrow's date",
+        icon: "\u{1F4C6}",
+        getDate: () => {
+          const d = /* @__PURE__ */ new Date();
+          d.setDate(d.getDate() + 1);
+          return d;
+        }
+      },
+      {
+        kind: "date",
+        id: "yesterday",
+        label: "@yesterday",
+        description: "Yesterday's date",
+        icon: "\u{1F4C6}",
+        getDate: () => {
+          const d = /* @__PURE__ */ new Date();
+          d.setDate(d.getDate() - 1);
+          return d;
+        }
+      }
+    ];
+  }
+  getUserOptions() {
+    var _a;
+    const team = this.teamManager.getTeam();
+    const options = [];
+    const meHandle = this.teamManager.resolveMe();
+    if (meHandle) {
+      const meMember = team.find((m) => m.isMe);
+      options.push({
+        kind: "user",
+        id: "me",
+        label: "@me",
+        description: (_a = meMember == null ? void 0 : meMember.name) != null ? _a : meHandle,
+        icon: "\u{1F464}",
+        handle: "me"
+      });
+    }
+    for (const member of team) {
+      options.push({
+        kind: "user",
+        id: member.handle,
+        label: `@${member.handle}`,
+        description: member.name,
+        icon: "\u{1F464}",
+        handle: member.handle
+      });
+    }
+    return options;
+  }
+  onTrigger(cursor, editor, file) {
+    const line = editor.getLine(cursor.line);
+    const beforeCursor = line.substring(0, cursor.ch);
+    const match = beforeCursor.match(/@([\w.]*)$/);
+    if (!match)
+      return null;
+    const atIndex = beforeCursor.lastIndexOf("@");
+    if (atIndex > 0) {
+      const charBefore = beforeCursor[atIndex - 1];
+      if (/[a-zA-Z0-9]/.test(charBefore))
+        return null;
+    }
+    return {
+      start: { line: cursor.line, ch: atIndex },
+      end: cursor,
+      query: match[1].toLowerCase()
+    };
+  }
+  getSuggestions(context) {
+    const query = context.query.toLowerCase();
+    const dateOptions = this.getDateOptions();
+    const userOptions = this.getUserOptions();
+    const all = [...dateOptions, ...userOptions];
+    if (!query)
+      return all;
+    return all.filter((opt) => {
+      const id = opt.id.toLowerCase();
+      return id.startsWith(query) || id.includes(query);
+    });
+  }
+  renderSuggestion(item, el) {
+    el.addClass("warped-todo-suggestion");
+    const iconSpan = el.createEl("span", { cls: "suggestion-icon" });
+    iconSpan.textContent = item.icon;
+    const textContainer = el.createEl("div", { cls: "suggestion-content" });
+    textContainer.createEl("span", { cls: "suggestion-name", text: item.label });
+    if (item.kind === "date" && item.getDate) {
+      const date = formatDate(item.getDate(), this.settings.dateFormat);
+      textContainer.createEl("span", { cls: "suggestion-description", text: date });
+    } else {
+      textContainer.createEl("span", { cls: "suggestion-description", text: item.description });
+    }
+  }
+  selectSuggestion(item, evt) {
+    var _a;
+    const editor = (_a = this.context) == null ? void 0 : _a.editor;
+    if (!editor || !this.context)
+      return;
+    const start = this.context.start;
+    const end = this.context.end;
+    if (item.kind === "date" && item.getDate) {
+      const date = formatDate(item.getDate(), this.settings.dateFormat);
+      editor.replaceRange(date, start, end);
+      editor.setCursor({ line: start.line, ch: start.ch + date.length });
+    } else if (item.handle) {
+      const text = `@${item.handle} `;
+      editor.replaceRange(text, start, end);
+      editor.setCursor({ line: start.line, ch: start.ch + text.length });
+    }
+  }
+};
+
+// src/TeamManager.ts
+var import_obsidian9 = require("obsidian");
+var TEAM_LINE_REGEX = /^-\s+@([\w][\w.-]*)\s*(?:—|-)\s*(.+)$/;
+var ME_SUFFIX = /\s*\(me\)\s*$/i;
+var TeamManager = class extends import_obsidian9.Events {
+  constructor(app, filePath) {
+    super();
+    this.members = [];
+    this.pendingAdds = /* @__PURE__ */ new Set();
+    this.debouncedFlushAdds = (0, import_obsidian9.debounce)(() => this.flushPendingAdds(), 500, true);
+    this.app = app;
+    this.filePath = filePath;
+  }
+  async load() {
+    await this.parse();
+  }
+  setFilePath(filePath) {
+    this.filePath = filePath;
+    this.parse();
+  }
+  getTeam() {
+    return this.members;
+  }
+  resolveMe() {
+    var _a;
+    const me = this.members.find((m) => m.isMe);
+    return (_a = me == null ? void 0 : me.handle) != null ? _a : null;
+  }
+  resolveHandle(raw) {
+    var _a, _b;
+    if (raw === "me") {
+      const meHandle = this.resolveMe();
+      if (!meHandle)
+        return null;
+      return (_a = this.members.find((m) => m.handle === meHandle)) != null ? _a : null;
+    }
+    return (_b = this.members.find((m) => m.handle === raw)) != null ? _b : null;
+  }
+  isKnownHandle(handle) {
+    if (handle === "me")
+      return true;
+    return this.members.some((m) => m.handle === handle);
+  }
+  addMember(handle) {
+    if (this.isKnownHandle(handle))
+      return;
+    this.pendingAdds.add(handle);
+    this.debouncedFlushAdds();
+  }
+  async flushPendingAdds() {
+    if (this.pendingAdds.size === 0)
+      return;
+    const handles = [...this.pendingAdds];
+    this.pendingAdds.clear();
+    const file = this.app.vault.getAbstractFileByPath(this.filePath);
+    if (!(file instanceof import_obsidian9.TFile))
+      return;
+    const content = await this.app.vault.read(file);
+    const newLines = handles.filter((h) => !this.members.some((m) => m.handle === h)).map((h) => `- @${h} \u2014 ${h}`);
+    if (newLines.length === 0)
+      return;
+    const updated = content.trimEnd() + "\n" + newLines.join("\n") + "\n";
+    await this.app.vault.modify(file, updated);
+  }
+  async createTeamFile() {
+    let username = "me";
+    try {
+      username = require("os").userInfo().username || "me";
+    } catch (e) {
+    }
+    const content = `# Team
+
+- @${username} \u2014 ${username} (me)
+`;
+    const file = await this.app.vault.create(this.filePath, content);
+    await this.parse();
+    return file;
+  }
+  watchFile() {
+    this.app.vault.on("modify", (file) => {
+      if (file instanceof import_obsidian9.TFile && file.path === this.filePath) {
+        this.parse();
+      }
+    });
+    this.app.vault.on("create", (file) => {
+      if (file instanceof import_obsidian9.TFile && file.path === this.filePath) {
+        this.parse();
+      }
+    });
+    this.app.vault.on("delete", (file) => {
+      if (file instanceof import_obsidian9.TFile && file.path === this.filePath) {
+        this.members = [];
+        this.trigger("team-updated");
+      }
+    });
+  }
+  async parse() {
+    const file = this.app.vault.getAbstractFileByPath(this.filePath);
+    if (!(file instanceof import_obsidian9.TFile)) {
+      this.members = [];
+      this.trigger("team-updated");
+      return;
+    }
+    const content = await this.app.vault.read(file);
+    const lines = content.split("\n");
+    const members = [];
+    for (const line of lines) {
+      const match = line.match(TEAM_LINE_REGEX);
+      if (!match)
+        continue;
+      const handle = match[1];
+      let name = match[2].trim();
+      const isMe = ME_SUFFIX.test(name);
+      if (isMe) {
+        name = name.replace(ME_SUFFIX, "").trim();
+      }
+      members.push({ handle, name, isMe });
+    }
+    this.members = members;
+    this.trigger("team-updated");
+  }
+};
+
+// src/SidebarView.ts
+var import_obsidian12 = require("obsidian");
 
 // src/HeaderBlockMover.ts
 var import_promises4 = require("fs/promises");
@@ -2987,560 +3428,11 @@ async function removeProjectItemTag(item, tag) {
 }
 
 // src/ProjectsSidebarView.ts
-var VIEW_TYPE_PROJECTS_SIDEBAR = "warped-todo-projects-sidebar";
 var GROUP_ORDER = [
   { heading: "TODOs", type: "todo", checkbox: true },
   { heading: "Ideas", type: "idea", checkbox: true },
   { heading: "Bugs", type: "bug", checkbox: true }
 ];
-var ProjectsSidebarView = class extends import_obsidian7.ItemView {
-  constructor(leaf, scanner, processor, projectManager, projectScanner, syncManager, contextMenuHandler, getOptions, onOpenSettings, onShowAbout, onOpenTodos) {
-    super(leaf);
-    this.scanner = scanner;
-    this.processor = processor;
-    this.projectManager = projectManager;
-    this.projectScanner = projectScanner;
-    this.syncManager = syncManager;
-    this.contextMenuHandler = contextMenuHandler;
-    this.getOptions = getOptions;
-    this.onOpenSettings = onOpenSettings;
-    this.onShowAbout = onShowAbout;
-    this.onOpenTodos = onOpenTodos;
-    this.mode = "list";
-    this.activeProjectName = null;
-    this.filterText = "";
-    this.scannedProjects = [];
-    this.updateListener = null;
-    // Tracks the active file's path so handleActiveFileChange can tell "the
-    // active file genuinely changed" from "some workspace event fired for the
-    // same file" (Obsidian fires these often, for reasons unrelated to
-    // navigation). Without this, clicking "< Back" while the project note is
-    // still open in the main pane got silently undone by the very next such
-    // event, since auto-follow would just re-derive "detail" mode from the
-    // still-active file — requiring several clicks before one happened to land
-    // in a gap between events. Found via live testing.
-    this.lastKnownActiveFilePath = null;
-  }
-  getViewType() {
-    return VIEW_TYPE_PROJECTS_SIDEBAR;
-  }
-  getDisplayText() {
-    return "Projects";
-  }
-  getIcon() {
-    return "folder-git-2";
-  }
-  async onOpen() {
-    this.updateListener = () => this.render();
-    this.scanner.on("todos-updated", this.updateListener);
-    this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.handleActiveFileChange()));
-    this.registerEvent(this.app.workspace.on("file-open", () => this.handleActiveFileChange()));
-    await this.reload();
-  }
-  async onClose() {
-    if (this.updateListener) {
-      this.scanner.off("todos-updated", this.updateListener);
-      this.updateListener = null;
-    }
-  }
-  /** Full rescan + resync of every project, then re-render. Manual "Sync" button and initial load. */
-  async reload() {
-    const options = this.getOptions();
-    if (options.baseFolder) {
-      try {
-        this.scannedProjects = await this.syncManager.syncAll({
-          baseFolder: options.baseFolder,
-          projectsFolder: options.projectsFolder,
-          maxDepth: options.scanDepth,
-          excludeDirs: options.excludeDirs
-        });
-      } catch (error) {
-        console.error("[Warped Todo]", "Project sync failed:", error);
-        new import_obsidian7.Notice("Project sync failed. See console for details.");
-      }
-    }
-    this.render();
-  }
-  /**
-   * Applies scan results this view didn't itself request — from a
-   * watch-triggered background sync, or the "Sync projects" command, both of
-   * which call `syncManager.syncAll()` directly. Just stores and re-renders;
-   * must NOT call back into `syncAll()`/`reload()`, or a view wired to run
-   * this on every sync completion would trigger another sync completion,
-   * forever. Found via live testing: `main.ts` used to route `onSynced`
-   * through `reload()`, which re-ran `syncAll()`, which fired `onSynced`
-   * again — an unbounded loop limited only by how fast a full scan could
-   * complete (observed retriggering roughly every 200ms against a real base
-   * folder, visible as `lastSynced` updating that often in the Properties
-   * panel).
-   */
-  applySyncResult(scanned) {
-    this.scannedProjects = scanned;
-    this.render();
-  }
-  // ===== Sidebar/pane sync (auto-follow) =====
-  async handleActiveFileChange() {
-    var _a;
-    const activeFile = this.app.workspace.getActiveFile();
-    const currentPath = (_a = activeFile == null ? void 0 : activeFile.path) != null ? _a : null;
-    if (currentPath === this.lastKnownActiveFilePath)
-      return;
-    this.lastKnownActiveFilePath = currentPath;
-    const projectName = activeFile ? this.projectNameForNotePath(activeFile.path) : null;
-    if (projectName) {
-      if (this.mode === "detail" && this.activeProjectName === projectName)
-        return;
-      this.mode = "detail";
-      this.activeProjectName = projectName;
-      this.render();
-    } else if (this.mode === "detail") {
-      this.mode = "list";
-      this.activeProjectName = null;
-      this.render();
-    }
-  }
-  projectNameForNotePath(filePath) {
-    const options = this.getOptions();
-    for (const project of this.projectManager.getProjects(this.scannedProjects)) {
-      if (!project.localPath)
-        continue;
-      const name = project.tag.replace(/^#/, "");
-      if (projectFilePath(options.projectsFolder, name) === filePath)
-        return name;
-    }
-    return null;
-  }
-  /**
-   * Public entry point for other views to jump straight to a project's
-   * detail view — e.g. "Show in Projects" on a project tag's context menu
-   * in the TODO sidebar. Accepts the tag with or without its leading `#`.
-   */
-  async showProject(tag) {
-    await this.openProject(tag.replace(/^#/, ""));
-  }
-  async openProject(name) {
-    const options = this.getOptions();
-    const path = projectFilePath(options.projectsFolder, name);
-    this.lastKnownActiveFilePath = path;
-    this.mode = "detail";
-    this.activeProjectName = name;
-    this.render();
-    const file = this.app.vault.getAbstractFileByPath(path);
-    if (file instanceof import_obsidian7.TFile) {
-      await this.app.workspace.getLeaf(false).openFile(file);
-    }
-  }
-  // ===== Rendering =====
-  render() {
-    const container = this.containerEl.children[1];
-    container.empty();
-    container.addClass("warped-todo-projects-view");
-    if (this.mode === "detail" && this.activeProjectName) {
-      this.renderDetail(container, this.activeProjectName);
-    } else {
-      this.renderList(container);
-    }
-  }
-  /**
-   * Shared by list and detail view — same header slot the TODOs sidebar uses
-   * (logo + title, clickable-icon buttons on the right), rather than the
-   * plain unbranded buttons this view had before. "Sync" lives in the kebab
-   * menu here, same treatment TODOs sidebar gives "Refresh" — not a
-   * standalone always-visible button. Found via live testing that the
-   * original plain-button header read as unstyled/off-brand.
-   */
-  renderHeader(container, title, showBack) {
-    const headerDiv = container.createDiv({ cls: "sidebar-header" });
-    const titleEl = headerDiv.createEl("h4", { cls: "sidebar-title" });
-    const logoEl = titleEl.createSpan({ cls: "warped-todo-logo clickable-logo", text: "\u2423\u2318" });
-    logoEl.addEventListener("click", () => this.onShowAbout());
-    titleEl.appendText(` ${title}`);
-    const tabNav = headerDiv.createDiv({ cls: "sidebar-tab-nav" });
-    if (showBack) {
-      const backBtn = tabNav.createEl("button", {
-        cls: "clickable-icon",
-        attr: { "aria-label": "Back to project list" }
-      });
-      (0, import_obsidian7.setIcon)(backBtn, "arrow-left");
-      backBtn.addEventListener("click", () => {
-        this.mode = "list";
-        this.activeProjectName = null;
-        this.render();
-      });
-    }
-    const todosBtn = tabNav.createEl("button", {
-      cls: "clickable-icon sidebar-nav-out-btn",
-      attr: { "aria-label": "Open TODOs" }
-    });
-    (0, import_obsidian7.setIcon)(todosBtn, "square-check-big");
-    todosBtn.addEventListener("click", () => this.onOpenTodos());
-    const menuBtn = tabNav.createEl("button", {
-      cls: "clickable-icon sidebar-menu-btn",
-      attr: { "aria-label": "Menu" }
-    });
-    (0, import_obsidian7.setIcon)(menuBtn, "more-vertical");
-    menuBtn.addEventListener("click", (evt) => {
-      const menu = new import_obsidian7.Menu();
-      menu.addItem((item) => {
-        item.setTitle("Sync").setIcon("refresh-cw").onClick(async () => {
-          menuBtn.addClass("rotating");
-          await this.reload();
-          setTimeout(() => menuBtn.removeClass("rotating"), 500);
-        });
-      });
-      menu.showAtMouseEvent(evt);
-    });
-  }
-  renderList(container) {
-    const options = this.getOptions();
-    this.renderHeader(container, "Projects", false);
-    if (!options.baseFolder) {
-      const empty = container.createDiv({ cls: "warped-todo-projects-empty" });
-      empty.createEl("p", { text: "No base folder configured yet." });
-      const btn = empty.createEl("button", { text: "Open settings" });
-      btn.addEventListener("click", () => this.onOpenSettings());
-      return;
-    }
-    const filterInput = container.createEl("input", {
-      type: "text",
-      placeholder: "Filter\u2026",
-      cls: "warped-todo-projects-filter"
-    });
-    filterInput.value = this.filterText;
-    const listEl = container.createDiv({ cls: "warped-todo-projects-list" });
-    filterInput.addEventListener("input", () => {
-      this.filterText = filterInput.value;
-      this.renderProjectRows(listEl);
-    });
-    this.renderProjectRows(listEl);
-  }
-  renderProjectRows(listEl) {
-    listEl.empty();
-    const filterLower = this.filterText.toLowerCase();
-    const projects = this.projectManager.getProjects(this.scannedProjects).filter((p) => p.localPath).filter((p) => !filterLower || p.tag.toLowerCase().includes(filterLower)).sort((a, b) => {
-      const aActive = this.itemCounts(a).total > 0 ? 1 : 0;
-      const bActive = this.itemCounts(b).total > 0 ? 1 : 0;
-      if (aActive !== bActive)
-        return bActive - aActive;
-      return a.tag.localeCompare(b.tag);
-    });
-    if (projects.length === 0) {
-      listEl.createEl("p", { text: "No projects found.", cls: "warped-todo-projects-empty-msg" });
-      return;
-    }
-    for (const project of projects)
-      this.renderProjectRow(listEl, project);
-  }
-  itemCounts(project) {
-    if (!project.localPath)
-      return { todo: 0, idea: 0, bug: 0, total: 0 };
-    const items = this.syncManager.getCachedItems(project.localPath).filter((i) => !i.completed);
-    const counts = { todo: 0, idea: 0, bug: 0, total: 0 };
-    for (const item of items) {
-      counts[item.itemType]++;
-      counts.total++;
-    }
-    return counts;
-  }
-  renderProjectRow(listEl, project) {
-    const name = project.tag.replace(/^#/, "");
-    const row = this.renderProjectSummary(listEl, project);
-    row.addClass("is-clickable");
-    row.addEventListener("click", () => this.openProject(name));
-  }
-  /**
-   * name/branch/status + item-count breakdown — the same block used both as
-   * a clickable row in the list view and, unclickable, as the framing header
-   * atop the detail view (see renderDetail). Sharing this one renderer is
-   * the point: the detail view's top should look like the list row you just
-   * clicked, not introduce a second, differently-styled summary of the same
-   * three facts. Found via live testing that a separate hand-styled
-   * "branch · status" line in the detail view read as visually disconnected
-   * from the list it followed from.
-   */
-  renderProjectSummary(container, project) {
-    const name = project.tag.replace(/^#/, "");
-    const counts = this.itemCounts(project);
-    const row = container.createDiv({ cls: "warped-todo-project-row" });
-    const titleLine = row.createDiv({ cls: "warped-todo-project-row-title" });
-    titleLine.createSpan({ text: name, cls: "warped-todo-project-name" });
-    if (project.branch)
-      titleLine.createSpan({ text: project.branch, cls: "warped-todo-project-branch" });
-    if (project.gitStatus)
-      titleLine.createSpan({ text: project.gitStatus, cls: "warped-todo-project-status" });
-    if (counts.total > 0) {
-      const parts = [];
-      if (counts.todo > 0)
-        parts.push(`${counts.todo} todo`);
-      if (counts.idea > 0)
-        parts.push(`${counts.idea} idea`);
-      if (counts.bug > 0)
-        parts.push(`${counts.bug} bug`);
-      row.createDiv({ text: parts.join(" \xB7 "), cls: "warped-todo-project-row-counts" });
-    }
-    return row;
-  }
-  // ===== Detail view =====
-  renderDetail(container, name) {
-    const projects = this.projectManager.getProjects(this.scannedProjects);
-    const project = projects.find((p) => p.tag.replace(/^#/, "") === name);
-    this.renderHeader(container, "Projects", true);
-    if (!project || !project.localPath) {
-      container.createEl("p", { text: `"${name}" is no longer a detected project.` });
-      return;
-    }
-    const info = container.createDiv({ cls: "warped-todo-project-info" });
-    this.renderProjectSummary(info, project);
-    const actions = info.createDiv({ cls: "warped-todo-project-info-actions" });
-    if (project.remote) {
-      const url = browsableUrl(project.remote);
-      const link = actions.createEl("a", {
-        cls: "warped-todo-project-info-action",
-        href: url,
-        attr: { title: url }
-      });
-      (0, import_obsidian7.setIcon)(link.createSpan(), "external-link");
-      link.createSpan({ text: url.replace(/^https?:\/\//, "") });
-      link.setAttr("target", "_blank");
-    }
-    const revealBtn = actions.createEl("a", {
-      cls: "warped-todo-project-info-action",
-      attr: { title: project.localPath }
-    });
-    (0, import_obsidian7.setIcon)(revealBtn.createSpan(), "folder-open");
-    revealBtn.createSpan({ text: homeRelativePath(project.localPath) });
-    revealBtn.addEventListener("click", () => this.revealInFinder(project.localPath));
-    const itemsContainer = container.createDiv({ cls: "warped-todo-project-items" });
-    this.renderItemGroups(itemsContainer, project);
-  }
-  revealInFinder(path) {
-    var _a, _b;
-    try {
-      const electron = require("electron");
-      const shell = (_b = (_a = electron.remote) == null ? void 0 : _a.shell) != null ? _b : electron.shell;
-      shell.showItemInFolder(path);
-    } catch (error) {
-      console.error("[Warped Todo]", "Failed to reveal folder:", error);
-      new import_obsidian7.Notice("Couldn't open Finder. See console for details.");
-    }
-  }
-  /** Opens a synced item's source file (a plain filesystem path, not necessarily inside the vault) in the OS default editor — the external-file equivalent of openFileAtLine for a vault TFile. */
-  openExternalFile(path) {
-    var _a, _b;
-    try {
-      const electron = require("electron");
-      const shell = (_b = (_a = electron.remote) == null ? void 0 : _a.shell) != null ? _b : electron.shell;
-      shell.openPath(path);
-    } catch (error) {
-      console.error("[Warped Todo]", "Failed to open file:", error);
-      new import_obsidian7.Notice("Couldn't open file. See console for details.");
-    }
-  }
-  /**
-   * Two sources, concatenated — see DESIGN.md's "Item list — two sources, no
-   * reverse-mapping": synced items come from `syncManager.getCachedItems()`
-   * (parsed straight from each repo's BUGS.md/TODO.md/etc., not from the vault
-   * note — the note's body is never written to for items, see
-   * ProjectSyncManager's class doc comment); hand-typed items come from a
-   * normal TodoScanner vault scan of this same note's `## Overview` (or
-   * anywhere else in it).
-   *
-   * Group headings and item rows reuse the TODOs sidebar's own CSS classes
-   * (`.todo-orphan-section*`, `.todo-checkbox*`, `.todo-text`) rather than
-   * parallel ones, so this view is styled identically by construction instead
-   * of by trying to hand-match colours/weights — found via live testing that
-   * the earlier hand-rolled styling didn't actually match.
-   */
-  renderItemGroups(container, project) {
-    const name = project.tag.replace(/^#/, "");
-    const syncedItems = this.syncManager.getCachedItems(project.localPath);
-    for (const group of GROUP_ORDER) {
-      const groupItems = syncedItems.filter((i) => i.itemType === group.type);
-      if (groupItems.length === 0)
-        continue;
-      const groupEl = container.createDiv({ cls: "warped-todo-project-item-group" });
-      this.renderGroupHeading(groupEl, group.heading, this.syncedGroupFileHint(groupItems));
-      for (const item of groupItems) {
-        this.renderSyncedItemRow(groupEl, item, name, group.checkbox, project.localPath);
-      }
-    }
-    const handTypedGroups = this.buildHandTypedGroups(name);
-    for (const group of handTypedGroups) {
-      const groupEl = container.createDiv({ cls: "warped-todo-project-item-group" });
-      this.renderGroupHeading(groupEl, group.label, {
-        displayName: group.file.name,
-        path: group.file.path,
-        onOpen: () => openFileAtLine(this.app, group.file, group.lineNumber)
-      });
-      for (const item of group.items)
-        this.renderHandTypedItemRow(groupEl, item);
-    }
-    if (syncedItems.length === 0 && handTypedGroups.length === 0) {
-      container.createEl("p", { text: "No tracked items.", cls: "warped-todo-projects-empty-msg" });
-    }
-  }
-  /**
-   * A group's file hint, when every item in it came from the same source
-   * file (the common case — one BUGS.md or TODO.md per repo). Omitted, not
-   * guessed, when a group spans more than one file, so the hint never points
-   * at the wrong one.
-   */
-  syncedGroupFileHint(items) {
-    var _a;
-    const paths = new Set(items.map((i) => i.sourceFile));
-    if (paths.size !== 1)
-      return void 0;
-    const path = items[0].sourceFile;
-    return {
-      displayName: (_a = path.split("/").pop()) != null ? _a : path,
-      path,
-      onOpen: () => this.openExternalFile(path)
-    };
-  }
-  /**
-   * `fileHint` supplies the visible filename + click-through arrow — same
-   * affordance the main TODOs sidebar gives a header-with-children row
-   * (`.header-filename` + `→`, see SidebarView.ts's renderTodoItem). Missing
-   * here before this pass (found via live testing/screenshot review): group
-   * headings rendered a bare label with no indication of, or way to jump to,
-   * the source file.
-   */
-  renderGroupHeading(groupEl, label, fileHint) {
-    const heading = groupEl.createDiv({ cls: "todo-orphan-section" });
-    heading.createSpan({ cls: "todo-orphan-section-text", text: label });
-    if (!fileHint)
-      return;
-    heading.createSpan({
-      cls: "header-filename",
-      text: fileHint.displayName,
-      attr: { title: fileHint.path }
-    });
-    const link = heading.createEl("a", {
-      cls: "todo-orphan-section-link",
-      text: "\u2192",
-      href: "#",
-      attr: { "aria-label": `Open ${fileHint.path}` }
-    });
-    link.addEventListener("click", (evt) => {
-      evt.preventDefault();
-      fileHint.onOpen();
-    });
-  }
-  /**
-   * Groups hand-typed items the same way the TODOs sidebar itself does: a
-   * header TODO's children belong under it (labelled with the header's own
-   * text, cleaned — not rendered as a checkbox row itself, since a header
-   * with children can't be completed directly), and true orphans (no parent
-   * header) group by `sectionLabel`. Getting this wrong was the actual bug —
-   * treating every scanned item as an independent checkbox row showed a
-   * header's raw markdown text (`### bugs #todo #project`) as its own row,
-   * on top of its children, with no connection between the two.
-   */
-  buildHandTypedGroups(projectName) {
-    return groupHandTypedItems(this.handTypedItems(projectName));
-  }
-  /** Vault-scanned #todo/#idea items hand-typed into this note (the whole note — there's no sync-owned region to exclude anymore). */
-  handTypedItems(projectName) {
-    const options = this.getOptions();
-    const notePath = projectFilePath(options.projectsFolder, projectName);
-    return [...this.scanner.getTodos(), ...this.scanner.getIdeas()].filter(
-      (t) => t.filePath === notePath
-    );
-  }
-  renderSyncedItemRow(container, item, projectName, checkbox, repoPath) {
-    const row = container.createDiv({ cls: "warped-todo-project-item-row todo-item" });
-    if (checkbox) {
-      const wrap = row.createDiv({ cls: "todo-checkbox-wrap" });
-      const cb = wrap.createEl("input", { type: "checkbox", cls: "todo-checkbox" });
-      cb.checked = item.completed;
-      cb.addEventListener("click", async (evt) => {
-        evt.stopPropagation();
-        const ok = await setProjectItemCompletion(item, !item.completed, {
-          repoPath,
-          scanner: this.projectScanner
-        });
-        if (ok)
-          await this.resyncActiveProject();
-      });
-    }
-    row.createSpan({ text: cleanDisplayText(item.text), cls: "todo-text" });
-    row.addEventListener("contextmenu", (evt) => {
-      evt.preventDefault();
-      this.showSyncedItemMenu(evt, item);
-    });
-  }
-  renderHandTypedItemRow(container, item) {
-    const row = container.createDiv({ cls: "warped-todo-project-item-row todo-item" });
-    if (item.hasCheckbox) {
-      const wrap = row.createDiv({ cls: "todo-checkbox-wrap" });
-      const cb = wrap.createEl("input", { type: "checkbox", cls: "todo-checkbox" });
-      cb.checked = false;
-      cb.addEventListener("click", async (evt) => {
-        evt.stopPropagation();
-        const ok = await this.processor.completeTodo(item, this.getOptions().defaultTodoneFile);
-        if (ok)
-          this.render();
-      });
-    }
-    row.createSpan({ text: cleanDisplayText(item.text), cls: "todo-text" });
-    row.addEventListener("contextmenu", (evt) => {
-      evt.preventDefault();
-      this.contextMenuHandler.showTodoMenu(evt, item, () => this.render(), false);
-    });
-  }
-  showSyncedItemMenu(evt, item) {
-    var _a;
-    const menu = new import_obsidian7.Menu();
-    const hasFocus = item.tags.includes("#focus");
-    const hasFuture = item.tags.includes("#future");
-    const currentPriority = (_a = item.tags.find((t) => /^#p[0-4]$/.test(t))) != null ? _a : null;
-    const hasLaterPriority = currentPriority !== null && /^#p[3-4]$/.test(currentPriority);
-    menu.addItem((mi) => {
-      mi.setTitle("Copy").setIcon("copy").onClick(async () => {
-        await navigator.clipboard.writeText(item.text);
-      });
-    });
-    menu.addItem((mi) => {
-      mi.setTitle(hasFocus ? "Unfocus" : "Focus").setIcon("zap").onClick(async () => {
-        const ok = hasFocus ? await removeProjectItemTag(item, "#focus") : await setProjectItemPriority(item, calculateFocusPriority(currentPriority), true);
-        if (ok)
-          await this.resyncActiveProject();
-      });
-    });
-    menu.addItem((mi) => {
-      mi.setTitle(hasLaterPriority ? "Unlater" : "Later").setIcon("clock").onClick(async () => {
-        const ok = hasLaterPriority ? await removeProjectItemTag(item, currentPriority) : await setProjectItemPriority(item, calculateLaterPriority(currentPriority));
-        if (ok)
-          await this.resyncActiveProject();
-      });
-    });
-    menu.addItem((mi) => {
-      mi.setTitle(hasFuture ? "Unsnooze" : "Snooze").setIcon("moon").onClick(async () => {
-        const ok = hasFuture ? await removeProjectItemTag(item, "#future") : await addProjectItemTag(item, "#future");
-        if (ok)
-          await this.resyncActiveProject();
-      });
-    });
-    menu.showAtMouseEvent(evt);
-  }
-  /**
-   * Re-reads the active project's structured files after a mutation and
-   * updates the sidebar's item cache directly, so the change is visible
-   * immediately without a vault write — items live only in the sidebar's
-   * cache now, not in the note body, so there's nothing in the vault that
-   * needs rewriting just to reflect a completion/priority/tag change.
-   */
-  async resyncActiveProject() {
-    if (!this.activeProjectName)
-      return;
-    const scanned = this.scannedProjects.find((p) => p.name === this.activeProjectName);
-    if (!scanned)
-      return;
-    const items = await this.syncManager.getProjectItems(scanned.localPath);
-    this.syncManager.updateCachedItems(scanned.localPath, items);
-    this.render();
-  }
-};
 function calculateFocusPriority(currentPriority) {
   if (!currentPriority || currentPriority === "#future")
     return "#p0";
@@ -3613,11 +3505,11 @@ function groupHandTypedItems(items) {
 }
 
 // src/ContextMenuHandler.ts
-var import_obsidian9 = require("obsidian");
+var import_obsidian11 = require("obsidian");
 
 // src/MoveTargetModal.ts
-var import_obsidian8 = require("obsidian");
-var MoveTargetModal = class extends import_obsidian8.SuggestModal {
+var import_obsidian10 = require("obsidian");
+var MoveTargetModal = class extends import_obsidian10.SuggestModal {
   constructor(app, moveHistory, excludePath, onChoose) {
     super(app);
     this.moveHistory = moveHistory;
@@ -3649,7 +3541,7 @@ var MoveTargetModal = class extends import_obsidian8.SuggestModal {
     }
     for (const path of this.moveHistory) {
       const file = this.app.vault.getAbstractFileByPath(path);
-      if (file instanceof import_obsidian8.TFile) {
+      if (file instanceof import_obsidian10.TFile) {
         addIfMatch(file, "recent");
       }
     }
@@ -3681,7 +3573,7 @@ var MoveTargetModal = class extends import_obsidian8.SuggestModal {
       for (const item of items) {
         if (item.type === "file" && item.path) {
           const file = this.app.vault.getAbstractFileByPath(item.path);
-          if (file instanceof import_obsidian8.TFile && file.extension === "md") {
+          if (file instanceof import_obsidian10.TFile && file.extension === "md") {
             files.push(file);
           }
         }
@@ -3696,7 +3588,7 @@ var MoveTargetModal = class extends import_obsidian8.SuggestModal {
     this.app.workspace.iterateAllLeaves((leaf) => {
       var _a;
       const file = (_a = leaf.view) == null ? void 0 : _a.file;
-      if (file instanceof import_obsidian8.TFile && file.extension === "md" && !seen.has(file.path)) {
+      if (file instanceof import_obsidian10.TFile && file.extension === "md" && !seen.has(file.path)) {
         seen.add(file.path);
         files.push(file);
       }
@@ -3735,7 +3627,7 @@ var ContextMenuHandler = class {
    * tracked for removal in PLAN.md, unrelated to Projects).
    */
   showTodoMenu(evt, todo, onRefresh, includeMove = true) {
-    const menu = new import_obsidian9.Menu();
+    const menu = new import_obsidian11.Menu();
     const currentPriority = this.getCurrentPriority(todo);
     const hasFocus = todo.tags.includes("#focus");
     const hasFuture = todo.tags.includes("#future");
@@ -3859,7 +3751,7 @@ var ContextMenuHandler = class {
    * Operations apply to all TODOs matching the project tag
    */
   showProjectMenu(evt, project, scanner, onRefresh, onFilterByTag) {
-    const menu = new import_obsidian9.Menu();
+    const menu = new import_obsidian11.Menu();
     const getTodosForProject = () => {
       return scanner.getTodos().filter((todo) => todo.tags.includes(project.tag));
     };
@@ -3927,7 +3819,7 @@ var ContextMenuHandler = class {
    * Show context menu for an idea item
    */
   showIdeaMenu(evt, idea, onRefresh) {
-    const menu = new import_obsidian9.Menu();
+    const menu = new import_obsidian11.Menu();
     const hasFocus = idea.tags.includes("#focus");
     menu.addItem((item) => {
       item.setTitle("Add to TODOs").setIcon("check-square").onClick(async () => {
@@ -3964,452 +3856,10 @@ var ContextMenuHandler = class {
   }
 };
 
-// src/SlashCommandSuggest.ts
-var import_obsidian10 = require("obsidian");
-var CALLOUT_TYPES = [
-  { id: "info", name: "Info", icon: "\u2139\uFE0F" },
-  { id: "tip", name: "Tip", icon: "\u{1F4A1}" },
-  { id: "note", name: "Note", icon: "\u{1F4DD}" },
-  { id: "warning", name: "Warning", icon: "\u26A0\uFE0F" },
-  { id: "danger", name: "Danger", icon: "\u{1F534}" },
-  { id: "bug", name: "Bug", icon: "\u{1F41B}" },
-  { id: "example", name: "Example", icon: "\u{1F4CB}" },
-  { id: "quote", name: "Quote", icon: "\u{1F4AC}" },
-  { id: "abstract", name: "Abstract", icon: "\u{1F4C4}" },
-  { id: "success", name: "Success", icon: "\u2705" },
-  { id: "question", name: "Question", icon: "\u2753" },
-  { id: "failure", name: "Failure", icon: "\u274C" }
-];
-var SlashCommandSuggest = class extends import_obsidian10.EditorSuggest {
-  constructor(app, settings) {
-    super(app);
-    this.inCalloutMenu = false;
-    this.triggerStart = null;
-    this.settings = settings;
-  }
-  getCommands() {
-    return [
-      {
-        id: "todo",
-        name: "Todo",
-        description: "Insert a TODO item",
-        icon: "\u2610",
-        action: (editor, start, end) => {
-          editor.replaceRange("- [ ] #todo ", start, end);
-          editor.setCursor({ line: start.line, ch: start.ch + 12 });
-        }
-      },
-      {
-        id: "todos",
-        name: "Todos",
-        description: "Insert a TODO list with heading",
-        icon: "\u2630",
-        action: (editor, start, end) => {
-          const text = "## TODOs #todos\n\n- [ ] ";
-          editor.replaceRange(text, start, end);
-          editor.setCursor({ line: start.line + 2, ch: 6 });
-        }
-      },
-      {
-        id: "idea",
-        name: "Idea",
-        description: "Insert an idea item",
-        icon: "\u{1F4A1}",
-        action: (editor, start, end) => {
-          editor.replaceRange("- [ ] #idea ", start, end);
-          editor.setCursor({ line: start.line, ch: start.ch + 12 });
-        }
-      },
-      {
-        id: "ideas",
-        name: "Ideas",
-        description: "Insert an Ideas list with heading",
-        icon: "\u{1F4A1}",
-        action: (editor, start, end) => {
-          const text = "## Ideas #ideas\n\n- [ ] ";
-          editor.replaceRange(text, start, end);
-          editor.setCursor({ line: start.line + 2, ch: 6 });
-        }
-      },
-      {
-        id: "today",
-        name: "Today",
-        description: "Insert today's date",
-        icon: "\u{1F4C5}",
-        action: (editor, start, end) => {
-          const date = formatDate(/* @__PURE__ */ new Date(), this.settings.dateFormat);
-          editor.replaceRange(date, start, end);
-          editor.setCursor({ line: start.line, ch: start.ch + date.length });
-        }
-      },
-      {
-        id: "tomorrow",
-        name: "Tomorrow",
-        description: "Insert tomorrow's date",
-        icon: "\u{1F4C6}",
-        action: (editor, start, end) => {
-          const tomorrow = /* @__PURE__ */ new Date();
-          tomorrow.setDate(tomorrow.getDate() + 1);
-          const date = formatDate(tomorrow, this.settings.dateFormat);
-          editor.replaceRange(date, start, end);
-          editor.setCursor({ line: start.line, ch: start.ch + date.length });
-        }
-      },
-      {
-        id: "callout",
-        name: "Callout",
-        description: "Insert a callout block",
-        icon: "\u{1F4E2}",
-        action: () => {
-        }
-      }
-    ];
-  }
-  onTrigger(cursor, editor, file) {
-    const line = editor.getLine(cursor.line);
-    const beforeCursor = line.substring(0, cursor.ch);
-    const match = beforeCursor.match(/^(\s*)\/(\S*)$/);
-    if (!match) {
-      this.inCalloutMenu = false;
-      return null;
-    }
-    const whitespace = match[1];
-    const query = match[2];
-    this.triggerStart = { line: cursor.line, ch: whitespace.length };
-    return {
-      start: this.triggerStart,
-      end: cursor,
-      query
-    };
-  }
-  getSuggestions(context) {
-    const query = context.query.toLowerCase();
-    if (this.inCalloutMenu) {
-      return CALLOUT_TYPES.filter(
-        (type) => type.id.includes(query) || type.name.toLowerCase().includes(query)
-      );
-    }
-    const commands = this.getCommands();
-    if (!query) {
-      return commands;
-    }
-    return commands.filter(
-      (cmd) => cmd.id.includes(query) || cmd.name.toLowerCase().includes(query)
-    );
-  }
-  renderSuggestion(item, el) {
-    el.addClass("warped-todo-suggestion");
-    const iconSpan = el.createEl("span", { cls: "suggestion-icon" });
-    iconSpan.textContent = item.icon;
-    const textContainer = el.createEl("div", { cls: "suggestion-content" });
-    textContainer.createEl("span", {
-      cls: "suggestion-name",
-      text: item.name
-    });
-    if ("description" in item) {
-      textContainer.createEl("span", {
-        cls: "suggestion-description",
-        text: item.description
-      });
-    }
-  }
-  selectSuggestion(item, evt) {
-    var _a;
-    const editor = (_a = this.context) == null ? void 0 : _a.editor;
-    if (!editor || !this.context)
-      return;
-    const start = this.context.start;
-    const end = this.context.end;
-    if (this.inCalloutMenu) {
-      const calloutType = item;
-      const calloutText = `> [!${calloutType.id}]
-> `;
-      editor.replaceRange(calloutText, start, end);
-      editor.setCursor({ line: start.line + 1, ch: 2 });
-      this.inCalloutMenu = false;
-    } else if ("action" in item) {
-      const command = item;
-      if (command.id === "callout") {
-        this.inCalloutMenu = true;
-        editor.replaceRange("/", start, end);
-        editor.setCursor({ line: start.line, ch: start.ch + 1 });
-      } else {
-        command.action(editor, start, end);
-      }
-    }
-  }
-};
-
-// src/AtSuggest.ts
-var import_obsidian11 = require("obsidian");
-var AtSuggest = class extends import_obsidian11.EditorSuggest {
-  constructor(app, settings, teamManager) {
-    super(app);
-    this.settings = settings;
-    this.teamManager = teamManager;
-  }
-  getDateOptions() {
-    return [
-      {
-        kind: "date",
-        id: "date",
-        label: "@date",
-        description: "Today's date",
-        icon: "\u{1F4C5}",
-        getDate: () => /* @__PURE__ */ new Date()
-      },
-      {
-        kind: "date",
-        id: "today",
-        label: "@today",
-        description: "Today's date",
-        icon: "\u{1F4C5}",
-        getDate: () => /* @__PURE__ */ new Date()
-      },
-      {
-        kind: "date",
-        id: "tomorrow",
-        label: "@tomorrow",
-        description: "Tomorrow's date",
-        icon: "\u{1F4C6}",
-        getDate: () => {
-          const d = /* @__PURE__ */ new Date();
-          d.setDate(d.getDate() + 1);
-          return d;
-        }
-      },
-      {
-        kind: "date",
-        id: "yesterday",
-        label: "@yesterday",
-        description: "Yesterday's date",
-        icon: "\u{1F4C6}",
-        getDate: () => {
-          const d = /* @__PURE__ */ new Date();
-          d.setDate(d.getDate() - 1);
-          return d;
-        }
-      }
-    ];
-  }
-  getUserOptions() {
-    var _a;
-    const team = this.teamManager.getTeam();
-    const options = [];
-    const meHandle = this.teamManager.resolveMe();
-    if (meHandle) {
-      const meMember = team.find((m) => m.isMe);
-      options.push({
-        kind: "user",
-        id: "me",
-        label: "@me",
-        description: (_a = meMember == null ? void 0 : meMember.name) != null ? _a : meHandle,
-        icon: "\u{1F464}",
-        handle: "me"
-      });
-    }
-    for (const member of team) {
-      options.push({
-        kind: "user",
-        id: member.handle,
-        label: `@${member.handle}`,
-        description: member.name,
-        icon: "\u{1F464}",
-        handle: member.handle
-      });
-    }
-    return options;
-  }
-  onTrigger(cursor, editor, file) {
-    const line = editor.getLine(cursor.line);
-    const beforeCursor = line.substring(0, cursor.ch);
-    const match = beforeCursor.match(/@([\w.]*)$/);
-    if (!match)
-      return null;
-    const atIndex = beforeCursor.lastIndexOf("@");
-    if (atIndex > 0) {
-      const charBefore = beforeCursor[atIndex - 1];
-      if (/[a-zA-Z0-9]/.test(charBefore))
-        return null;
-    }
-    return {
-      start: { line: cursor.line, ch: atIndex },
-      end: cursor,
-      query: match[1].toLowerCase()
-    };
-  }
-  getSuggestions(context) {
-    const query = context.query.toLowerCase();
-    const dateOptions = this.getDateOptions();
-    const userOptions = this.getUserOptions();
-    const all = [...dateOptions, ...userOptions];
-    if (!query)
-      return all;
-    return all.filter((opt) => {
-      const id = opt.id.toLowerCase();
-      return id.startsWith(query) || id.includes(query);
-    });
-  }
-  renderSuggestion(item, el) {
-    el.addClass("warped-todo-suggestion");
-    const iconSpan = el.createEl("span", { cls: "suggestion-icon" });
-    iconSpan.textContent = item.icon;
-    const textContainer = el.createEl("div", { cls: "suggestion-content" });
-    textContainer.createEl("span", { cls: "suggestion-name", text: item.label });
-    if (item.kind === "date" && item.getDate) {
-      const date = formatDate(item.getDate(), this.settings.dateFormat);
-      textContainer.createEl("span", { cls: "suggestion-description", text: date });
-    } else {
-      textContainer.createEl("span", { cls: "suggestion-description", text: item.description });
-    }
-  }
-  selectSuggestion(item, evt) {
-    var _a;
-    const editor = (_a = this.context) == null ? void 0 : _a.editor;
-    if (!editor || !this.context)
-      return;
-    const start = this.context.start;
-    const end = this.context.end;
-    if (item.kind === "date" && item.getDate) {
-      const date = formatDate(item.getDate(), this.settings.dateFormat);
-      editor.replaceRange(date, start, end);
-      editor.setCursor({ line: start.line, ch: start.ch + date.length });
-    } else if (item.handle) {
-      const text = `@${item.handle} `;
-      editor.replaceRange(text, start, end);
-      editor.setCursor({ line: start.line, ch: start.ch + text.length });
-    }
-  }
-};
-
-// src/TeamManager.ts
-var import_obsidian12 = require("obsidian");
-var TEAM_LINE_REGEX = /^-\s+@([\w][\w.-]*)\s*(?:—|-)\s*(.+)$/;
-var ME_SUFFIX = /\s*\(me\)\s*$/i;
-var TeamManager = class extends import_obsidian12.Events {
-  constructor(app, filePath) {
-    super();
-    this.members = [];
-    this.pendingAdds = /* @__PURE__ */ new Set();
-    this.debouncedFlushAdds = (0, import_obsidian12.debounce)(() => this.flushPendingAdds(), 500, true);
-    this.app = app;
-    this.filePath = filePath;
-  }
-  async load() {
-    await this.parse();
-  }
-  setFilePath(filePath) {
-    this.filePath = filePath;
-    this.parse();
-  }
-  getTeam() {
-    return this.members;
-  }
-  resolveMe() {
-    var _a;
-    const me = this.members.find((m) => m.isMe);
-    return (_a = me == null ? void 0 : me.handle) != null ? _a : null;
-  }
-  resolveHandle(raw) {
-    var _a, _b;
-    if (raw === "me") {
-      const meHandle = this.resolveMe();
-      if (!meHandle)
-        return null;
-      return (_a = this.members.find((m) => m.handle === meHandle)) != null ? _a : null;
-    }
-    return (_b = this.members.find((m) => m.handle === raw)) != null ? _b : null;
-  }
-  isKnownHandle(handle) {
-    if (handle === "me")
-      return true;
-    return this.members.some((m) => m.handle === handle);
-  }
-  addMember(handle) {
-    if (this.isKnownHandle(handle))
-      return;
-    this.pendingAdds.add(handle);
-    this.debouncedFlushAdds();
-  }
-  async flushPendingAdds() {
-    if (this.pendingAdds.size === 0)
-      return;
-    const handles = [...this.pendingAdds];
-    this.pendingAdds.clear();
-    const file = this.app.vault.getAbstractFileByPath(this.filePath);
-    if (!(file instanceof import_obsidian12.TFile))
-      return;
-    const content = await this.app.vault.read(file);
-    const newLines = handles.filter((h) => !this.members.some((m) => m.handle === h)).map((h) => `- @${h} \u2014 ${h}`);
-    if (newLines.length === 0)
-      return;
-    const updated = content.trimEnd() + "\n" + newLines.join("\n") + "\n";
-    await this.app.vault.modify(file, updated);
-  }
-  async createTeamFile() {
-    let username = "me";
-    try {
-      username = require("os").userInfo().username || "me";
-    } catch (e) {
-    }
-    const content = `# Team
-
-- @${username} \u2014 ${username} (me)
-`;
-    const file = await this.app.vault.create(this.filePath, content);
-    await this.parse();
-    return file;
-  }
-  watchFile() {
-    this.app.vault.on("modify", (file) => {
-      if (file instanceof import_obsidian12.TFile && file.path === this.filePath) {
-        this.parse();
-      }
-    });
-    this.app.vault.on("create", (file) => {
-      if (file instanceof import_obsidian12.TFile && file.path === this.filePath) {
-        this.parse();
-      }
-    });
-    this.app.vault.on("delete", (file) => {
-      if (file instanceof import_obsidian12.TFile && file.path === this.filePath) {
-        this.members = [];
-        this.trigger("team-updated");
-      }
-    });
-  }
-  async parse() {
-    const file = this.app.vault.getAbstractFileByPath(this.filePath);
-    if (!(file instanceof import_obsidian12.TFile)) {
-      this.members = [];
-      this.trigger("team-updated");
-      return;
-    }
-    const content = await this.app.vault.read(file);
-    const lines = content.split("\n");
-    const members = [];
-    for (const line of lines) {
-      const match = line.match(TEAM_LINE_REGEX);
-      if (!match)
-        continue;
-      const handle = match[1];
-      let name = match[2].trim();
-      const isMe = ME_SUFFIX.test(name);
-      if (isMe) {
-        name = name.replace(ME_SUFFIX, "").trim();
-      }
-      members.push({ handle, name, isMe });
-    }
-    this.members = members;
-    this.trigger("team-updated");
-  }
-};
-
 // src/SidebarView.ts
-var import_obsidian13 = require("obsidian");
 var VIEW_TYPE_TODO_SIDEBAR = "warped-todo-sidebar";
-var TodoSidebarView = class extends import_obsidian13.ItemView {
-  constructor(leaf, scanner, processor, projectManager, defaultTodoneFile, priorityTags, activeTodosLimit, focusListLimit, makeLinksClickable, onShowAbout, onShowStats, onOpenProjects, getMoveHistory = () => [], teamManager, defaultAssignee = "", focusQueueLimit = 1, focusModeActive = false, setFocusModeActive = async () => {
+var TodoSidebarView = class extends import_obsidian12.ItemView {
+  constructor(leaf, scanner, processor, projectManager, projectScanner, syncManager, getProjectsOptions, onOpenSettings, defaultTodoneFile, priorityTags, activeTodosLimit, focusListLimit, makeLinksClickable, onShowAbout, onShowStats, getMoveHistory = () => [], teamManager, defaultAssignee = "", focusQueueLimit = 1, focusModeActive = false, setFocusModeActive = async () => {
   }) {
     super(leaf);
     this.updateListener = null;
@@ -4436,6 +3886,19 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
     this.openDropdown = null;
     this.openDropdownTrigger = null;
     this.openInfoPopup = null;
+    this.projectsMode = "list";
+    this.activeProjectName = null;
+    this.projectsFilterText = "";
+    this.scannedProjects = [];
+    this.projectsSyncing = false;
+    this.projectsSyncedOnce = false;
+    // Tracks the active file's path so handleProjectActiveFileChange can tell
+    // "the active file genuinely changed" from "some workspace event fired for
+    // the same file" (Obsidian fires these often, for reasons unrelated to
+    // navigation). Without this, a project note staying open while the user
+    // switched away from the Projects tab could get silently yanked back into
+    // detail mode by the next such event.
+    this.lastKnownProjectFilePath = null;
     // Configuration for unified list item rendering
     this.todoConfig = {
       type: "todo",
@@ -4456,13 +3919,16 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
     this.scanner = scanner;
     this.processor = processor;
     this.projectManager = projectManager;
+    this.projectScanner = projectScanner;
+    this.syncManager = syncManager;
+    this.getProjectsOptions = getProjectsOptions;
+    this.onOpenSettings = onOpenSettings;
     this.defaultTodoneFile = defaultTodoneFile;
     this.activeTodosLimit = activeTodosLimit;
     this.focusListLimit = focusListLimit;
     this.makeLinksClickable = makeLinksClickable;
     this.onShowAbout = onShowAbout;
     this.onShowStats = onShowStats;
-    this.onOpenProjects = onOpenProjects;
     this.teamManager = teamManager != null ? teamManager : new TeamManager(this.app, "team.md");
     this.defaultAssignee = defaultAssignee;
     this.priorityTags = priorityTags;
@@ -4474,7 +3940,7 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
       processor,
       priorityTags,
       getMoveHistory,
-      (tag) => this.onOpenProjects(tag)
+      (tag) => this.switchToProjectsTab(tag)
     );
   }
   getViewType() {
@@ -4486,6 +3952,8 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
         return "TODOs";
       case "ideas":
         return "IDEAs";
+      case "projects":
+        return "Projects";
     }
   }
   getIcon() {
@@ -4735,6 +4203,8 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
       this.render();
     };
     this.scanner.on("todos-updated", this.updateListener);
+    this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.handleProjectActiveFileChange()));
+    this.registerEvent(this.app.workspace.on("file-open", () => this.handleProjectActiveFileChange()));
     const hasTodos = this.scanner.getTodos().length > 0;
     const hasTodones = this.scanner.getTodones().length > 0;
     const hasIdeas = this.scanner.getIdeas().length > 0;
@@ -4837,6 +4307,9 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
         case "ideas":
           titleEl.appendText(" IDEAs");
           break;
+        case "projects":
+          titleEl.appendText(" Projects");
+          break;
       }
     }
     const tabNav = headerDiv.createEl("div", { cls: "sidebar-tab-nav" });
@@ -4864,12 +4337,12 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
     });
     ideasTab.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"></path><path d="M10 22h4"></path><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"></path></svg>';
     ideasTab.addEventListener("click", () => this.switchTab("ideas"));
-    const projectsNavBtn = tabNav.createEl("button", {
-      cls: "sidebar-tab-btn sidebar-nav-out-btn",
-      attr: { "aria-label": "Open Projects" }
+    const projectsTab = tabNav.createEl("button", {
+      cls: `sidebar-tab-btn${!this.focusModeActive && this.activeTab === "projects" ? " active" : ""}`,
+      attr: { "aria-label": "Projects" }
     });
-    projectsNavBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v5"></path><circle cx="13" cy="12" r="2"></circle><path d="M18 19c-2.8 0-5-2.2-5-5v8"></path><circle cx="20" cy="19" r="2"></circle></svg>';
-    projectsNavBtn.addEventListener("click", () => this.onOpenProjects());
+    projectsTab.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v5"></path><circle cx="13" cy="12" r="2"></circle><path d="M18 19c-2.8 0-5-2.2-5-5v8"></path><circle cx="20" cy="19" r="2"></circle></svg>';
+    projectsTab.addEventListener("click", () => this.switchToProjectsTab());
     this.createSidebarMenuButton(headerDiv);
     const content = container.createEl("div", { cls: "sidebar-content" });
     if (this.focusModeActive) {
@@ -4883,6 +4356,9 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
         break;
       case "ideas":
         this.renderIdeasContent(content);
+        break;
+      case "projects":
+        this.renderProjectsTabContent(content);
         break;
     }
   }
@@ -5163,9 +4639,9 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
       title.appendText(project.tag);
       if (info.description) {
         const desc = popup.createEl("div", { cls: "project-info-description" });
-        const component = new import_obsidian13.Component();
+        const component = new import_obsidian12.Component();
         component.load();
-        await import_obsidian13.MarkdownRenderer.render(this.app, info.description, desc, info.filepath, component);
+        await import_obsidian12.MarkdownRenderer.render(this.app, info.description, desc, info.filepath, component);
       } else {
         const desc = popup.createEl("div", { cls: "project-info-description project-info-empty" });
         desc.appendText("No description available.");
@@ -5182,9 +4658,9 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
           const li = principlesList.createEl("li", { cls: "project-info-principle-item" });
           let displayText = principle.text.replace(/#principles?\b/gi, "").replace(new RegExp(project.tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "gi"), "").replace(/\s+/g, " ").trim();
           displayText = displayText.replace(/^[-*+]\s*/, "");
-          const principleComponent = new import_obsidian13.Component();
+          const principleComponent = new import_obsidian12.Component();
           principleComponent.load();
-          await import_obsidian13.MarkdownRenderer.render(this.app, displayText, li, (info == null ? void 0 : info.filepath) || "", principleComponent);
+          await import_obsidian12.MarkdownRenderer.render(this.app, displayText, li, (info == null ? void 0 : info.filepath) || "", principleComponent);
         }
       }
       if (info.principles.length > 0) {
@@ -5209,7 +4685,7 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
         this.closeInfoPopup();
         const filepath = this.projectManager.getProjectFilePath(project.tag);
         const file = this.app.vault.getAbstractFileByPath(filepath);
-        if (file instanceof import_obsidian13.TFile) {
+        if (file instanceof import_obsidian12.TFile) {
           const leaf = this.app.workspace.getLeaf("tab");
           await leaf.openFile(file);
         }
@@ -5420,7 +4896,7 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
       e.preventDefault();
       e.stopPropagation();
       const file = this.app.vault.getAbstractFileByPath(this.defaultTodoneFile);
-      if (file instanceof import_obsidian13.TFile) {
+      if (file instanceof import_obsidian12.TFile) {
         await this.app.workspace.getLeaf(false).openFile(file);
       }
     });
@@ -5440,7 +4916,7 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
     const todos = this.scanner.getTodos();
     const openCount = todos.filter((t) => t.parentLineNumber === void 0).length;
     const todones = this.scanner.getTodones();
-    const m = import_obsidian13.moment;
+    const m = import_obsidian12.moment;
     const todayStr = m().format("YYYY-MM-DD");
     const weekStart = m().startOf("isoWeek").format("YYYY-MM-DD");
     const monthStart = m().startOf("month").format("YYYY-MM-DD");
@@ -5762,7 +5238,7 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
   }
   /** Format an ISO date as `D/M/YYYY` (e.g. `5/5/2026`). */
   formatFocusDate(iso) {
-    return (0, import_obsidian13.moment)(iso).format("D/M/YYYY");
+    return (0, import_obsidian12.moment)(iso).format("D/M/YYYY");
   }
   /**
    * Build the sidebar's kebab (vertical-dots) menu button and append it to
@@ -5776,7 +5252,7 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
     });
     menuBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>';
     menuBtn.addEventListener("click", (evt) => {
-      const menu = new import_obsidian13.Menu();
+      const menu = new import_obsidian12.Menu();
       menu.addItem((item) => {
         item.setTitle("Refresh").setIcon("refresh-cw").onClick(async () => {
           menuBtn.addClass("rotating");
@@ -5784,6 +5260,16 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
           setTimeout(() => menuBtn.removeClass("rotating"), 500);
         });
       });
+      if (this.activeTab === "projects") {
+        menu.addItem((item) => {
+          item.setTitle("Sync").setIcon("refresh-cw").onClick(async () => {
+            menuBtn.addClass("rotating");
+            this.projectsSyncedOnce = false;
+            await this.ensureProjectsSynced();
+            setTimeout(() => menuBtn.removeClass("rotating"), 500);
+          });
+        });
+      }
       menu.addSeparator();
       menu.addItem((item) => {
         item.setTitle("Stats").setIcon("bar-chart-2").onClick(() => this.onShowStats());
@@ -5793,10 +5279,7 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
         item.setTitle("About").setIcon("info").onClick(() => this.onShowAbout());
       });
       menu.addItem((item) => {
-        item.setTitle("Settings").setIcon("settings").onClick(() => {
-          this.app.setting.open();
-          this.app.setting.openTabById("warped-todo");
-        });
+        item.setTitle("Settings").setIcon("settings").onClick(() => this.onOpenSettings());
       });
       menu.showAtMouseEvent(evt);
     });
@@ -5883,6 +5366,41 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
     }
     this.activeTab = tab;
     this.render();
+  }
+  /**
+   * Switch to the Projects tab. With no tag (the tab button itself), always
+   * resets to the project list — even if already on this tab in detail
+   * view, since that's the intended "back" affordance (see the tab
+   * button's own click handler comment). With a tag (the "Show in
+   * Projects" context-menu entries), jumps straight to that project's
+   * detail view instead.
+   */
+  switchToProjectsTab(tag) {
+    if (this.focusModeActive) {
+      this.focusModeActive = false;
+      this.focusQueue = null;
+      this.prevActiveTab = null;
+      void this.setFocusModeActive(false);
+    }
+    this.activeTab = "projects";
+    void this.ensureProjectsSynced();
+    if (tag) {
+      void this.openProjectDetail(tag.replace(/^#/, ""));
+    } else {
+      this.projectsMode = "list";
+      this.activeProjectName = null;
+      this.render();
+    }
+  }
+  /**
+   * Public entry point for main.ts — Settings' "Open Projects sidebar"
+   * button and the "toggle-projects-sidebar" command, both of which need
+   * to switch this view's tab from outside it (unlike the tab button and
+   * the "Show in Projects" context-menu entries, which call
+   * switchToProjectsTab directly since they're already inside this view).
+   */
+  openProjectsTab(tag) {
+    this.switchToProjectsTab(tag);
   }
   handleFocusEnter() {
     var _a;
@@ -6006,6 +5524,441 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
       inContinueMode: true
     };
     this.rebuildFocusQueue();
+    this.render();
+  }
+  // ===================================================================
+  // Projects tab — list of detected git-repo projects, detail view per
+  // project on selection. See ProjectsSidebarView.ts's file-level comment
+  // for why this lives here instead of a second ItemView.
+  // ===================================================================
+  /** Full rescan + resync of every project. Runs once per session, lazily, the first time the Projects tab is opened; "Sync" in the kebab menu forces a repeat by clearing projectsSyncedOnce first. */
+  async ensureProjectsSynced() {
+    if (this.projectsSyncedOnce || this.projectsSyncing)
+      return;
+    const options = this.getProjectsOptions();
+    if (!options.baseFolder)
+      return;
+    this.projectsSyncing = true;
+    try {
+      this.scannedProjects = await this.syncManager.syncAll({
+        baseFolder: options.baseFolder,
+        projectsFolder: options.projectsFolder,
+        maxDepth: options.scanDepth,
+        excludeDirs: options.excludeDirs
+      });
+    } catch (error) {
+      console.error("[Warped Todo]", "Project sync failed:", error);
+      showNotice2("Project sync failed. See console for details.");
+    } finally {
+      this.projectsSyncing = false;
+      this.projectsSyncedOnce = true;
+    }
+    if (this.activeTab === "projects")
+      this.render();
+  }
+  /**
+   * Applies scan results this view didn't itself request — from a
+   * watch-triggered background sync, or the "Sync projects" command, both
+   * of which call `syncManager.syncAll()` directly. Just stores; must NOT
+   * call back into `syncAll()`, or wiring this to fire on every sync
+   * completion would trigger another sync completion, forever (see
+   * ProjectSyncManager's constructor doc comment for how this was found —
+   * the same hazard applies here, not just to the old standalone view).
+   * Only re-renders if the Projects tab is actually showing — a background
+   * sync shouldn't yank a full re-render onto whatever tab the user's on.
+   */
+  applyProjectSyncResult(scanned) {
+    this.scannedProjects = scanned;
+    this.projectsSyncedOnce = true;
+    if (this.activeTab === "projects")
+      this.render();
+  }
+  // ===== Sidebar/pane sync (auto-follow) =====
+  async handleProjectActiveFileChange() {
+    var _a;
+    const activeFile = this.app.workspace.getActiveFile();
+    const currentPath = (_a = activeFile == null ? void 0 : activeFile.path) != null ? _a : null;
+    if (currentPath === this.lastKnownProjectFilePath)
+      return;
+    this.lastKnownProjectFilePath = currentPath;
+    const projectName = activeFile ? this.projectNameForNotePath(activeFile.path) : null;
+    if (projectName) {
+      if (this.projectsMode === "detail" && this.activeProjectName === projectName)
+        return;
+      this.projectsMode = "detail";
+      this.activeProjectName = projectName;
+    } else if (this.projectsMode === "detail") {
+      this.projectsMode = "list";
+      this.activeProjectName = null;
+    } else {
+      return;
+    }
+    if (this.activeTab === "projects")
+      this.render();
+  }
+  projectNameForNotePath(filePath) {
+    const options = this.getProjectsOptions();
+    for (const project of this.projectManager.getProjects(this.scannedProjects)) {
+      if (!project.localPath)
+        continue;
+      const name = project.tag.replace(/^#/, "");
+      if (projectFilePath(options.projectsFolder, name) === filePath)
+        return name;
+    }
+    return null;
+  }
+  async openProjectDetail(name) {
+    const options = this.getProjectsOptions();
+    const path = projectFilePath(options.projectsFolder, name);
+    this.lastKnownProjectFilePath = path;
+    this.projectsMode = "detail";
+    this.activeProjectName = name;
+    this.render();
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (file instanceof import_obsidian12.TFile) {
+      await this.app.workspace.getLeaf(false).openFile(file);
+    }
+  }
+  // ===== Rendering =====
+  renderProjectsTabContent(container) {
+    if (this.projectsMode === "detail" && this.activeProjectName) {
+      this.renderProjectsDetail(container, this.activeProjectName);
+    } else {
+      this.renderProjectsList(container);
+    }
+  }
+  renderProjectsList(container) {
+    const options = this.getProjectsOptions();
+    if (!options.baseFolder) {
+      const empty = container.createDiv({ cls: "warped-todo-projects-empty" });
+      empty.createEl("p", { text: "No base folder configured yet." });
+      const btn = empty.createEl("button", { text: "Open settings" });
+      btn.addEventListener("click", () => this.onOpenSettings());
+      return;
+    }
+    if (this.projectsSyncing && !this.projectsSyncedOnce) {
+      container.createEl("p", { text: "Syncing projects\u2026", cls: "warped-todo-projects-empty-msg" });
+      return;
+    }
+    const filterInput = container.createEl("input", {
+      type: "text",
+      placeholder: "Filter\u2026",
+      cls: "warped-todo-projects-filter"
+    });
+    filterInput.value = this.projectsFilterText;
+    const listEl = container.createDiv({ cls: "warped-todo-projects-list" });
+    filterInput.addEventListener("input", () => {
+      this.projectsFilterText = filterInput.value;
+      this.renderProjectRows(listEl);
+    });
+    this.renderProjectRows(listEl);
+  }
+  renderProjectRows(listEl) {
+    listEl.empty();
+    const filterLower = this.projectsFilterText.toLowerCase();
+    const projects = this.projectManager.getProjects(this.scannedProjects).filter((p) => p.localPath).filter((p) => !filterLower || p.tag.toLowerCase().includes(filterLower)).sort((a, b) => {
+      const aActive = this.projectItemCounts(a).total > 0 ? 1 : 0;
+      const bActive = this.projectItemCounts(b).total > 0 ? 1 : 0;
+      if (aActive !== bActive)
+        return bActive - aActive;
+      return a.tag.localeCompare(b.tag);
+    });
+    if (projects.length === 0) {
+      listEl.createEl("p", { text: "No projects found.", cls: "warped-todo-projects-empty-msg" });
+      return;
+    }
+    for (const project of projects)
+      this.renderProjectRow(listEl, project);
+  }
+  projectItemCounts(project) {
+    if (!project.localPath)
+      return { todo: 0, idea: 0, bug: 0, total: 0 };
+    const items = this.syncManager.getCachedItems(project.localPath).filter((i) => !i.completed);
+    const counts = { todo: 0, idea: 0, bug: 0, total: 0 };
+    for (const item of items) {
+      counts[item.itemType]++;
+      counts.total++;
+    }
+    return counts;
+  }
+  renderProjectRow(listEl, project) {
+    const name = project.tag.replace(/^#/, "");
+    const row = this.renderProjectSummary(listEl, project);
+    row.addClass("is-clickable");
+    row.addEventListener("click", () => this.openProjectDetail(name));
+  }
+  /**
+   * name/branch/status + item-count breakdown — the same block used both as
+   * a clickable row in the list view and, unclickable, as the framing header
+   * atop the detail view. Sharing this one renderer is the point: the
+   * detail view's top should look like the list row you just clicked, not
+   * introduce a second, differently-styled summary of the same three facts.
+   */
+  renderProjectSummary(container, project) {
+    const name = project.tag.replace(/^#/, "");
+    const counts = this.projectItemCounts(project);
+    const row = container.createDiv({ cls: "warped-todo-project-row" });
+    const titleLine = row.createDiv({ cls: "warped-todo-project-row-title" });
+    titleLine.createSpan({ text: name, cls: "warped-todo-project-name" });
+    if (project.branch)
+      titleLine.createSpan({ text: project.branch, cls: "warped-todo-project-branch" });
+    if (project.gitStatus)
+      titleLine.createSpan({ text: project.gitStatus, cls: "warped-todo-project-status" });
+    if (counts.total > 0) {
+      const parts = [];
+      if (counts.todo > 0)
+        parts.push(`${counts.todo} todo`);
+      if (counts.idea > 0)
+        parts.push(`${counts.idea} idea`);
+      if (counts.bug > 0)
+        parts.push(`${counts.bug} bug`);
+      row.createDiv({ text: parts.join(" \xB7 "), cls: "warped-todo-project-row-counts" });
+    }
+    return row;
+  }
+  // ===== Detail view =====
+  renderProjectsDetail(container, name) {
+    const projects = this.projectManager.getProjects(this.scannedProjects);
+    const project = projects.find((p) => p.tag.replace(/^#/, "") === name);
+    if (!project || !project.localPath) {
+      container.createEl("p", { text: `"${name}" is no longer a detected project.` });
+      return;
+    }
+    const info = container.createDiv({ cls: "warped-todo-project-info" });
+    this.renderProjectSummary(info, project);
+    const actions = info.createDiv({ cls: "warped-todo-project-info-actions" });
+    if (project.remote) {
+      const url = browsableUrl(project.remote);
+      const link = actions.createEl("a", {
+        cls: "warped-todo-project-info-action",
+        href: url,
+        attr: { title: url }
+      });
+      (0, import_obsidian12.setIcon)(link.createSpan(), "external-link");
+      link.createSpan({ text: url.replace(/^https?:\/\//, "") });
+      link.setAttr("target", "_blank");
+    }
+    const revealBtn = actions.createEl("a", {
+      cls: "warped-todo-project-info-action",
+      attr: { title: project.localPath }
+    });
+    (0, import_obsidian12.setIcon)(revealBtn.createSpan(), "folder-open");
+    revealBtn.createSpan({ text: homeRelativePath(project.localPath) });
+    revealBtn.addEventListener("click", () => this.revealProjectInFinder(project.localPath));
+    const itemsContainer = container.createDiv({ cls: "warped-todo-project-items" });
+    this.renderProjectItemGroups(itemsContainer, project);
+  }
+  revealProjectInFinder(path) {
+    var _a, _b;
+    try {
+      const electron = require("electron");
+      const shell = (_b = (_a = electron.remote) == null ? void 0 : _a.shell) != null ? _b : electron.shell;
+      shell.showItemInFolder(path);
+    } catch (error) {
+      console.error("[Warped Todo]", "Failed to reveal folder:", error);
+      showNotice2("Couldn't open Finder. See console for details.");
+    }
+  }
+  /** Opens a synced item's source file (a plain filesystem path, not necessarily inside the vault) in the OS default editor — the external-file equivalent of openFileAtLine for a vault TFile. */
+  openExternalProjectFile(path) {
+    var _a, _b;
+    try {
+      const electron = require("electron");
+      const shell = (_b = (_a = electron.remote) == null ? void 0 : _a.shell) != null ? _b : electron.shell;
+      shell.openPath(path);
+    } catch (error) {
+      console.error("[Warped Todo]", "Failed to open file:", error);
+      showNotice2("Couldn't open file. See console for details.");
+    }
+  }
+  /**
+   * Two sources, concatenated — see DESIGN.md's "Item list — two sources, no
+   * reverse-mapping": synced items come from `syncManager.getCachedItems()`
+   * (parsed straight from each repo's BUGS.md/TODO.md/etc., not from the
+   * vault note); hand-typed items come from a normal TodoScanner vault scan
+   * of this same note.
+   *
+   * Group headings and item rows reuse the TODOs tab's own CSS classes
+   * (`.todo-orphan-section*`, `.todo-checkbox*`, `.todo-text`) rather than
+   * parallel ones, so this view is styled identically by construction.
+   */
+  renderProjectItemGroups(container, project) {
+    const name = project.tag.replace(/^#/, "");
+    const syncedItems = this.syncManager.getCachedItems(project.localPath);
+    for (const group of GROUP_ORDER) {
+      const groupItems = syncedItems.filter((i) => i.itemType === group.type);
+      if (groupItems.length === 0)
+        continue;
+      const groupEl = container.createDiv({ cls: "warped-todo-project-item-group" });
+      this.renderProjectGroupHeading(groupEl, group.heading, this.syncedProjectGroupFileHint(groupItems));
+      for (const item of groupItems) {
+        this.renderSyncedProjectItemRow(groupEl, item, name, group.checkbox, project.localPath);
+      }
+    }
+    const handTypedGroups = this.buildHandTypedProjectGroups(name);
+    for (const group of handTypedGroups) {
+      const groupEl = container.createDiv({ cls: "warped-todo-project-item-group" });
+      this.renderProjectGroupHeading(groupEl, group.label, {
+        displayName: group.file.name,
+        path: group.file.path,
+        onOpen: () => openFileAtLine(this.app, group.file, group.lineNumber)
+      });
+      for (const item of group.items)
+        this.renderHandTypedProjectItemRow(groupEl, item);
+    }
+    if (syncedItems.length === 0 && handTypedGroups.length === 0) {
+      container.createEl("p", { text: "No tracked items.", cls: "warped-todo-projects-empty-msg" });
+    }
+  }
+  /**
+   * A group's file hint, when every item in it came from the same source
+   * file (the common case — one BUGS.md or TODO.md per repo). Omitted, not
+   * guessed, when a group spans more than one file.
+   */
+  syncedProjectGroupFileHint(items) {
+    var _a;
+    const paths = new Set(items.map((i) => i.sourceFile));
+    if (paths.size !== 1)
+      return void 0;
+    const path = items[0].sourceFile;
+    return {
+      displayName: (_a = path.split("/").pop()) != null ? _a : path,
+      path,
+      onOpen: () => this.openExternalProjectFile(path)
+    };
+  }
+  /**
+   * `fileHint` supplies the visible filename + click-through arrow — same
+   * affordance a header-with-children row gets on the TODOs tab
+   * (`.header-filename` + `→`).
+   */
+  renderProjectGroupHeading(groupEl, label, fileHint) {
+    const heading = groupEl.createDiv({ cls: "todo-orphan-section" });
+    heading.createSpan({ cls: "todo-orphan-section-text", text: label });
+    if (!fileHint)
+      return;
+    heading.createSpan({
+      cls: "header-filename",
+      text: fileHint.displayName,
+      attr: { title: fileHint.path }
+    });
+    const link = heading.createEl("a", {
+      cls: "todo-orphan-section-link",
+      text: "\u2192",
+      href: "#",
+      attr: { "aria-label": `Open ${fileHint.path}` }
+    });
+    link.addEventListener("click", (evt) => {
+      evt.preventDefault();
+      fileHint.onOpen();
+    });
+  }
+  /**
+   * Groups hand-typed items the same way the TODOs tab itself does: a
+   * header TODO's children belong under it, true orphans (no parent header)
+   * group by `sectionLabel`.
+   */
+  buildHandTypedProjectGroups(projectName) {
+    return groupHandTypedItems(this.handTypedProjectItems(projectName));
+  }
+  /** Vault-scanned #todo/#idea items hand-typed into this note (the whole note — there's no sync-owned region to exclude). */
+  handTypedProjectItems(projectName) {
+    const options = this.getProjectsOptions();
+    const notePath = projectFilePath(options.projectsFolder, projectName);
+    return [...this.scanner.getTodos(), ...this.scanner.getIdeas()].filter(
+      (t) => t.filePath === notePath
+    );
+  }
+  renderSyncedProjectItemRow(container, item, projectName, checkbox, repoPath) {
+    const row = container.createDiv({ cls: "warped-todo-project-item-row todo-item" });
+    if (checkbox) {
+      const wrap = row.createDiv({ cls: "todo-checkbox-wrap" });
+      const cb = wrap.createEl("input", { type: "checkbox", cls: "todo-checkbox" });
+      cb.checked = item.completed;
+      cb.addEventListener("click", async (evt) => {
+        evt.stopPropagation();
+        const ok = await setProjectItemCompletion(item, !item.completed, {
+          repoPath,
+          scanner: this.projectScanner
+        });
+        if (ok)
+          await this.resyncActiveProject();
+      });
+    }
+    row.createSpan({ text: cleanDisplayText(item.text), cls: "todo-text" });
+    row.addEventListener("contextmenu", (evt) => {
+      evt.preventDefault();
+      this.showSyncedProjectItemMenu(evt, item);
+    });
+  }
+  renderHandTypedProjectItemRow(container, item) {
+    const row = container.createDiv({ cls: "warped-todo-project-item-row todo-item" });
+    if (item.hasCheckbox) {
+      const wrap = row.createDiv({ cls: "todo-checkbox-wrap" });
+      const cb = wrap.createEl("input", { type: "checkbox", cls: "todo-checkbox" });
+      cb.checked = false;
+      cb.addEventListener("click", async (evt) => {
+        evt.stopPropagation();
+        const ok = await this.processor.completeTodo(item, this.getProjectsOptions().defaultTodoneFile);
+        if (ok)
+          this.render();
+      });
+    }
+    row.createSpan({ text: cleanDisplayText(item.text), cls: "todo-text" });
+    row.addEventListener("contextmenu", (evt) => {
+      evt.preventDefault();
+      this.contextMenuHandler.showTodoMenu(evt, item, () => this.render(), false);
+    });
+  }
+  showSyncedProjectItemMenu(evt, item) {
+    var _a;
+    const menu = new import_obsidian12.Menu();
+    const hasFocus = item.tags.includes("#focus");
+    const hasFuture = item.tags.includes("#future");
+    const currentPriority = (_a = item.tags.find((t) => /^#p[0-4]$/.test(t))) != null ? _a : null;
+    const hasLaterPriority = currentPriority !== null && /^#p[3-4]$/.test(currentPriority);
+    menu.addItem((mi) => {
+      mi.setTitle("Copy").setIcon("copy").onClick(async () => {
+        await navigator.clipboard.writeText(item.text);
+      });
+    });
+    menu.addItem((mi) => {
+      mi.setTitle(hasFocus ? "Unfocus" : "Focus").setIcon("zap").onClick(async () => {
+        const ok = hasFocus ? await removeProjectItemTag(item, "#focus") : await setProjectItemPriority(item, calculateFocusPriority(currentPriority), true);
+        if (ok)
+          await this.resyncActiveProject();
+      });
+    });
+    menu.addItem((mi) => {
+      mi.setTitle(hasLaterPriority ? "Unlater" : "Later").setIcon("clock").onClick(async () => {
+        const ok = hasLaterPriority ? await removeProjectItemTag(item, currentPriority) : await setProjectItemPriority(item, calculateLaterPriority(currentPriority));
+        if (ok)
+          await this.resyncActiveProject();
+      });
+    });
+    menu.addItem((mi) => {
+      mi.setTitle(hasFuture ? "Unsnooze" : "Snooze").setIcon("moon").onClick(async () => {
+        const ok = hasFuture ? await removeProjectItemTag(item, "#future") : await addProjectItemTag(item, "#future");
+        if (ok)
+          await this.resyncActiveProject();
+      });
+    });
+    menu.showAtMouseEvent(evt);
+  }
+  /**
+   * Re-reads the active project's structured files after a mutation and
+   * updates this view's item cache directly, so the change is visible
+   * immediately without a vault write — items live only in the sidebar's
+   * cache now, not in the note body.
+   */
+  async resyncActiveProject() {
+    if (!this.activeProjectName)
+      return;
+    const scanned = this.scannedProjects.find((p) => p.name === this.activeProjectName);
+    if (!scanned)
+      return;
+    const items = await this.syncManager.getProjectItems(scanned.localPath);
+    this.syncManager.updateCachedItems(scanned.localPath, items);
     this.render();
   }
 };
@@ -6562,7 +6515,7 @@ function createHeaderChecklistExtension() {
 }
 
 // main.ts
-var WarpedTodoPlugin = class extends import_obsidian14.Plugin {
+var WarpedTodoPlugin = class extends import_obsidian13.Plugin {
   async onload() {
     await this.loadSettings();
     if (!this.settings.focusModePersist && this.settings.focusModeActive) {
@@ -6570,7 +6523,6 @@ var WarpedTodoPlugin = class extends import_obsidian14.Plugin {
       await this.saveSettings();
     }
     this.sidebarManager = new SidebarManager(this.app, VIEW_TYPE_TODO_SIDEBAR);
-    this.projectsSidebarManager = new SidebarManager(this.app, VIEW_TYPE_PROJECTS_SIDEBAR);
     this.teamManager = new TeamManager(this.app, this.settings.teamFilePath);
     this.teamManager.watchFile();
     this.scanner = new TodoScanner(this.app);
@@ -6587,7 +6539,7 @@ var WarpedTodoPlugin = class extends import_obsidian14.Plugin {
     this.projectSyncManager = new ProjectSyncManager(
       this.app,
       this.projectScanner,
-      (scanned) => this.projectsSidebarManager.forEach((view) => view.applySyncResult(scanned))
+      (scanned) => this.sidebarManager.forEach((view) => view.applyProjectSyncResult(scanned))
     );
     if (this.settings.projectsBaseFolder) {
       this.projectSyncManager.startWatching(this.projectsSyncOptions());
@@ -6660,6 +6612,13 @@ var WarpedTodoPlugin = class extends import_obsidian14.Plugin {
         this.scanner,
         this.processor,
         this.projectManager,
+        this.projectScanner,
+        this.projectSyncManager,
+        () => this.projectsSyncOptions(),
+        () => {
+          this.app.setting.open();
+          this.app.setting.openTabById(this.manifest.id);
+        },
         this.settings.defaultTodoneFile,
         this.settings.priorityTags,
         this.settings.activeTodosLimit,
@@ -6667,7 +6626,6 @@ var WarpedTodoPlugin = class extends import_obsidian14.Plugin {
         this.settings.makeLinksClickable,
         () => this.showAboutModal(),
         () => this.showStatsModal(),
-        (tag) => this.openProjectsSidebar(tag),
         () => this.settings.moveHistory,
         this.teamManager,
         this.settings.defaultAssignee,
@@ -6735,7 +6693,7 @@ var WarpedTodoPlugin = class extends import_obsidian14.Plugin {
           showNotice2("Cursor is not on a #todo line");
           return;
         }
-        const file = (_a = this.app.workspace.getActiveViewOfType(import_obsidian14.MarkdownView)) == null ? void 0 : _a.file;
+        const file = (_a = this.app.workspace.getActiveViewOfType(import_obsidian13.MarkdownView)) == null ? void 0 : _a.file;
         if (!file)
           return;
         const todos = this.scanner.getTodos();
@@ -6817,35 +6775,11 @@ var WarpedTodoPlugin = class extends import_obsidian14.Plugin {
         }
       })
     );
-    this.registerView(
-      VIEW_TYPE_PROJECTS_SIDEBAR,
-      (leaf) => new ProjectsSidebarView(
-        leaf,
-        this.scanner,
-        this.processor,
-        this.projectManager,
-        this.projectScanner,
-        this.projectSyncManager,
-        new ContextMenuHandler(
-          this.app,
-          this.processor,
-          this.settings.priorityTags,
-          () => this.settings.moveHistory
-        ),
-        () => this.projectsSyncOptions(),
-        () => {
-          this.app.setting.open();
-          this.app.setting.openTabById(this.manifest.id);
-        },
-        () => this.showAboutModal(),
-        () => this.sidebarManager.toggle()
-      )
-    );
     this.addCommand({
       id: "toggle-projects-sidebar",
       name: "Toggle Projects Sidebar",
       callback: () => {
-        this.projectsSidebarManager.toggle();
+        this.openProjectsTab();
       }
     });
     this.addCommand({
@@ -6879,7 +6813,7 @@ var WarpedTodoPlugin = class extends import_obsidian14.Plugin {
   onunload() {
     var _a;
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_TODO_SIDEBAR);
-    this.app.workspace.detachLeavesOfType(VIEW_TYPE_PROJECTS_SIDEBAR);
+    this.app.workspace.detachLeavesOfType("warped-todo-projects-sidebar");
     this.tabLockManager.destroy();
     (_a = this.projectSyncManager) == null ? void 0 : _a.stopWatching();
   }
@@ -6894,26 +6828,15 @@ var WarpedTodoPlugin = class extends import_obsidian14.Plugin {
     this.sidebarManager.refresh();
   }
   /**
-   * Opens/reveals the Projects sidebar, or — called with no tag — toggles
-   * it closed if it's already open. The toggle matters: this is also what
-   * the TODO sidebar's "Open Projects" nav button calls, and that button
-   * replaced the old ribbon icon, which toggled. Without it, that button
-   * could only ever open the sidebar, leaving it pinned open with no way
-   * to dismiss it from the same spot — reported via screenshot as the
-   * Projects icon "installing" itself with no way back.
-   *
-   * With a tag (the "Show in Projects" context-menu entries), always opens
-   * and jumps straight to that project's detail view — never closes, since
-   * the intent there is "show me this," not "toggle."
+   * Opens (if closed) the TODO sidebar and switches it to the Projects
+   * tab — Settings' "Open Projects sidebar" button and the
+   * "toggle-projects-sidebar" command both go through this. With a tag,
+   * jumps straight to that project's detail view.
    */
-  async openProjectsSidebar(tag) {
-    if (!tag) {
-      await this.projectsSidebarManager.toggle();
-      return;
-    }
-    await this.projectsSidebarManager.activate();
-    const view = this.projectsSidebarManager.getView();
-    await (view == null ? void 0 : view.showProject(tag));
+  async openProjectsTab(tag) {
+    var _a;
+    await this.sidebarManager.activate();
+    (_a = this.sidebarManager.getView()) == null ? void 0 : _a.openProjectsTab(tag);
   }
   showAboutModal() {
     new AboutModal(this.app, this.manifest.version).open();
@@ -6922,7 +6845,7 @@ var WarpedTodoPlugin = class extends import_obsidian14.Plugin {
     new StatsModal(this.app, this.scanner).open();
   }
 };
-var AboutModal = class extends import_obsidian14.Modal {
+var AboutModal = class extends import_obsidian13.Modal {
   constructor(app, version) {
     super(app);
     this.version = version;
@@ -6953,7 +6876,7 @@ var AboutModal = class extends import_obsidian14.Modal {
     this.contentEl.empty();
   }
 };
-var StatsModal = class extends import_obsidian14.Modal {
+var StatsModal = class extends import_obsidian13.Modal {
   constructor(app, scanner) {
     super(app);
     this.scanner = scanner;
@@ -7002,7 +6925,7 @@ var StatsModal = class extends import_obsidian14.Modal {
     this.contentEl.empty();
   }
 };
-var WarpedTodoSettingTab = class extends import_obsidian14.PluginSettingTab {
+var WarpedTodoSettingTab = class extends import_obsidian13.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -7028,13 +6951,13 @@ var WarpedTodoSettingTab = class extends import_obsidian14.PluginSettingTab {
       href: "https://github.com/robotpony/warped-command"
     });
     containerEl.createEl("h3", { text: "Sidebar" });
-    new import_obsidian14.Setting(containerEl).setName("Show sidebar by default").setDesc("Show the TODO sidebar when Obsidian starts").addToggle(
+    new import_obsidian13.Setting(containerEl).setName("Show sidebar by default").setDesc("Show the TODO sidebar when Obsidian starts").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.showSidebarByDefault).onChange(async (value) => {
         this.plugin.settings.showSidebarByDefault = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian14.Setting(containerEl).setName("Show tab lock buttons").setDesc("Add lock buttons to tab headers. Locked tabs force links to open in new tabs.").addToggle(
+    new import_obsidian13.Setting(containerEl).setName("Show tab lock buttons").setDesc("Add lock buttons to tab headers. Locked tabs force links to open in new tabs.").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.showTabLockButton).onChange(async (value) => {
         this.plugin.settings.showTabLockButton = value;
         if (value) {
@@ -7045,7 +6968,7 @@ var WarpedTodoSettingTab = class extends import_obsidian14.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian14.Setting(containerEl).setName("Make links clickable in lists").setDesc("Render wiki links and markdown links as clickable in the sidebar. When disabled, links display as plain text without markdown syntax.").addToggle(
+    new import_obsidian13.Setting(containerEl).setName("Make links clickable in lists").setDesc("Render wiki links and markdown links as clickable in the sidebar. When disabled, links display as plain text without markdown syntax.").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.makeLinksClickable).onChange(async (value) => {
         this.plugin.settings.makeLinksClickable = value;
         await this.plugin.saveSettings();
@@ -7053,13 +6976,13 @@ var WarpedTodoSettingTab = class extends import_obsidian14.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: "TODOs" });
-    new import_obsidian14.Setting(containerEl).setName("Default TODONE file").setDesc("Default file path for logging completed TODOs").addText(
+    new import_obsidian13.Setting(containerEl).setName("Default TODONE file").setDesc("Default file path for logging completed TODOs").addText(
       (text) => text.setPlaceholder("todos/done.md").setValue(this.plugin.settings.defaultTodoneFile).onChange(async (value) => {
         this.plugin.settings.defaultTodoneFile = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian14.Setting(containerEl).setName("Date format").setDesc("Format for completion dates. e.g. YYYY-MM-DD \u2192 2026-05-09, D/M/YYYY \u2192 9/5/2026").addText(
+    new import_obsidian13.Setting(containerEl).setName("Date format").setDesc("Format for completion dates. e.g. YYYY-MM-DD \u2192 2026-05-09, D/M/YYYY \u2192 9/5/2026").addText(
       (text) => text.setPlaceholder("YYYY-MM-DD").setValue(this.plugin.settings.dateFormat).onChange(async (value) => {
         this.plugin.settings.dateFormat = value;
         this.plugin.processor = new TodoProcessor(
@@ -7070,18 +6993,18 @@ var WarpedTodoSettingTab = class extends import_obsidian14.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: "Projects" });
-    new import_obsidian14.Setting(containerEl).setName("Projects sidebar").setDesc("Open the Projects sidebar directly from settings.").addButton(
+    new import_obsidian13.Setting(containerEl).setName("Projects sidebar").setDesc("Open the Projects sidebar directly from settings.").addButton(
       (btn) => btn.setButtonText("Open Projects sidebar").onClick(() => {
-        this.plugin.openProjectsSidebar();
+        this.plugin.openProjectsTab();
       })
     );
-    new import_obsidian14.Setting(containerEl).setName("Default projects folder").setDesc("Folder scanned for project files. TODOs here get automatic project tags if no explicit tag is set (e.g., projects/)").addText(
+    new import_obsidian13.Setting(containerEl).setName("Default projects folder").setDesc("Folder scanned for project files. TODOs here get automatic project tags if no explicit tag is set (e.g., projects/)").addText(
       (text) => text.setPlaceholder("projects/").setValue(this.plugin.settings.defaultProjectsFolder).onChange(async (value) => {
         this.plugin.settings.defaultProjectsFolder = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian14.Setting(containerEl).setName("Project list limit").setDesc("Maximum number of projects to show in the tag cloud").addText(
+    new import_obsidian13.Setting(containerEl).setName("Project list limit").setDesc("Maximum number of projects to show in the tag cloud").addText(
       (text) => text.setPlaceholder("5").setValue(String(this.plugin.settings.focusListLimit)).onChange(async (value) => {
         const num = parseInt(value);
         if (!isNaN(num) && num > 0) {
@@ -7090,7 +7013,7 @@ var WarpedTodoSettingTab = class extends import_obsidian14.PluginSettingTab {
         }
       })
     );
-    new import_obsidian14.Setting(containerEl).setName("Active TODOs limit").setDesc("Maximum number of TODOs to show in sidebar (0 for unlimited)").addText(
+    new import_obsidian13.Setting(containerEl).setName("Active TODOs limit").setDesc("Maximum number of TODOs to show in sidebar (0 for unlimited)").addText(
       (text) => text.setPlaceholder("5").setValue(String(this.plugin.settings.activeTodosLimit)).onChange(async (value) => {
         const num = parseInt(value);
         if (!isNaN(num) && num >= 0) {
@@ -7099,7 +7022,7 @@ var WarpedTodoSettingTab = class extends import_obsidian14.PluginSettingTab {
         }
       })
     );
-    new import_obsidian14.Setting(containerEl).setName("Exclude folders from projects").setDesc("Comma-separated folders to exclude from inferred project tags (e.g., log, archive)").addText(
+    new import_obsidian13.Setting(containerEl).setName("Exclude folders from projects").setDesc("Comma-separated folders to exclude from inferred project tags (e.g., log, archive)").addText(
       (text) => text.setPlaceholder("log").setValue(this.plugin.settings.excludeFoldersFromProjects.join(", ")).onChange(async (value) => {
         const folders = value.split(",").map((f) => f.trim()).filter((f) => f.length > 0);
         this.plugin.settings.excludeFoldersFromProjects = folders;
@@ -7113,7 +7036,7 @@ var WarpedTodoSettingTab = class extends import_obsidian14.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian14.Setting(containerEl).setName("Projects base folder").setDesc("Folder of git repos scanned for project notes (e.g., /Users/you/projects). Leave blank to disable repo syncing.").addText(
+    new import_obsidian13.Setting(containerEl).setName("Projects base folder").setDesc("Folder of git repos scanned for project notes (e.g., /Users/you/projects). Leave blank to disable repo syncing.").addText(
       (text) => text.setPlaceholder("/Users/you/projects").setValue(this.plugin.settings.projectsBaseFolder).onChange(async (value) => {
         this.plugin.settings.projectsBaseFolder = value;
         await this.plugin.saveSettings();
@@ -7124,13 +7047,13 @@ var WarpedTodoSettingTab = class extends import_obsidian14.PluginSettingTab {
         }
       })
     );
-    new import_obsidian14.Setting(containerEl).setName("Projects exclude directories").setDesc("Comma-separated directory names to skip while scanning for repos (e.g., node_modules, dist, build, archive)").addText(
+    new import_obsidian13.Setting(containerEl).setName("Projects exclude directories").setDesc("Comma-separated directory names to skip while scanning for repos (e.g., node_modules, dist, build, archive)").addText(
       (text) => text.setPlaceholder("node_modules, dist, build, archive").setValue(this.plugin.settings.projectsExcludeDirs.join(", ")).onChange(async (value) => {
         this.plugin.settings.projectsExcludeDirs = value.split(",").map((d) => d.trim()).filter((d) => d.length > 0);
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian14.Setting(containerEl).setName("Projects scan depth").setDesc("How many folder levels deep to look for repos under the base folder").addText(
+    new import_obsidian13.Setting(containerEl).setName("Projects scan depth").setDesc("How many folder levels deep to look for repos under the base folder").addText(
       (text) => text.setPlaceholder("3").setValue(String(this.plugin.settings.projectsScanDepth)).onChange(async (value) => {
         const num = parseInt(value);
         if (!isNaN(num) && num >= 0) {
@@ -7140,20 +7063,20 @@ var WarpedTodoSettingTab = class extends import_obsidian14.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: "Focus Mode" });
-    new import_obsidian14.Setting(containerEl).setName("Focus queue limit").setDesc("How many items to show at once in Focus Mode (1\u20135). 1 means strict single-task focus.").addSlider(
+    new import_obsidian13.Setting(containerEl).setName("Focus queue limit").setDesc("How many items to show at once in Focus Mode (1\u20135). 1 means strict single-task focus.").addSlider(
       (slider) => slider.setLimits(1, 5, 1).setValue(this.plugin.settings.focusQueueLimit).setDynamicTooltip().onChange(async (value) => {
         this.plugin.settings.focusQueueLimit = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian14.Setting(containerEl).setName("Persist focus mode across sessions").setDesc("When on, Focus Mode stays active after closing and reopening Obsidian.").addToggle(
+    new import_obsidian13.Setting(containerEl).setName("Persist focus mode across sessions").setDesc("When on, Focus Mode stays active after closing and reopening Obsidian.").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.focusModePersist).onChange(async (value) => {
         this.plugin.settings.focusModePersist = value;
         await this.plugin.saveSettings();
       })
     );
     containerEl.createEl("h3", { text: "Team" });
-    new import_obsidian14.Setting(containerEl).setName("Team file path").setDesc("Path to the team definition file in your vault").addText(
+    new import_obsidian13.Setting(containerEl).setName("Team file path").setDesc("Path to the team definition file in your vault").addText(
       (text) => text.setPlaceholder("team.md").setValue(this.plugin.settings.teamFilePath).onChange(async (value) => {
         this.plugin.settings.teamFilePath = value;
         this.plugin.teamManager.setFilePath(value);
@@ -7162,8 +7085,8 @@ var WarpedTodoSettingTab = class extends import_obsidian14.PluginSettingTab {
       })
     );
     const teamFile = this.app.vault.getAbstractFileByPath(this.plugin.settings.teamFilePath);
-    const teamButtonSetting = new import_obsidian14.Setting(containerEl);
-    if (teamFile instanceof import_obsidian14.TFile) {
+    const teamButtonSetting = new import_obsidian13.Setting(containerEl);
+    if (teamFile instanceof import_obsidian13.TFile) {
       teamButtonSetting.setName("Manage team file").addButton(
         (btn) => btn.setButtonText("Open team file").onClick(async () => {
           await this.app.workspace.getLeaf(false).openFile(teamFile);
@@ -7189,7 +7112,7 @@ var WarpedTodoSettingTab = class extends import_obsidian14.PluginSettingTab {
           entry.createEl("span", { cls: "sc-team-me-badge", text: "(me)" });
         }
       }
-      new import_obsidian14.Setting(containerEl).setName("Default assignee").setDesc("Unattributed tasks are treated as belonging to this person when filtering").addDropdown((dropdown) => {
+      new import_obsidian13.Setting(containerEl).setName("Default assignee").setDesc("Unattributed tasks are treated as belonging to this person when filtering").addDropdown((dropdown) => {
         dropdown.addOption("", "None");
         dropdown.addOption("me", "@me");
         for (const member of team) {

@@ -12,11 +12,6 @@ import { TodoProcessor } from "./src/TodoProcessor";
 import { ProjectManager } from "./src/ProjectManager";
 import { ProjectScanner } from "./src/ProjectScanner";
 import { ProjectSyncManager } from "./src/ProjectSyncManager";
-import {
-  ProjectsSidebarView,
-  VIEW_TYPE_PROJECTS_SIDEBAR,
-} from "./src/ProjectsSidebarView";
-import { ContextMenuHandler } from "./src/ContextMenuHandler";
 import { SlashCommandSuggest } from "./src/SlashCommandSuggest";
 import { AtSuggest } from "./src/AtSuggest";
 import { TeamManager } from "./src/TeamManager";
@@ -48,7 +43,6 @@ export default class WarpedTodoPlugin extends Plugin {
   tabLockManager: TabLockManager;
   teamManager: TeamManager;
   private sidebarManager: SidebarManager;
-  private projectsSidebarManager: SidebarManager;
 
   async onload() {
     await this.loadSettings();
@@ -60,9 +54,11 @@ export default class WarpedTodoPlugin extends Plugin {
       await this.saveSettings();
     }
 
-    // Initialize sidebar managers
+    // Initialize sidebar manager. Projects is a tab within this same
+    // sidebar now (TodoSidebarView's 'projects' mode), not a second view —
+    // see ProjectsSidebarView.ts's file-level comment — so there's only
+    // one manager, matching there being only one leaf.
     this.sidebarManager = new SidebarManager(this.app, VIEW_TYPE_TODO_SIDEBAR);
-    this.projectsSidebarManager = new SidebarManager(this.app, VIEW_TYPE_PROJECTS_SIDEBAR);
 
     // Initialize team manager
     this.teamManager = new TeamManager(this.app, this.settings.teamFilePath);
@@ -80,12 +76,12 @@ export default class WarpedTodoPlugin extends Plugin {
       this.settings.excludeFoldersFromProjects
     );
     this.projectScanner = new ProjectScanner();
-    // onSynced must apply results directly (applySyncResult), not go through
-    // SidebarManager.refresh()/view.reload() — reload() itself calls
+    // onSynced must apply results directly (applyProjectSyncResult), not go
+    // through SidebarManager.refresh()/view.reload() — reload() itself calls
     // syncAll(), which would fire onSynced again: an unbounded loop. See
-    // ProjectsSidebarView.applySyncResult's doc comment for how this was found.
+    // TodoSidebarView.applyProjectSyncResult's doc comment for how this was found.
     this.projectSyncManager = new ProjectSyncManager(this.app, this.projectScanner, (scanned) =>
-      this.projectsSidebarManager.forEach<ProjectsSidebarView>((view) => view.applySyncResult(scanned))
+      this.sidebarManager.forEach<TodoSidebarView>((view) => view.applyProjectSyncResult(scanned))
     );
     // Desktop-only feature (Node fs/child_process — see manifest.json's isDesktopOnly).
     // Only starts watching if a base folder is actually configured.
@@ -208,6 +204,13 @@ export default class WarpedTodoPlugin extends Plugin {
           this.scanner,
           this.processor,
           this.projectManager,
+          this.projectScanner,
+          this.projectSyncManager,
+          () => this.projectsSyncOptions(),
+          () => {
+            (this.app as any).setting.open();
+            (this.app as any).setting.openTabById(this.manifest.id);
+          },
           this.settings.defaultTodoneFile,
           this.settings.priorityTags,
           this.settings.activeTodosLimit,
@@ -215,7 +218,6 @@ export default class WarpedTodoPlugin extends Plugin {
           this.settings.makeLinksClickable,
           () => this.showAboutModal(),
           () => this.showStatsModal(),
-          (tag?: string) => this.openProjectsSidebar(tag),
           () => this.settings.moveHistory,
           this.teamManager,
           this.settings.defaultAssignee,
@@ -392,38 +394,11 @@ export default class WarpedTodoPlugin extends Plugin {
       })
     );
 
-    // Register Projects sidebar view
-    this.registerView(
-      VIEW_TYPE_PROJECTS_SIDEBAR,
-      (leaf) =>
-        new ProjectsSidebarView(
-          leaf,
-          this.scanner,
-          this.processor,
-          this.projectManager,
-          this.projectScanner,
-          this.projectSyncManager,
-          new ContextMenuHandler(
-            this.app,
-            this.processor,
-            this.settings.priorityTags,
-            () => this.settings.moveHistory
-          ),
-          () => this.projectsSyncOptions(),
-          () => {
-            (this.app as any).setting.open();
-            (this.app as any).setting.openTabById(this.manifest.id);
-          },
-          () => this.showAboutModal(),
-          () => this.sidebarManager.toggle()
-        )
-    );
-
     this.addCommand({
       id: "toggle-projects-sidebar",
       name: "Toggle Projects Sidebar",
       callback: () => {
-        this.projectsSidebarManager.toggle();
+        this.openProjectsTab();
       },
     });
 
@@ -443,11 +418,10 @@ export default class WarpedTodoPlugin extends Plugin {
       },
     });
 
-    // Add ribbon icon. Projects no longer gets its own ribbon icon — it's
-    // reached from the TODO sidebar's tab nav (beside Ideas) instead, so
-    // there's one entry point into this plugin's sidebars, not two. The
-    // "toggle-projects-sidebar" command (and its Projects nav button) still
-    // work when the TODO sidebar itself is closed.
+    // Add ribbon icon. Projects doesn't get its own — it's a tab within
+    // this same sidebar (see ProjectsSidebarView.ts's file-level comment),
+    // reached via the Projects tab button or the "toggle-projects-sidebar"
+    // command, both of which work whether or not the sidebar is open.
     this.addRibbonIcon("square-check-big", "Toggle TODO Sidebar", () => {
       this.sidebarManager.toggle();
     });
@@ -469,9 +443,15 @@ export default class WarpedTodoPlugin extends Plugin {
   }
 
   onunload() {
-    // Detach all sidebar views
+    // Detach the sidebar view
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_TODO_SIDEBAR);
-    this.app.workspace.detachLeavesOfType(VIEW_TYPE_PROJECTS_SIDEBAR);
+    // Migration cleanup: pre-0.35.3 installs could have a leaf of the old,
+    // now-unregistered standalone Projects view still saved in the user's
+    // workspace layout (Projects folded into TodoSidebarView as a tab —
+    // see ProjectsSidebarView.ts's file-level comment). Detaching by the
+    // hardcoded former VIEW_TYPE_PROJECTS_SIDEBAR string clears it instead
+    // of leaving an unrecognized-view leaf behind.
+    this.app.workspace.detachLeavesOfType("warped-todo-projects-sidebar");
     // Clean up tab lock manager
     this.tabLockManager.destroy();
     // Stop the Projects file watcher (fs.watch doesn't clean itself up)
@@ -492,26 +472,14 @@ export default class WarpedTodoPlugin extends Plugin {
   }
 
   /**
-   * Opens/reveals the Projects sidebar, or — called with no tag — toggles
-   * it closed if it's already open. The toggle matters: this is also what
-   * the TODO sidebar's "Open Projects" nav button calls, and that button
-   * replaced the old ribbon icon, which toggled. Without it, that button
-   * could only ever open the sidebar, leaving it pinned open with no way
-   * to dismiss it from the same spot — reported via screenshot as the
-   * Projects icon "installing" itself with no way back.
-   *
-   * With a tag (the "Show in Projects" context-menu entries), always opens
-   * and jumps straight to that project's detail view — never closes, since
-   * the intent there is "show me this," not "toggle."
+   * Opens (if closed) the TODO sidebar and switches it to the Projects
+   * tab — Settings' "Open Projects sidebar" button and the
+   * "toggle-projects-sidebar" command both go through this. With a tag,
+   * jumps straight to that project's detail view.
    */
-  async openProjectsSidebar(tag?: string) {
-    if (!tag) {
-      await this.projectsSidebarManager.toggle();
-      return;
-    }
-    await this.projectsSidebarManager.activate();
-    const view = this.projectsSidebarManager.getView<ProjectsSidebarView>();
-    await view?.showProject(tag);
+  async openProjectsTab(tag?: string) {
+    await this.sidebarManager.activate();
+    this.sidebarManager.getView<TodoSidebarView>()?.openProjectsTab(tag);
   }
 
   showAboutModal() {
@@ -766,7 +734,7 @@ class WarpedTodoSettingTab extends PluginSettingTab {
       .setDesc("Open the Projects sidebar directly from settings.")
       .addButton((btn) =>
         btn.setButtonText("Open Projects sidebar").onClick(() => {
-          this.plugin.openProjectsSidebar();
+          this.plugin.openProjectsTab();
         })
       );
 

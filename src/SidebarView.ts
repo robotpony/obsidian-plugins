@@ -1,7 +1,28 @@
-import { ItemView, WorkspaceLeaf, TFile, Menu, Modal, MarkdownRenderer, Component, moment } from "obsidian";
+import { ItemView, WorkspaceLeaf, TFile, Menu, Modal, MarkdownRenderer, Component, moment, setIcon } from "obsidian";
 import { TodoScanner } from "./TodoScanner";
 import { TodoProcessor } from "./TodoProcessor";
-import { ProjectManager } from "./ProjectManager";
+import { ProjectManager, projectFilePath } from "./ProjectManager";
+import { ProjectScanner, ScannedProject } from "./ProjectScanner";
+import { ProjectSyncManager } from "./ProjectSyncManager";
+import { ParsedProjectItem } from "./StructuredFileParser";
+import {
+  setProjectItemCompletion,
+  setProjectItemPriority,
+  addProjectItemTag,
+  removeProjectItemTag,
+} from "./ProjectItemMutator";
+import {
+  ProjectsSidebarOptions,
+  GROUP_ORDER,
+  GroupFileHint,
+  HandTypedGroup,
+  browsableUrl,
+  homeRelativePath,
+  groupHandTypedItems,
+  cleanDisplayText,
+  calculateFocusPriority as calculateProjectFocusPriority,
+  calculateLaterPriority as calculateProjectLaterPriority,
+} from "./ProjectsSidebarView";
 import { TeamManager } from "./TeamManager";
 import { TodoItem, ProjectInfo, ItemRenderConfig, FocusQueueState } from "./types";
 import { ContextMenuHandler } from "./ContextMenuHandler";
@@ -28,7 +49,7 @@ export class TodoSidebarView extends ItemView {
   private summaryExpanded: boolean = false;
   private focusListLimit: number;
   private makeLinksClickable: boolean;
-  private activeTab: 'todos' | 'ideas' = 'todos';
+  private activeTab: 'todos' | 'ideas' | 'projects' = 'todos';
   private activeTagFilter: string | null = null;
   private activeAssigneeFilter: string | null = null;
   // Crossfade transition for filter changes — guards against overlapping
@@ -43,24 +64,46 @@ export class TodoSidebarView extends ItemView {
   private focusQueue: FocusQueueState | null = null;
   private setFocusModeActive: (active: boolean) => Promise<void>;
   // Snapshot for restoring sidebar position on Exit.
-  private prevActiveTab: 'todos' | 'ideas' | null = null;
+  private prevActiveTab: 'todos' | 'ideas' | 'projects' | null = null;
   private prevScrollTop: number = 0;
   private openDropdown: HTMLElement | null = null;
   private openDropdownTrigger: HTMLElement | null = null;
   private openInfoPopup: HTMLElement | null = null;
   private onShowAbout: () => void;
   private onShowStats: () => void;
-  // Optional tag: with one, jumps straight to that project's detail view
-  // (and never closes it); without one (the header nav button), toggles
-  // the Projects sidebar open/closed, matching the ribbon-icon convention
-  // it replaced.
-  private onOpenProjects: (tag?: string) => void;
+  private onOpenSettings: () => void;
+
+  // ===== Projects tab state =====
+  // Projects used to be a second, standalone ItemView/leaf; folded in here
+  // as a third tab (see ProjectsSidebarView.ts's file-level comment) so it
+  // shares this view's header, tab row, and kebab menu instead of growing
+  // its own of each.
+  private projectScanner: ProjectScanner;
+  private syncManager: ProjectSyncManager;
+  private getProjectsOptions: () => ProjectsSidebarOptions;
+  private projectsMode: 'list' | 'detail' = 'list';
+  private activeProjectName: string | null = null;
+  private projectsFilterText: string = '';
+  private scannedProjects: ScannedProject[] = [];
+  private projectsSyncing: boolean = false;
+  private projectsSyncedOnce: boolean = false;
+  // Tracks the active file's path so handleProjectActiveFileChange can tell
+  // "the active file genuinely changed" from "some workspace event fired for
+  // the same file" (Obsidian fires these often, for reasons unrelated to
+  // navigation). Without this, a project note staying open while the user
+  // switched away from the Projects tab could get silently yanked back into
+  // detail mode by the next such event.
+  private lastKnownProjectFilePath: string | null = null;
 
   constructor(
     leaf: WorkspaceLeaf,
     scanner: TodoScanner,
     processor: TodoProcessor,
     projectManager: ProjectManager,
+    projectScanner: ProjectScanner,
+    syncManager: ProjectSyncManager,
+    getProjectsOptions: () => ProjectsSidebarOptions,
+    onOpenSettings: () => void,
     defaultTodoneFile: string,
     priorityTags: string[],
     activeTodosLimit: number,
@@ -68,7 +111,6 @@ export class TodoSidebarView extends ItemView {
     makeLinksClickable: boolean,
     onShowAbout: () => void,
     onShowStats: () => void,
-    onOpenProjects: (tag?: string) => void,
     getMoveHistory: () => string[] = () => [],
     teamManager?: TeamManager,
     defaultAssignee: string = "",
@@ -80,13 +122,16 @@ export class TodoSidebarView extends ItemView {
     this.scanner = scanner;
     this.processor = processor;
     this.projectManager = projectManager;
+    this.projectScanner = projectScanner;
+    this.syncManager = syncManager;
+    this.getProjectsOptions = getProjectsOptions;
+    this.onOpenSettings = onOpenSettings;
     this.defaultTodoneFile = defaultTodoneFile;
     this.activeTodosLimit = activeTodosLimit;
     this.focusListLimit = focusListLimit;
     this.makeLinksClickable = makeLinksClickable;
     this.onShowAbout = onShowAbout;
     this.onShowStats = onShowStats;
-    this.onOpenProjects = onOpenProjects;
     this.teamManager = teamManager ?? new TeamManager(this.app, "team.md");
     this.defaultAssignee = defaultAssignee;
     this.priorityTags = priorityTags;
@@ -100,7 +145,7 @@ export class TodoSidebarView extends ItemView {
       processor,
       priorityTags,
       getMoveHistory,
-      (tag: string) => this.onOpenProjects(tag)
+      (tag: string) => this.switchToProjectsTab(tag)
     );
   }
 
@@ -112,6 +157,7 @@ export class TodoSidebarView extends ItemView {
     switch (this.activeTab) {
       case 'todos': return "TODOs";
       case 'ideas': return "IDEAs";
+      case 'projects': return "Projects";
     }
   }
 
@@ -489,6 +535,13 @@ export class TodoSidebarView extends ItemView {
     };
     this.scanner.on("todos-updated", this.updateListener);
 
+    // Auto-follow: opening a project's note elsewhere updates Projects tab
+    // state (see handleProjectActiveFileChange) so it's ready the next time
+    // the user switches there — it doesn't force a tab switch away from
+    // whatever the user's actually doing.
+    this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.handleProjectActiveFileChange()));
+    this.registerEvent(this.app.workspace.on("file-open", () => this.handleProjectActiveFileChange()));
+
     // Check if scanner has data; if not, wait for initial scan to complete
     // This handles the case where Obsidian restores the sidebar from layout
     // before the plugin's scanVault() has finished
@@ -609,6 +662,7 @@ export class TodoSidebarView extends ItemView {
       switch (this.activeTab) {
         case 'todos': titleEl.appendText(" TODOs"); break;
         case 'ideas': titleEl.appendText(" IDEAs"); break;
+        case 'projects': titleEl.appendText(" Projects"); break;
       }
     }
 
@@ -644,17 +698,19 @@ export class TodoSidebarView extends ItemView {
     ideasTab.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"></path><path d="M10 22h4"></path><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"></path></svg>';
     ideasTab.addEventListener("click", () => this.switchTab('ideas'));
 
-    // Projects lives in its own sidebar, not a tab here — the item shapes
-    // (repo-matched vs. hand-typed) and sync machinery don't fit the
-    // TODOs/Ideas tab model. This button is the one entry point into it
-    // (replaces the old separate ribbon icon, which put an unrelated icon
-    // in the left rail for something that's really a TODOs sidebar sibling).
-    const projectsNavBtn = tabNav.createEl("button", {
-      cls: "sidebar-tab-btn sidebar-nav-out-btn",
-      attr: { "aria-label": "Open Projects" },
+    // Projects is a tab like TODOs/Ideas, not a separate view — it used to
+    // be a second ItemView/leaf, which meant its own icon in the sidebar
+    // dock's tab strip and a back button in place of just clicking the tab
+    // again. Folded in as a third tab so it's identical in kind to Ideas.
+    const projectsTab = tabNav.createEl("button", {
+      cls: `sidebar-tab-btn${!this.focusModeActive && this.activeTab === 'projects' ? ' active' : ''}`,
+      attr: { "aria-label": "Projects" },
     });
-    projectsNavBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v5"></path><circle cx="13" cy="12" r="2"></circle><path d="M18 19c-2.8 0-5-2.2-5-5v8"></path><circle cx="20" cy="19" r="2"></circle></svg>';
-    projectsNavBtn.addEventListener("click", () => this.onOpenProjects());
+    projectsTab.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v5"></path><circle cx="13" cy="12" r="2"></circle><path d="M18 19c-2.8 0-5-2.2-5-5v8"></path><circle cx="20" cy="19" r="2"></circle></svg>';
+    // No tag → always resets to the project list, even if already on this
+    // tab in detail view. That's the point: clicking Projects again is the
+    // way back, no separate back-arrow button needed.
+    projectsTab.addEventListener("click", () => this.switchToProjectsTab());
 
     // Kebab menu stays accessible in all modes (refresh, stats, about)
     this.createSidebarMenuButton(headerDiv);
@@ -671,6 +727,7 @@ export class TodoSidebarView extends ItemView {
     switch (this.activeTab) {
       case 'todos':  this.renderTodosContent(content); break;
       case 'ideas':  this.renderIdeasContent(content); break;
+      case 'projects': this.renderProjectsTabContent(content); break;
     }
   }
 
@@ -1831,6 +1888,23 @@ export class TodoSidebarView extends ItemView {
           });
       });
 
+      // Full project re-sync — only meaningful on the Projects tab. Mirrors
+      // "Refresh" above but for repo-derived project data instead of the
+      // vault's own #todo/#idea items, which "Refresh" already covers.
+      if (this.activeTab === 'projects') {
+        menu.addItem((item) => {
+          item
+            .setTitle("Sync")
+            .setIcon("refresh-cw")
+            .onClick(async () => {
+              menuBtn.addClass("rotating");
+              this.projectsSyncedOnce = false;
+              await this.ensureProjectsSynced();
+              setTimeout(() => menuBtn.removeClass("rotating"), 500);
+            });
+        });
+      }
+
       menu.addSeparator();
 
       menu.addItem((item) => {
@@ -1853,10 +1927,7 @@ export class TodoSidebarView extends ItemView {
         item
           .setTitle("Settings")
           .setIcon("settings")
-          .onClick(() => {
-            (this.app as any).setting.open();
-            (this.app as any).setting.openTabById("warped-todo");
-          });
+          .onClick(() => this.onOpenSettings());
       });
 
       menu.showAtMouseEvent(evt);
@@ -1943,6 +2014,43 @@ export class TodoSidebarView extends ItemView {
     }
     this.activeTab = tab;
     this.render();
+  }
+
+  /**
+   * Switch to the Projects tab. With no tag (the tab button itself), always
+   * resets to the project list — even if already on this tab in detail
+   * view, since that's the intended "back" affordance (see the tab
+   * button's own click handler comment). With a tag (the "Show in
+   * Projects" context-menu entries), jumps straight to that project's
+   * detail view instead.
+   */
+  private switchToProjectsTab(tag?: string): void {
+    if (this.focusModeActive) {
+      this.focusModeActive = false;
+      this.focusQueue = null;
+      this.prevActiveTab = null;
+      void this.setFocusModeActive(false);
+    }
+    this.activeTab = 'projects';
+    void this.ensureProjectsSynced();
+    if (tag) {
+      void this.openProjectDetail(tag.replace(/^#/, ""));
+    } else {
+      this.projectsMode = 'list';
+      this.activeProjectName = null;
+      this.render();
+    }
+  }
+
+  /**
+   * Public entry point for main.ts — Settings' "Open Projects sidebar"
+   * button and the "toggle-projects-sidebar" command, both of which need
+   * to switch this view's tab from outside it (unlike the tab button and
+   * the "Show in Projects" context-menu entries, which call
+   * switchToProjectsTab directly since they're already inside this view).
+   */
+  openProjectsTab(tag?: string): void {
+    this.switchToProjectsTab(tag);
   }
 
   private handleFocusEnter(): void {
@@ -2089,6 +2197,504 @@ export class TodoSidebarView extends ItemView {
       inContinueMode: true,
     };
     this.rebuildFocusQueue();
+    this.render();
+  }
+
+  // ===================================================================
+  // Projects tab — list of detected git-repo projects, detail view per
+  // project on selection. See ProjectsSidebarView.ts's file-level comment
+  // for why this lives here instead of a second ItemView.
+  // ===================================================================
+
+  /** Full rescan + resync of every project. Runs once per session, lazily, the first time the Projects tab is opened; "Sync" in the kebab menu forces a repeat by clearing projectsSyncedOnce first. */
+  private async ensureProjectsSynced(): Promise<void> {
+    if (this.projectsSyncedOnce || this.projectsSyncing) return;
+    const options = this.getProjectsOptions();
+    if (!options.baseFolder) return;
+
+    this.projectsSyncing = true;
+    try {
+      this.scannedProjects = await this.syncManager.syncAll({
+        baseFolder: options.baseFolder,
+        projectsFolder: options.projectsFolder,
+        maxDepth: options.scanDepth,
+        excludeDirs: options.excludeDirs,
+      });
+    } catch (error) {
+      console.error("[Warped Todo]", "Project sync failed:", error);
+      showNotice("Project sync failed. See console for details.");
+    } finally {
+      this.projectsSyncing = false;
+      this.projectsSyncedOnce = true;
+    }
+    if (this.activeTab === 'projects') this.render();
+  }
+
+  /**
+   * Applies scan results this view didn't itself request — from a
+   * watch-triggered background sync, or the "Sync projects" command, both
+   * of which call `syncManager.syncAll()` directly. Just stores; must NOT
+   * call back into `syncAll()`, or wiring this to fire on every sync
+   * completion would trigger another sync completion, forever (see
+   * ProjectSyncManager's constructor doc comment for how this was found —
+   * the same hazard applies here, not just to the old standalone view).
+   * Only re-renders if the Projects tab is actually showing — a background
+   * sync shouldn't yank a full re-render onto whatever tab the user's on.
+   */
+  applyProjectSyncResult(scanned: ScannedProject[]): void {
+    this.scannedProjects = scanned;
+    this.projectsSyncedOnce = true;
+    if (this.activeTab === 'projects') this.render();
+  }
+
+  // ===== Sidebar/pane sync (auto-follow) =====
+
+  private async handleProjectActiveFileChange(): Promise<void> {
+    const activeFile = this.app.workspace.getActiveFile();
+    const currentPath = activeFile?.path ?? null;
+    // Obsidian fires active-leaf-change/file-open often for reasons that
+    // aren't "the user navigated somewhere new" (focus changes, layout
+    // events). Only re-derive state when the active file itself actually
+    // changed.
+    if (currentPath === this.lastKnownProjectFilePath) return;
+    this.lastKnownProjectFilePath = currentPath;
+
+    const projectName = activeFile ? this.projectNameForNotePath(activeFile.path) : null;
+
+    if (projectName) {
+      if (this.projectsMode === 'detail' && this.activeProjectName === projectName) return;
+      this.projectsMode = 'detail';
+      this.activeProjectName = projectName;
+    } else if (this.projectsMode === 'detail') {
+      this.projectsMode = 'list';
+      this.activeProjectName = null;
+    } else {
+      return;
+    }
+    if (this.activeTab === 'projects') this.render();
+  }
+
+  private projectNameForNotePath(filePath: string): string | null {
+    const options = this.getProjectsOptions();
+    for (const project of this.projectManager.getProjects(this.scannedProjects)) {
+      if (!project.localPath) continue; // only repo-matched projects have a note worth auto-following
+      const name = project.tag.replace(/^#/, "");
+      if (projectFilePath(options.projectsFolder, name) === filePath) return name;
+    }
+    return null;
+  }
+
+  private async openProjectDetail(name: string): Promise<void> {
+    const options = this.getProjectsOptions();
+    const path = projectFilePath(options.projectsFolder, name);
+
+    // Set state and render immediately — don't wait on the file-open round
+    // trip first. Also records lastKnownProjectFilePath up front, so once
+    // the resulting file-open event reaches handleProjectActiveFileChange,
+    // it sees "nothing changed" and skips a second, redundant pass.
+    this.lastKnownProjectFilePath = path;
+    this.projectsMode = 'detail';
+    this.activeProjectName = name;
+    this.render();
+
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (file instanceof TFile) {
+      await this.app.workspace.getLeaf(false).openFile(file);
+    }
+  }
+
+  // ===== Rendering =====
+
+  private renderProjectsTabContent(container: HTMLElement): void {
+    if (this.projectsMode === 'detail' && this.activeProjectName) {
+      this.renderProjectsDetail(container, this.activeProjectName);
+    } else {
+      this.renderProjectsList(container);
+    }
+  }
+
+  private renderProjectsList(container: HTMLElement): void {
+    const options = this.getProjectsOptions();
+
+    if (!options.baseFolder) {
+      const empty = container.createDiv({ cls: "warped-todo-projects-empty" });
+      empty.createEl("p", { text: "No base folder configured yet." });
+      const btn = empty.createEl("button", { text: "Open settings" });
+      btn.addEventListener("click", () => this.onOpenSettings());
+      return;
+    }
+
+    // The first switch to this tab triggers ensureProjectsSynced() in the
+    // background (see switchToProjectsTab) and renders immediately rather
+    // than waiting on it, so scannedProjects can still be empty here purely
+    // because the sync hasn't finished — say so, rather than showing "No
+    // projects found," which would read as a config problem instead of a
+    // brief, normal wait.
+    if (this.projectsSyncing && !this.projectsSyncedOnce) {
+      container.createEl("p", { text: "Syncing projects…", cls: "warped-todo-projects-empty-msg" });
+      return;
+    }
+
+    const filterInput = container.createEl("input", {
+      type: "text",
+      placeholder: "Filter…",
+      cls: "warped-todo-projects-filter",
+    }) as HTMLInputElement;
+    filterInput.value = this.projectsFilterText;
+
+    const listEl = container.createDiv({ cls: "warped-todo-projects-list" });
+    filterInput.addEventListener("input", () => {
+      this.projectsFilterText = filterInput.value;
+      this.renderProjectRows(listEl);
+    });
+
+    this.renderProjectRows(listEl);
+  }
+
+  private renderProjectRows(listEl: HTMLElement): void {
+    listEl.empty();
+    const filterLower = this.projectsFilterText.toLowerCase();
+
+    const projects = this.projectManager
+      .getProjects(this.scannedProjects)
+      .filter((p) => p.localPath) // list view is repo-matched projects only
+      .filter((p) => !filterLower || p.tag.toLowerCase().includes(filterLower))
+      .sort((a, b) => {
+        const aActive = this.projectItemCounts(a).total > 0 ? 1 : 0;
+        const bActive = this.projectItemCounts(b).total > 0 ? 1 : 0;
+        if (aActive !== bActive) return bActive - aActive;
+        return a.tag.localeCompare(b.tag);
+      });
+
+    if (projects.length === 0) {
+      listEl.createEl("p", { text: "No projects found.", cls: "warped-todo-projects-empty-msg" });
+      return;
+    }
+
+    for (const project of projects) this.renderProjectRow(listEl, project);
+  }
+
+  private projectItemCounts(project: ProjectInfo): { todo: number; idea: number; bug: number; total: number } {
+    if (!project.localPath) return { todo: 0, idea: 0, bug: 0, total: 0 };
+    const items = this.syncManager.getCachedItems(project.localPath).filter((i) => !i.completed);
+    const counts = { todo: 0, idea: 0, bug: 0, total: 0 };
+    for (const item of items) {
+      counts[item.itemType]++;
+      counts.total++;
+    }
+    return counts;
+  }
+
+  private renderProjectRow(listEl: HTMLElement, project: ProjectInfo): void {
+    const name = project.tag.replace(/^#/, "");
+    const row = this.renderProjectSummary(listEl, project);
+    row.addClass("is-clickable");
+    row.addEventListener("click", () => this.openProjectDetail(name));
+  }
+
+  /**
+   * name/branch/status + item-count breakdown — the same block used both as
+   * a clickable row in the list view and, unclickable, as the framing header
+   * atop the detail view. Sharing this one renderer is the point: the
+   * detail view's top should look like the list row you just clicked, not
+   * introduce a second, differently-styled summary of the same three facts.
+   */
+  private renderProjectSummary(container: HTMLElement, project: ProjectInfo): HTMLElement {
+    const name = project.tag.replace(/^#/, "");
+    const counts = this.projectItemCounts(project);
+    const row = container.createDiv({ cls: "warped-todo-project-row" });
+
+    const titleLine = row.createDiv({ cls: "warped-todo-project-row-title" });
+    titleLine.createSpan({ text: name, cls: "warped-todo-project-name" });
+    if (project.branch) titleLine.createSpan({ text: project.branch, cls: "warped-todo-project-branch" });
+    if (project.gitStatus) titleLine.createSpan({ text: project.gitStatus, cls: "warped-todo-project-status" });
+
+    if (counts.total > 0) {
+      const parts: string[] = [];
+      if (counts.todo > 0) parts.push(`${counts.todo} todo`);
+      if (counts.idea > 0) parts.push(`${counts.idea} idea`);
+      if (counts.bug > 0) parts.push(`${counts.bug} bug`);
+      row.createDiv({ text: parts.join(" · "), cls: "warped-todo-project-row-counts" });
+    }
+    return row;
+  }
+
+  // ===== Detail view =====
+
+  private renderProjectsDetail(container: HTMLElement, name: string): void {
+    const projects = this.projectManager.getProjects(this.scannedProjects);
+    const project = projects.find((p) => p.tag.replace(/^#/, "") === name);
+
+    if (!project || !project.localPath) {
+      container.createEl("p", { text: `"${name}" is no longer a detected project.` });
+      return;
+    }
+
+    const info = container.createDiv({ cls: "warped-todo-project-info" });
+    this.renderProjectSummary(info, project);
+
+    const actions = info.createDiv({ cls: "warped-todo-project-info-actions" });
+    if (project.remote) {
+      const url = browsableUrl(project.remote);
+      const link = actions.createEl("a", {
+        cls: "warped-todo-project-info-action",
+        href: url,
+        attr: { title: url },
+      });
+      setIcon(link.createSpan(), "external-link");
+      link.createSpan({ text: url.replace(/^https?:\/\//, "") });
+      link.setAttr("target", "_blank");
+    }
+    const revealBtn = actions.createEl("a", {
+      cls: "warped-todo-project-info-action",
+      attr: { title: project.localPath },
+    });
+    setIcon(revealBtn.createSpan(), "folder-open");
+    revealBtn.createSpan({ text: homeRelativePath(project.localPath) });
+    revealBtn.addEventListener("click", () => this.revealProjectInFinder(project.localPath!));
+
+    const itemsContainer = container.createDiv({ cls: "warped-todo-project-items" });
+    this.renderProjectItemGroups(itemsContainer, project);
+  }
+
+  private revealProjectInFinder(path: string): void {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const electron = require("electron");
+      const shell = electron.remote?.shell ?? electron.shell;
+      shell.showItemInFolder(path);
+    } catch (error) {
+      console.error("[Warped Todo]", "Failed to reveal folder:", error);
+      showNotice("Couldn't open Finder. See console for details.");
+    }
+  }
+
+  /** Opens a synced item's source file (a plain filesystem path, not necessarily inside the vault) in the OS default editor — the external-file equivalent of openFileAtLine for a vault TFile. */
+  private openExternalProjectFile(path: string): void {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const electron = require("electron");
+      const shell = electron.remote?.shell ?? electron.shell;
+      shell.openPath(path);
+    } catch (error) {
+      console.error("[Warped Todo]", "Failed to open file:", error);
+      showNotice("Couldn't open file. See console for details.");
+    }
+  }
+
+  /**
+   * Two sources, concatenated — see DESIGN.md's "Item list — two sources, no
+   * reverse-mapping": synced items come from `syncManager.getCachedItems()`
+   * (parsed straight from each repo's BUGS.md/TODO.md/etc., not from the
+   * vault note); hand-typed items come from a normal TodoScanner vault scan
+   * of this same note.
+   *
+   * Group headings and item rows reuse the TODOs tab's own CSS classes
+   * (`.todo-orphan-section*`, `.todo-checkbox*`, `.todo-text`) rather than
+   * parallel ones, so this view is styled identically by construction.
+   */
+  private renderProjectItemGroups(container: HTMLElement, project: ProjectInfo): void {
+    const name = project.tag.replace(/^#/, "");
+    const syncedItems = this.syncManager.getCachedItems(project.localPath!);
+
+    for (const group of GROUP_ORDER) {
+      const groupItems = syncedItems.filter((i) => i.itemType === group.type);
+      if (groupItems.length === 0) continue;
+      const groupEl = container.createDiv({ cls: "warped-todo-project-item-group" });
+      this.renderProjectGroupHeading(groupEl, group.heading, this.syncedProjectGroupFileHint(groupItems));
+      for (const item of groupItems) {
+        this.renderSyncedProjectItemRow(groupEl, item, name, group.checkbox, project.localPath!);
+      }
+    }
+
+    const handTypedGroups = this.buildHandTypedProjectGroups(name);
+    for (const group of handTypedGroups) {
+      const groupEl = container.createDiv({ cls: "warped-todo-project-item-group" });
+      this.renderProjectGroupHeading(groupEl, group.label, {
+        displayName: group.file.name,
+        path: group.file.path,
+        onOpen: () => openFileAtLine(this.app, group.file, group.lineNumber),
+      });
+      for (const item of group.items) this.renderHandTypedProjectItemRow(groupEl, item);
+    }
+
+    if (syncedItems.length === 0 && handTypedGroups.length === 0) {
+      container.createEl("p", { text: "No tracked items.", cls: "warped-todo-projects-empty-msg" });
+    }
+  }
+
+  /**
+   * A group's file hint, when every item in it came from the same source
+   * file (the common case — one BUGS.md or TODO.md per repo). Omitted, not
+   * guessed, when a group spans more than one file.
+   */
+  private syncedProjectGroupFileHint(items: ParsedProjectItem[]): GroupFileHint | undefined {
+    const paths = new Set(items.map((i) => i.sourceFile));
+    if (paths.size !== 1) return undefined;
+    const path = items[0].sourceFile;
+    return {
+      displayName: path.split("/").pop() ?? path,
+      path,
+      onOpen: () => this.openExternalProjectFile(path),
+    };
+  }
+
+  /**
+   * `fileHint` supplies the visible filename + click-through arrow — same
+   * affordance a header-with-children row gets on the TODOs tab
+   * (`.header-filename` + `→`).
+   */
+  private renderProjectGroupHeading(groupEl: HTMLElement, label: string, fileHint?: GroupFileHint): void {
+    const heading = groupEl.createDiv({ cls: "todo-orphan-section" });
+    heading.createSpan({ cls: "todo-orphan-section-text", text: label });
+    if (!fileHint) return;
+    heading.createSpan({
+      cls: "header-filename",
+      text: fileHint.displayName,
+      attr: { title: fileHint.path },
+    });
+    const link = heading.createEl("a", {
+      cls: "todo-orphan-section-link",
+      text: "→",
+      href: "#",
+      attr: { "aria-label": `Open ${fileHint.path}` },
+    });
+    link.addEventListener("click", (evt) => {
+      evt.preventDefault();
+      fileHint.onOpen();
+    });
+  }
+
+  /**
+   * Groups hand-typed items the same way the TODOs tab itself does: a
+   * header TODO's children belong under it, true orphans (no parent header)
+   * group by `sectionLabel`.
+   */
+  private buildHandTypedProjectGroups(projectName: string): HandTypedGroup[] {
+    return groupHandTypedItems(this.handTypedProjectItems(projectName));
+  }
+
+  /** Vault-scanned #todo/#idea items hand-typed into this note (the whole note — there's no sync-owned region to exclude). */
+  private handTypedProjectItems(projectName: string): TodoItem[] {
+    const options = this.getProjectsOptions();
+    const notePath = projectFilePath(options.projectsFolder, projectName);
+    return [...this.scanner.getTodos(), ...this.scanner.getIdeas()].filter(
+      (t) => t.filePath === notePath
+    );
+  }
+
+  private renderSyncedProjectItemRow(
+    container: HTMLElement,
+    item: ParsedProjectItem,
+    projectName: string,
+    checkbox: boolean,
+    repoPath: string
+  ): void {
+    const row = container.createDiv({ cls: "warped-todo-project-item-row todo-item" });
+    if (checkbox) {
+      const wrap = row.createDiv({ cls: "todo-checkbox-wrap" });
+      const cb = wrap.createEl("input", { type: "checkbox", cls: "todo-checkbox" }) as HTMLInputElement;
+      cb.checked = item.completed;
+      cb.addEventListener("click", async (evt) => {
+        evt.stopPropagation();
+        // headerNested (Phase 6 Case 1) needs repoPath/scanner for its git-clean
+        // safety check; harmless to pass for other shapes, which ignore it.
+        const ok = await setProjectItemCompletion(item, !item.completed, {
+          repoPath,
+          scanner: this.projectScanner,
+        });
+        if (ok) await this.resyncActiveProject();
+      });
+    }
+    row.createSpan({ text: cleanDisplayText(item.text), cls: "todo-text" });
+    row.addEventListener("contextmenu", (evt) => {
+      evt.preventDefault();
+      this.showSyncedProjectItemMenu(evt, item);
+    });
+  }
+
+  private renderHandTypedProjectItemRow(container: HTMLElement, item: TodoItem): void {
+    const row = container.createDiv({ cls: "warped-todo-project-item-row todo-item" });
+    if (item.hasCheckbox) {
+      const wrap = row.createDiv({ cls: "todo-checkbox-wrap" });
+      const cb = wrap.createEl("input", { type: "checkbox", cls: "todo-checkbox" }) as HTMLInputElement;
+      cb.checked = false; // getTodos() only returns active items — never pre-checked
+      cb.addEventListener("click", async (evt) => {
+        evt.stopPropagation();
+        const ok = await this.processor.completeTodo(item, this.getProjectsOptions().defaultTodoneFile);
+        if (ok) this.render();
+      });
+    }
+    row.createSpan({ text: cleanDisplayText(item.text), cls: "todo-text" });
+    row.addEventListener("contextmenu", (evt) => {
+      evt.preventDefault();
+      this.contextMenuHandler.showTodoMenu(evt, item, () => this.render(), false);
+    });
+  }
+
+  private showSyncedProjectItemMenu(evt: MouseEvent, item: ParsedProjectItem): void {
+    const menu = new Menu();
+    const hasFocus = item.tags.includes("#focus");
+    const hasFuture = item.tags.includes("#future");
+    const currentPriority = item.tags.find((t) => /^#p[0-4]$/.test(t)) ?? null;
+    const hasLaterPriority = currentPriority !== null && /^#p[3-4]$/.test(currentPriority);
+
+    menu.addItem((mi) => {
+      mi.setTitle("Copy").setIcon("copy").onClick(async () => {
+        await navigator.clipboard.writeText(item.text);
+      });
+    });
+
+    menu.addItem((mi) => {
+      mi.setTitle(hasFocus ? "Unfocus" : "Focus")
+        .setIcon("zap")
+        .onClick(async () => {
+          const ok = hasFocus
+            ? await removeProjectItemTag(item, "#focus")
+            : await setProjectItemPriority(item, calculateProjectFocusPriority(currentPriority), true);
+          if (ok) await this.resyncActiveProject();
+        });
+    });
+
+    menu.addItem((mi) => {
+      mi.setTitle(hasLaterPriority ? "Unlater" : "Later")
+        .setIcon("clock")
+        .onClick(async () => {
+          const ok = hasLaterPriority
+            ? await removeProjectItemTag(item, currentPriority!)
+            : await setProjectItemPriority(item, calculateProjectLaterPriority(currentPriority));
+          if (ok) await this.resyncActiveProject();
+        });
+    });
+
+    menu.addItem((mi) => {
+      mi.setTitle(hasFuture ? "Unsnooze" : "Snooze")
+        .setIcon("moon")
+        .onClick(async () => {
+          const ok = hasFuture
+            ? await removeProjectItemTag(item, "#future")
+            : await addProjectItemTag(item, "#future");
+          if (ok) await this.resyncActiveProject();
+        });
+    });
+
+    menu.showAtMouseEvent(evt);
+  }
+
+  /**
+   * Re-reads the active project's structured files after a mutation and
+   * updates this view's item cache directly, so the change is visible
+   * immediately without a vault write — items live only in the sidebar's
+   * cache now, not in the note body.
+   */
+  private async resyncActiveProject(): Promise<void> {
+    if (!this.activeProjectName) return;
+    const scanned = this.scannedProjects.find((p) => p.name === this.activeProjectName);
+    if (!scanned) return;
+
+    const items = await this.syncManager.getProjectItems(scanned.localPath);
+    this.syncManager.updateCachedItems(scanned.localPath, items);
+
     this.render();
   }
 

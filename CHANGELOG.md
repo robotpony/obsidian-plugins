@@ -2,23 +2,78 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.35.3] - 2026-08-17
+
+### Changed — Projects folded into the TODO sidebar as a tab, not a separate view
+
+Screenshot review of 0.35.2 found the leaf-sharing fix was addressing the
+wrong layer: Projects was still architecturally a second `ItemView`, just
+now sharing a leaf with TODOs instead of opening its own. That's why it
+kept looking and behaving unlike Ideas/Focus — a different header, its own
+"Sync" always-visible instead of living in the kebab menu, a back-arrow
+button, and (per report) the sidebar dock's own tab-strip icon still
+changing to the folder-git icon whenever Projects was showing, since the
+*leaf's view type itself* was swapping back and forth between two classes.
+
+Projects is now a third mode of `TodoSidebarView` (`activeTab: 'todos' |
+'ideas' | 'projects'`), exactly like Ideas — same header, same tab row,
+same kebab menu (with "Sync" appearing there only while on the Projects
+tab), no back button. `TodoSidebarView.getIcon()` never changes, so the
+tab-strip icon this leaf shows in the sidebar dock now stays constant no
+matter which internal tab is active — the root cause of the icon
+"installing itself in the ribbon" the last two entries chased. Clicking
+the Projects tab again while already viewing a project's detail returns
+to the list, replacing the old back arrow (point 4 of the report: with
+Projects/TODOs/Focus/Ideas/kebab all in one row, a dedicated back control
+was redundant with just clicking the tab again).
+
+`ProjectsSidebarView.ts` (the old standalone view) is now a small module
+of pure helpers and types (`groupHandTypedItems`, `browsableUrl`,
+`homeRelativePath`, etc.) that both `SidebarView.ts` and its existing unit
+tests use — no `ItemView`, no `app`/`leaf` dependency. The
+`toggle-projects-sidebar` command and Settings' "Open Projects sidebar"
+button still work, now opening (or reusing) the one TODO sidebar leaf and
+switching it to the Projects tab. A migration step in `onunload()` clears
+any leftover leaf of the old, now-unregistered standalone view type for
+anyone upgrading from 0.35.2 or earlier.
+
+## [0.35.2] - 2026-08-17
+
+### Fixed — 0.35.1's fixes didn't hold up; corrected both
+
+A clean uninstall/rebuild/install showed both "fixed" bugs unchanged,
+because 0.35.1 diagnosed the wrong cause for each.
+
+The border: not a focus ring (0.35.1's fix, harmless but ineffective —
+left in place, `.tag-cloud-pill` uses the same treatment for a real
+reason elsewhere). The actual cause was a `border-left` divider added on
+purpose to set the button apart from the TODOs/Focus/Ideas cluster,
+styled heavily enough to read as a stray box around the icon — replaced
+with plain spacing, no border.
+
+The "won't close" bug: not a missing `toggle()` (0.35.1's fix). Clicking
+the nav button opened Projects in a brand new leaf (`getRightLeaf(false)`),
+giving it its own tab in the sidebar dock — structurally unlike every
+other tab (TODOs/Focus/Ideas), which swap content within the *same* leaf.
+That's what read as the Projects icon "installing itself in the ribbon":
+a second, independent pane where a same-slot swap was expected. Fixed by
+having both nav buttons — and, so switching sidebars behaves identically
+everywhere, the `toggle-todo-sidebar`/`toggle-projects-sidebar` commands
+and the TODO sidebar's ribbon icon too — reuse whichever leaf currently
+holds the other view instead of opening a second one. TODOs and Projects
+now share one dock slot, the same way TODOs/Focus/Ideas already share
+theirs. The "Show in Projects" context-menu entries, which pass a
+specific project tag, still always land you on that project rather than
+toggling anything closed, since their intent is "show me this."
+
 ## [0.35.1] - 2026-08-17
 
 ### Fixed — Projects nav button had a stray border and couldn't be closed
 
 Two bugs found via screenshot review of 0.35.0's new Projects nav button:
-the button had a faint border around its icon after being clicked, a
-Chromium focus ring left over because (unlike the other tab buttons) it
-never gets `.active` styling to mask it — fixed by clearing `outline` on
-`:focus-visible`, the same treatment `.tag-cloud-pill` already uses.
-Separately, the button only opened the Projects sidebar, never closed it:
-it called `activate()`, where the ribbon icon it replaced called
-`toggle()`, so once opened there was no way back except closing the pane
-by hand. Reported as the Projects icon "installing" itself in the ribbon
-with no way to dismiss it. Both nav buttons (Projects → TODOs and back)
-now toggle when called with no target; the "Show in Projects"
-context-menu entries, which pass a specific project tag, still always
-open (never close) since their intent is "show me this."
+a faint border around its icon, and no way to close it once opened —
+superseded by 0.35.2 above, which found both fixes here were diagnosed
+wrong.
 
 ## [0.35.0] - 2026-08-17
 
