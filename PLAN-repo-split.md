@@ -187,32 +187,54 @@ left in it.
 **Exit criteria — met**: new repo builds and installs standalone; nothing
 in it still points back at `obsidian-plugins`.
 
-## Phase 3: warped-reference → warped-gdrive, mechanical move only
+## Phase 3: warped-reference → warped-gdrive, mechanical move only — done (2026-08-17)
 
 **Goal**: `warped-reference` exists as a standalone repo named
 `warped-gdrive`, functionally unchanged — the Obsidian plugin ships
 as-is. CLI/MCP-first product scoping is explicitly **not** part of this
 phase; see Phase 4.
 
-- New repo `robotpony/warped-gdrive`, flat layout.
-- Rename `package.json` `name` → `warped-gdrive`. **Leave
-  `manifest.json` untouched** (`id: "warped-reference"`, `name: "Warped
-  Reference"`) — Phase 4 decides whether/how that changes.
-- Copy `warped-reference/*` in as the repo root; copy `shared/` into its
-  own source tree only if the code actually still imports from it after
-  the move (`Notice`/`SidebarManager` are Obsidian-specific — likely
-  nothing survives the cut for the MCP server half; confirm rather than
-  assume when doing this step).
-- Single "initial import" commit; no history migration. Version stays
-  `1.14.0`.
-- Update README/CHANGELOG to drop mono-repo-relative references, but
-  don't rewrite the README's framing yet — that's Phase 4's job.
-- Verify: `npm run build`/`npm test` pass; the MCP server still runs
-  standalone; the Obsidian plugin half still installs and works exactly
-  as it does in this repo today.
+**What was done**: new repo `robotpony/warped-gdrive` (public), at
+sibling path `/Users/mx/projects/warped-gdrive/`, flat layout. Root
+`package.json` `name` → `warped-gdrive`; `manifest.json` left untouched
+(`id: "warped-reference"`, `name: "Warped Reference"`) except its
+`authorUrl`, updated to the new repo — a broken-link fix (where the code
+lives now), not an identity change. `shared/` copied into `src/shared/`
+since `main.ts` genuinely still imports `SidebarManager` from it
+(confirmed rather than assumed, per the plan's own caution above — the
+MCP server half in `src/gdrive/` does not use `shared/` at all).
+`tsconfig.json`'s stale `../shared/**/*.ts` include entry removed
+(`src/shared` is already covered by the existing `src/**/*.ts` glob).
+`install.sh` and `.gitignore` added — same generic script as the other
+two repos; `.gitignore` also covers `src/gdrive/`'s own `dist/`/
+`node_modules` (the MCP server subproject builds separately, excluded
+from the main `tsc` run by `tsconfig.json`'s own `exclude`).
 
-**Exit criteria**: `warped-gdrive` repo builds, tests pass, and both
-halves (Obsidian plugin + MCP server) work exactly as they did in
+**Left alone, on purpose**: the "g-command" internal branding (README
+title, `GCommandPlugin`/`GCommandSettings` class names, `setup.sh`'s
+banner) — established self-identity predating this split, same
+treatment as `warped-hugo`'s "Hugo Command." `src/gdrive/package.json`'s
+own `name`/`bin` (`warped-reference-vault`) also left untouched, for the
+same reason `manifest.json` was: it's the MCP server's actual product
+identity, not administrative repo/package naming — a Phase 4 call, not
+this move's. (It's also not functionally load-bearing today: the
+documented registration is `claude mcp add vault node
+/absolute/path/to/src/gdrive/dist/index.js`, invoked by file path, not
+by package name.)
+
+README/CHANGELOG needed no mono-repo-relative reference fixes — this
+plugin's docs were already self-contained, unlike the other two.
+
+**Verified**: `npm run build` and `npm test` (156 tests, 6 files) pass —
+now running under this repo's own `vitest.config.mjs`, not leaking into
+a sibling repo's the way it briefly did before Phase 1a's config fix.
+The MCP server subproject builds standalone (`cd src/gdrive && npm
+install`, which runs its own `prepare`/`build` script) to a valid
+executable `dist/gdrive/index.js`. A real vault install shows the
+correct manifest: `id`/`name` unchanged, `authorUrl` fixed.
+
+**Exit criteria — met**: `warped-gdrive` repo builds, tests pass, and
+both halves (Obsidian plugin + MCP server) work exactly as they did in
 `obsidian-plugins/warped-reference/` — no functional change, just a new
 home and a new repo/package name.
 

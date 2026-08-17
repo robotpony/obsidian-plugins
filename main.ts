@@ -215,6 +215,7 @@ export default class WarpedTodoPlugin extends Plugin {
           this.settings.makeLinksClickable,
           () => this.showAboutModal(),
           () => this.showStatsModal(),
+          () => this.projectsSidebarManager.activate(),
           () => this.settings.moveHistory,
           this.teamManager,
           this.settings.defaultAssignee,
@@ -441,12 +442,13 @@ export default class WarpedTodoPlugin extends Plugin {
       },
     });
 
-    // Add ribbon icons
+    // Add ribbon icon. Projects no longer gets its own ribbon icon — it's
+    // reached from the TODO sidebar's tab nav (beside Ideas) instead, so
+    // there's one entry point into this plugin's sidebars, not two. The
+    // "toggle-projects-sidebar" command (and its Projects nav button) still
+    // work when the TODO sidebar itself is closed.
     this.addRibbonIcon("square-check-big", "Toggle TODO Sidebar", () => {
       this.sidebarManager.toggle();
-    });
-    this.addRibbonIcon("folder-git-2", "Toggle Projects Sidebar", () => {
-      this.projectsSidebarManager.toggle();
     });
 
     // Add settings tab

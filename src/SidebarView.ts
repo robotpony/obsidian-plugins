@@ -50,6 +50,7 @@ export class TodoSidebarView extends ItemView {
   private openInfoPopup: HTMLElement | null = null;
   private onShowAbout: () => void;
   private onShowStats: () => void;
+  private onOpenProjects: () => void;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -63,6 +64,7 @@ export class TodoSidebarView extends ItemView {
     makeLinksClickable: boolean,
     onShowAbout: () => void,
     onShowStats: () => void,
+    onOpenProjects: () => void,
     getMoveHistory: () => string[] = () => [],
     teamManager?: TeamManager,
     defaultAssignee: string = "",
@@ -80,6 +82,7 @@ export class TodoSidebarView extends ItemView {
     this.makeLinksClickable = makeLinksClickable;
     this.onShowAbout = onShowAbout;
     this.onShowStats = onShowStats;
+    this.onOpenProjects = onOpenProjects;
     this.teamManager = teamManager ?? new TeamManager(this.app, "team.md");
     this.defaultAssignee = defaultAssignee;
     this.priorityTags = priorityTags;
@@ -635,6 +638,18 @@ export class TodoSidebarView extends ItemView {
     });
     ideasTab.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"></path><path d="M10 22h4"></path><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"></path></svg>';
     ideasTab.addEventListener("click", () => this.switchTab('ideas'));
+
+    // Projects lives in its own sidebar, not a tab here — the item shapes
+    // (repo-matched vs. hand-typed) and sync machinery don't fit the
+    // TODOs/Ideas tab model. This button is the one entry point into it
+    // (replaces the old separate ribbon icon, which put an unrelated icon
+    // in the left rail for something that's really a TODOs sidebar sibling).
+    const projectsNavBtn = tabNav.createEl("button", {
+      cls: "sidebar-tab-btn sidebar-nav-out-btn",
+      attr: { "aria-label": "Open Projects" },
+    });
+    projectsNavBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v5"></path><circle cx="13" cy="12" r="2"></circle><path d="M18 19c-2.8 0-5-2.2-5-5v8"></path><circle cx="20" cy="19" r="2"></circle></svg>';
+    projectsNavBtn.addEventListener("click", () => this.onOpenProjects());
 
     // Kebab menu stays accessible in all modes (refresh, stats, about)
     this.createSidebarMenuButton(headerDiv);

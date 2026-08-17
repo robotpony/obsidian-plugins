@@ -272,6 +272,16 @@
   background-color: var(--background-modifier-hover) !important;
 }
 
+/* Marks a tab-nav button that navigates to a different sidebar view
+   (Projects) rather than switching tabs within this one. A left border
+   sets it apart from the TODOs/Focus/Ideas cluster so it doesn't read as a
+   fourth tab that never lights up active. */
+.sidebar-nav-out-btn {
+  margin-left: 4px;
+  padding-left: 6px;
+  border-left: 1px solid var(--background-modifier-border) !important;
+}
+
 /* Hamburger menu button */
 .sidebar-menu-btn {
   padding: 4px;
