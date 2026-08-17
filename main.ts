@@ -515,7 +515,7 @@ class AboutModal extends Modal {
     // Logo and title
     const header = contentEl.createEl("div", { cls: "about-header" });
     header.createEl("span", { cls: "warped-todo-logo about-logo", text: "␣⌘" });
-    header.createEl("h2", { text: "Warped Todo" });
+    header.createEl("h2", { text: "Warped Command" });
 
     // Version
     contentEl.createEl("p", { cls: "about-version", text: `Version ${this.version}` });
@@ -533,8 +533,8 @@ class AboutModal extends Modal {
     const repoLink = details.createEl("p");
     repoLink.appendText("Repository: ");
     repoLink.createEl("a", {
-      text: "github.com/robotpony/obsidian-plugins",
-      href: "https://github.com/robotpony/obsidian-plugins",
+      text: "github.com/robotpony/warped-command",
+      href: "https://github.com/robotpony/warped-command",
     });
 
     details.createEl("p", { text: "Made in 🇨🇦", cls: "about-made-in" });
@@ -631,13 +631,13 @@ class WarpedTodoSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: "Warped Todo Settings" });
+    containerEl.createEl("h2", { text: "Warped Command Settings" });
 
     // About section
     const aboutSection = containerEl.createEl("div", { cls: "warped-todo-about-section" });
     const aboutHeader = aboutSection.createEl("div", { cls: "about-header" });
     aboutHeader.createEl("span", { cls: "warped-todo-logo about-logo", text: "␣⌘" });
-    aboutHeader.createEl("span", { cls: "about-title", text: "Warped Todo" });
+    aboutHeader.createEl("span", { cls: "about-title", text: "Warped Command" });
 
     aboutSection.createEl("p", {
       cls: "about-blurb",
@@ -651,7 +651,7 @@ class WarpedTodoSettingTab extends PluginSettingTab {
     aboutDetails.appendText(" · ");
     aboutDetails.createEl("a", {
       text: "GitHub",
-      href: "https://github.com/robotpony/obsidian-plugins",
+      href: "https://github.com/robotpony/warped-command",
     });
 
     // Sidebar section (first)

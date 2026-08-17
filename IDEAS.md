@@ -113,7 +113,9 @@ idea). No whole-repo markdown scan, no source-code comment scanning
 
 **Why**: requiring explicit tags on every line was a bad first-run
 experience, since almost no existing file qualifies, including this repo's
-own `warped-todo/BUGS.md` (prose-style bug writeups, zero tags). A
+own `BUGS.md` (prose-style bug writeups, zero tags; lived at
+`warped-todo/BUGS.md` before PLAN-repo-split.md's Phase 1a flattened this
+repo to one plugin). A
 filename-based default gets useful output on day one without retrofitting
 every repo's files first, while still letting an explicit tag override the
 default when a line genuinely is a different type (e.g. an idea noted

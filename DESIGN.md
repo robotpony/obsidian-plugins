@@ -651,7 +651,7 @@ duplicate copies of that block into the note on every pass).
 ## File Organization
 
 ```
-warped-todo/
+warped-command/          # repo root — flat since PLAN-repo-split.md's Phase 1a
 ├── main.ts              # Plugin entry, initialization
 ├── src/
 │   ├── TodoScanner.ts        # Vault + repo file scanning & caching

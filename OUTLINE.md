@@ -69,7 +69,7 @@ sync. `createProjectFile`'s template gains frontmatter and the delimited
 block, guarded so plain tag-only projects (no matching repo) still get
 today's simpler template.
 
-### New components (`warped-todo/src/`)
+### New components (`src/`, `warped-todo/src/` before Phase 1a flattened this repo)
 
 | File | Purpose |
 |------|---------|
@@ -93,7 +93,8 @@ today's simpler template.
 Requiring every line in every repo's `BUGS.md`/`TODO.md`/`IDEAS.md` to
 already carry an explicit `#todo`/`#idea`/`#bug` tag before the plugin
 finds anything is a bad first-run experience; almost no existing file
-qualifies, including this repo's own `warped-todo/BUGS.md`. Instead, each
+qualifies, including this repo's own `BUGS.md` (`warped-todo/BUGS.md`
+before Phase 1a). Instead, each
 recognized filename carries a default item type, and untagged content is
 attributed to that default. An explicit tag on a line always wins over the
 filename default (e.g. an `#idea` noted inline in `BUGS.md` stays an idea).
@@ -108,7 +109,7 @@ filename default (e.g. an `#idea` noted inline in `BUGS.md` stays an idea).
 
 **Item boundaries** — two shapes, selected by whether the file has any `###` headings (checked first, since it's the less ambiguous signal — see below):
 
-1. **Header-per-item reports**: if the file has any `###` heading, each one nested under a recognized `##` status section is one item, and flat-list parsing is skipped entirely for the whole file. A `##` counts as a pure status section only if it's little more than the status word itself (`Open`, `Completed ✓`); a `##` with a real title that happens to mention its own status (`## Issue: widget crashes ✅ RESOLVED`) is an item in its own right instead, and its `###` children are body text, not further items — needed once real data (`peep/ISSUES.md`) showed the loose version exploding one issue into 8 fake items. Recognized status words: `Open`/`Todo`/`Active`/`Future`/`Enhancement` → open, `Fixed`/`Resolved`/`Completed`/`Done`/`Closed` → closed. Covers files like this repo's own `warped-todo/BUGS.md`, where each bug is a prose write-up under `## Open`.
+1. **Header-per-item reports**: if the file has any `###` heading, each one nested under a recognized `##` status section is one item, and flat-list parsing is skipped entirely for the whole file. A `##` counts as a pure status section only if it's little more than the status word itself (`Open`, `Completed ✓`); a `##` with a real title that happens to mention its own status (`## Issue: widget crashes ✅ RESOLVED`) is an item in its own right instead, and its `###` children are body text, not further items — needed once real data (`peep/ISSUES.md`) showed the loose version exploding one issue into 8 fake items. Recognized status words: `Open`/`Todo`/`Active`/`Future`/`Enhancement` → open, `Fixed`/`Resolved`/`Completed`/`Done`/`Closed` → closed. Covers files like this repo's own `BUGS.md`, where each bug is a prose write-up under `## Open`.
 2. **Flat list items**: only used when the file has no `###` headings at all. Top-level bullet or checkbox lines (`- ...`, `- [ ] ...`), one item per line, default-typed by filename unless the line already has an explicit tag. This covers files like `peep/TODO.md`.
 
 `###` presence decides first rather than "no top-level list items exist" (the original rule): a prose write-up can easily contain an incidental `-` list inside one item's body (a root-cause breakdown, for instance — this repo's actual `BUGS.md` does exactly that) without being a flat-list file. Checking for bullets first would silently misparse the whole file as a couple of random bullet fragments instead of the real `###` items. Found during Phase 3 implementation testing against the real file — see PLAN.md.

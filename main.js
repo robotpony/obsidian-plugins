@@ -6839,7 +6839,7 @@ var AboutModal = class extends import_obsidian14.Modal {
     contentEl.addClass("warped-todo-about-modal");
     const header = contentEl.createEl("div", { cls: "about-header" });
     header.createEl("span", { cls: "warped-todo-logo about-logo", text: "\u2423\u2318" });
-    header.createEl("h2", { text: "Warped Todo" });
+    header.createEl("h2", { text: "Warped Command" });
     contentEl.createEl("p", { cls: "about-version", text: `Version ${this.version}` });
     contentEl.createEl("p", {
       cls: "about-blurb",
@@ -6850,8 +6850,8 @@ var AboutModal = class extends import_obsidian14.Modal {
     const repoLink = details.createEl("p");
     repoLink.appendText("Repository: ");
     repoLink.createEl("a", {
-      text: "github.com/robotpony/obsidian-plugins",
-      href: "https://github.com/robotpony/obsidian-plugins"
+      text: "github.com/robotpony/warped-command",
+      href: "https://github.com/robotpony/warped-command"
     });
     details.createEl("p", { text: "Made in \u{1F1E8}\u{1F1E6}", cls: "about-made-in" });
   }
@@ -6916,11 +6916,11 @@ var WarpedTodoSettingTab = class extends import_obsidian14.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: "Warped Todo Settings" });
+    containerEl.createEl("h2", { text: "Warped Command Settings" });
     const aboutSection = containerEl.createEl("div", { cls: "warped-todo-about-section" });
     const aboutHeader = aboutSection.createEl("div", { cls: "about-header" });
     aboutHeader.createEl("span", { cls: "warped-todo-logo about-logo", text: "\u2423\u2318" });
-    aboutHeader.createEl("span", { cls: "about-title", text: "Warped Todo" });
+    aboutHeader.createEl("span", { cls: "about-title", text: "Warped Command" });
     aboutSection.createEl("p", {
       cls: "about-blurb",
       text: "Focus on the right next task. Simple TODOs and tags in your markdown, surfaced when you need them."
@@ -6931,7 +6931,7 @@ var WarpedTodoSettingTab = class extends import_obsidian14.PluginSettingTab {
     aboutDetails.appendText(" \xB7 ");
     aboutDetails.createEl("a", {
       text: "GitHub",
-      href: "https://github.com/robotpony/obsidian-plugins"
+      href: "https://github.com/robotpony/warped-command"
     });
     containerEl.createEl("h3", { text: "Sidebar" });
     new import_obsidian14.Setting(containerEl).setName("Show sidebar by default").setDesc("Show the TODO sidebar when Obsidian starts").addToggle(
