@@ -1,8 +1,8 @@
-# ␣⌘ Space Command for Obsidian
+# ␣⌘ Warped Command for Obsidian
 
 Focus on the right next task. Plain `#todo` tags in your markdown, surfaced in a sidebar when you need them.
 
-## Why Space Command?
+## Why Warped Command?
 
 Your notes are full of TODOs — action items from meetings, tasks buried in project docs, ideas scattered across daily logs. Space Command surfaces them without moving them.
 

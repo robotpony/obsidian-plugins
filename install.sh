@@ -1,7 +1,9 @@
 #!/bin/zsh
 
-# Warped Command Installer
-# Builds the plugin and installs it into selected Obsidian vaults
+# Obsidian Plugin Installer
+# Builds the plugin and installs it into selected Obsidian vaults.
+# Generic across Warped plugin repos — reads the plugin's identity from
+# manifest.json, nothing here is hardcoded to a specific plugin.
 
 set -e
 
@@ -285,7 +287,7 @@ main() {
         esac
     done
 
-    echo "${BOLD}${BLUE}Warped Command Installer${NC}"
+    echo "${BOLD}${BLUE}$DISPLAY_NAME Installer${NC}"
 
     # Build
     print_header "Building..."
