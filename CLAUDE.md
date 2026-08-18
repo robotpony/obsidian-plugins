@@ -23,7 +23,7 @@ Vault selections are cached in `.install-vaults` for reuse with `--previous`.
 
 ## Architecture
 
-Warped Command is an Obsidian plugin for tracking TODOs, Ideas, and Principles across a vault, plus a Projects sidebar that syncs vault notes with git repos on disk. Vault items are tagged in markdown files (`#todo`, `#idea`, `#principle`); the plugin scans the vault, indexes them, and surfaces them in a custom sidebar with priority/focus/snooze workflows. The Projects sidebar finds git repos under a configured base folder, syncs a note per project (frontmatter git facts + `#todo`/`#idea`/`#bug` items parsed from each repo's `BUGS.md`/`TODO.md`/etc.), and lets you act on those items from Obsidian, writing back to the repo file. Desktop only (`isDesktopOnly: true`) — Projects needs Node `fs`/`child_process`. Full Projects design: [OUTLINE.md](OUTLINE.md), [DESIGN.md](DESIGN.md), [PLAN.md](PLAN.md).
+Warped Command is an Obsidian plugin for tracking TODOs, Ideas, and Principles across a vault, plus a Projects sidebar that syncs vault notes with git repos on disk. Vault items are tagged in markdown files (`#todo`, `#idea`, `#principle`); the plugin scans the vault, indexes them, and surfaces them in a custom sidebar with priority/focus/snooze workflows. The Projects sidebar finds git repos under a configured base folder, syncs a note per project (frontmatter git facts + `#todo`/`#idea`/`#bug` items parsed from each repo's `BUGS.md`/`TODO.md`/etc.), and lets you act on those items from Obsidian, writing back to the repo file. Desktop only (`isDesktopOnly: true`) — Projects needs Node `fs`/`child_process`. Full Projects design: [DESIGN.md](DESIGN.md).
 
 ### Entry point
 
