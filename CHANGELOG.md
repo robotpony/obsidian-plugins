@@ -2,6 +2,75 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.35.12] - 2026-08-17
+
+### Fixed — Synced project items showed completed todos; hand-typed ones never did
+
+Reported as an inconsistency: TODOs synced from a repo's `BUGS.md`/`TODO.md`
+kept showing up checked off after completion, while TODOs hand-typed into
+the project note itself never did. Root cause: hand-typed items structurally
+can't include a completed one — `TodoScanner` keeps `#todo` and `#todone`
+items in separate caches, and `getTodos()` never returns a completed item at
+all. Synced items don't have that split; `StructuredFileParser` parses a
+repo's structured file into one list with a `completed` flag, open and
+closed together, and `renderProjectItemGroups` never filtered it out before
+rendering — unlike `projectItemCounts()`, reading the exact same cache for
+the list-view row's todo/idea/bug badge, which already does. A completed
+synced item stayed in the list, checked, indefinitely — nothing else prunes
+a closed entry out of `BUGS.md`.
+
+Now filtered to active-only in the render path too, matching the count
+badge and matching hand-typed items: checking a synced item off makes it
+disappear from the sidebar immediately, the same as a hand-typed one
+already did. The completed item isn't lost — still in the file, checked
+off — just no longer mirrored into this active-work view.
+
+## [0.35.11] - 2026-08-17
+
+### Added — Back arrow in the project detail view
+
+Returning to the project list required clicking the Projects tab icon
+again — an intentional "back" affordance (`switchToProjectsTab`'s own
+comment notes it replaced a dedicated back button, removed when Projects
+folded into the TODOs sidebar as a tab) but not a discoverable one from
+inside the detail view itself. Added a `←` before the project title that
+does the same thing, factored into a shared `backToProjectsList()` both
+entry points now call.
+
+## [0.35.10] - 2026-08-17
+
+### Fixed — Duplicate, cut-off `.md` link in the project detail header
+
+The detail view's title line carried its own filename+arrow link to the
+project's note, on top of the same link already shown in the TODO group
+heading below it and, as of 0.35.9, the new frontmatter block. Screenshot
+review: with the longer README-derived title now on that line, the link
+had no room left and got visibly truncated. Removed for the detail view
+(`renderProjectSummary` gained a `variant` param); list view rows keep it,
+where there's room and it isn't redundant.
+
+## [0.35.9] - 2026-08-17
+
+### Added — Project/Stack/Status frontmatter summary in the project detail view
+
+The project detail view's header showed branch/status/counts and a raw
+GitHub-URL action row that wrapped badly in a narrow sidebar (screenshot
+review). Replaced with a compact three-line block between the header and
+the TODO list: **Project** (the value doubles as the GitHub link — no URL
+text shown, so there's no domain-vs-room trade-off; the full URL is still
+on hover), **Stack** (auto-detected technologies), **Status** (branch +
+a clean/dirty glyph + `(git)`).
+
+Title and Stack are computed the way `~/projects/peep/p`'s
+`extract_project_name()`/`detect_technologies()` already do — ported as
+native TypeScript in new `ProjectMetadata.ts`, not shelled out to `p`,
+consistent with `ProjectScanner.ts`'s existing git-facts decision — so a
+repo's title/Stack reads the same whether you're looking at `p`'s CLI
+output or here. Both are now also synced into the note's own frontmatter,
+sync-owned alongside `project`/`branch`/`gitStatus`. Reveal-in-Finder
+survives as a small icon next to the Project row rather than its own
+action row.
+
 ## [0.35.8] - 2026-08-17
 
 ### Fixed — project notes with a pre-existing `cssclasses` never got their Properties panel hidden

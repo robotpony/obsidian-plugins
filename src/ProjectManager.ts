@@ -438,11 +438,15 @@ function mergeScannedProjects(projects: ProjectInfo[], scannedProjects: ScannedP
   return [...merged.values()];
 }
 
-function repoFields(scanned: ScannedProject): Pick<ProjectInfo, "localPath" | "remote" | "branch" | "gitStatus"> {
+function repoFields(
+  scanned: ScannedProject
+): Pick<ProjectInfo, "localPath" | "remote" | "branch" | "gitStatus" | "title" | "stack"> {
   return {
     localPath: scanned.localPath,
     remote: scanned.remote,
     branch: scanned.branch,
     gitStatus: scanned.gitStatus,
+    title: scanned.title,
+    stack: scanned.stack,
   };
 }

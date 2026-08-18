@@ -62,6 +62,10 @@ export interface ProjectInfo {
   remote?: string;
   branch?: string;
   gitStatus?: string;
+  /** README-derived display title, or the repo folder name if there's no README/heading. See ProjectMetadata.ts. */
+  title?: string;
+  /** Detected technologies (marker files, package.json deps). See ProjectMetadata.ts. */
+  stack?: string[];
 }
 
 /**

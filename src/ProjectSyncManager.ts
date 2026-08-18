@@ -21,7 +21,7 @@ const WATCH_COOLDOWN_MS = 1500;
 // Properties panel for notes carrying it, since the sidebar already surfaces
 // those fields (see DESIGN.md's Projects Extension).
 const PROJECT_NOTE_CSS_CLASS = "warped-todo-project-note";
-const SYNC_KEY_ORDER = ["project", "repo", "remote", "branch", "gitStatus", "lastSynced"] as const;
+const SYNC_KEY_ORDER = ["project", "title", "stack", "repo", "remote", "branch", "gitStatus", "lastSynced"] as const;
 const SYNC_KEYS = new Set<string>(SYNC_KEY_ORDER);
 
 export interface SyncOptions {
@@ -306,6 +306,8 @@ function mergeFrontmatter(
 ): Map<string, string> {
   const merged = new Map<string, string>();
   merged.set("project", quote(scanned.name));
+  merged.set("title", quote(scanned.title));
+  merged.set("stack", quoteList(scanned.stack));
   merged.set("repo", quote(scanned.localPath));
   merged.set("remote", quote(scanned.remote));
   merged.set("branch", quote(scanned.branch));
@@ -335,6 +337,11 @@ function mergeFrontmatter(
 
 function quote(value: string): string {
   return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+
+/** Serializes a string list as an inline YAML array, e.g. `["JS", "npm"]` — same inline-array shape mergeCssClasses() below writes for cssclasses. */
+function quoteList(values: string[]): string {
+  return `[${values.map(quote).join(", ")}]`;
 }
 
 /**

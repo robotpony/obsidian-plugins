@@ -2145,15 +2145,251 @@ function repoFields(scanned) {
     localPath: scanned.localPath,
     remote: scanned.remote,
     branch: scanned.branch,
-    gitStatus: scanned.gitStatus
+    gitStatus: scanned.gitStatus,
+    title: scanned.title,
+    stack: scanned.stack
   };
 }
 
 // src/ProjectScanner.ts
 var import_child_process = require("child_process");
-var import_fs = require("fs");
+var import_fs2 = require("fs");
 var import_promises2 = require("fs/promises");
+var import_path2 = require("path");
+
+// src/ProjectMetadata.ts
+var import_fs = require("fs");
 var import_path = require("path");
+var TECH_FILES = {
+  "package.json": ["JS", "node.js"],
+  "requirements.txt": ["Python"],
+  "Pipfile": ["Python"],
+  "pyproject.toml": ["Python"],
+  "setup.py": ["Python"],
+  "setup.cfg": ["Python"],
+  "tox.ini": ["Python"],
+  "pytest.ini": ["Python"],
+  ".python-version": ["Python"],
+  "Cargo.toml": ["Rust"],
+  "go.mod": ["Go"],
+  "pom.xml": ["Java", "Maven"],
+  "build.gradle": ["Java", "Gradle"],
+  "composer.json": ["PHP"],
+  "Gemfile": ["Ruby"],
+  "yarn.lock": ["JS", "yarn"],
+  "package-lock.json": ["JS", "npm"],
+  "Dockerfile": ["Docker"],
+  "docker-compose.yml": ["Docker"],
+  "docker-compose.yaml": ["Docker"],
+  "Makefile": ["Make"],
+  "config.toml": ["Hugo"],
+  "config.yaml": ["Hugo"],
+  "config.yml": ["Hugo"],
+  "hugo.toml": ["Hugo"],
+  "hugo.yaml": ["Hugo"],
+  "hugo.yml": ["Hugo"]
+};
+var PACKAGE_DEPS = {
+  react: "react",
+  vue: "vue",
+  angular: "angular",
+  typescript: "typescript"
+};
+var CODE_EXTENSIONS = /* @__PURE__ */ new Set([
+  ".py",
+  ".js",
+  ".ts",
+  ".jsx",
+  ".tsx",
+  ".rs",
+  ".go",
+  ".java",
+  ".cpp",
+  ".c",
+  ".php",
+  ".rb",
+  ".swift",
+  ".kt",
+  ".scala",
+  ".clj",
+  ".cs",
+  ".fs",
+  ".vb",
+  ".sh",
+  ".bash",
+  ".zsh",
+  ".fish",
+  ".ps1",
+  ".bat",
+  ".cmd"
+]);
+var PYTHON_SHEBANGS = [
+  "#!/usr/bin/env python",
+  "#!/usr/bin/python",
+  "#!/usr/local/bin/python",
+  "#!python"
+];
+var PLANNING_FILES = [
+  "TODO.md",
+  "todo.md",
+  "TODOS.md",
+  "PLANNING.md",
+  "planning.md",
+  "DESIGN.md",
+  "design.md",
+  "NOTES.md",
+  "notes.md",
+  "IDEAS.md",
+  "ideas.md",
+  "ROADMAP.md",
+  "roadmap.md",
+  "SPEC.md",
+  "spec.md"
+];
+function scanDirForTech(dirPath, technologies) {
+  for (const [filename, techs] of Object.entries(TECH_FILES)) {
+    if ((0, import_fs.existsSync)((0, import_path.join)(dirPath, filename)))
+      technologies.push(...techs);
+  }
+  const packageJsonPath = (0, import_path.join)(dirPath, "package.json");
+  if ((0, import_fs.existsSync)(packageJsonPath)) {
+    try {
+      const pkg = JSON.parse((0, import_fs.readFileSync)(packageJsonPath, "utf-8"));
+      const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+      for (const [dep, tech] of Object.entries(PACKAGE_DEPS)) {
+        if (dep in deps)
+          technologies.push(tech);
+      }
+    } catch (e) {
+    }
+  }
+}
+function listDirSafe(dirPath) {
+  try {
+    return (0, import_fs.readdirSync)(dirPath);
+  } catch (e) {
+    return [];
+  }
+}
+function isFileSafe(path) {
+  try {
+    return (0, import_fs.statSync)(path).isFile();
+  } catch (e) {
+    return false;
+  }
+}
+function dirHasFileWithExt(dirPath, exts) {
+  if (!(0, import_fs.existsSync)(dirPath))
+    return false;
+  for (const name of listDirSafe(dirPath)) {
+    const full = (0, import_path.join)(dirPath, name);
+    if (isFileSafe(full) && exts.has((0, import_path.extname)(name).toLowerCase()))
+      return true;
+  }
+  return false;
+}
+function hasPythonFiles(projectPath) {
+  const dirs = [".", "src", "lib", "tests", "test", "scripts", "bin"];
+  return dirs.some((d) => dirHasFileWithExt((0, import_path.join)(projectPath, d), /* @__PURE__ */ new Set([".py"])));
+}
+function isPythonExecutable(filePath) {
+  try {
+    const stat = (0, import_fs.statSync)(filePath);
+    if (!stat.isFile() || (stat.mode & 73) === 0)
+      return false;
+    const firstLine = (0, import_fs.readFileSync)(filePath, "utf-8").split("\n", 1)[0].trim();
+    return PYTHON_SHEBANGS.some((shebang) => firstLine.startsWith(shebang));
+  } catch (e) {
+    return false;
+  }
+}
+function hasPythonExecutables(projectPath) {
+  const dirs = [".", "bin", "scripts"];
+  for (const d of dirs) {
+    const dirPath = (0, import_path.join)(projectPath, d);
+    if (!(0, import_fs.existsSync)(dirPath))
+      continue;
+    for (const name of listDirSafe(dirPath)) {
+      if (isPythonExecutable((0, import_path.join)(dirPath, name)))
+        return true;
+    }
+  }
+  return false;
+}
+function hasAnyCodeFiles(projectPath) {
+  const dirs = [".", "src", "lib", "app", "scripts", "bin", "test", "tests"];
+  return dirs.some((d) => dirHasFileWithExt((0, import_path.join)(projectPath, d), CODE_EXTENSIONS));
+}
+function isEmptyOrPlanningProject(projectPath) {
+  const hasReadme = (0, import_fs.existsSync)((0, import_path.join)(projectPath, "README.md")) || (0, import_fs.existsSync)((0, import_path.join)(projectPath, "readme.md"));
+  const hasGit = (0, import_fs.existsSync)((0, import_path.join)(projectPath, ".git"));
+  if ((hasReadme || hasGit) && !hasAnyCodeFiles(projectPath))
+    return true;
+  const hasPlanningFiles = PLANNING_FILES.some((f) => (0, import_fs.existsSync)((0, import_path.join)(projectPath, f)));
+  if (hasPlanningFiles && !hasAnyCodeFiles(projectPath))
+    return true;
+  return false;
+}
+function subdirsForTechScan(projectPath, excludeDirs) {
+  const excluded = new Set(excludeDirs);
+  return listDirSafe(projectPath).filter((name) => !name.startsWith(".") && !excluded.has(name)).filter((name) => {
+    try {
+      return (0, import_fs.statSync)((0, import_path.join)(projectPath, name)).isDirectory();
+    } catch (e) {
+      return false;
+    }
+  }).sort();
+}
+function detectStack(projectPath, excludeDirs = []) {
+  const technologies = [];
+  scanDirForTech(projectPath, technologies);
+  if (!technologies.includes("Python")) {
+    if (hasPythonFiles(projectPath))
+      technologies.push("Python");
+    else if (hasPythonExecutables(projectPath))
+      technologies.push("Python");
+  }
+  for (const subdir of subdirsForTechScan(projectPath, excludeDirs)) {
+    const subdirPath = (0, import_path.join)(projectPath, subdir);
+    scanDirForTech(subdirPath, technologies);
+    if (!technologies.includes("Python") && hasPythonFiles(subdirPath)) {
+      technologies.push("Python");
+    }
+  }
+  if (technologies.length === 0 && (0, import_fs.existsSync)((0, import_path.join)(projectPath, "index.html"))) {
+    technologies.push("static website");
+  }
+  if (technologies.length === 0 && isEmptyOrPlanningProject(projectPath)) {
+    technologies.push("n/a");
+  }
+  return [...new Set(technologies)];
+}
+function findReadme(projectPath) {
+  for (const name of ["README.md", "readme.md"]) {
+    const candidate = (0, import_path.join)(projectPath, name);
+    if ((0, import_fs.existsSync)(candidate))
+      return candidate;
+  }
+  return null;
+}
+function extractProjectTitle(projectPath) {
+  const readmePath = findReadme(projectPath);
+  if (!readmePath)
+    return null;
+  let content;
+  try {
+    content = (0, import_fs.readFileSync)(readmePath, "utf-8");
+  } catch (e) {
+    return null;
+  }
+  const match = content.match(/^#\s+(.+)$/m);
+  if (!match)
+    return null;
+  const title = match[1].replace(/[^\x20-\x7E]/g, "").replace(/\s+/g, " ").trim();
+  return title || null;
+}
+
+// src/ProjectScanner.ts
 var MAX_BUFFER = 10 * 1024 * 1024;
 var TAG = "[Warped Todo]";
 var GIT_SEARCH_PATHS = [
@@ -2187,7 +2423,7 @@ var ProjectScanner = class {
     const projects = [];
     for (const repoPath of repoPaths) {
       try {
-        projects.push(await this.readProject(repoPath));
+        projects.push(await this.readProject(repoPath, [...excludeDirs]));
       } catch (error) {
         console.error(TAG, `Failed to read git facts for ${repoPath}:`, error);
       }
@@ -2223,10 +2459,11 @@ var ProjectScanner = class {
         continue;
       if (entry.name === ".git" || excludeDirs.has(entry.name))
         continue;
-      await this.walk((0, import_path.join)(dir, entry.name), depth + 1, maxDepth, excludeDirs, found);
+      await this.walk((0, import_path2.join)(dir, entry.name), depth + 1, maxDepth, excludeDirs, found);
     }
   }
-  async readProject(repoPath) {
+  async readProject(repoPath, excludeDirs) {
+    var _a;
     const [branch, statusLines, remote] = await Promise.all([
       this.run(["branch", "--show-current"], repoPath).then((out) => out.trim()),
       this.run(["status", "--porcelain"], repoPath).then(
@@ -2238,12 +2475,15 @@ var ProjectScanner = class {
     const hasModified = statusLines.some((line) => !line.startsWith("??"));
     const hasUntracked = statusLines.some((line) => line.startsWith("??"));
     const gitStatus = `${hasModified ? "M" : ""}${hasUntracked ? "?" : ""}`;
+    const name = (0, import_path2.basename)(repoPath);
     return {
-      name: (0, import_path.basename)(repoPath),
+      name,
       localPath: repoPath,
       branch,
       gitStatus,
-      remote
+      remote,
+      title: (_a = extractProjectTitle(repoPath)) != null ? _a : name,
+      stack: detectStack(repoPath, excludeDirs)
     };
   }
   /**
@@ -2267,7 +2507,7 @@ var ProjectScanner = class {
     if (this.gitPath)
       return true;
     for (const candidate of GIT_SEARCH_PATHS) {
-      if (candidate.includes("/") && !(0, import_fs.existsSync)(candidate))
+      if (candidate.includes("/") && !(0, import_fs2.existsSync)(candidate))
         continue;
       try {
         await this.tryBinary(candidate);
@@ -2306,9 +2546,9 @@ var ProjectScanner = class {
 
 // src/ProjectSyncManager.ts
 var import_obsidian6 = require("obsidian");
-var import_fs2 = require("fs");
+var import_fs3 = require("fs");
 var import_promises3 = require("fs/promises");
-var import_path2 = require("path");
+var import_path3 = require("path");
 
 // src/StructuredFileParser.ts
 var FILENAME_DEFAULT_TYPE = {
@@ -2488,7 +2728,7 @@ var STRUCTURED_FILENAMES = ["BUGS.md", "TODO.md", "TODOS.md", "IDEAS.md", "ISSUE
 var WATCH_DEBOUNCE_MS = 300;
 var WATCH_COOLDOWN_MS = 1500;
 var PROJECT_NOTE_CSS_CLASS = "warped-todo-project-note";
-var SYNC_KEY_ORDER = ["project", "repo", "remote", "branch", "gitStatus", "lastSynced"];
+var SYNC_KEY_ORDER = ["project", "title", "stack", "repo", "remote", "branch", "gitStatus", "lastSynced"];
 var SYNC_KEYS = new Set(SYNC_KEY_ORDER);
 var ProjectSyncManager = class {
   constructor(app, scanner = new ProjectScanner(), onSynced) {
@@ -2581,11 +2821,11 @@ var ProjectSyncManager = class {
   startWatching(options) {
     var _a;
     this.stopWatching();
-    if (!options.baseFolder || !(0, import_fs2.existsSync)(options.baseFolder))
+    if (!options.baseFolder || !(0, import_fs3.existsSync)(options.baseFolder))
       return;
     const excludeDirs = new Set((_a = options.excludeDirs) != null ? _a : []);
     try {
-      this.watcher = (0, import_fs2.watch)(options.baseFolder, { recursive: true }, (_event, filename) => {
+      this.watcher = (0, import_fs3.watch)(options.baseFolder, { recursive: true }, (_event, filename) => {
         if (filename && isUnderExcludedDir(filename, excludeDirs))
           return;
         this.scheduleSyncAll(options);
@@ -2662,8 +2902,8 @@ function isUnderExcludedDir(filename, excludeDirs) {
 async function readProjectItems(localPath) {
   const items = [];
   for (const filename of STRUCTURED_FILENAMES) {
-    const filePath = (0, import_path2.join)(localPath, filename);
-    if (!(0, import_fs2.existsSync)(filePath))
+    const filePath = (0, import_path3.join)(localPath, filename);
+    if (!(0, import_fs3.existsSync)(filePath))
       continue;
     try {
       const content = await (0, import_promises3.readFile)(filePath, "utf-8");
@@ -2694,6 +2934,8 @@ function parseFrontmatter(content) {
 function mergeFrontmatter(existing, scanned, lastSynced) {
   const merged = /* @__PURE__ */ new Map();
   merged.set("project", quote(scanned.name));
+  merged.set("title", quote(scanned.title));
+  merged.set("stack", quoteList(scanned.stack));
   merged.set("repo", quote(scanned.localPath));
   merged.set("remote", quote(scanned.remote));
   merged.set("branch", quote(scanned.branch));
@@ -2708,6 +2950,9 @@ function mergeFrontmatter(existing, scanned, lastSynced) {
 }
 function quote(value) {
   return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+function quoteList(values) {
+  return `[${values.map(quote).join(", ")}]`;
 }
 function mergeCssClasses(existingRaw) {
   const classes = existingRaw ? parseCssClassesValue(existingRaw) : [];
@@ -3186,7 +3431,7 @@ var import_obsidian12 = require("obsidian");
 
 // src/HeaderBlockMover.ts
 var import_promises4 = require("fs/promises");
-var import_path3 = require("path");
+var import_path4 = require("path");
 var TAG3 = "[Warped Todo]";
 var DEFAULT_CLOSED_SECTION = "## Fixed";
 var DEFAULT_OPEN_SECTION = "## Open";
@@ -3198,7 +3443,7 @@ async function moveHeaderBlock(item, targetCompleted, repoPath, scanner) {
   if (!clean) {
     return {
       ok: false,
-      reason: `Commit or stash changes to ${(0, import_path3.basename)(item.sourceFile)} before completing this item.`
+      reason: `Commit or stash changes to ${(0, import_path4.basename)(item.sourceFile)} before completing this item.`
     };
   }
   let content;
@@ -5408,10 +5653,14 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     if (tag) {
       void this.openProjectDetail(tag.replace(/^#/, ""));
     } else {
-      this.projectsMode = "list";
-      this.activeProjectName = null;
-      this.render();
+      this.backToProjectsList();
     }
+  }
+  /** Returns the Projects tab to its list view. Shared by the tab button's own click handler (switchToProjectsTab with no tag) and the detail view's inline back arrow — same "back" affordance, two entry points. */
+  backToProjectsList() {
+    this.projectsMode = "list";
+    this.activeProjectName = null;
+    this.render();
   }
   /**
    * Public entry point for main.ts — Settings' "Open Projects sidebar"
@@ -5704,7 +5953,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
   }
   renderProjectRow(listEl, project) {
     const name = project.tag.replace(/^#/, "");
-    const row = this.renderProjectSummary(listEl, project);
+    const row = this.renderProjectSummary(listEl, project, "list");
     row.addClass("is-clickable");
     row.addEventListener("click", () => this.openProjectDetail(name));
   }
@@ -5714,15 +5963,38 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
    * atop the detail view. Sharing this one renderer is the point: the
    * detail view's top should look like the list row you just clicked, not
    * introduce a second, differently-styled summary of the same three facts.
+   *
+   * `variant` distinguishes the two uses: "list" shows the compact tag name
+   * plus a branch/status/counts meta line (space-constrained, and counts are
+   * the only signal you have before clicking in); "detail" shows the
+   * README-derived title (falls back to the tag name) and skips the meta
+   * line entirely — the detail view's own frontmatter block covers
+   * branch/status, and item counts are redundant with the TODO list right
+   * below.
    */
-  renderProjectSummary(container, project) {
+  renderProjectSummary(container, project, variant) {
+    var _a;
     const name = project.tag.replace(/^#/, "");
-    const counts = this.projectItemCounts(project);
     const row = container.createDiv({ cls: "warped-todo-project-row" });
     const titleLine = row.createDiv({ cls: "warped-todo-project-row-title" });
-    titleLine.createSpan({ text: name, cls: "warped-todo-project-name" });
+    if (variant === "detail") {
+      const backLink = titleLine.createEl("a", {
+        cls: "warped-todo-project-back-link",
+        text: "\u2190",
+        href: "#",
+        attr: { "aria-label": "Back to projects list" }
+      });
+      backLink.addEventListener("click", (evt) => {
+        evt.preventDefault();
+        this.backToProjectsList();
+      });
+    }
+    titleLine.createSpan({
+      text: variant === "detail" ? (_a = project.title) != null ? _a : name : name,
+      cls: "warped-todo-project-name"
+    });
     const notePath = projectFilePath(this.getProjectsOptions().projectsFolder, name);
-    const noteFile = this.app.vault.getAbstractFileByPath(notePath);
+    const noteFile = variant === "list" ? this.app.vault.getAbstractFileByPath(notePath) : null;
     if (noteFile instanceof import_obsidian12.TFile) {
       titleLine.createSpan({
         cls: "header-filename",
@@ -5742,19 +6014,22 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       });
     }
     const metaChunks = [];
-    if (project.branch)
-      metaChunks.push({ text: project.branch, cls: "warped-todo-project-branch" });
-    if (project.gitStatus)
-      metaChunks.push({ text: project.gitStatus, cls: "warped-todo-project-status" });
-    if (counts.total > 0) {
-      const parts = [];
-      if (counts.todo > 0)
-        parts.push(`${counts.todo} todo`);
-      if (counts.idea > 0)
-        parts.push(`${counts.idea} idea`);
-      if (counts.bug > 0)
-        parts.push(`${counts.bug} bug`);
-      metaChunks.push({ text: parts.join(" \xB7 ") });
+    if (variant === "list") {
+      const counts = this.projectItemCounts(project);
+      if (project.branch)
+        metaChunks.push({ text: project.branch, cls: "warped-todo-project-branch" });
+      if (project.gitStatus)
+        metaChunks.push({ text: project.gitStatus, cls: "warped-todo-project-status" });
+      if (counts.total > 0) {
+        const parts = [];
+        if (counts.todo > 0)
+          parts.push(`${counts.todo} todo`);
+        if (counts.idea > 0)
+          parts.push(`${counts.idea} idea`);
+        if (counts.bug > 0)
+          parts.push(`${counts.bug} bug`);
+        metaChunks.push({ text: parts.join(" \xB7 ") });
+      }
     }
     if (metaChunks.length > 0) {
       const metaLine = row.createDiv({ cls: "warped-todo-project-row-meta" });
@@ -5775,28 +6050,61 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       return;
     }
     const info = container.createDiv({ cls: "warped-todo-project-info" });
-    this.renderProjectSummary(info, project);
-    const actions = info.createDiv({ cls: "warped-todo-project-info-actions" });
-    if (project.remote) {
-      const url = browsableUrl(project.remote);
-      const link = actions.createEl("a", {
-        cls: "warped-todo-project-info-action",
-        href: url,
-        attr: { title: url }
-      });
-      (0, import_obsidian12.setIcon)(link.createSpan(), "external-link");
-      link.createSpan({ text: url.replace(/^https?:\/\//, "") });
-      link.setAttr("target", "_blank");
-    }
-    const revealBtn = actions.createEl("a", {
-      cls: "warped-todo-project-info-action",
-      attr: { title: project.localPath }
-    });
-    (0, import_obsidian12.setIcon)(revealBtn.createSpan(), "folder-open");
-    revealBtn.createSpan({ text: homeRelativePath(project.localPath) });
-    revealBtn.addEventListener("click", () => this.revealProjectInFinder(project.localPath));
+    this.renderProjectSummary(info, project, "detail");
+    this.renderProjectFrontmatter(info, project);
     const itemsContainer = container.createDiv({ cls: "warped-todo-project-items" });
     this.renderProjectItemGroups(itemsContainer, project);
+  }
+  /**
+   * Compact Project/Stack/Status summary shown between the detail view's
+   * header and its TODO list. Mirrors the same three fields
+   * ProjectSyncManager writes into the note's own frontmatter (see its
+   * SYNC_KEY_ORDER) — rendered from the live scan result already in memory,
+   * not by re-reading the note, same as the rest of this view does for
+   * branch/gitStatus. "Project" doubles as the GitHub link (was a separate
+   * action row showing the full URL, which wrapped badly in a narrow
+   * sidebar — screenshot review); the full URL is still available via the
+   * link's tooltip. Reveal-in-Finder survives as an icon-only control next
+   * to it rather than its own row, keeping the block to three lines.
+   */
+  renderProjectFrontmatter(container, project) {
+    const name = project.tag.replace(/^#/, "");
+    const block = container.createDiv({ cls: "warped-todo-project-frontmatter" });
+    const projectRow = block.createDiv({ cls: "warped-todo-project-frontmatter-row" });
+    projectRow.createSpan({ text: "Project", cls: "warped-todo-project-frontmatter-label" });
+    if (project.remote) {
+      const url = browsableUrl(project.remote);
+      projectRow.createEl("a", {
+        text: name,
+        href: url,
+        cls: "warped-todo-project-frontmatter-value warped-todo-project-frontmatter-link",
+        attr: { title: url, target: "_blank" }
+      });
+    } else {
+      projectRow.createSpan({ text: name, cls: "warped-todo-project-frontmatter-value" });
+    }
+    if (project.localPath) {
+      const revealBtn = projectRow.createEl("a", {
+        cls: "warped-todo-project-frontmatter-reveal",
+        attr: { title: `Reveal in Finder: ${homeRelativePath(project.localPath)}`, "aria-label": "Reveal in Finder" }
+      });
+      (0, import_obsidian12.setIcon)(revealBtn, "folder-open");
+      revealBtn.addEventListener("click", () => this.revealProjectInFinder(project.localPath));
+    }
+    if (project.stack && project.stack.length > 0) {
+      const stackRow = block.createDiv({ cls: "warped-todo-project-frontmatter-row" });
+      stackRow.createSpan({ text: "Stack", cls: "warped-todo-project-frontmatter-label" });
+      stackRow.createSpan({ text: project.stack.join(", "), cls: "warped-todo-project-frontmatter-value" });
+    }
+    if (project.branch) {
+      const statusRow = block.createDiv({ cls: "warped-todo-project-frontmatter-row" });
+      statusRow.createSpan({ text: "Status", cls: "warped-todo-project-frontmatter-label" });
+      const statusGlyph = project.gitStatus ? project.gitStatus : "\u2713";
+      statusRow.createSpan({
+        text: `${project.branch} ${statusGlyph} (git)`,
+        cls: "warped-todo-project-frontmatter-value warped-todo-project-frontmatter-status"
+      });
+    }
   }
   revealProjectInFinder(path) {
     var _a, _b;
@@ -5834,7 +6142,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
    */
   renderProjectItemGroups(container, project) {
     const name = project.tag.replace(/^#/, "");
-    const syncedItems = this.syncManager.getCachedItems(project.localPath);
+    const syncedItems = this.syncManager.getCachedItems(project.localPath).filter((i) => !i.completed);
     for (const group of GROUP_ORDER) {
       const groupItems = syncedItems.filter((i) => i.itemType === group.type);
       if (groupItems.length === 0)

@@ -2150,6 +2150,22 @@
   margin-left: auto;
 }
 
+/* Detail view's inline back-to-list arrow, before the title — see
+   backToProjectsList()'s comment for why this exists alongside the tab
+   button doing the same thing. Same treatment as .todo-orphan-section-link
+   (the note-filename arrow) for visual consistency. */
+.warped-todo-project-back-link {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: inherit;
+  transition: color 120ms ease;
+}
+
+.warped-todo-project-back-link:hover {
+  color: var(--text-accent);
+}
+
 .warped-todo-project-name {
   font-weight: 600;
   color: var(--text-normal);
@@ -2181,35 +2197,67 @@
   margin-bottom: var(--size-4-2);
 }
 
-/* Horizontal padding lives here (and on .warped-todo-project-row above it),
-   not on .warped-todo-project-info itself — the summary row supplies its
-   own, and doubling up on the container would widen the left/right margins
-   past what the row uses. */
-.warped-todo-project-info-actions {
-  display: flex;
-  gap: var(--size-4-3);
+/* Compact Project/Stack/Status summary between the detail view's header and
+   its TODO list — see renderProjectFrontmatter(). Horizontal padding lives
+   here (and on .warped-todo-project-row above it), not on
+   .warped-todo-project-info itself — the summary row supplies its own, and
+   doubling up on the container would widen the left/right margins past what
+   the row uses. Deliberately small (font-size, line-height) — this is a
+   summary strip, not a second reading of the project's data. */
+.warped-todo-project-frontmatter {
   padding: 0 var(--size-4-2) var(--size-4-2);
   margin-top: var(--size-2-2);
   font-size: 0.85em;
 }
 
-/* Replaces the earlier raw-emoji, unstyled <a> links — those fell back to
-   the vault theme's default external-link styling (bold small-caps, in the
-   screenshot that was reviewed) since they carried no class of their own. */
-.warped-todo-project-info-action {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--size-2-1);
+.warped-todo-project-frontmatter-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--size-4-2);
+  line-height: 1.6;
+}
+
+.warped-todo-project-frontmatter-label {
   color: var(--text-muted);
+  min-width: 3.5em;
+}
+
+.warped-todo-project-frontmatter-value {
+  color: var(--text-normal);
+}
+
+/* Project's value doubles as the GitHub link — plain project name, no URL
+   text, so there's never a domain-name-vs-space problem in a narrow
+   sidebar. Full URL is still available via the link's title tooltip. */
+.warped-todo-project-frontmatter-link {
   text-decoration: none;
   cursor: pointer;
 }
 
-.warped-todo-project-info-action:hover {
+.warped-todo-project-frontmatter-link:hover {
+  color: var(--text-accent);
+  text-decoration: underline;
+}
+
+.warped-todo-project-frontmatter-status {
+  font-family: var(--font-monospace);
+}
+
+/* Icon-only reveal-in-Finder control, inline with the Project row rather
+   than its own row — keeps the block to three lines. */
+.warped-todo-project-frontmatter-reveal {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-muted);
+  cursor: pointer;
+  margin-left: auto;
+}
+
+.warped-todo-project-frontmatter-reveal:hover {
   color: var(--text-accent);
 }
 
-.warped-todo-project-info-action svg {
+.warped-todo-project-frontmatter-reveal svg {
   width: 14px;
   height: 14px;
 }

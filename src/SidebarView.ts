@@ -2036,10 +2036,15 @@ export class TodoSidebarView extends ItemView {
     if (tag) {
       void this.openProjectDetail(tag.replace(/^#/, ""));
     } else {
-      this.projectsMode = 'list';
-      this.activeProjectName = null;
-      this.render();
+      this.backToProjectsList();
     }
+  }
+
+  /** Returns the Projects tab to its list view. Shared by the tab button's own click handler (switchToProjectsTab with no tag) and the detail view's inline back arrow — same "back" affordance, two entry points. */
+  private backToProjectsList(): void {
+    this.projectsMode = 'list';
+    this.activeProjectName = null;
+    this.render();
   }
 
   /**
@@ -2387,7 +2392,7 @@ export class TodoSidebarView extends ItemView {
 
   private renderProjectRow(listEl: HTMLElement, project: ProjectInfo): void {
     const name = project.tag.replace(/^#/, "");
-    const row = this.renderProjectSummary(listEl, project);
+    const row = this.renderProjectSummary(listEl, project, "list");
     row.addClass("is-clickable");
     row.addEventListener("click", () => this.openProjectDetail(name));
   }
@@ -2398,14 +2403,41 @@ export class TodoSidebarView extends ItemView {
    * atop the detail view. Sharing this one renderer is the point: the
    * detail view's top should look like the list row you just clicked, not
    * introduce a second, differently-styled summary of the same three facts.
+   *
+   * `variant` distinguishes the two uses: "list" shows the compact tag name
+   * plus a branch/status/counts meta line (space-constrained, and counts are
+   * the only signal you have before clicking in); "detail" shows the
+   * README-derived title (falls back to the tag name) and skips the meta
+   * line entirely — the detail view's own frontmatter block covers
+   * branch/status, and item counts are redundant with the TODO list right
+   * below.
    */
-  private renderProjectSummary(container: HTMLElement, project: ProjectInfo): HTMLElement {
+  private renderProjectSummary(container: HTMLElement, project: ProjectInfo, variant: "list" | "detail"): HTMLElement {
     const name = project.tag.replace(/^#/, "");
-    const counts = this.projectItemCounts(project);
     const row = container.createDiv({ cls: "warped-todo-project-row" });
 
     const titleLine = row.createDiv({ cls: "warped-todo-project-row-title" });
-    titleLine.createSpan({ text: name, cls: "warped-todo-project-name" });
+
+    // Inline back-to-list affordance — the tab button itself already does
+    // this (see switchToProjectsTab's comment), but that's not discoverable
+    // from inside the detail view itself. List view has no need for it.
+    if (variant === "detail") {
+      const backLink = titleLine.createEl("a", {
+        cls: "warped-todo-project-back-link",
+        text: "←",
+        href: "#",
+        attr: { "aria-label": "Back to projects list" },
+      });
+      backLink.addEventListener("click", (evt) => {
+        evt.preventDefault();
+        this.backToProjectsList();
+      });
+    }
+
+    titleLine.createSpan({
+      text: variant === "detail" ? project.title ?? name : name,
+      cls: "warped-todo-project-name",
+    });
 
     // Filename + arrow to the project's own note — the same "which file is
     // this?" affordance TODOs' header/orphan-section rows give their source
@@ -2414,8 +2446,14 @@ export class TodoSidebarView extends ItemView {
     // stopPropagation matters in the list view, where the row itself is
     // also clickable (opens detail mode) — otherwise this arrow's click
     // would bubble up and trigger that too, on top of opening the file.
+    //
+    // List view only — in the detail view this got cut off for width (the
+    // title line has less room once it's showing the longer README-derived
+    // title) and was redundant besides: the TODO group below already links
+    // to the same note, and now so does the frontmatter block. Reported via
+    // screenshot.
     const notePath = projectFilePath(this.getProjectsOptions().projectsFolder, name);
-    const noteFile = this.app.vault.getAbstractFileByPath(notePath);
+    const noteFile = variant === "list" ? this.app.vault.getAbstractFileByPath(notePath) : null;
     if (noteFile instanceof TFile) {
       titleLine.createSpan({
         cls: "header-filename",
@@ -2442,15 +2480,22 @@ export class TodoSidebarView extends ItemView {
     // the repo's current state. Reported via screenshot. Each chunk keeps
     // its own class (status keeps its accent colour/monospace) rather than
     // joining into one plain string, the way counts alone used to.
+    //
+    // List view only — the detail view shows its own frontmatter block
+    // instead (see renderProjectFrontmatter), which covers branch/status,
+    // and counts are redundant there with the TODO list right below.
     const metaChunks: { text: string; cls?: string }[] = [];
-    if (project.branch) metaChunks.push({ text: project.branch, cls: "warped-todo-project-branch" });
-    if (project.gitStatus) metaChunks.push({ text: project.gitStatus, cls: "warped-todo-project-status" });
-    if (counts.total > 0) {
-      const parts: string[] = [];
-      if (counts.todo > 0) parts.push(`${counts.todo} todo`);
-      if (counts.idea > 0) parts.push(`${counts.idea} idea`);
-      if (counts.bug > 0) parts.push(`${counts.bug} bug`);
-      metaChunks.push({ text: parts.join(" · ") });
+    if (variant === "list") {
+      const counts = this.projectItemCounts(project);
+      if (project.branch) metaChunks.push({ text: project.branch, cls: "warped-todo-project-branch" });
+      if (project.gitStatus) metaChunks.push({ text: project.gitStatus, cls: "warped-todo-project-status" });
+      if (counts.total > 0) {
+        const parts: string[] = [];
+        if (counts.todo > 0) parts.push(`${counts.todo} todo`);
+        if (counts.idea > 0) parts.push(`${counts.idea} idea`);
+        if (counts.bug > 0) parts.push(`${counts.bug} bug`);
+        metaChunks.push({ text: parts.join(" · ") });
+      }
     }
     if (metaChunks.length > 0) {
       const metaLine = row.createDiv({ cls: "warped-todo-project-row-meta" });
@@ -2474,30 +2519,66 @@ export class TodoSidebarView extends ItemView {
     }
 
     const info = container.createDiv({ cls: "warped-todo-project-info" });
-    this.renderProjectSummary(info, project);
-
-    const actions = info.createDiv({ cls: "warped-todo-project-info-actions" });
-    if (project.remote) {
-      const url = browsableUrl(project.remote);
-      const link = actions.createEl("a", {
-        cls: "warped-todo-project-info-action",
-        href: url,
-        attr: { title: url },
-      });
-      setIcon(link.createSpan(), "external-link");
-      link.createSpan({ text: url.replace(/^https?:\/\//, "") });
-      link.setAttr("target", "_blank");
-    }
-    const revealBtn = actions.createEl("a", {
-      cls: "warped-todo-project-info-action",
-      attr: { title: project.localPath },
-    });
-    setIcon(revealBtn.createSpan(), "folder-open");
-    revealBtn.createSpan({ text: homeRelativePath(project.localPath) });
-    revealBtn.addEventListener("click", () => this.revealProjectInFinder(project.localPath!));
+    this.renderProjectSummary(info, project, "detail");
+    this.renderProjectFrontmatter(info, project);
 
     const itemsContainer = container.createDiv({ cls: "warped-todo-project-items" });
     this.renderProjectItemGroups(itemsContainer, project);
+  }
+
+  /**
+   * Compact Project/Stack/Status summary shown between the detail view's
+   * header and its TODO list. Mirrors the same three fields
+   * ProjectSyncManager writes into the note's own frontmatter (see its
+   * SYNC_KEY_ORDER) — rendered from the live scan result already in memory,
+   * not by re-reading the note, same as the rest of this view does for
+   * branch/gitStatus. "Project" doubles as the GitHub link (was a separate
+   * action row showing the full URL, which wrapped badly in a narrow
+   * sidebar — screenshot review); the full URL is still available via the
+   * link's tooltip. Reveal-in-Finder survives as an icon-only control next
+   * to it rather than its own row, keeping the block to three lines.
+   */
+  private renderProjectFrontmatter(container: HTMLElement, project: ProjectInfo): void {
+    const name = project.tag.replace(/^#/, "");
+    const block = container.createDiv({ cls: "warped-todo-project-frontmatter" });
+
+    const projectRow = block.createDiv({ cls: "warped-todo-project-frontmatter-row" });
+    projectRow.createSpan({ text: "Project", cls: "warped-todo-project-frontmatter-label" });
+    if (project.remote) {
+      const url = browsableUrl(project.remote);
+      projectRow.createEl("a", {
+        text: name,
+        href: url,
+        cls: "warped-todo-project-frontmatter-value warped-todo-project-frontmatter-link",
+        attr: { title: url, target: "_blank" },
+      });
+    } else {
+      projectRow.createSpan({ text: name, cls: "warped-todo-project-frontmatter-value" });
+    }
+    if (project.localPath) {
+      const revealBtn = projectRow.createEl("a", {
+        cls: "warped-todo-project-frontmatter-reveal",
+        attr: { title: `Reveal in Finder: ${homeRelativePath(project.localPath)}`, "aria-label": "Reveal in Finder" },
+      });
+      setIcon(revealBtn, "folder-open");
+      revealBtn.addEventListener("click", () => this.revealProjectInFinder(project.localPath!));
+    }
+
+    if (project.stack && project.stack.length > 0) {
+      const stackRow = block.createDiv({ cls: "warped-todo-project-frontmatter-row" });
+      stackRow.createSpan({ text: "Stack", cls: "warped-todo-project-frontmatter-label" });
+      stackRow.createSpan({ text: project.stack.join(", "), cls: "warped-todo-project-frontmatter-value" });
+    }
+
+    if (project.branch) {
+      const statusRow = block.createDiv({ cls: "warped-todo-project-frontmatter-row" });
+      statusRow.createSpan({ text: "Status", cls: "warped-todo-project-frontmatter-label" });
+      const statusGlyph = project.gitStatus ? project.gitStatus : "✓";
+      statusRow.createSpan({
+        text: `${project.branch} ${statusGlyph} (git)`,
+        cls: "warped-todo-project-frontmatter-value warped-todo-project-frontmatter-status",
+      });
+    }
   }
 
   private revealProjectInFinder(path: string): void {
@@ -2538,7 +2619,15 @@ export class TodoSidebarView extends ItemView {
    */
   private renderProjectItemGroups(container: HTMLElement, project: ProjectInfo): void {
     const name = project.tag.replace(/^#/, "");
-    const syncedItems = this.syncManager.getCachedItems(project.localPath!);
+    // Active only — matches projectItemCounts() (same cache, same filter,
+    // used for the list-view row's badge) and matches hand-typed items
+    // below, which structurally can never include a completed one (see
+    // handTypedProjectItems()). Without this, a synced item stayed in the
+    // list checked-off forever once completed, since nothing else prunes a
+    // closed item from BUGS.md/TODO.md — inconsistent with hand-typed items
+    // vanishing the moment they're completed. Reported as a bug: synced
+    // items showed completed todos, hand-typed ones never did.
+    const syncedItems = this.syncManager.getCachedItems(project.localPath!).filter((i) => !i.completed);
 
     for (const group of GROUP_ORDER) {
       const groupItems = syncedItems.filter((i) => i.itemType === group.type);

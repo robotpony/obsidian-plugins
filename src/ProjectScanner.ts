@@ -2,6 +2,7 @@ import { execFile } from "child_process";
 import { existsSync } from "fs";
 import { readdir } from "fs/promises";
 import { basename, join } from "path";
+import { detectStack, extractProjectTitle } from "./ProjectMetadata";
 
 const MAX_BUFFER = 10 * 1024 * 1024; // 10 MB — git output here is small, generous headroom
 const TAG = "[Warped Todo]";
@@ -17,7 +18,7 @@ const GIT_SEARCH_PATHS = [
 
 // "archive" matches `p`'s own default filter_dirs — archived/backup copies of a
 // project are common and shouldn't surface as a second project of the same name.
-const DEFAULT_EXCLUDE_DIRS = ["node_modules", "dist", "build", "archive"];
+export const DEFAULT_EXCLUDE_DIRS = ["node_modules", "dist", "build", "archive"];
 const DEFAULT_MAX_DEPTH = 3;
 
 export interface ScannedProject {
@@ -31,6 +32,10 @@ export interface ScannedProject {
   gitStatus: string;
   /** origin remote URL; "" if no remote is configured. */
   remote: string;
+  /** README's first `#` heading, ASCII-filtered; falls back to `name` if there's no README/heading. See ProjectMetadata.ts. */
+  title: string;
+  /** Detected technologies (marker files, package.json deps, monorepo subdirs). See ProjectMetadata.ts. */
+  stack: string[];
 }
 
 export interface ProjectScannerOptions {
@@ -63,7 +68,7 @@ export class ProjectScanner {
     const projects: ScannedProject[] = [];
     for (const repoPath of repoPaths) {
       try {
-        projects.push(await this.readProject(repoPath));
+        projects.push(await this.readProject(repoPath, [...excludeDirs]));
       } catch (error) {
         console.error(TAG, `Failed to read git facts for ${repoPath}:`, error);
       }
@@ -111,7 +116,7 @@ export class ProjectScanner {
     }
   }
 
-  private async readProject(repoPath: string): Promise<ScannedProject> {
+  private async readProject(repoPath: string, excludeDirs: string[]): Promise<ScannedProject> {
     const [branch, statusLines, remote] = await Promise.all([
       this.run(["branch", "--show-current"], repoPath).then((out) => out.trim()),
       this.run(["status", "--porcelain"], repoPath).then((out) =>
@@ -125,13 +130,16 @@ export class ProjectScanner {
     const hasModified = statusLines.some((line) => !line.startsWith("??"));
     const hasUntracked = statusLines.some((line) => line.startsWith("??"));
     const gitStatus = `${hasModified ? "M" : ""}${hasUntracked ? "?" : ""}`;
+    const name = basename(repoPath);
 
     return {
-      name: basename(repoPath),
+      name,
       localPath: repoPath,
       branch,
       gitStatus,
       remote,
+      title: extractProjectTitle(repoPath) ?? name,
+      stack: detectStack(repoPath, excludeDirs),
     };
   }
 

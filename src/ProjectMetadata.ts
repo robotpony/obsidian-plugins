@@ -1,0 +1,262 @@
+import { existsSync, readdirSync, readFileSync, statSync } from "fs";
+import { extname, join } from "path";
+
+/**
+ * README-derived display title and marker-file-derived tech stack for a
+ * project. Ports the detection signals from `~/projects/peep/p`'s
+ * `extract_project_name()` and `detect_technologies()` as native TypeScript
+ * — same marker files, same fallback order — so a repo's title/Stack read
+ * the same whether you're looking at `p`'s CLI output or this sidebar.
+ * Reimplemented rather than shelling out to `p` itself, consistent with
+ * ProjectScanner.ts's own git-facts decision (see its module comment).
+ */
+
+// Marker file -> tech tags. Mirrors `p`'s `tech_files` table exactly.
+const TECH_FILES: Record<string, string[]> = {
+  "package.json": ["JS", "node.js"],
+  "requirements.txt": ["Python"],
+  "Pipfile": ["Python"],
+  "pyproject.toml": ["Python"],
+  "setup.py": ["Python"],
+  "setup.cfg": ["Python"],
+  "tox.ini": ["Python"],
+  "pytest.ini": ["Python"],
+  ".python-version": ["Python"],
+  "Cargo.toml": ["Rust"],
+  "go.mod": ["Go"],
+  "pom.xml": ["Java", "Maven"],
+  "build.gradle": ["Java", "Gradle"],
+  "composer.json": ["PHP"],
+  "Gemfile": ["Ruby"],
+  "yarn.lock": ["JS", "yarn"],
+  "package-lock.json": ["JS", "npm"],
+  "Dockerfile": ["Docker"],
+  "docker-compose.yml": ["Docker"],
+  "docker-compose.yaml": ["Docker"],
+  "Makefile": ["Make"],
+  "config.toml": ["Hugo"],
+  "config.yaml": ["Hugo"],
+  "config.yml": ["Hugo"],
+  "hugo.toml": ["Hugo"],
+  "hugo.yaml": ["Hugo"],
+  "hugo.yml": ["Hugo"],
+};
+
+// package.json dependency (in dependencies or devDependencies) -> tech tag.
+const PACKAGE_DEPS: Record<string, string> = {
+  react: "react",
+  vue: "vue",
+  angular: "angular",
+  typescript: "typescript",
+};
+
+const CODE_EXTENSIONS = new Set([
+  ".py", ".js", ".ts", ".jsx", ".tsx", ".rs", ".go", ".java", ".cpp", ".c",
+  ".php", ".rb", ".swift", ".kt", ".scala", ".clj", ".cs", ".fs", ".vb",
+  ".sh", ".bash", ".zsh", ".fish", ".ps1", ".bat", ".cmd",
+]);
+
+const PYTHON_SHEBANGS = [
+  "#!/usr/bin/env python",
+  "#!/usr/bin/python",
+  "#!/usr/local/bin/python",
+  "#!python",
+];
+
+const PLANNING_FILES = [
+  "TODO.md", "todo.md", "TODOS.md",
+  "PLANNING.md", "planning.md",
+  "DESIGN.md", "design.md",
+  "NOTES.md", "notes.md",
+  "IDEAS.md", "ideas.md",
+  "ROADMAP.md", "roadmap.md",
+  "SPEC.md", "spec.md",
+];
+
+// ---------------------------------------------------------------------
+// Stack detection
+// ---------------------------------------------------------------------
+
+function scanDirForTech(dirPath: string, technologies: string[]): void {
+  for (const [filename, techs] of Object.entries(TECH_FILES)) {
+    if (existsSync(join(dirPath, filename))) technologies.push(...techs);
+  }
+
+  const packageJsonPath = join(dirPath, "package.json");
+  if (existsSync(packageJsonPath)) {
+    try {
+      const pkg = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
+      const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+      for (const [dep, tech] of Object.entries(PACKAGE_DEPS)) {
+        if (dep in deps) technologies.push(tech);
+      }
+    } catch {
+      // malformed package.json — marker-file detection above still counts
+    }
+  }
+}
+
+function listDirSafe(dirPath: string): string[] {
+  try {
+    return readdirSync(dirPath);
+  } catch {
+    return [];
+  }
+}
+
+function isFileSafe(path: string): boolean {
+  try {
+    return statSync(path).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function dirHasFileWithExt(dirPath: string, exts: Set<string>): boolean {
+  if (!existsSync(dirPath)) return false;
+  for (const name of listDirSafe(dirPath)) {
+    const full = join(dirPath, name);
+    if (isFileSafe(full) && exts.has(extname(name).toLowerCase())) return true;
+  }
+  return false;
+}
+
+function hasPythonFiles(projectPath: string): boolean {
+  const dirs = [".", "src", "lib", "tests", "test", "scripts", "bin"];
+  return dirs.some((d) => dirHasFileWithExt(join(projectPath, d), new Set([".py"])));
+}
+
+function isPythonExecutable(filePath: string): boolean {
+  try {
+    const stat = statSync(filePath);
+    if (!stat.isFile() || (stat.mode & 0o111) === 0) return false;
+    const firstLine = readFileSync(filePath, "utf-8").split("\n", 1)[0].trim();
+    return PYTHON_SHEBANGS.some((shebang) => firstLine.startsWith(shebang));
+  } catch {
+    return false;
+  }
+}
+
+function hasPythonExecutables(projectPath: string): boolean {
+  const dirs = [".", "bin", "scripts"];
+  for (const d of dirs) {
+    const dirPath = join(projectPath, d);
+    if (!existsSync(dirPath)) continue;
+    for (const name of listDirSafe(dirPath)) {
+      if (isPythonExecutable(join(dirPath, name))) return true;
+    }
+  }
+  return false;
+}
+
+function hasAnyCodeFiles(projectPath: string): boolean {
+  const dirs = [".", "src", "lib", "app", "scripts", "bin", "test", "tests"];
+  return dirs.some((d) => dirHasFileWithExt(join(projectPath, d), CODE_EXTENSIONS));
+}
+
+function isEmptyOrPlanningProject(projectPath: string): boolean {
+  const hasReadme = existsSync(join(projectPath, "README.md")) || existsSync(join(projectPath, "readme.md"));
+  const hasGit = existsSync(join(projectPath, ".git"));
+  if ((hasReadme || hasGit) && !hasAnyCodeFiles(projectPath)) return true;
+
+  const hasPlanningFiles = PLANNING_FILES.some((f) => existsSync(join(projectPath, f)));
+  if (hasPlanningFiles && !hasAnyCodeFiles(projectPath)) return true;
+
+  return false;
+}
+
+/**
+ * Immediate subdirectories worth checking for a monorepo's per-package
+ * marker files (e.g. several independent plugins sharing one root README/git
+ * history, but no root package.json). One level only, same skip-list the
+ * repo scan itself uses.
+ */
+function subdirsForTechScan(projectPath: string, excludeDirs: string[]): string[] {
+  const excluded = new Set(excludeDirs);
+  return listDirSafe(projectPath)
+    .filter((name) => !name.startsWith(".") && !excluded.has(name))
+    .filter((name) => {
+      try {
+        return statSync(join(projectPath, name)).isDirectory();
+      } catch {
+        return false;
+      }
+    })
+    .sort();
+}
+
+/**
+ * Detects technologies used in a project: marker files, package.json
+ * dependencies, a one-level monorepo subdirectory scan, then Python-file/
+ * shebang and static-website fallbacks. Falls back to `["n/a"]` for a
+ * project that's clearly real (has a README or git) but has no detectable
+ * code yet, rather than returning nothing.
+ */
+export function detectStack(projectPath: string, excludeDirs: string[] = []): string[] {
+  const technologies: string[] = [];
+  scanDirForTech(projectPath, technologies);
+
+  if (!technologies.includes("Python")) {
+    if (hasPythonFiles(projectPath)) technologies.push("Python");
+    else if (hasPythonExecutables(projectPath)) technologies.push("Python");
+  }
+
+  for (const subdir of subdirsForTechScan(projectPath, excludeDirs)) {
+    const subdirPath = join(projectPath, subdir);
+    scanDirForTech(subdirPath, technologies);
+    if (!technologies.includes("Python") && hasPythonFiles(subdirPath)) {
+      technologies.push("Python");
+    }
+  }
+
+  if (technologies.length === 0 && existsSync(join(projectPath, "index.html"))) {
+    technologies.push("static website");
+  }
+
+  if (technologies.length === 0 && isEmptyOrPlanningProject(projectPath)) {
+    technologies.push("n/a");
+  }
+
+  return [...new Set(technologies)]; // dedupe, preserve first-seen order
+}
+
+// ---------------------------------------------------------------------
+// Title detection
+// ---------------------------------------------------------------------
+
+function findReadme(projectPath: string): string | null {
+  for (const name of ["README.md", "readme.md"]) {
+    const candidate = join(projectPath, name);
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+/**
+ * Extracts a display title from a project's README first `# heading`, ASCII-
+ * filtered (drops logo glyphs/emoji, e.g. "␣⌘ Warped Command for Obsidian"
+ * -> "Warped Command for Obsidian") and whitespace-collapsed. Returns null
+ * if there's no README or no top-level heading — callers fall back to the
+ * repo folder name, same as `p`'s `extract_project_name(...) or folder_name`.
+ */
+export function extractProjectTitle(projectPath: string): string | null {
+  const readmePath = findReadme(projectPath);
+  if (!readmePath) return null;
+
+  let content: string;
+  try {
+    content = readFileSync(readmePath, "utf-8");
+  } catch {
+    return null;
+  }
+
+  const match = content.match(/^#\s+(.+)$/m);
+  if (!match) return null;
+
+  const title = match[1]
+    .replace(/[^\x20-\x7E]/g, "") // printable ASCII only — strips logo glyphs/emoji
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return title || null;
+}
