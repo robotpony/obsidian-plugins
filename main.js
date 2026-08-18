@@ -291,6 +291,23 @@ function comparePriorityOnly(a, b, allItems) {
     return priorityDiff;
   return getTagCount(b.tags) - getTagCount(a.tags);
 }
+function compareSortableEntries(a, b, allTodos) {
+  const tierOf = (entry) => entry.kind === "todo" ? { focused: isEffectivelyFocused(entry.item, allTodos), priority: getEffectivePriority(entry.item, allTodos) } : { focused: entry.project.hasFocusItems, priority: entry.project.highestPriority };
+  const tierA = tierOf(a);
+  const tierB = tierOf(b);
+  if (tierA.focused && !tierB.focused)
+    return -1;
+  if (!tierA.focused && tierB.focused)
+    return 1;
+  const priorityDiff = tierA.priority - tierB.priority;
+  if (priorityDiff !== 0)
+    return priorityDiff;
+  if (a.kind === "todo" && b.kind === "project")
+    return -1;
+  if (a.kind === "project" && b.kind === "todo")
+    return 1;
+  return 0;
+}
 function resolveTopLevelAncestor(item, allItems) {
   if (item.parentLineNumber === void 0)
     return item;
@@ -1830,8 +1847,14 @@ var ProjectManager = class {
    * the most recent `ProjectScanner`/`ProjectSyncManager.syncAll()` result
    * rather than triggering a fresh scan here (scanning shells out to `git` per
    * repo — not something render-path code should trigger on its own).
+   *
+   * `getCachedItems`, when supplied, folds each repo-matched project's
+   * synced items (from `ProjectSyncManager.getCachedItems()`) into
+   * `count`/`highestPriority`/`hasFocusItems` alongside the vault-derived
+   * numbers — see `foldSyncedItemsIntoProjects` below. Callers that only
+   * care about vault items can omit it; the merge step is skipped entirely.
    */
-  getProjects(scannedProjects = []) {
+  getProjects(scannedProjects = [], getCachedItems) {
     const todos = this.scanner.getTodos();
     const projectMap = /* @__PURE__ */ new Map();
     for (const todo of todos) {
@@ -1908,7 +1931,8 @@ var ProjectManager = class {
         colourIndex
       });
     }
-    return mergeScannedProjects(projects, scannedProjects);
+    const merged = mergeScannedProjects(projects, scannedProjects);
+    return getCachedItems ? foldSyncedItemsIntoProjects(merged, getCachedItems) : merged;
   }
   getFocusProjects(limit) {
     const projects = this.getProjects();
@@ -2142,6 +2166,25 @@ function mergeScannedProjects(projects, scannedProjects) {
     });
   }
   return [...merged.values()];
+}
+function foldSyncedItemsIntoProjects(projects, getCachedItems) {
+  return projects.map((project) => {
+    if (!project.localPath)
+      return project;
+    const items = getCachedItems(project.localPath).filter((i) => !i.completed);
+    if (items.length === 0)
+      return project;
+    let count = project.count;
+    let highestPriority = project.highestPriority;
+    let hasFocusItems = project.hasFocusItems;
+    for (const item of items) {
+      count++;
+      highestPriority = Math.min(highestPriority, getPriorityValue(item.tags));
+      if (hasTag(item.tags, "#focus"))
+        hasFocusItems = true;
+    }
+    return { ...project, count, highestPriority, hasFocusItems };
+  });
 }
 function repoFields(scanned) {
   return {
@@ -4157,6 +4200,13 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     this.openInfoPopup = null;
     this.projectsMode = "list";
     this.activeProjectName = null;
+    // Where the detail view's "← Back" link should go: null means the normal
+    // "back to the Projects list" affordance; set when a project block's →
+    // arrow (TODOs/Ideas tab) opens the detail view directly, so back returns
+    // to the tab the user actually came from instead. Cleared by every other
+    // path into detail view (list row click, auto-follow) — see
+    // backToProjectsList and switchToProjectsTab.
+    this.projectDetailReturnTab = null;
     this.projectsFilterText = "";
     this.scannedProjects = [];
     this.projectsSyncing = false;
@@ -4698,7 +4748,10 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
   }
   renderProjects(container) {
     var _a, _b, _c;
-    const projects = this.projectManager.getProjects();
+    const projects = this.projectManager.getProjects(
+      this.scannedProjects,
+      (localPath) => this.syncManager.getCachedItems(localPath)
+    );
     const section = container.createEl("div", { cls: "projects-section tag-cloud-section" });
     const entries = [];
     const todos = this.scanner.getTodos();
@@ -4727,7 +4780,8 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       return b.count - a.count;
     });
     for (const p of sortedProjects) {
-      const activeCount = (_b = activeTagCounts.get(p.tag)) != null ? _b : 0;
+      const syncedCount = p.localPath ? this.syncManager.getCachedItems(p.localPath).filter((i) => !i.completed).length : 0;
+      const activeCount = ((_b = activeTagCounts.get(p.tag)) != null ? _b : 0) + syncedCount;
       if (activeCount === 0)
         continue;
       entries.push({ tag: p.tag, project: p, pinned: false, activeCount });
@@ -5021,7 +5075,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     });
   }
   renderActiveTodos(container) {
-    var _a, _b;
+    var _a, _b, _c;
     let todos = this.scanner.getTodos();
     todos = todos.filter(
       (todo) => !todo.tags.includes("#idea") && !todo.tags.includes("#ideas") && !todo.tags.includes("#ideation")
@@ -5070,9 +5124,16 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       }
     }
     todos = this.sortTodosByPriority(todos, allTodosForChildLookup);
-    const totalCount = todos.length;
+    const projectBlocks = this.buildProjectBlocks(["todo", "bug"]);
+    const itemsByProjectTag = new Map(projectBlocks.map((b) => [b.project.tag, b.items]));
+    let entries = [
+      ...todos.map((item) => ({ kind: "todo", item })),
+      ...projectBlocks.map(({ project }) => ({ kind: "project", project }))
+    ];
+    entries.sort((a, b) => compareSortableEntries(a, b, allTodosForChildLookup));
+    const totalCount = entries.length;
     if (this.activeTodosLimit > 0) {
-      todos = todos.slice(0, this.activeTodosLimit);
+      entries = entries.slice(0, this.activeTodosLimit);
     }
     const section = container.createEl("div", { cls: "todo-section" });
     const header = section.createEl("div", { cls: "todo-section-header" });
@@ -5087,11 +5148,17 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     }
     const list = section.createEl("ul", { cls: "todo-list" });
     let lastOrphanSectionKey = null;
-    for (const todo of todos) {
+    for (const entry of entries) {
+      if (entry.kind === "project") {
+        lastOrphanSectionKey = null;
+        this.renderProjectBlockItem(list, entry.project, (_a = itemsByProjectTag.get(entry.project.tag)) != null ? _a : []);
+        continue;
+      }
+      const todo = entry.item;
       const isOrphan = !todo.isHeader && todo.parentLineNumber === void 0 && !todo.isSubheading;
       if (isOrphan) {
-        const sectionLabel = ((_a = todo.sectionLabel) == null ? void 0 : _a.trim()) || todo.file.basename || todo.file.name;
-        const sectionLine = (_b = todo.sectionLineNumber) != null ? _b : 0;
+        const sectionLabel = ((_b = todo.sectionLabel) == null ? void 0 : _b.trim()) || todo.file.basename || todo.file.name;
+        const sectionLine = (_c = todo.sectionLineNumber) != null ? _c : 0;
         const sectionKey = `${todo.filePath}::${sectionLine}::${sectionLabel}`;
         if (sectionKey !== lastOrphanSectionKey) {
           this.renderOrphanSectionHeader(list, todo, sectionLabel, sectionLine);
@@ -5102,12 +5169,82 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       }
       this.renderTodoItem(list, todo);
     }
-    if (totalCount > todos.length) {
+    if (totalCount > entries.length) {
       const moreIndicator = section.createEl("div", {
         cls: "todo-more-indicator",
-        text: `+${totalCount - todos.length} more`
+        text: `+${totalCount - entries.length} more`
       });
-      moreIndicator.setAttribute("title", `Showing ${todos.length} of ${totalCount} TODOs`);
+      moreIndicator.setAttribute("title", `Showing ${entries.length} of ${totalCount} TODOs`);
+    }
+  }
+  /**
+   * Repo-matched projects (`project.localPath` set) with at least one
+   * non-completed synced item matching `itemTypes`, as one block each. The
+   * active tag filter applies here too, mirroring the vault-item behaviour:
+   * a filter matching a project's own tag collapses the result to just that
+   * project's block; any other active filter narrows each block's items via
+   * the same `itemMatchesTagFilter` vault items use (it already accepts the
+   * bare `{tags, inferredFileTag?}` shape `ParsedProjectItem` has), dropping
+   * a block that ends up empty. `activeAssigneeFilter` doesn't apply —
+   * synced items carry no `mentions`.
+   */
+  buildProjectBlocks(itemTypes) {
+    const projects = this.projectManager.getProjects(
+      this.scannedProjects,
+      (localPath) => this.syncManager.getCachedItems(localPath)
+    );
+    const tagFilter = this.activeTagFilter;
+    const filterIsProjectTag = !!tagFilter && projects.some((p) => p.tag.toLowerCase() === tagFilter.toLowerCase());
+    const blocks = [];
+    for (const project of projects) {
+      if (!project.localPath)
+        continue;
+      if (filterIsProjectTag && project.tag.toLowerCase() !== tagFilter.toLowerCase())
+        continue;
+      let items = this.syncManager.getCachedItems(project.localPath).filter((i) => !i.completed && itemTypes.includes(i.itemType));
+      if (tagFilter && !filterIsProjectTag) {
+        items = items.filter((i) => itemMatchesTagFilter(i, tagFilter));
+      }
+      if (items.length > 0)
+        blocks.push({ project, items });
+    }
+    return blocks;
+  }
+  /**
+   * One project's synced items as a single collapsible block in the active
+   * list — same markup shape `renderListItem` uses for a header-with-children
+   * TODO (`.todo-header-row` + `.todo-children`), for visual consistency with
+   * sibling rows. Header click switches the sidebar to the Projects tab's
+   * detail view for this project; the separate arrow opens the vault note
+   * directly — both affordances, not one or the other (confirmed via
+   * AskUserQuestion). Row rendering for each item reuses
+   * `renderSyncedProjectItemRow` as-is, so checkbox completion and the
+   * right-click menu (focus/later/snooze) write straight to `sourceFile` —
+   * the same 2-way sync path the Projects tab's detail view already uses.
+   */
+  renderProjectBlockItem(list, project, items) {
+    var _a;
+    const name = project.tag.replace(/^#/, "");
+    const li = list.createEl("li", { cls: "todo-item todo-header todo-header-with-children todo-project-block" });
+    const rowContainer = li.createEl("div", { cls: "todo-header-row is-clickable" });
+    rowContainer.createEl("span", { cls: "todo-text", text: (_a = project.title) != null ? _a : name });
+    rowContainer.createEl("span", { cls: "header-filename", text: pluralize(items.length, "item") });
+    rowContainer.addEventListener("click", () => this.switchToProjectsTab(project.tag));
+    const link = rowContainer.createEl("a", {
+      text: "\u2192",
+      cls: "todo-link",
+      href: "#",
+      attr: { "aria-label": `Open ${name} note` }
+    });
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const returnTab = this.activeTab === "ideas" ? "ideas" : "todos";
+      this.switchToProjectsTab(project.tag, returnTab);
+    });
+    const childrenContainer = li.createEl("ul", { cls: "todo-children" });
+    for (const item of items) {
+      this.renderSyncedProjectItemRow(childrenContainer, item, name, true, project.localPath);
     }
   }
   renderTodoItem(list, todo, isChild = false) {
@@ -5292,7 +5429,10 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     }
   }
   renderTopBacklogs(section) {
-    const projects = this.projectManager.getProjects();
+    const projects = this.projectManager.getProjects(
+      this.scannedProjects,
+      (localPath) => this.syncManager.getCachedItems(localPath)
+    );
     const qualifying = projects.filter((p) => p.count >= 3);
     if (qualifying.length === 0)
       return;
@@ -5317,15 +5457,23 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     }
   }
   renderActiveIdeas(container) {
+    var _a;
     let ideas = this.scanner.getIdeas();
     const allIdeasForChildLookup = ideas;
     ideas = ideas.filter((idea) => idea.parentLineNumber === void 0);
     ideas = this.filterByActiveTag(ideas, allIdeasForChildLookup);
     ideas = this.sortTodosByPriority(ideas, allIdeasForChildLookup);
+    const projectBlocks = this.buildProjectBlocks(["idea"]);
+    const itemsByProjectTag = new Map(projectBlocks.map((b) => [b.project.tag, b.items]));
+    const entries = [
+      ...ideas.map((item) => ({ kind: "todo", item })),
+      ...projectBlocks.map(({ project }) => ({ kind: "project", project }))
+    ];
+    entries.sort((a, b) => compareSortableEntries(a, b, allIdeasForChildLookup));
     const section = container.createEl("div", { cls: "ideas-section" });
     const header = section.createEl("div", { cls: "todo-section-header" });
     this.renderFilterIndicator(header);
-    if (ideas.length === 0) {
+    if (entries.length === 0) {
       const emptyText = this.activeTagFilter ? `No ideas matching ${this.activeTagFilter}` : "No ideas yet";
       section.createEl("div", {
         text: emptyText,
@@ -5334,8 +5482,12 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       return;
     }
     const list = section.createEl("ul", { cls: "idea-list" });
-    for (const idea of ideas) {
-      this.renderIdeaItem(list, idea);
+    for (const entry of entries) {
+      if (entry.kind === "project") {
+        this.renderProjectBlockItem(list, entry.project, (_a = itemsByProjectTag.get(entry.project.tag)) != null ? _a : []);
+      } else {
+        this.renderIdeaItem(list, entry.item);
+      }
     }
   }
   renderIdeaItem(list, idea) {
@@ -5641,10 +5793,18 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
    * resets to the project list — even if already on this tab in detail
    * view, since that's the intended "back" affordance (see the tab
    * button's own click handler comment). With a tag (the "Show in
-   * Projects" context-menu entries), jumps straight to that project's
-   * detail view instead.
+   * Projects" context-menu entries, or a project block's header click),
+   * jumps straight to that project's detail view instead.
+   *
+   * `returnTab`, when given, is remembered so the detail view's back button
+   * returns there instead of the Projects list — used by a project block's
+   * → arrow (`renderProjectBlockItem`), which opens the detail view *in
+   * addition to* the note rather than instead of it, so "back" should feel
+   * like returning to where you were, not browsing into Projects. Omitted
+   * (defaulting to the normal list) by every other caller.
    */
-  switchToProjectsTab(tag) {
+  switchToProjectsTab(tag, returnTab) {
+    this.projectDetailReturnTab = returnTab != null ? returnTab : null;
     if (this.focusModeActive) {
       this.focusModeActive = false;
       this.focusQueue = null;
@@ -5659,8 +5819,20 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       this.backToProjectsList();
     }
   }
-  /** Returns the Projects tab to its list view. Shared by the tab button's own click handler (switchToProjectsTab with no tag) and the detail view's inline back arrow — same "back" affordance, two entry points. */
+  /**
+   * Returns the Projects tab to its list view — or, if a project block's →
+   * arrow set `projectDetailReturnTab`, back to that originating TODOs/Ideas
+   * tab instead. Shared by the tab button's own click handler
+   * (switchToProjectsTab with no tag) and the detail view's inline back
+   * arrow — same "back" affordance, two entry points.
+   */
   backToProjectsList() {
+    if (this.projectDetailReturnTab) {
+      const tab = this.projectDetailReturnTab;
+      this.projectDetailReturnTab = null;
+      this.switchTab(tab);
+      return;
+    }
     this.projectsMode = "list";
     this.activeProjectName = null;
     this.render();
@@ -5860,9 +6032,11 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
         return;
       this.projectsMode = "detail";
       this.activeProjectName = projectName;
+      this.projectDetailReturnTab = null;
     } else if (this.projectsMode === "detail") {
       this.projectsMode = "list";
       this.activeProjectName = null;
+      this.projectDetailReturnTab = null;
     } else {
       return;
     }
@@ -5958,7 +6132,10 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     const name = project.tag.replace(/^#/, "");
     const row = this.renderProjectSummary(listEl, project, "list");
     row.addClass("is-clickable");
-    row.addEventListener("click", () => this.openProjectDetail(name));
+    row.addEventListener("click", () => {
+      this.projectDetailReturnTab = null;
+      void this.openProjectDetail(name);
+    });
   }
   /**
    * name/branch/status + item-count breakdown — the same block used both as
@@ -6243,13 +6420,13 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
           scanner: this.projectScanner
         });
         if (ok)
-          await this.resyncActiveProject();
+          await this.resyncProject(projectName);
       });
     }
     row.createSpan({ text: cleanDisplayText(item.text), cls: "todo-text" });
     row.addEventListener("contextmenu", (evt) => {
       evt.preventDefault();
-      this.showSyncedProjectItemMenu(evt, item);
+      this.showSyncedProjectItemMenu(evt, item, projectName);
     });
   }
   renderHandTypedProjectItemRow(container, item) {
@@ -6271,7 +6448,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       this.contextMenuHandler.showTodoMenu(evt, item, () => this.render(), false);
     });
   }
-  showSyncedProjectItemMenu(evt, item) {
+  showSyncedProjectItemMenu(evt, item, projectName) {
     var _a;
     const menu = new import_obsidian12.Menu();
     const hasFocus = item.tags.includes("#focus");
@@ -6287,35 +6464,36 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       mi.setTitle(hasFocus ? "Unfocus" : "Focus").setIcon("zap").onClick(async () => {
         const ok = hasFocus ? await removeProjectItemTag(item, "#focus") : await setProjectItemPriority(item, calculateFocusPriority(currentPriority), true);
         if (ok)
-          await this.resyncActiveProject();
+          await this.resyncProject(projectName);
       });
     });
     menu.addItem((mi) => {
       mi.setTitle(hasLaterPriority ? "Unlater" : "Later").setIcon("clock").onClick(async () => {
         const ok = hasLaterPriority ? await removeProjectItemTag(item, currentPriority) : await setProjectItemPriority(item, calculateLaterPriority(currentPriority));
         if (ok)
-          await this.resyncActiveProject();
+          await this.resyncProject(projectName);
       });
     });
     menu.addItem((mi) => {
       mi.setTitle(hasFuture ? "Unsnooze" : "Snooze").setIcon("moon").onClick(async () => {
         const ok = hasFuture ? await removeProjectItemTag(item, "#future") : await addProjectItemTag(item, "#future");
         if (ok)
-          await this.resyncActiveProject();
+          await this.resyncProject(projectName);
       });
     });
     menu.showAtMouseEvent(evt);
   }
   /**
-   * Re-reads the active project's structured files after a mutation and
-   * updates this view's item cache directly, so the change is visible
-   * immediately without a vault write — items live only in the sidebar's
-   * cache now, not in the note body.
+   * Re-reads one project's structured files after a mutation and updates
+   * this view's item cache directly, then re-renders — so the change is
+   * visible immediately without a vault write (items live only in the
+   * sidebar's cache, not in the note body). Takes an explicit project name
+   * rather than reading `this.activeProjectName` so it works both for the
+   * Projects tab's own detail view and for a project block interleaved into
+   * the TODOs/Ideas tabs, which isn't necessarily the "active" project.
    */
-  async resyncActiveProject() {
-    if (!this.activeProjectName)
-      return;
-    const scanned = this.scannedProjects.find((p) => p.name === this.activeProjectName);
+  async resyncProject(name) {
+    const scanned = this.scannedProjects.find((p) => p.name === name);
     if (!scanned)
       return;
     const items = await this.syncManager.getProjectItems(scanned.localPath);

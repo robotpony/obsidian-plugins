@@ -99,28 +99,34 @@ this changed from the original delimited-block design.
 - `startWatching()`/`stopWatching()`: a single recursive `fs.watch` on the base folder, debounced 300ms, ignoring events under an excluded directory (`isUnderExcludedDir()`, same list the scan uses) and events within 1500ms of the last completed sync (absorbs `git status` touching `.git/index`, which sits inside the watched tree). Recursive `fs.watch` is only reliable on macOS/Windows, not Linux, which is fine given the macOS-only scope decision
 - Calls `onSynced(scanned)` once per `syncAll()` batch, passing the fresh scan results directly. Callers **must not** respond by triggering another `syncAll()` (e.g. a sidebar "full reload" method) — `main.ts` learned this the hard way: wiring `onSynced` through a view's `reload()` (which itself calls `syncAll()`) is an unbounded loop, found via live testing as a project note's `lastSynced` updating roughly every 200ms. `onSynced` exists only to hand fresh data to an already-open sidebar for a re-render.
 
-### ProjectsSidebarView (`src/ProjectsSidebarView.ts`)
+### Projects tab (`src/SidebarView.ts`, logic shared from `src/ProjectsSidebarView.ts`)
 
-**Follows the same conventions as `SidebarView.ts`, not a fresh pattern:**
-`ItemView` with the same `getViewType()`/`getDisplayText()`/`getIcon()`
-shape and a `VIEW_TYPE_PROJECTS_SIDEBAR` constant alongside the existing
-`VIEW_TYPE_TODO_SIDEBAR`; its own `addRibbonIcon()` toggle command,
-registered next to the existing "Toggle TODO Sidebar" one in `main.ts`.
-Settings land in the *existing* `WarpedTodoSettingTab`'s "Projects" `h3`
-section (already holds `defaultProjectsFolder`/`excludeFoldersFromProjects`
-for the tag-based flow) — the new repo-scan fields (base folder, exclude
-dirs, scan depth) are added there, not a new section, since it's the same
-underlying "Projects" concept now that tag- and repo-derived `ProjectInfo`
-are unified. No separate "About" panel exists in this plugin today (just
-the settings tab's `h2` title), so nothing new needed there.
+**Not a second sidebar.** An earlier design put Projects in its own
+`ItemView` (`VIEW_TYPE_PROJECTS_SIDEBAR`, its own ribbon icon) alongside the
+TODOs sidebar; a screenshot review found it behaved structurally unlike
+every other tab — its own leaf, its own icon in the sidebar dock's tab
+strip, a back button where clicking the tab again would do — so it was
+folded into `TodoSidebarView` as a third tab (`activeTab: 'todos' | 'ideas'
+| 'projects'`), alongside the tab-switching machinery `switchTab`/
+`switchToProjectsTab` already documented under SidebarView above.
+`src/ProjectsSidebarView.ts` is what's left of the original file: pure,
+`ItemView`-independent helpers (display formatting, hand-typed-item
+grouping, the `GROUP_ORDER` constant) the tab's rendering code in
+`SidebarView.ts` calls into — safe to unit-test directly
+(`groupHandTypedItems.test.ts`, `projectsSidebarDisplay.test.ts`), which was
+the point of keeping it a separate file rather than inlining it. Settings
+live in the *existing* `WarpedTodoSettingTab`'s "Projects" `h3` section
+(already holds `defaultProjectsFolder`/`excludeFoldersFromProjects` for the
+tag-based flow) — the repo-scan fields (base folder, exclude dirs, scan
+depth) are added there, not a new section, since it's the same underlying
+"Projects" concept now that tag- and repo-derived `ProjectInfo` are unified.
 
-Second sidebar `ItemView`, alongside the existing TODOs sidebar. Flat list,
-sorted projects-with-tracked-items first (alphabetical within each group,
-no separate section headers — chosen over grouping/collapsing after seeing
-real data: only 2 of 26 real repos had anything tracked, but a flat sort
-with the busy ones on top reads fine without extra UI state). Each row
-opens its vault note on click (same target `ProjectManager` already
-resolves via `getProjectFilePath()`).
+List view: flat list, sorted projects-with-tracked-items first (alphabetical
+within each group, no separate section headers — chosen over grouping/
+collapsing after seeing real data: only 2 of 26 real repos had anything
+tracked, but a flat sort with the busy ones on top reads fine without extra
+UI state). Each row opens its vault note on click (same target
+`ProjectManager` already resolves via `getProjectFilePath()`).
 
 ```
 Projects                                              [⟳ Sync]
@@ -261,6 +267,83 @@ like:
   completes by appending `" ✅ RESOLVED"` to its own heading line — no move,
   just Phase 1's single-line write path again.
 
+### Project blocks in the TODOs/Ideas tabs
+
+Synced items were originally visible only inside the Projects tab's detail
+view, one project at a time — `TodoScanner`'s vault-only cache (and
+everything downstream of it: the TODOs/Ideas tabs' active lists, the tag
+cloud) had no way to know they existed. Repo-matched projects with
+non-completed synced items now surface directly in the TODOs/Ideas tabs
+too, as one collapsible block per project, interleaved with regular items
+by priority rather than shown in a separate section.
+
+- **Aggregation**: `ProjectManager.getProjects()` takes an optional
+  `getCachedItems` lookup; when supplied, `foldSyncedItemsIntoProjects`
+  folds each repo-matched project's non-completed synced items into
+  `count`/`highestPriority`/`hasFocusItems` alongside the vault-derived
+  numbers (reusing `getPriorityValue`/`hasTag` — both already operate on
+  bare `tags: string[]`, so `ParsedProjectItem` needs no adapter).
+  `colourIndex` is deliberately left untouched — recomputing a cosmetic
+  pill colour from a second, differently-shaped item set wasn't worth it.
+  Callers that need the unified view (`renderProjects`'s tag cloud,
+  `renderTopBacklogs`) pass
+  `(localPath) => this.syncManager.getCachedItems(localPath)`; callers that
+  only care about vault items omit the argument and the merge is skipped.
+- **Interleaving**: `SortableEntry` (`src/types.ts`) is a discriminated
+  union — `{kind: 'todo', item: TodoItem}` or `{kind: 'project', project:
+  ProjectInfo}`. `compareSortableEntries` (`src/utils.ts`) gives both kinds
+  the same tier-then-priority ordering `compareWithEffectivePriority`
+  already uses for two `TodoItem`s: a `todo` entry's tier/priority come from
+  `isEffectivelyFocused`/`getEffectivePriority` as before; a `project`
+  entry's come straight from its (now synced-item-inclusive)
+  `hasFocusItems`/`highestPriority` — no new priority logic, just combining
+  two already-computed values. `renderActiveTodos`/`renderActiveIdeas`
+  build one `SortableEntry[]` from the tab's filtered vault items plus
+  `buildProjectBlocks()`'s project blocks, sort it, and render in order. A
+  block counts as a single entry toward `activeTodosLimit`'s "+N more"
+  truncation, same as a header-with-children TODO, regardless of how many
+  synced items it holds.
+- **Filtering**: `buildProjectBlocks()` applies the active tag filter the
+  same way the vault-item path does — a filter matching a project's own tag
+  collapses the result to just that project's block; any other filter
+  narrows each block's items via `itemMatchesTagFilter` (already accepts
+  `ParsedProjectItem`'s `{tags, inferredFileTag?}` shape) and drops a block
+  that goes empty. `activeAssigneeFilter` doesn't apply — synced items carry
+  no `mentions`.
+- **Rendering and mutation**: `renderProjectBlockItem` builds the same
+  `.todo-header-row` + `.todo-children` markup shape a header-with-children
+  TODO uses, for visual consistency, but delegates each child row to the
+  existing `renderSyncedProjectItemRow`/`showSyncedProjectItemMenu` — the
+  same functions the Projects tab's detail view already used, unchanged.
+  This is where 2-way sync comes from: nothing new was built for it. The
+  one refactor needed was generalizing `resyncActiveProject()` (hardcoded to
+  `this.activeProjectName`) into `resyncProject(name)`, since a project
+  block's mutations aren't necessarily for the "active" detail-view project.
+- **Navigation**: a block's header row and its small arrow both switch the
+  sidebar to the Projects tab's detail view for that project
+  (`switchToProjectsTab`/`openProjectDetail`) and open the vault note — both
+  affordances fire from either control, confirmed as the intended pair
+  rather than a choice between them. They differ in what the detail view's
+  back button then does: the header row leaves the normal "back to the
+  Projects list" behaviour; the arrow sets `projectDetailReturnTab` to
+  whichever tab (TODOs/Ideas) it was clicked from, so back returns there
+  instead — reported via screenshot, since the arrow felt like "look at
+  this note" rather than "go browse Projects." `backToProjectsList` checks
+  and clears that field first; every other entry into detail view (a
+  project's own list row, Quick Switcher/wikilink auto-follow via
+  `handleProjectActiveFileChange`) explicitly resets it to `null` so a
+  stale return-tab from an earlier arrow click can't leak into an unrelated
+  visit.
+- **Why the merge happens at render time, not in `TodoScanner`**:
+  `TodoScanner` stays the single source of truth for *vault* state, exactly
+  as designed — folding repo items into it would mean either giving
+  synced items a fake `TFile`/line-number identity they don't have, or
+  teaching the vault scanner about `ProjectSyncManager`'s existence. Doing
+  the merge in `SidebarView` instead mirrors the reasoning that already kept
+  the synced cache itself out of the vault (see "Item list" above): the two
+  item shapes (`TodoItem` vs `ParsedProjectItem`) stay distinct all the way
+  through, joined only at the render/sort boundary via `SortableEntry`.
+
 ### StructuredFileParser (`src/StructuredFileParser.ts`)
 
 Standalone parser, not part of `TodoScanner`: `parseStructuredFile(filename,
@@ -274,16 +357,21 @@ parsing, below.
 
 Custom Obsidian sidebar panel:
 
-- Two tabs, TODOs and Ideas (`activeTab`), plus a separate Focus Mode
-  overlay toggled by the eye icon — not a third tab; see "Immersive Focus
-  Mode" below for how it composes with the two real tabs.
+- Three tabs — TODOs, Ideas, Projects (`activeTab`) — plus a separate Focus
+  Mode overlay toggled by the eye icon that composes with TODOs/Ideas only;
+  see "Immersive Focus Mode" below.
 - **TODOs tab** (`renderTodosContent`): tag cloud (`renderProjects`,
   `#focus`/`#p0` pinned first), the active TODO list grouped by header
   where applicable (`renderActiveTodos`), then a collapsible **Summary**
   section (priority counts, assignee stats, top backlogs, a Done
   today/week/month preview, and a link straight to the TODONE log file).
+  Repo-matched projects with non-completed synced `#todo`/`#bug` items
+  interleave into the same active list as one collapsible block per
+  project, sorted by priority alongside regular TODOs rather than in a
+  separate section — see "Project blocks in the TODOs/Ideas tabs" below.
 - **Ideas tab** (`renderIdeasContent`): its own tag cloud built from all
-  ideas, then a single list sorted focus-first (`renderActiveIdeas`).
+  ideas, then a single list sorted focus-first (`renderActiveIdeas`), with
+  synced `#idea` items interleaved as project blocks the same way.
   Principles are scanned but don't get their own section here — they only
   surface inside a project's info popup.
 - Snoozed items (`#future`/`#snooze`/`#snoozed`) are an ordinary tag in
@@ -565,11 +653,13 @@ Two suggester classes provide inline editing assistance:
 
 ## Projects Extension
 
-Adds a second sidebar (Projects) that treats a folder of git repos as
-projects: repo facts sync into frontmatter on the same per-project vault
-note `ProjectManager` already owns, and tagged `#todo`/`#idea`/`#bug`
-items are read from disk into an in-memory cache the sidebar displays
-directly (never written into the note — see "Item list" above for why).
+Adds a Projects tab that treats a folder of git repos as projects: repo
+facts sync into frontmatter on the same per-project vault note
+`ProjectManager` already owns, and tagged `#todo`/`#idea`/`#bug` items are
+read from disk into an in-memory cache the sidebar displays directly (never
+written into the note — see "Item list" above for why), both in the
+Projects tab's own detail view and, interleaved with regular items, in the
+TODOs/Ideas tabs — see "Project blocks in the TODOs/Ideas tabs" above.
 Full rationale in [IDEAS.md](IDEAS.md); spec in [OUTLINE.md](OUTLINE.md).
 Desktop only —
 `ProjectScanner`/`ProjectSyncManager` need Node `fs`/`child_process`, so

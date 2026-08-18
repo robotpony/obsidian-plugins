@@ -2,6 +2,45 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.36.1] - 2026-08-17
+
+### Fixed — Project block's → arrow didn't open the project in the sidebar
+
+Clicking a project block's header (in the TODOs/Ideas tabs) already opened
+the project's vault note and switched the sidebar to its Projects-tab
+detail view; the small → arrow only opened the note, leaving the sidebar
+on the TODOs/Ideas tab — reported via screenshot. The arrow now does both,
+same as the header. They differ in what "back" does from the detail view
+afterward: the header leaves the normal back-to-Projects-list behaviour;
+the arrow returns to whichever TODOs/Ideas tab it was clicked from, since
+that felt more like "look at this note" than "go browse Projects." Every
+other way into detail view (a project's own list row, Quick Switcher, a
+wikilink) still returns to the list as before.
+
+## [0.36.0] - 2026-08-17
+
+### Added — Project TODOs/ideas now show up in the main TODOs/Ideas tabs
+
+Synced project items (a repo's `TODO.md`/`BUGS.md`/`IDEAS.md`, kept live by
+`ProjectSyncManager`) were only ever visible one project at a time, inside
+the Projects tab's detail view. They now also surface directly in the
+TODOs and Ideas tabs, as one collapsible block per project, interleaved
+with regular items by priority rather than off in a separate section — a
+project carrying a `#focus` synced item sorts to the top of the list the
+same way a `#focus` TODO does.
+
+- Clicking a block's header switches to that project's detail view in the
+  Projects tab; a small separate arrow opens its vault note directly.
+- The TODOs tab's project tag-cloud pill now reflects vault + synced items
+  together for repo-matched projects, both in its count and in what
+  clicking it filters to.
+- Checking off, focusing, or snoozing a synced item from its block writes
+  straight to the repo file, same as the Projects tab's detail view — no
+  new sync mechanism, this just reuses the existing one from a second
+  place.
+- Immersive Focus Mode's queue stays vault-only for now; folding synced
+  items into it is a separate follow-up.
+
 ## [0.35.13] - 2026-08-17
 
 ### Fixed — Project row counts didn't pluralize

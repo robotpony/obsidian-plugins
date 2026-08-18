@@ -23,7 +23,7 @@ Vault selections are cached in `.install-vaults` for reuse with `--previous`.
 
 ## Architecture
 
-Warped Command is an Obsidian plugin for tracking TODOs, Ideas, and Principles across a vault, plus a Projects sidebar that syncs vault notes with git repos on disk. Vault items are tagged in markdown files (`#todo`, `#idea`, `#principle`); the plugin scans the vault, indexes them, and surfaces them in a custom sidebar with priority/focus/snooze workflows. The Projects sidebar finds git repos under a configured base folder, syncs a note per project (frontmatter git facts + `#todo`/`#idea`/`#bug` items parsed from each repo's `BUGS.md`/`TODO.md`/etc.), and lets you act on those items from Obsidian, writing back to the repo file. Desktop only (`isDesktopOnly: true`) — Projects needs Node `fs`/`child_process`. Full Projects design: [DESIGN.md](DESIGN.md).
+Warped Command is an Obsidian plugin for tracking TODOs, Ideas, and Principles across a vault, plus a Projects tab that syncs vault notes with git repos on disk. Vault items are tagged in markdown files (`#todo`, `#idea`, `#principle`); the plugin scans the vault, indexes them, and surfaces them in a custom sidebar with priority/focus/snooze workflows. The sidebar's Projects tab finds git repos under a configured base folder, syncs a note per project (frontmatter git facts + `#todo`/`#idea`/`#bug` items parsed from each repo's `BUGS.md`/`TODO.md`/etc.), and lets you act on those items from Obsidian, writing back to the repo file. Repo-matched projects with tracked items also surface as collapsible blocks directly in the TODOs/Ideas tabs, interleaved with vault items by priority. Desktop only (`isDesktopOnly: true`) — Projects needs Node `fs`/`child_process`. Full Projects design: [DESIGN.md](DESIGN.md).
 
 ### Entry point
 
@@ -33,7 +33,7 @@ Warped Command is an Obsidian plugin for tracking TODOs, Ideas, and Principles a
 - Wires `TodoProcessor` for completion/priority mutations
 - Builds `ProjectManager` for tag-based grouping, merged with repo-derived data
 - Builds `ProjectScanner`/`ProjectSyncManager` and starts the Projects file watcher (if a base folder is configured)
-- Registers both sidebar views (TODOs and Projects)
+- Registers the sidebar view (TODOs/Ideas/Projects tabs in one `ItemView`)
 - Registers `SlashCommandSuggest` (`/todo`, `/idea`, etc.) and `AtSuggest` (`@today`, `@handle`)
 - Registers CodeMirror extensions for header sort and checkbox/tag sync
 - Registers commands and the settings tab
@@ -45,7 +45,7 @@ Warped Command is an Obsidian plugin for tracking TODOs, Ideas, and Principles a
 | [TodoScanner.ts](src/TodoScanner.ts) | Scans vault for `#todo`/`#todone`/`#idea`/`#principle`. Maintains per-file caches, watches file changes, emits `todos-updated` events. |
 | [TodoProcessor.ts](src/TodoProcessor.ts) | Mutations: complete TODO (`#todo` → `#todone @date`, append to TODONE log), change priority, snooze, move file. |
 | [ProjectManager.ts](src/ProjectManager.ts) | Aggregates items by project tag (excludes `#focus`/priority/lifecycle tags). Reads project description from project files. |
-| [SidebarView.ts](src/SidebarView.ts) | Custom `ItemView` with TODOs / Ideas tabs, tag cloud, immersive Focus Mode, summary stats. Snoozed items are an ordinary tag (no dedicated tab), excluded only from the Focus Mode queue. |
+| [SidebarView.ts](src/SidebarView.ts) | Custom `ItemView` with TODOs / Ideas / Projects tabs, tag cloud, immersive Focus Mode, summary stats. Repo-matched projects with synced items render as collapsible blocks interleaved into the TODOs/Ideas active lists by priority (`renderProjectBlockItem`/`compareSortableEntries`), not just in the Projects tab's own detail view. Snoozed items are an ordinary tag (no dedicated tab), excluded only from the Focus Mode queue. |
 | [ContextMenuHandler.ts](src/ContextMenuHandler.ts) | Right-click menu on sidebar rows: priority, focus, snooze, move, copy, delete. |
 | [SlashCommandSuggest.ts](src/SlashCommandSuggest.ts) | Editor suggester for `/` at column 0: `/todo`, `/todos`, `/idea`, `/ideas`, `/today`, `/tomorrow`, `/callout`. |
 | [AtSuggest.ts](src/AtSuggest.ts) | Editor suggester for `@`: dates (`@today`, `@tomorrow`, `@yesterday`, `@<date>`) and team mentions (`@<handle>`). |
@@ -63,7 +63,7 @@ Warped Command is an Obsidian plugin for tracking TODOs, Ideas, and Principles a
 | [ProjectSyncManager.ts](src/ProjectSyncManager.ts) | Keeps each repo-matched project note in sync: frontmatter merge (sync-owned keys + `cssclasses`), delimited-block rewrite (preserves non-owned tags across resync by fingerprint match), `fs.watch`, manual sync entry point. |
 | [ProjectItemMutator.ts](src/ProjectItemMutator.ts) | Mutates a `ParsedProjectItem`'s source line directly (external file, not the vault) — completion (by item `shape`), priority, add/remove tag. Mirrors `TodoProcessor`'s vault-item methods. |
 | [HeaderBlockMover.ts](src/HeaderBlockMover.ts) | Multi-line block-move for `headerNested` items: cuts a `###` block and reinserts it under the first matching `##` status section (creating one if none exists), gated on a clean `git status` for that file. |
-| [ProjectsSidebarView.ts](src/ProjectsSidebarView.ts) | Second sidebar: project list + per-project detail view (auto-follows the active file), merged synced/hand-typed item list, context menu (no "move"). |
+| [ProjectsSidebarView.ts](src/ProjectsSidebarView.ts) | Not a second sidebar — `ItemView`-independent helpers (display formatting, hand-typed-item grouping, the `GROUP_ORDER` constant) that `SidebarView.ts`'s Projects tab (list + per-project detail view, auto-follows the active file, merged synced/hand-typed item list, context menu with no "move") calls into. Kept separate so the logic is unit-testable without an `ItemView`. |
 
 ### Data flow
 

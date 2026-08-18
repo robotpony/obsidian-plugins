@@ -1072,6 +1072,17 @@
   flex: 1;
 }
 
+/* Project block header (renderProjectBlockItem) — the row itself navigates
+   to the Projects tab detail view on click, unlike a regular header-with-
+   children TODO's row, which isn't clickable outside its own → link. */
+.todo-header-row.is-clickable {
+  cursor: pointer;
+}
+
+.todo-header-row.is-clickable:hover {
+  background-color: var(--background-modifier-hover);
+}
+
 /* Sort button for header TODOs */
 .todo-sort-btn {
   opacity: 0.4;

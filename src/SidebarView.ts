@@ -83,6 +83,13 @@ export class TodoSidebarView extends ItemView {
   private getProjectsOptions: () => ProjectsSidebarOptions;
   private projectsMode: 'list' | 'detail' = 'list';
   private activeProjectName: string | null = null;
+  // Where the detail view's "← Back" link should go: null means the normal
+  // "back to the Projects list" affordance; set when a project block's →
+  // arrow (TODOs/Ideas tab) opens the detail view directly, so back returns
+  // to the tab the user actually came from instead. Cleared by every other
+  // path into detail view (list row click, auto-follow) — see
+  // backToProjectsList and switchToProjectsTab.
+  private projectDetailReturnTab: 'todos' | 'ideas' | null = null;
   private projectsFilterText: string = '';
   private scannedProjects: ScannedProject[] = [];
   private projectsSyncing: boolean = false;
@@ -1469,11 +1476,12 @@ export class TodoSidebarView extends ItemView {
     link.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      const notePath = projectFilePath(this.getProjectsOptions().projectsFolder, name);
-      const noteFile = this.app.vault.getAbstractFileByPath(notePath);
-      if (noteFile instanceof TFile) {
-        openFileAtLine(this.app, noteFile, 0);
-      }
+      // Opens the note *and* switches the sidebar to this project's detail
+      // view — same as the header click, but remembers the tab we came from
+      // so the detail view's back button returns here instead of the
+      // Projects list (switchToProjectsTab's returnTab param).
+      const returnTab = this.activeTab === 'ideas' ? 'ideas' : 'todos';
+      this.switchToProjectsTab(project.tag, returnTab);
     });
 
     const childrenContainer = li.createEl("ul", { cls: "todo-children" });
@@ -2155,10 +2163,18 @@ export class TodoSidebarView extends ItemView {
    * resets to the project list — even if already on this tab in detail
    * view, since that's the intended "back" affordance (see the tab
    * button's own click handler comment). With a tag (the "Show in
-   * Projects" context-menu entries), jumps straight to that project's
-   * detail view instead.
+   * Projects" context-menu entries, or a project block's header click),
+   * jumps straight to that project's detail view instead.
+   *
+   * `returnTab`, when given, is remembered so the detail view's back button
+   * returns there instead of the Projects list — used by a project block's
+   * → arrow (`renderProjectBlockItem`), which opens the detail view *in
+   * addition to* the note rather than instead of it, so "back" should feel
+   * like returning to where you were, not browsing into Projects. Omitted
+   * (defaulting to the normal list) by every other caller.
    */
-  private switchToProjectsTab(tag?: string): void {
+  private switchToProjectsTab(tag?: string, returnTab?: 'todos' | 'ideas'): void {
+    this.projectDetailReturnTab = returnTab ?? null;
     if (this.focusModeActive) {
       this.focusModeActive = false;
       this.focusQueue = null;
@@ -2174,8 +2190,20 @@ export class TodoSidebarView extends ItemView {
     }
   }
 
-  /** Returns the Projects tab to its list view. Shared by the tab button's own click handler (switchToProjectsTab with no tag) and the detail view's inline back arrow — same "back" affordance, two entry points. */
+  /**
+   * Returns the Projects tab to its list view — or, if a project block's →
+   * arrow set `projectDetailReturnTab`, back to that originating TODOs/Ideas
+   * tab instead. Shared by the tab button's own click handler
+   * (switchToProjectsTab with no tag) and the detail view's inline back
+   * arrow — same "back" affordance, two entry points.
+   */
   private backToProjectsList(): void {
+    if (this.projectDetailReturnTab) {
+      const tab = this.projectDetailReturnTab;
+      this.projectDetailReturnTab = null;
+      this.switchTab(tab);
+      return;
+    }
     this.projectsMode = 'list';
     this.activeProjectName = null;
     this.render();
@@ -2404,9 +2432,14 @@ export class TodoSidebarView extends ItemView {
       if (this.projectsMode === 'detail' && this.activeProjectName === projectName) return;
       this.projectsMode = 'detail';
       this.activeProjectName = projectName;
+      // A fresh entry into detail view via Quick Switcher/a wikilink/etc.,
+      // not through switchToProjectsTab's returnTab param — back should go
+      // to the Projects list, not some earlier tab from an unrelated visit.
+      this.projectDetailReturnTab = null;
     } else if (this.projectsMode === 'detail') {
       this.projectsMode = 'list';
       this.activeProjectName = null;
+      this.projectDetailReturnTab = null;
     } else {
       return;
     }
@@ -2528,7 +2561,10 @@ export class TodoSidebarView extends ItemView {
     const name = project.tag.replace(/^#/, "");
     const row = this.renderProjectSummary(listEl, project, "list");
     row.addClass("is-clickable");
-    row.addEventListener("click", () => this.openProjectDetail(name));
+    row.addEventListener("click", () => {
+      this.projectDetailReturnTab = null; // browsing the list normally — back means the list, not some earlier tab
+      void this.openProjectDetail(name);
+    });
   }
 
   /**
