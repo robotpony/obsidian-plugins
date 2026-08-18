@@ -26,7 +26,7 @@ import {
 import { TeamManager } from "./TeamManager";
 import { TodoItem, ProjectInfo, ItemRenderConfig, FocusQueueState } from "./types";
 import { ContextMenuHandler } from "./ContextMenuHandler";
-import { getPriorityValue, compareTodoItems, compareWithEffectivePriority, hasTag, openFileAtLine, extractMentions, resolveMentions, resolveEffectiveMentions, showNotice, getTagColourInfo, extractCompletionDate, buildFocusQueue, getItemDate, tallyProjectTags, itemMatchesTagFilter } from "./utils";
+import { getPriorityValue, compareTodoItems, compareWithEffectivePriority, hasTag, openFileAtLine, extractMentions, resolveMentions, resolveEffectiveMentions, showNotice, getTagColourInfo, extractCompletionDate, buildFocusQueue, getItemDate, tallyProjectTags, itemMatchesTagFilter, pluralize } from "./utils";
 
 export const VIEW_TYPE_TODO_SIDEBAR = "warped-todo-sidebar";
 
@@ -2491,9 +2491,9 @@ export class TodoSidebarView extends ItemView {
       if (project.gitStatus) metaChunks.push({ text: project.gitStatus, cls: "warped-todo-project-status" });
       if (counts.total > 0) {
         const parts: string[] = [];
-        if (counts.todo > 0) parts.push(`${counts.todo} todo`);
-        if (counts.idea > 0) parts.push(`${counts.idea} idea`);
-        if (counts.bug > 0) parts.push(`${counts.bug} bug`);
+        if (counts.todo > 0) parts.push(pluralize(counts.todo, "todo"));
+        if (counts.idea > 0) parts.push(pluralize(counts.idea, "idea"));
+        if (counts.bug > 0) parts.push(pluralize(counts.bug, "bug"));
         metaChunks.push({ text: parts.join(" · ") });
       }
     }

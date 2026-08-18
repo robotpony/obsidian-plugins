@@ -122,6 +122,11 @@ export function formatDate(date: Date, format: string): string {
   return (moment as any)(date).format(format);
 }
 
+/** "1 todo", "3 todos" — every word this is used with (todo, idea, bug) pluralizes with a plain "s". */
+export function pluralize(count: number, word: string): string {
+  return `${count} ${word}${count === 1 ? "" : "s"}`;
+}
+
 /**
  * Get the priority value for sorting TODOs.
  * Lower values = higher priority.

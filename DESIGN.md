@@ -640,13 +640,7 @@ in fact: sync only ever touches the frontmatter block above.
 
 Synced `#todo`/`#idea`/`#bug` items don't appear in the note at all — see
 "Item list" above for where they live instead (the Projects sidebar's
-detail view, sourced from `ProjectSyncManager`'s in-memory cache). This is
-a change from the original design, which rendered a delimited
-`<!-- warped-todo:sync:start -->...<!-- warped-todo:sync:end -->` block of
-items directly into the note; see PLAN.md's round-4 write-up for why that
-was removed (a content-flicker bug against `TodoScanner`'s own tag
-correction, and a runaway-sync bug that crashed Obsidian by stacking
-duplicate copies of that block into the note on every pass).
+detail view, sourced from `ProjectSyncManager`'s in-memory cache).
 
 ## File Organization
 

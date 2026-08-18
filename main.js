@@ -188,6 +188,9 @@ function hasCachedRelevantTags(tags) {
 function formatDate(date, format) {
   return (0, import_obsidian2.moment)(date).format(format);
 }
+function pluralize(count, word) {
+  return `${count} ${word}${count === 1 ? "" : "s"}`;
+}
 function getPriorityValue(tags) {
   if (hasTag(tags, "#today"))
     return 1;
@@ -6023,11 +6026,11 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       if (counts.total > 0) {
         const parts = [];
         if (counts.todo > 0)
-          parts.push(`${counts.todo} todo`);
+          parts.push(pluralize(counts.todo, "todo"));
         if (counts.idea > 0)
-          parts.push(`${counts.idea} idea`);
+          parts.push(pluralize(counts.idea, "idea"));
         if (counts.bug > 0)
-          parts.push(`${counts.bug} bug`);
+          parts.push(pluralize(counts.bug, "bug"));
         metaChunks.push({ text: parts.join(" \xB7 ") });
       }
     }

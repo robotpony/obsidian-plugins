@@ -2,6 +2,16 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.35.13] - 2026-08-17
+
+### Fixed — Project row counts didn't pluralize
+
+The project list row's todo/idea/bug count line always used the singular
+form regardless of count (`3 todo`, `2 bug`, `3 idea`) — reported via
+screenshot. Added a small `pluralize()` helper (`src/utils.ts`) and used it
+for all three counts; each word here (todo, idea, bug) pluralizes with a
+plain `s`, so no irregular-plural handling is needed.
+
 ## [0.35.12] - 2026-08-17
 
 ### Fixed — Synced project items showed completed todos; hand-typed ones never did

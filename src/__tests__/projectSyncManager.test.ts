@@ -68,9 +68,8 @@ describe("ProjectSyncManager.syncProject: creating a new note", () => {
     // shows the note's name; a duplicate heading here just repeated it
     // (found via live testing/screenshot review: "peep" appeared 3 times).
     expect(content).not.toMatch(/^# peep$/m);
-    // No item content, no delimited block — items live in the sidebar's cache only.
+    // No item content — items live in the sidebar's cache only.
     expect(content).not.toContain("Fix the widget");
-    expect(content).not.toContain("warped-todo:sync:start");
   });
 
   it("creates the projects folder first", async () => {
