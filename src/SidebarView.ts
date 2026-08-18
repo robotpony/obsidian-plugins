@@ -4,7 +4,7 @@ import { TodoProcessor } from "./TodoProcessor";
 import { ProjectManager, projectFilePath } from "./ProjectManager";
 import { ProjectScanner, ScannedProject } from "./ProjectScanner";
 import { ProjectSyncManager } from "./ProjectSyncManager";
-import { ParsedProjectItem } from "./StructuredFileParser";
+import { ParsedProjectItem, ProjectItemType } from "./StructuredFileParser";
 import {
   setProjectItemCompletion,
   setProjectItemPriority,
@@ -24,9 +24,9 @@ import {
   calculateLaterPriority as calculateProjectLaterPriority,
 } from "./ProjectsSidebarView";
 import { TeamManager } from "./TeamManager";
-import { TodoItem, ProjectInfo, ItemRenderConfig, FocusQueueState } from "./types";
+import { TodoItem, ProjectInfo, ItemRenderConfig, FocusQueueState, SortableEntry } from "./types";
 import { ContextMenuHandler } from "./ContextMenuHandler";
-import { getPriorityValue, compareTodoItems, compareWithEffectivePriority, hasTag, openFileAtLine, extractMentions, resolveMentions, resolveEffectiveMentions, showNotice, getTagColourInfo, extractCompletionDate, buildFocusQueue, getItemDate, tallyProjectTags, itemMatchesTagFilter, pluralize } from "./utils";
+import { getPriorityValue, compareTodoItems, compareWithEffectivePriority, compareSortableEntries, hasTag, openFileAtLine, extractMentions, resolveMentions, resolveEffectiveMentions, showNotice, getTagColourInfo, extractCompletionDate, buildFocusQueue, getItemDate, tallyProjectTags, itemMatchesTagFilter, pluralize } from "./utils";
 
 export const VIEW_TYPE_TODO_SIDEBAR = "warped-todo-sidebar";
 
@@ -815,7 +815,14 @@ export class TodoSidebarView extends ItemView {
   }
 
   private renderProjects(container: HTMLElement): void {
-    const projects = this.projectManager.getProjects();
+    // Pass scannedProjects + the synced-items lookup so a repo-matched
+    // project's pill (count, focus tier, sort position) reflects vault +
+    // synced items together, not vault items alone — see
+    // ProjectManager.foldSyncedItemsIntoProjects.
+    const projects = this.projectManager.getProjects(
+      this.scannedProjects,
+      (localPath) => this.syncManager.getCachedItems(localPath)
+    );
 
     const section = container.createEl("div", { cls: "projects-section tag-cloud-section" });
 
@@ -861,8 +868,15 @@ export class TodoSidebarView extends ItemView {
       if (priorityDiff !== 0) return priorityDiff;
       return b.count - a.count;
     });
+    // Synced items have no header/children structure to gate on (every
+    // ParsedProjectItem the cache returns is already "active" once
+    // completed items are filtered out), so they add straight onto the
+    // vault-derived, isActiveTodo-gated count below.
     for (const p of sortedProjects) {
-      const activeCount = activeTagCounts.get(p.tag) ?? 0;
+      const syncedCount = p.localPath
+        ? this.syncManager.getCachedItems(p.localPath).filter((i) => !i.completed).length
+        : 0;
+      const activeCount = (activeTagCounts.get(p.tag) ?? 0) + syncedCount;
       // Skip projects with no active work (see isActiveTodo) — they'd just
       // empty out on click. Obsidian's tag search already covers the
       // all-up view.
@@ -1309,12 +1323,26 @@ export class TodoSidebarView extends ItemView {
     // Pass the full todos list for accurate child priority lookup
     todos = this.sortTodosByPriority(todos, allTodosForChildLookup);
 
+    // Repo-matched projects with non-completed synced #todo/#bug items become
+    // one block each in this same list, interleaved by priority rather than
+    // a separate section — see compareSortableEntries in utils.ts. A block
+    // counts as a single entry toward activeTodosLimit below, regardless of
+    // how many synced items it holds, same as a header-with-children TODO.
+    const projectBlocks = this.buildProjectBlocks(["todo", "bug"]);
+    const itemsByProjectTag = new Map(projectBlocks.map((b) => [b.project.tag, b.items]));
+
+    let entries: SortableEntry[] = [
+      ...todos.map((item): SortableEntry => ({ kind: 'todo', item })),
+      ...projectBlocks.map(({ project }): SortableEntry => ({ kind: 'project', project })),
+    ];
+    entries.sort((a, b) => compareSortableEntries(a, b, allTodosForChildLookup));
+
     // Track total count before limiting
-    const totalCount = todos.length;
+    const totalCount = entries.length;
 
     // Apply limit
     if (this.activeTodosLimit > 0) {
-      todos = todos.slice(0, this.activeTodosLimit);
+      entries = entries.slice(0, this.activeTodosLimit);
     }
 
     const section = container.createEl("div", { cls: "todo-section" });
@@ -1341,7 +1369,13 @@ export class TodoSidebarView extends ItemView {
     // share the same source heading. Repeats on interleaved runs so the
     // current sort order is preserved (priority/focus first).
     let lastOrphanSectionKey: string | null = null;
-    for (const todo of todos) {
+    for (const entry of entries) {
+      if (entry.kind === 'project') {
+        lastOrphanSectionKey = null;
+        this.renderProjectBlockItem(list, entry.project, itemsByProjectTag.get(entry.project.tag) ?? []);
+        continue;
+      }
+      const todo = entry.item;
       const isOrphan = !todo.isHeader && todo.parentLineNumber === undefined && !todo.isSubheading;
       if (isOrphan) {
         const sectionLabel = todo.sectionLabel?.trim() || todo.file.basename || todo.file.name;
@@ -1358,12 +1392,93 @@ export class TodoSidebarView extends ItemView {
     }
 
     // Show count indicator if there are more items than displayed
-    if (totalCount > todos.length) {
+    if (totalCount > entries.length) {
       const moreIndicator = section.createEl("div", {
         cls: "todo-more-indicator",
-        text: `+${totalCount - todos.length} more`,
+        text: `+${totalCount - entries.length} more`,
       });
-      moreIndicator.setAttribute("title", `Showing ${todos.length} of ${totalCount} TODOs`);
+      moreIndicator.setAttribute("title", `Showing ${entries.length} of ${totalCount} TODOs`);
+    }
+  }
+
+  /**
+   * Repo-matched projects (`project.localPath` set) with at least one
+   * non-completed synced item matching `itemTypes`, as one block each. The
+   * active tag filter applies here too, mirroring the vault-item behaviour:
+   * a filter matching a project's own tag collapses the result to just that
+   * project's block; any other active filter narrows each block's items via
+   * the same `itemMatchesTagFilter` vault items use (it already accepts the
+   * bare `{tags, inferredFileTag?}` shape `ParsedProjectItem` has), dropping
+   * a block that ends up empty. `activeAssigneeFilter` doesn't apply —
+   * synced items carry no `mentions`.
+   */
+  private buildProjectBlocks(itemTypes: ProjectItemType[]): { project: ProjectInfo; items: ParsedProjectItem[] }[] {
+    const projects = this.projectManager.getProjects(
+      this.scannedProjects,
+      (localPath) => this.syncManager.getCachedItems(localPath)
+    );
+
+    const tagFilter = this.activeTagFilter;
+    const filterIsProjectTag = !!tagFilter && projects.some((p) => p.tag.toLowerCase() === tagFilter.toLowerCase());
+
+    const blocks: { project: ProjectInfo; items: ParsedProjectItem[] }[] = [];
+    for (const project of projects) {
+      if (!project.localPath) continue;
+      if (filterIsProjectTag && project.tag.toLowerCase() !== tagFilter!.toLowerCase()) continue;
+
+      let items = this.syncManager
+        .getCachedItems(project.localPath)
+        .filter((i) => !i.completed && itemTypes.includes(i.itemType));
+
+      if (tagFilter && !filterIsProjectTag) {
+        items = items.filter((i) => itemMatchesTagFilter(i, tagFilter));
+      }
+
+      if (items.length > 0) blocks.push({ project, items });
+    }
+    return blocks;
+  }
+
+  /**
+   * One project's synced items as a single collapsible block in the active
+   * list — same markup shape `renderListItem` uses for a header-with-children
+   * TODO (`.todo-header-row` + `.todo-children`), for visual consistency with
+   * sibling rows. Header click switches the sidebar to the Projects tab's
+   * detail view for this project; the separate arrow opens the vault note
+   * directly — both affordances, not one or the other (confirmed via
+   * AskUserQuestion). Row rendering for each item reuses
+   * `renderSyncedProjectItemRow` as-is, so checkbox completion and the
+   * right-click menu (focus/later/snooze) write straight to `sourceFile` —
+   * the same 2-way sync path the Projects tab's detail view already uses.
+   */
+  private renderProjectBlockItem(list: HTMLElement, project: ProjectInfo, items: ParsedProjectItem[]): void {
+    const name = project.tag.replace(/^#/, "");
+    const li = list.createEl("li", { cls: "todo-item todo-header todo-header-with-children todo-project-block" });
+
+    const rowContainer = li.createEl("div", { cls: "todo-header-row is-clickable" });
+    rowContainer.createEl("span", { cls: "todo-text", text: project.title ?? name });
+    rowContainer.createEl("span", { cls: "header-filename", text: pluralize(items.length, "item") });
+    rowContainer.addEventListener("click", () => this.switchToProjectsTab(project.tag));
+
+    const link = rowContainer.createEl("a", {
+      text: "→",
+      cls: "todo-link",
+      href: "#",
+      attr: { "aria-label": `Open ${name} note` },
+    });
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const notePath = projectFilePath(this.getProjectsOptions().projectsFolder, name);
+      const noteFile = this.app.vault.getAbstractFileByPath(notePath);
+      if (noteFile instanceof TFile) {
+        openFileAtLine(this.app, noteFile, 0);
+      }
+    });
+
+    const childrenContainer = li.createEl("ul", { cls: "todo-children" });
+    for (const item of items) {
+      this.renderSyncedProjectItemRow(childrenContainer, item, name, true, project.localPath!);
     }
   }
 
@@ -1570,7 +1685,10 @@ export class TodoSidebarView extends ItemView {
 
 
   private renderTopBacklogs(section: HTMLElement): void {
-    const projects = this.projectManager.getProjects();
+    const projects = this.projectManager.getProjects(
+      this.scannedProjects,
+      (localPath) => this.syncManager.getCachedItems(localPath)
+    );
     const qualifying = projects.filter(p => p.count >= 3);
     if (qualifying.length === 0) return;
 
@@ -1620,6 +1738,18 @@ export class TodoSidebarView extends ItemView {
     // Pass full list for accurate child priority lookup
     ideas = this.sortTodosByPriority(ideas, allIdeasForChildLookup);
 
+    // Repo-matched projects with non-completed synced #idea items become one
+    // block each in this same list — same interleave-by-priority treatment
+    // as the TODOs tab (see buildProjectBlocks/renderProjectBlockItem).
+    const projectBlocks = this.buildProjectBlocks(["idea"]);
+    const itemsByProjectTag = new Map(projectBlocks.map((b) => [b.project.tag, b.items]));
+
+    const entries: SortableEntry[] = [
+      ...ideas.map((item): SortableEntry => ({ kind: 'todo', item })),
+      ...projectBlocks.map(({ project }): SortableEntry => ({ kind: 'project', project })),
+    ];
+    entries.sort((a, b) => compareSortableEntries(a, b, allIdeasForChildLookup));
+
     const section = container.createEl("div", { cls: "ideas-section" });
 
     // Header carries the filter pill only — no title (the IDEAs tab name
@@ -1627,7 +1757,7 @@ export class TodoSidebarView extends ItemView {
     const header = section.createEl("div", { cls: "todo-section-header" });
     this.renderFilterIndicator(header);
 
-    if (ideas.length === 0) {
+    if (entries.length === 0) {
       const emptyText = this.activeTagFilter
         ? `No ideas matching ${this.activeTagFilter}`
         : "No ideas yet";
@@ -1640,8 +1770,12 @@ export class TodoSidebarView extends ItemView {
 
     const list = section.createEl("ul", { cls: "idea-list" });
 
-    for (const idea of ideas) {
-      this.renderIdeaItem(list, idea);
+    for (const entry of entries) {
+      if (entry.kind === 'project') {
+        this.renderProjectBlockItem(list, entry.project, itemsByProjectTag.get(entry.project.tag) ?? []);
+      } else {
+        this.renderIdeaItem(list, entry.item);
+      }
     }
   }
 
@@ -2735,13 +2869,13 @@ export class TodoSidebarView extends ItemView {
           repoPath,
           scanner: this.projectScanner,
         });
-        if (ok) await this.resyncActiveProject();
+        if (ok) await this.resyncProject(projectName);
       });
     }
     row.createSpan({ text: cleanDisplayText(item.text), cls: "todo-text" });
     row.addEventListener("contextmenu", (evt) => {
       evt.preventDefault();
-      this.showSyncedProjectItemMenu(evt, item);
+      this.showSyncedProjectItemMenu(evt, item, projectName);
     });
   }
 
@@ -2764,7 +2898,7 @@ export class TodoSidebarView extends ItemView {
     });
   }
 
-  private showSyncedProjectItemMenu(evt: MouseEvent, item: ParsedProjectItem): void {
+  private showSyncedProjectItemMenu(evt: MouseEvent, item: ParsedProjectItem, projectName: string): void {
     const menu = new Menu();
     const hasFocus = item.tags.includes("#focus");
     const hasFuture = item.tags.includes("#future");
@@ -2784,7 +2918,7 @@ export class TodoSidebarView extends ItemView {
           const ok = hasFocus
             ? await removeProjectItemTag(item, "#focus")
             : await setProjectItemPriority(item, calculateProjectFocusPriority(currentPriority), true);
-          if (ok) await this.resyncActiveProject();
+          if (ok) await this.resyncProject(projectName);
         });
     });
 
@@ -2795,7 +2929,7 @@ export class TodoSidebarView extends ItemView {
           const ok = hasLaterPriority
             ? await removeProjectItemTag(item, currentPriority!)
             : await setProjectItemPriority(item, calculateProjectLaterPriority(currentPriority));
-          if (ok) await this.resyncActiveProject();
+          if (ok) await this.resyncProject(projectName);
         });
     });
 
@@ -2806,7 +2940,7 @@ export class TodoSidebarView extends ItemView {
           const ok = hasFuture
             ? await removeProjectItemTag(item, "#future")
             : await addProjectItemTag(item, "#future");
-          if (ok) await this.resyncActiveProject();
+          if (ok) await this.resyncProject(projectName);
         });
     });
 
@@ -2814,14 +2948,16 @@ export class TodoSidebarView extends ItemView {
   }
 
   /**
-   * Re-reads the active project's structured files after a mutation and
-   * updates this view's item cache directly, so the change is visible
-   * immediately without a vault write — items live only in the sidebar's
-   * cache now, not in the note body.
+   * Re-reads one project's structured files after a mutation and updates
+   * this view's item cache directly, then re-renders — so the change is
+   * visible immediately without a vault write (items live only in the
+   * sidebar's cache, not in the note body). Takes an explicit project name
+   * rather than reading `this.activeProjectName` so it works both for the
+   * Projects tab's own detail view and for a project block interleaved into
+   * the TODOs/Ideas tabs, which isn't necessarily the "active" project.
    */
-  private async resyncActiveProject(): Promise<void> {
-    if (!this.activeProjectName) return;
-    const scanned = this.scannedProjects.find((p) => p.name === this.activeProjectName);
+  private async resyncProject(name: string): Promise<void> {
+    const scanned = this.scannedProjects.find((p) => p.name === name);
     if (!scanned) return;
 
     const items = await this.syncManager.getProjectItems(scanned.localPath);

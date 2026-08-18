@@ -3,6 +3,7 @@ import { TodoScanner } from "./TodoScanner";
 import { ProjectInfo, TodoItem } from "./types";
 import { getPriorityValue, hasTag } from "./utils";
 import { ScannedProject } from "./ProjectScanner";
+import { ParsedProjectItem } from "./StructuredFileParser";
 
 /**
  * Shared by ProjectManager (interactive, tag-click flow) and ProjectSyncManager
@@ -43,8 +44,17 @@ export class ProjectManager {
    * the most recent `ProjectScanner`/`ProjectSyncManager.syncAll()` result
    * rather than triggering a fresh scan here (scanning shells out to `git` per
    * repo — not something render-path code should trigger on its own).
+   *
+   * `getCachedItems`, when supplied, folds each repo-matched project's
+   * synced items (from `ProjectSyncManager.getCachedItems()`) into
+   * `count`/`highestPriority`/`hasFocusItems` alongside the vault-derived
+   * numbers — see `foldSyncedItemsIntoProjects` below. Callers that only
+   * care about vault items can omit it; the merge step is skipped entirely.
    */
-  getProjects(scannedProjects: ScannedProject[] = []): ProjectInfo[] {
+  getProjects(
+    scannedProjects: ScannedProject[] = [],
+    getCachedItems?: (localPath: string) => ParsedProjectItem[]
+  ): ProjectInfo[] {
     const todos = this.scanner.getTodos();
     // Track projects with priority sum for weighted average calculation
     const projectMap = new Map<string, ProjectInfo & { prioritySum: number }>();
@@ -128,7 +138,8 @@ export class ProjectManager {
       });
     }
 
-    return mergeScannedProjects(projects, scannedProjects);
+    const merged = mergeScannedProjects(projects, scannedProjects);
+    return getCachedItems ? foldSyncedItemsIntoProjects(merged, getCachedItems) : merged;
   }
 
   getFocusProjects(limit?: number): ProjectInfo[] {
@@ -436,6 +447,43 @@ function mergeScannedProjects(projects: ProjectInfo[], scannedProjects: ScannedP
   }
 
   return [...merged.values()];
+}
+
+/**
+ * Folds each repo-matched project's non-completed synced items (from
+ * `ProjectSyncManager.getCachedItems()`) into `count`/`highestPriority`/
+ * `hasFocusItems`, the same three fields the vault-todo loop in
+ * `getProjects()` computes. Keeps the TODOs tab's tag cloud and interleaved
+ * project blocks (`SidebarView.renderActiveTodos`) sorting/filtering
+ * consistently whether an item lives in the vault or a repo file — a
+ * project with a `#focus` synced item should sort to the top of the pill
+ * cloud exactly like one with a `#focus` vault item does.
+ *
+ * `colourIndex` is deliberately left untouched — it's derived from a
+ * weighted average of vault priorities computed earlier in `getProjects()`,
+ * and re-deriving it from a second, differently-shaped item set isn't worth
+ * the complexity for a cosmetic pill colour.
+ */
+function foldSyncedItemsIntoProjects(
+  projects: ProjectInfo[],
+  getCachedItems: (localPath: string) => ParsedProjectItem[]
+): ProjectInfo[] {
+  return projects.map((project) => {
+    if (!project.localPath) return project;
+    const items = getCachedItems(project.localPath).filter((i) => !i.completed);
+    if (items.length === 0) return project;
+
+    let count = project.count;
+    let highestPriority = project.highestPriority;
+    let hasFocusItems = project.hasFocusItems;
+    for (const item of items) {
+      count++;
+      highestPriority = Math.min(highestPriority, getPriorityValue(item.tags));
+      if (hasTag(item.tags, "#focus")) hasFocusItems = true;
+    }
+
+    return { ...project, count, highestPriority, hasFocusItems };
+  });
 }
 
 function repoFields(

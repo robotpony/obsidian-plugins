@@ -4,6 +4,7 @@ import { ProjectManager } from "../ProjectManager";
 import { TodoScanner } from "../TodoScanner";
 import { ScannedProject } from "../ProjectScanner";
 import { TodoItem } from "../types";
+import { ParsedProjectItem } from "../StructuredFileParser";
 
 // Phase 5 (see PLAN.md): ProjectManager.getProjects() merging tag-derived and
 // repo-derived ProjectInfo. Uses a minimal fake TodoScanner (just getTodos()),
@@ -90,5 +91,81 @@ describe("ProjectManager.getProjects: merging with scannedProjects", () => {
     const withEmpty = manager.getProjects([]);
     const withNone = manager.getProjects();
     expect(withEmpty).toEqual(withNone);
+  });
+});
+
+function syncedItemFixture(overrides: Partial<ParsedProjectItem> = {}): ParsedProjectItem {
+  return {
+    sourceFile: "/Users/mx/projects/peep/TODO.md",
+    lineNumber: 0,
+    fingerprint: "",
+    text: "- Add caching",
+    hasCheckbox: false,
+    itemType: "todo",
+    completed: false,
+    tags: [],
+    shape: "plainBullet",
+    ...overrides,
+  };
+}
+
+// Folding synced items (ProjectSyncManager.getCachedItems()) into
+// count/highestPriority/hasFocusItems — see DESIGN.md's "Project blocks in
+// the TODOs/Ideas tabs".
+describe("ProjectManager.getProjects: folding synced items via getCachedItems", () => {
+  it("omitting getCachedItems leaves the merge untouched", () => {
+    const manager = makeManager([todoFixture({ tags: ["#todo", "#peep"] })]);
+    const withLookup = manager.getProjects([scannedFixture()], () => [syncedItemFixture({ tags: ["#focus"] })]);
+    const without = manager.getProjects([scannedFixture()]);
+    expect(without[0].hasFocusItems).toBe(false);
+    expect(withLookup[0].hasFocusItems).toBe(true);
+  });
+
+  it("adds synced item count on top of the vault-derived count", () => {
+    const manager = makeManager([todoFixture({ tags: ["#todo", "#peep"] })]);
+    const projects = manager.getProjects([scannedFixture()], () => [
+      syncedItemFixture(),
+      syncedItemFixture({ lineNumber: 1 }),
+    ]);
+    expect(projects[0].count).toBe(3); // 1 vault + 2 synced
+  });
+
+  it("a synced #focus item sets hasFocusItems even with no vault #focus item", () => {
+    const manager = makeManager([todoFixture({ tags: ["#todo", "#peep"] })]);
+    const projects = manager.getProjects([scannedFixture()], () => [syncedItemFixture({ tags: ["#focus"] })]);
+    expect(projects[0].hasFocusItems).toBe(true);
+  });
+
+  it("a synced #p0 item improves highestPriority over an unmarked vault item", () => {
+    const manager = makeManager([todoFixture({ tags: ["#todo", "#peep"] })]); // no priority tag -> value 7
+    const projects = manager.getProjects([scannedFixture()], () => [syncedItemFixture({ tags: ["#p0"] })]);
+    expect(projects[0].highestPriority).toBe(2); // #p0
+  });
+
+  it("ignores completed synced items", () => {
+    const manager = makeManager([todoFixture({ tags: ["#todo", "#peep"] })]);
+    const projects = manager.getProjects([scannedFixture()], () => [
+      syncedItemFixture({ completed: true, tags: ["#focus"] }),
+    ]);
+    expect(projects[0].count).toBe(1); // vault item only
+    expect(projects[0].hasFocusItems).toBe(false);
+  });
+
+  it("leaves colourIndex untouched by synced items", () => {
+    const manager = makeManager([todoFixture({ tags: ["#todo", "#peep"] })]);
+    const without = manager.getProjects([scannedFixture()]);
+    const withLookup = manager.getProjects([scannedFixture()], () => [syncedItemFixture({ tags: ["#p0"] })]);
+    expect(withLookup[0].colourIndex).toBe(without[0].colourIndex);
+  });
+
+  it("gives a synced-only project (no localPath match issue) its own entry via zero-count repo merge", () => {
+    const manager = makeManager([todoFixture({ tags: ["#todo", "#unrelated"] })]);
+    const projects = manager.getProjects([scannedFixture({ name: "quiet-repo" })], (localPath) =>
+      localPath === "/Users/mx/projects/peep" ? [syncedItemFixture({ tags: ["#focus"] })] : []
+    );
+    const quiet = projects.find((p) => p.tag === "#quiet-repo");
+    expect(quiet).toBeDefined();
+    expect(quiet!.count).toBe(1);
+    expect(quiet!.hasFocusItems).toBe(true);
   });
 });

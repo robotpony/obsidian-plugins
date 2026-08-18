@@ -69,6 +69,18 @@ export interface ProjectInfo {
 }
 
 /**
+ * One row in the TODOs/Ideas tab's active list: either a vault `TodoItem`
+ * (rendered as today) or a repo project's synced-item block (rendered as
+ * one collapsible group). The two interleave in a single sorted list —
+ * see `compareSortableEntries` in `utils.ts` — rather than living in
+ * separate sections, so a `#focus` synced item bubbles to the top the same
+ * way a `#focus` vault item does.
+ */
+export type SortableEntry =
+  | { kind: 'todo'; item: TodoItem }
+  | { kind: 'project'; project: ProjectInfo };
+
+/**
  * Source classification for a focus queue.
  * - 'focus-tagged': queue items came from explicit #focus tags
  * - 'priority-fallback': queue items came from highest-priority TODOs (no #focus items existed)

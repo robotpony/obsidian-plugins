@@ -1,7 +1,7 @@
 import { App, MarkdownView, TFile, Vault, WorkspaceLeaf, moment } from "obsidian";
 import { readFile, writeFile } from "fs/promises";
 import { createNoticeFactory } from "./shared";
-import type { FocusQueueResult, ItemDate, TodoItem } from "./types";
+import type { FocusQueueResult, ItemDate, SortableEntry, TodoItem } from "./types";
 
 /** Logo prefix for Notice messages */
 export const LOGO_PREFIX = "␣⌘";
@@ -320,6 +320,45 @@ export function comparePriorityOnly(
   const priorityDiff = getEffectivePriority(a, allItems) - getEffectivePriority(b, allItems);
   if (priorityDiff !== 0) return priorityDiff;
   return getTagCount(b.tags) - getTagCount(a.tags);
+}
+
+/**
+ * Compare a `TodoItem` and a project block for the same tier-then-priority
+ * ordering `compareWithEffectivePriority` gives two `TodoItem`s — used to
+ * interleave synced project blocks into the TODOs/Ideas tabs' active list
+ * (`SidebarView.renderActiveTodos`/`renderActiveIdeas`) rather than showing
+ * them in a separate section. A project block's tier/priority come from its
+ * `ProjectInfo.hasFocusItems`/`highestPriority`, which already folds in
+ * synced items (see `ProjectManager.foldSyncedItemsIntoProjects`) — no new
+ * priority logic here, just combining two already-computed values.
+ *
+ * Ties (equal tier and priority) keep todo entries before project entries;
+ * an exact tie between two entries of the same kind is left in place
+ * (stable sort), matching `compareWithEffectivePriority`'s tag-count
+ * tiebreak not applying across kinds.
+ */
+export function compareSortableEntries(
+  a: SortableEntry,
+  b: SortableEntry,
+  allTodos: TodoItem[]
+): number {
+  const tierOf = (entry: SortableEntry): { focused: boolean; priority: number } =>
+    entry.kind === 'todo'
+      ? { focused: isEffectivelyFocused(entry.item, allTodos), priority: getEffectivePriority(entry.item, allTodos) }
+      : { focused: entry.project.hasFocusItems, priority: entry.project.highestPriority };
+
+  const tierA = tierOf(a);
+  const tierB = tierOf(b);
+
+  if (tierA.focused && !tierB.focused) return -1;
+  if (!tierA.focused && tierB.focused) return 1;
+
+  const priorityDiff = tierA.priority - tierB.priority;
+  if (priorityDiff !== 0) return priorityDiff;
+
+  if (a.kind === 'todo' && b.kind === 'project') return -1;
+  if (a.kind === 'project' && b.kind === 'todo') return 1;
+  return 0;
 }
 
 /**
