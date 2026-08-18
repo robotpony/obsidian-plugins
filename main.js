@@ -2699,17 +2699,38 @@ function mergeFrontmatter(existing, scanned, lastSynced) {
   merged.set("branch", quote(scanned.branch));
   merged.set("gitStatus", quote(scanned.gitStatus));
   merged.set("lastSynced", quote(lastSynced));
-  if (!existing.has("cssclasses")) {
-    merged.set("cssclasses", quote(PROJECT_NOTE_CSS_CLASS));
-  }
+  merged.set("cssclasses", mergeCssClasses(existing.get("cssclasses")));
   for (const [key, value] of existing) {
-    if (key === "cssclasses" || !SYNC_KEYS.has(key))
+    if (key !== "cssclasses" && !SYNC_KEYS.has(key))
       merged.set(key, value);
   }
   return merged;
 }
 function quote(value) {
   return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+function mergeCssClasses(existingRaw) {
+  const classes = existingRaw ? parseCssClassesValue(existingRaw) : [];
+  if (!classes.includes(PROJECT_NOTE_CSS_CLASS)) {
+    classes.push(PROJECT_NOTE_CSS_CLASS);
+  }
+  if (classes.length === 1)
+    return quote(classes[0]);
+  return `[${classes.map(quote).join(", ")}]`;
+}
+function parseCssClassesValue(raw) {
+  const trimmed = raw.trim();
+  if (!trimmed)
+    return [];
+  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+    return trimmed.slice(1, -1).split(",").map((entry) => unquoteYamlScalar(entry.trim())).filter((entry) => entry.length > 0);
+  }
+  return [unquoteYamlScalar(trimmed)];
+}
+function unquoteYamlScalar(value) {
+  var _a;
+  const match = (_a = value.match(/^"(.*)"$/)) != null ? _a : value.match(/^'(.*)'$/);
+  return match ? match[1] : value;
 }
 function serializeFrontmatter(entries) {
   const lines = [...entries.entries()].map(([key, value]) => `${key}: ${value}`);
@@ -5700,10 +5721,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     const row = container.createDiv({ cls: "warped-todo-project-row" });
     const titleLine = row.createDiv({ cls: "warped-todo-project-row-title" });
     titleLine.createSpan({ text: name, cls: "warped-todo-project-name" });
-    if (project.branch)
-      titleLine.createSpan({ text: project.branch, cls: "warped-todo-project-branch" });
-    if (project.gitStatus)
-      titleLine.createSpan({ text: project.gitStatus, cls: "warped-todo-project-status" });
     const notePath = projectFilePath(this.getProjectsOptions().projectsFolder, name);
     const noteFile = this.app.vault.getAbstractFileByPath(notePath);
     if (noteFile instanceof import_obsidian12.TFile) {
@@ -5724,6 +5741,11 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
         openFileAtLine(this.app, noteFile, 0);
       });
     }
+    const metaChunks = [];
+    if (project.branch)
+      metaChunks.push({ text: project.branch, cls: "warped-todo-project-branch" });
+    if (project.gitStatus)
+      metaChunks.push({ text: project.gitStatus, cls: "warped-todo-project-status" });
     if (counts.total > 0) {
       const parts = [];
       if (counts.todo > 0)
@@ -5732,7 +5754,15 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
         parts.push(`${counts.idea} idea`);
       if (counts.bug > 0)
         parts.push(`${counts.bug} bug`);
-      row.createDiv({ text: parts.join(" \xB7 "), cls: "warped-todo-project-row-counts" });
+      metaChunks.push({ text: parts.join(" \xB7 ") });
+    }
+    if (metaChunks.length > 0) {
+      const metaLine = row.createDiv({ cls: "warped-todo-project-row-meta" });
+      metaChunks.forEach((chunk, i) => {
+        if (i > 0)
+          metaLine.createSpan({ text: " \xB7 " });
+        metaLine.createSpan({ text: chunk.text, cls: chunk.cls });
+      });
     }
     return row;
   }

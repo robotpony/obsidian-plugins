@@ -120,7 +120,7 @@ describe("ProjectSyncManager.syncProject: updating an existing note", () => {
     expect(content).toContain('cssclasses: "warped-todo-project-note"'); // added, wasn't set before
   });
 
-  it("leaves an existing custom cssclasses value completely alone", async () => {
+  it("appends the hide-properties class to an existing bare cssclasses value instead of skipping it", async () => {
     const { app, vault } = createFakeApp();
     const manager = new ProjectSyncManager(app as any);
 
@@ -143,8 +143,39 @@ describe("ProjectSyncManager.syncProject: updating an existing note", () => {
     await manager.syncProject(scannedFixture(), [item()], PROJECTS_FOLDER);
 
     const content = vault.getRawContent("projects/peep.md")!;
-    expect(content).toContain("cssclasses: my-custom-style");
-    expect(content).not.toContain("warped-todo-project-note");
+    // Both classes present, re-emitted as an inline array — not skipped
+    // entirely the way an earlier version of this merge did, which left
+    // notes with any pre-existing cssclasses never getting the hide class
+    // (their Properties panel just stayed visible forever).
+    expect(content).toContain('cssclasses: ["my-custom-style", "warped-todo-project-note"]');
+  });
+
+  it("doesn't duplicate the hide-properties class if a resync finds it already appended", async () => {
+    const { app, vault } = createFakeApp();
+    const manager = new ProjectSyncManager(app as any);
+
+    vault.setRawContent(
+      "projects/peep.md",
+      [
+        "---",
+        'project: "peep"',
+        'repo: "/repos/peep"',
+        'remote: "https://github.com/robotpony/peep.git"',
+        'branch: "main"',
+        'gitStatus: ""',
+        'lastSynced: "2026-01-01T00:00:00.000Z"',
+        'cssclasses: ["my-custom-style", "warped-todo-project-note"]',
+        "---",
+        "",
+      ].join("\n")
+    );
+
+    await manager.syncProject(scannedFixture({ gitStatus: "M" }), [item()], PROJECTS_FOLDER);
+
+    const content = vault.getRawContent("projects/peep.md")!;
+    const occurrences = content.match(/warped-todo-project-note/g) ?? [];
+    expect(occurrences).toHaveLength(1);
+    expect(content).toContain('cssclasses: ["my-custom-style", "warped-todo-project-note"]');
   });
 
   it("is idempotent: two syncs with no underlying change produce identical frontmatter and body (aside from lastSynced)", async () => {

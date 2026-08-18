@@ -313,17 +313,21 @@ function mergeFrontmatter(
   merged.set("lastSynced", quote(lastSynced));
 
   // cssclasses (Obsidian's per-note styling hook, used to hide the Properties
-  // panel) is only set when the note doesn't already define one — an existing
-  // custom value, however formatted, is left completely alone rather than
-  // risking the hand-rolled parser below mangling multi-line YAML list syntax
-  // it was never built to round-trip.
-  if (!existing.has("cssclasses")) {
-    merged.set("cssclasses", quote(PROJECT_NOTE_CSS_CLASS));
-  }
+  // panel — see styles.css) gets our class appended if it's missing, rather
+  // than skipped whenever the note already defines one. The earlier version
+  // skipped entirely to avoid mangling a value it couldn't safely round-trip
+  // — but that meant any note with a pre-existing cssclasses (from a
+  // template, or predating this feature) silently never got the hide class,
+  // and its Properties panel just stayed visible forever. See
+  // mergeCssClasses()'s own comment for what it does and doesn't handle.
+  merged.set("cssclasses", mergeCssClasses(existing.get("cssclasses")));
 
-  // Preserve anything else the user (or a future feature) added, in its original order.
+  // Preserve anything else the user (or a future feature) added, in its
+  // original order. cssclasses is excluded here — already handled above —
+  // otherwise this would immediately overwrite mergeCssClasses()'s result
+  // with the untouched original value.
   for (const [key, value] of existing) {
-    if (key === "cssclasses" || !SYNC_KEYS.has(key)) merged.set(key, value);
+    if (key !== "cssclasses" && !SYNC_KEYS.has(key)) merged.set(key, value);
   }
 
   return merged;
@@ -331,6 +335,52 @@ function mergeFrontmatter(
 
 function quote(value: string): string {
   return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+
+/**
+ * Builds the `cssclasses` value to write, appending PROJECT_NOTE_CSS_CLASS
+ * to whatever's already there instead of skipping when a value exists.
+ *
+ * Handles the two forms an existing single-line value can take: a bare
+ * scalar (`cssclasses: foo`, `cssclasses: "foo"`) and an inline YAML array
+ * (`cssclasses: [foo, "bar"]`) — parsed, deduped, and re-emitted as an
+ * inline array so it round-trips through this same function on every future
+ * sync. Does NOT handle a multi-line YAML block list
+ * (`cssclasses:\n  - foo\n  - bar`): `parseFrontmatter`'s line-based parser
+ * above can't represent one at all — it already reads a bare `cssclasses:`
+ * line as an empty value and silently drops the indented `- item` lines
+ * that follow, before this function ever sees it. That data loss is a
+ * pre-existing limit of this hand-rolled parser, not something introduced
+ * here; fixing it for real needs an actual YAML parser. A block-list note
+ * is rare for a single-purpose key like this one, and the practical effect
+ * is the same either way — the original list wasn't going to survive a
+ * resync regardless of what this function does with it.
+ */
+function mergeCssClasses(existingRaw: string | undefined): string {
+  const classes = existingRaw ? parseCssClassesValue(existingRaw) : [];
+  if (!classes.includes(PROJECT_NOTE_CSS_CLASS)) {
+    classes.push(PROJECT_NOTE_CSS_CLASS);
+  }
+  if (classes.length === 1) return quote(classes[0]);
+  return `[${classes.map(quote).join(", ")}]`;
+}
+
+function parseCssClassesValue(raw: string): string[] {
+  const trimmed = raw.trim();
+  if (!trimmed) return [];
+  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+    return trimmed
+      .slice(1, -1)
+      .split(",")
+      .map((entry) => unquoteYamlScalar(entry.trim()))
+      .filter((entry) => entry.length > 0);
+  }
+  return [unquoteYamlScalar(trimmed)];
+}
+
+function unquoteYamlScalar(value: string): string {
+  const match = value.match(/^"(.*)"$/) ?? value.match(/^'(.*)'$/);
+  return match ? match[1] : value;
 }
 
 function serializeFrontmatter(entries: Map<string, string>): string {

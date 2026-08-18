@@ -2406,8 +2406,6 @@ export class TodoSidebarView extends ItemView {
 
     const titleLine = row.createDiv({ cls: "warped-todo-project-row-title" });
     titleLine.createSpan({ text: name, cls: "warped-todo-project-name" });
-    if (project.branch) titleLine.createSpan({ text: project.branch, cls: "warped-todo-project-branch" });
-    if (project.gitStatus) titleLine.createSpan({ text: project.gitStatus, cls: "warped-todo-project-status" });
 
     // Filename + arrow to the project's own note — the same "which file is
     // this?" affordance TODOs' header/orphan-section rows give their source
@@ -2437,12 +2435,29 @@ export class TodoSidebarView extends ItemView {
       });
     }
 
+    // Branch, git status, and item counts share one muted line below the
+    // name, dot-separated like the counts already were — branch used to
+    // sit on the title line instead, which wrapped badly for long project
+    // names and put it on a different line than everything else describing
+    // the repo's current state. Reported via screenshot. Each chunk keeps
+    // its own class (status keeps its accent colour/monospace) rather than
+    // joining into one plain string, the way counts alone used to.
+    const metaChunks: { text: string; cls?: string }[] = [];
+    if (project.branch) metaChunks.push({ text: project.branch, cls: "warped-todo-project-branch" });
+    if (project.gitStatus) metaChunks.push({ text: project.gitStatus, cls: "warped-todo-project-status" });
     if (counts.total > 0) {
       const parts: string[] = [];
       if (counts.todo > 0) parts.push(`${counts.todo} todo`);
       if (counts.idea > 0) parts.push(`${counts.idea} idea`);
       if (counts.bug > 0) parts.push(`${counts.bug} bug`);
-      row.createDiv({ text: parts.join(" · "), cls: "warped-todo-project-row-counts" });
+      metaChunks.push({ text: parts.join(" · ") });
+    }
+    if (metaChunks.length > 0) {
+      const metaLine = row.createDiv({ cls: "warped-todo-project-row-meta" });
+      metaChunks.forEach((chunk, i) => {
+        if (i > 0) metaLine.createSpan({ text: " · " });
+        metaLine.createSpan({ text: chunk.text, cls: chunk.cls });
+      });
     }
     return row;
   }

@@ -2,6 +2,48 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.35.8] - 2026-08-17
+
+### Fixed — project notes with a pre-existing `cssclasses` never got their Properties panel hidden
+
+`ProjectSyncManager` writes `cssclasses: warped-todo-project-note` into
+each synced note so `styles.css` can hide its Properties panel — the
+sidebar already surfaces branch/status/remote/counts, so the raw
+frontmatter is just noise in the editor. That only happened when the note
+had no `cssclasses` at all, though: if one already existed (predating this
+feature, from a template, however it got there), the merge skipped adding
+ours entirely rather than risk mangling a value the frontmatter parser
+here — hand-rolled, single-line only — couldn't safely round-trip. Any
+such note just kept showing its Properties panel forever, with no way to
+fix it short of hand-editing the file. This is what the "front-matter is
+still shown in project file" TODO was almost certainly about.
+
+Now appends instead of skipping: a bare value (`cssclasses: foo`) or an
+inline array (`cssclasses: [foo, "bar"]`) both get parsed, deduped against
+`warped-todo-project-note`, and re-emitted as an inline array, so a
+resync fixes any note that hit this. Doesn't cover a multi-line YAML block
+list (`cssclasses:` followed by indented `- item` lines) — the parser
+already couldn't represent one before this change either; that's a
+pre-existing limit of hand-rolling frontmatter parsing rather than
+something this introduces, and rare for a single-purpose key like this.
+
+## [0.35.7] - 2026-08-17
+
+### Changed — Project row branch moved down to join the item-count line
+
+Branch (and its git-status badge, e.g. `M`/`?`) sat on the title line next
+to the project name, wrapping badly for long names (`brucealderson.ca.2025
+main` forcing "main" onto its own line, `development-notes` wrapping the
+name itself with "main" stranded beside it) and putting it on a different
+line than the todo/idea/bug counts it's conceptually part of ("what's the
+current state of this repo"). Reported via screenshot with the desired
+layout: branch on the same dot-separated line as the counts. Rows with no
+counts (most projects, which have no open items) now get that line too,
+just branch/status alone — previously they had no second line at all.
+Each chunk (branch, status, counts) keeps its own styling — status keeps
+its accent colour and monospace font — rather than collapsing into one
+plain string.
+
 ## [0.35.6] - 2026-08-17
 
 ### Fixed — Projects list still didn't match TODOs: spacing and missing file link

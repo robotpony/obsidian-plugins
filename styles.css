@@ -2166,7 +2166,11 @@
   font-family: var(--font-monospace);
 }
 
-.warped-todo-project-row-counts {
+/* Branch, git status, and item counts — one muted line below the name,
+   dot-separated. Was .warped-todo-project-row-counts (counts only); branch
+   and status used to sit on the title line instead, which wrapped badly
+   for long project names — see renderProjectSummary's comment. */
+.warped-todo-project-row-meta {
   color: var(--text-muted);
   font-size: 0.85em;
   margin-top: var(--size-2-1);
