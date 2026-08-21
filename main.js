@@ -3973,6 +3973,11 @@ function homeRelativePath(path) {
   const home = require("os").homedir();
   return path === home || path.startsWith(home + "/") ? "~" + path.slice(home.length) : path;
 }
+function guessProjectsFolder(homedir = () => require("os").homedir(), pathExists = (path) => require("fs").existsSync(path)) {
+  const home = homedir();
+  const candidate = `${home}/projects`;
+  return pathExists(candidate) ? candidate : home;
+}
 function isHeaderWithChildren(item) {
   return item.isHeader === true && !!item.childLineNumbers && item.childLineNumbers.length > 0;
 }
@@ -5942,7 +5947,12 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       menu.addItem((item) => {
         item.setTitle("Refresh").setIcon("refresh-cw").onClick(async () => {
           menuBtn.addClass("rotating");
-          await this.scanner.scanVault();
+          const rescans = [this.scanner.scanVault()];
+          if (this.getProjectsOptions().baseFolder) {
+            this.projectsSyncedOnce = false;
+            rescans.push(this.ensureProjectsSynced());
+          }
+          await Promise.all(rescans);
           setTimeout(() => menuBtn.removeClass("rotating"), 500);
         });
       });
@@ -7851,10 +7861,38 @@ var StatsModal = class extends import_obsidian13.Modal {
     this.contentEl.empty();
   }
 };
+function chooseFolder(defaultPath) {
+  var _a, _b;
+  try {
+    const electron = require("electron");
+    const dialog = (_b = (_a = electron.remote) == null ? void 0 : _a.dialog) != null ? _b : electron.dialog;
+    const result = dialog.showOpenDialogSync({
+      title: "Choose Projects folder",
+      defaultPath,
+      properties: ["openDirectory", "createDirectory"]
+    });
+    return result && result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error("[Warped Todo]", "Failed to open folder picker:", error);
+    showNotice2("Couldn't open the folder picker. See console for details.");
+    return null;
+  }
+}
 var WarpedTodoSettingTab = class extends import_obsidian13.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
+    // Set inside display() by the Projects base folder field; applies the
+    // pending value (restart the file watcher, full resync) once, deduped
+    // against what was last applied. Covers the "modal closed with the field
+    // still focused" case, where a blur event may not fire — see that field's
+    // own comment for why the actual apply is deferred to blur in the first
+    // place.
+    this.pendingProjectsBaseFolderApply = null;
     this.plugin = plugin;
+  }
+  hide() {
+    var _a;
+    void ((_a = this.pendingProjectsBaseFolderApply) == null ? void 0 : _a.call(this));
   }
   display() {
     const { containerEl } = this;
@@ -7962,17 +8000,48 @@ var WarpedTodoSettingTab = class extends import_obsidian13.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian13.Setting(containerEl).setName("Projects base folder").setDesc("Folder of git repos scanned for project notes (e.g., /Users/you/projects). Leave blank to disable repo syncing.").addText(
-      (text) => text.setPlaceholder("/Users/you/projects").setValue(this.plugin.settings.projectsBaseFolder).onChange(async (value) => {
-        this.plugin.settings.projectsBaseFolder = value;
-        await this.plugin.saveSettings();
+    {
+      let lastApplied = this.plugin.settings.projectsBaseFolder;
+      const applyBaseFolderChange = async () => {
+        const value = this.plugin.settings.projectsBaseFolder;
+        if (value === lastApplied)
+          return;
+        lastApplied = value;
         if (value) {
           this.plugin.projectSyncManager.startWatching(this.plugin.projectsSyncOptions());
+          try {
+            await this.plugin.projectSyncManager.syncAll(this.plugin.projectsSyncOptions());
+          } catch (error) {
+            console.error("[Warped Todo]", "Project sync failed:", error);
+            showNotice2("Project sync failed. See console for details.");
+          }
         } else {
           this.plugin.projectSyncManager.stopWatching();
         }
-      })
-    );
+      };
+      this.pendingProjectsBaseFolderApply = applyBaseFolderChange;
+      let projectsFolderText;
+      new import_obsidian13.Setting(containerEl).setName("Projects base folder").setDesc("Folder of git repos scanned for project notes (e.g., /Users/you/projects). Leave blank to disable repo syncing.").addText((text) => {
+        projectsFolderText = text;
+        text.setPlaceholder("/Users/you/projects").setValue(this.plugin.settings.projectsBaseFolder).onChange(async (value) => {
+          this.plugin.settings.projectsBaseFolder = value;
+          await this.plugin.saveSettings();
+        });
+        text.inputEl.addEventListener("blur", () => void applyBaseFolderChange());
+      }).addExtraButton(
+        (btn) => btn.setIcon("folder-open").setTooltip("Choose a folder").onClick(async () => {
+          const chosen = chooseFolder(
+            this.plugin.settings.projectsBaseFolder || guessProjectsFolder()
+          );
+          if (!chosen)
+            return;
+          projectsFolderText.setValue(chosen);
+          this.plugin.settings.projectsBaseFolder = chosen;
+          await this.plugin.saveSettings();
+          await applyBaseFolderChange();
+        })
+      );
+    }
     new import_obsidian13.Setting(containerEl).setName("Projects exclude directories").setDesc("Comma-separated directory names to skip while scanning for repos (e.g., node_modules, dist, build, archive)").addText(
       (text) => text.setPlaceholder("node_modules, dist, build, archive").setValue(this.plugin.settings.projectsExcludeDirs.join(", ")).onChange(async (value) => {
         this.plugin.settings.projectsExcludeDirs = value.split(",").map((d) => d.trim()).filter((d) => d.length > 0);

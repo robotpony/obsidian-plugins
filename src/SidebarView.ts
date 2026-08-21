@@ -2149,14 +2149,28 @@ export class TodoSidebarView extends ItemView {
           .setIcon("refresh-cw")
           .onClick(async () => {
             menuBtn.addClass("rotating");
-            await this.scanner.scanVault();
+            const rescans: Promise<unknown>[] = [this.scanner.scanVault()];
+            // Also re-syncs projects, not just the vault's own #todo/#idea
+            // items — otherwise "Refresh" (available from every tab) looked
+            // like it covered everything but silently left a stale project
+            // list after e.g. correcting the base folder in settings,
+            // forcing a trip to the Projects tab for the "Sync" item below
+            // instead. Only when a base folder is actually configured;
+            // ensureProjectsSynced() no-ops on an empty one anyway, but
+            // there's nothing to rotate the icon for in that case.
+            if (this.getProjectsOptions().baseFolder) {
+              this.projectsSyncedOnce = false;
+              rescans.push(this.ensureProjectsSynced());
+            }
+            await Promise.all(rescans);
             setTimeout(() => menuBtn.removeClass("rotating"), 500);
           });
       });
 
-      // Full project re-sync — only meaningful on the Projects tab. Mirrors
-      // "Refresh" above but for repo-derived project data instead of the
-      // vault's own #todo/#idea items, which "Refresh" already covers.
+      // Same project re-sync "Refresh" above already does, as a
+      // Projects-tab-local shortcut — kept since "Sync" reads clearer than
+      // "Refresh" when you're already looking at repo-derived project data
+      // specifically, not vault items.
       if (this.activeTab === 'projects') {
         menu.addItem((item) => {
           item

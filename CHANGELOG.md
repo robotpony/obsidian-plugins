@@ -2,6 +2,22 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.38.3] - 2026-08-21
+
+### Fixed — Projects base folder setting
+
+- Typing into "Projects base folder" no longer restarts the repo file
+  watcher on every keystroke. The change is now applied once, on blur (or
+  when Settings closes with the field still focused) — and applying it now
+  does a full project resync, not just a watcher restart, so the Projects
+  list actually reflects a newly-set folder without a manual "Sync."
+- The sidebar's "Refresh" (kebab menu, available from any tab) now
+  re-syncs projects too when a base folder is configured, not just the
+  vault's own #todo/#idea items — it looked like a full refresh but
+  silently skipped projects before.
+- Added a "Choose a folder" button beside the field, using the OS folder
+  picker. Defaults to `~/projects` if it exists, else the home directory.
+
 ## [0.38.2] - 2026-08-21
 
 ### Fixed

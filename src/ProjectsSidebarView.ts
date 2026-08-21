@@ -97,6 +97,25 @@ export function homeRelativePath(path: string): string {
   return path === home || path.startsWith(home + "/") ? "~" + path.slice(home.length) : path;
 }
 
+/**
+ * Best-guess starting point for the "Choose a folder" picker beside the
+ * Projects base folder setting: ~/projects if it exists — the same path
+ * homedir()'s own /Users/<you> resolves to, so trying "~/projects" and
+ * "/Users/<you>/projects" is one check, not two — falling back to the home
+ * directory itself so the dialog opens somewhere sensible instead of
+ * Electron's own default (usually Documents). `homedir`/`pathExists` are
+ * injectable so this stays unit-testable without touching the real
+ * filesystem, same reasoning as everything else in this file.
+ */
+export function guessProjectsFolder(
+  homedir: () => string = () => require("os").homedir(),
+  pathExists: (path: string) => boolean = (path) => require("fs").existsSync(path)
+): string {
+  const home = homedir();
+  const candidate = `${home}/projects`;
+  return pathExists(candidate) ? candidate : home;
+}
+
 /** A header TODO with children can't be completed directly (TodoProcessor refuses it) — same rule the TODOs tab uses to decide whether a header row gets its own checkbox. */
 function isHeaderWithChildren(item: TodoItem): boolean {
   return item.isHeader === true && !!item.childLineNumbers && item.childLineNumbers.length > 0;

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { homedir } from "os";
-import { browsableUrl, homeRelativePath } from "../ProjectsSidebarView";
+import { browsableUrl, homeRelativePath, guessProjectsFolder } from "../ProjectsSidebarView";
 
 // UI-review round (see PLAN.md): remote should display as a bare, browsable
 // URL with no protocol, and local path should display home-relativized —
@@ -41,5 +41,22 @@ describe("homeRelativePath", () => {
     const home = homedir();
     const sibling = `${home}xavier/projects/peep`; // no path separator between home and the extra chars
     expect(homeRelativePath(sibling)).toBe(sibling);
+  });
+});
+
+describe("guessProjectsFolder", () => {
+  it("prefers ~/projects when it exists", () => {
+    const home = "/Users/mx";
+    const result = guessProjectsFolder(
+      () => home,
+      (path) => path === `${home}/projects`
+    );
+    expect(result).toBe("/Users/mx/projects");
+  });
+
+  it("falls back to the home directory when ~/projects doesn't exist", () => {
+    const home = "/Users/mx";
+    const result = guessProjectsFolder(() => home, () => false);
+    expect(result).toBe(home);
   });
 });

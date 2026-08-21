@@ -6,6 +6,7 @@ import {
   PluginSettingTab,
   Setting,
   TFile,
+  TextComponent,
 } from "obsidian";
 import { TodoScanner } from "./src/TodoScanner";
 import { TodoProcessor } from "./src/TodoProcessor";
@@ -32,6 +33,7 @@ import { TabLockManager } from "./src/TabLockManager";
 import { createHeaderSortPlugin } from "./src/HeaderSortExtension";
 import { createHeaderChecklistExtension } from "./src/HeaderChecklistExtension";
 import { SidebarManager } from "./src/shared";
+import { guessProjectsFolder } from "./src/ProjectsSidebarView";
 
 export default class WarpedTodoPlugin extends Plugin {
   settings: WarpedTodoSettings;
@@ -616,12 +618,49 @@ class StatsModal extends Modal {
   }
 }
 
+/**
+ * Native folder picker for the Projects base folder setting — Electron's
+ * synchronous dialog, same electron.remote fallback SidebarView.ts's
+ * revealProjectInFinder uses for shell.showItemInFolder (this plugin is
+ * desktop-only anyway; see manifest.json's isDesktopOnly). Returns null on
+ * cancel or failure; a failure shows a notice rather than throwing, so a
+ * picker error doesn't crash the settings tab.
+ */
+function chooseFolder(defaultPath: string): string | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const electron = require("electron");
+    const dialog = electron.remote?.dialog ?? electron.dialog;
+    const result = dialog.showOpenDialogSync({
+      title: "Choose Projects folder",
+      defaultPath,
+      properties: ["openDirectory", "createDirectory"],
+    });
+    return result && result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error("[Warped Todo]", "Failed to open folder picker:", error);
+    showNotice("Couldn't open the folder picker. See console for details.");
+    return null;
+  }
+}
+
 class WarpedTodoSettingTab extends PluginSettingTab {
   plugin: WarpedTodoPlugin;
+  // Set inside display() by the Projects base folder field; applies the
+  // pending value (restart the file watcher, full resync) once, deduped
+  // against what was last applied. Covers the "modal closed with the field
+  // still focused" case, where a blur event may not fire — see that field's
+  // own comment for why the actual apply is deferred to blur in the first
+  // place.
+  private pendingProjectsBaseFolderApply: (() => Promise<void>) | null = null;
 
   constructor(app: App, plugin: WarpedTodoPlugin) {
     super(app, plugin);
     this.plugin = plugin;
+  }
+
+  hide(): void {
+    void this.pendingProjectsBaseFolderApply?.();
   }
 
   display(): void {
@@ -813,23 +852,69 @@ class WarpedTodoSettingTab extends PluginSettingTab {
           })
       );
 
-    new Setting(containerEl)
-      .setName("Projects base folder")
-      .setDesc("Folder of git repos scanned for project notes (e.g., /Users/you/projects). Leave blank to disable repo syncing.")
-      .addText((text) =>
-        text
-          .setPlaceholder("/Users/you/projects")
-          .setValue(this.plugin.settings.projectsBaseFolder)
-          .onChange(async (value) => {
-            this.plugin.settings.projectsBaseFolder = value;
-            await this.plugin.saveSettings();
-            if (value) {
-              this.plugin.projectSyncManager.startWatching(this.plugin.projectsSyncOptions());
-            } else {
-              this.plugin.projectSyncManager.stopWatching();
-            }
-          })
-      );
+    {
+      // Typing into this field used to restart the file watcher (stop +
+      // recreate a recursive fs.watch) on every keystroke — pointless work
+      // for every character typed, and it never actually resynced the
+      // project list, just started watching for *future* changes. A
+      // half-typed path also isn't a real folder yet, so there was nothing
+      // useful to do with it until the user was done. Now onChange only
+      // persists the raw text; the actual apply (restart watching, full
+      // resync so "Projects" tab/sidebar reflect the new folder without a
+      // manual "Sync") happens once, on blur — or on the settings tab's own
+      // hide() as a fallback, in case the modal closes without a blur event.
+      // lastApplied dedupes so blur-then-hide (or refocusing without
+      // editing) doesn't trigger a second, redundant resync.
+      let lastApplied = this.plugin.settings.projectsBaseFolder;
+      const applyBaseFolderChange = async () => {
+        const value = this.plugin.settings.projectsBaseFolder;
+        if (value === lastApplied) return;
+        lastApplied = value;
+        if (value) {
+          this.plugin.projectSyncManager.startWatching(this.plugin.projectsSyncOptions());
+          try {
+            await this.plugin.projectSyncManager.syncAll(this.plugin.projectsSyncOptions());
+          } catch (error) {
+            console.error("[Warped Todo]", "Project sync failed:", error);
+            showNotice("Project sync failed. See console for details.");
+          }
+        } else {
+          this.plugin.projectSyncManager.stopWatching();
+        }
+      };
+      this.pendingProjectsBaseFolderApply = applyBaseFolderChange;
+
+      let projectsFolderText: TextComponent;
+      new Setting(containerEl)
+        .setName("Projects base folder")
+        .setDesc("Folder of git repos scanned for project notes (e.g., /Users/you/projects). Leave blank to disable repo syncing.")
+        .addText((text) => {
+          projectsFolderText = text;
+          text
+            .setPlaceholder("/Users/you/projects")
+            .setValue(this.plugin.settings.projectsBaseFolder)
+            .onChange(async (value) => {
+              this.plugin.settings.projectsBaseFolder = value;
+              await this.plugin.saveSettings();
+            });
+          text.inputEl.addEventListener("blur", () => void applyBaseFolderChange());
+        })
+        .addExtraButton((btn) =>
+          btn
+            .setIcon("folder-open")
+            .setTooltip("Choose a folder")
+            .onClick(async () => {
+              const chosen = chooseFolder(
+                this.plugin.settings.projectsBaseFolder || guessProjectsFolder()
+              );
+              if (!chosen) return;
+              projectsFolderText.setValue(chosen);
+              this.plugin.settings.projectsBaseFolder = chosen;
+              await this.plugin.saveSettings();
+              await applyBaseFolderChange();
+            })
+        );
+    }
 
     new Setting(containerEl)
       .setName("Projects exclude directories")
