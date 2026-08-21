@@ -85,10 +85,12 @@ export class TodoSidebarView extends ItemView {
   private activeProjectName: string | null = null;
   // Where the detail view's "← Back" link should go: null means the normal
   // "back to the Projects list" affordance; set when a project block's →
-  // arrow (TODOs/Ideas tab) opens the detail view directly, so back returns
-  // to the tab the user actually came from instead. Cleared by every other
-  // path into detail view (list row click, auto-follow) — see
-  // backToProjectsList and switchToProjectsTab.
+  // arrow (TODOs/Ideas tab) opens the detail view directly, or when
+  // auto-open (see handleProjectActiveFileChange) jumps here from Todos/
+  // Ideas on its own, so back returns to the tab the user actually came
+  // from instead. Cleared by every other path into detail view (list row
+  // click, auto-follow while already on this tab) — see backToProjectsList
+  // and switchToProjectsTab.
   private projectDetailReturnTab: 'todos' | 'ideas' | null = null;
   private projectsFilterText: string = '';
   // Set at the top of the TODOs tab's render pass (renderTodosList) and read
@@ -2542,12 +2544,38 @@ export class TodoSidebarView extends ItemView {
 
     if (projectName) {
       if (this.projectsMode === 'detail' && this.activeProjectName === projectName) return;
+
+      // Auto-open (a settings toggle, default on): jump the whole sidebar to
+      // the Projects tab when the note opened while Todos/Ideas was active,
+      // not just update state that only shows once the user clicks over —
+      // that's the point of "auto". Remember the tab we jumped from so Back
+      // returns there instead of the Projects list. Skipped during focus
+      // mode: exiting it because a linked note happened to open would be a
+      // bigger interruption than this setting is meant to cause.
+      if (
+        this.getProjectsOptions().autoOpenOnLinkedNote &&
+        !this.focusModeActive &&
+        this.activeTab !== 'projects'
+      ) {
+        this.projectDetailReturnTab = this.activeTab;
+        this.activeTab = 'projects';
+      } else if (this.activeTab !== 'projects') {
+        // Auto-open is off, or focus mode is active, and we're not already
+        // on Projects — a normal fresh entry into detail view (Quick
+        // Switcher, a wikilink) with no tab-jump behind it, so back should
+        // go to the Projects list.
+        this.projectDetailReturnTab = null;
+      }
+      // else (already on Projects, whether list or detail): leave
+      // projectDetailReturnTab as-is. Following a link from one project's
+      // note to a different project's note is still navigation *within*
+      // this same visit to Projects — it shouldn't erase a "came from
+      // Todos/Ideas" context an earlier auto-jump established. Explicit
+      // paths back to the list (backToProjectsList, a list-row click)
+      // already clear it themselves when that's really the intent.
+
       this.projectsMode = 'detail';
       this.activeProjectName = projectName;
-      // A fresh entry into detail view via Quick Switcher/a wikilink/etc.,
-      // not through switchToProjectsTab's returnTab param — back should go
-      // to the Projects list, not some earlier tab from an unrelated visit.
-      this.projectDetailReturnTab = null;
     } else if (this.projectsMode === 'detail') {
       this.projectsMode = 'list';
       this.activeProjectName = null;
@@ -2803,9 +2831,28 @@ export class TodoSidebarView extends ItemView {
     const info = container.createDiv({ cls: "warped-todo-project-info" });
     this.renderProjectSummary(info, project, "detail");
     this.renderProjectFrontmatter(info, project);
+    if (project.readmeSummary) {
+      const summaryEl = info.createDiv({ cls: "warped-todo-project-readme-summary" });
+      void this.renderProjectReadmeSummary(summaryEl, project);
+    }
 
     const itemsContainer = container.createDiv({ cls: "warped-todo-project-items" });
     this.renderProjectItemGroups(itemsContainer, project);
+  }
+
+  /**
+   * Renders the README's opening paragraph (ProjectMetadata.
+   * extractProjectSummary, via ProjectInfo.readmeSummary) as markdown — the
+   * detail view's only hint at what a project actually is, beyond its name
+   * and git facts. Async because MarkdownRenderer.render is; the caller
+   * (a sync render pass) doesn't await it, same as the project-info popup's
+   * description render elsewhere in this file.
+   */
+  private async renderProjectReadmeSummary(container: HTMLElement, project: ProjectInfo): Promise<void> {
+    if (!project.readmeSummary || !project.localPath) return;
+    const component = new Component();
+    component.load();
+    await MarkdownRenderer.render(this.app, project.readmeSummary, container, project.localPath, component);
   }
 
   /**
@@ -2838,12 +2885,25 @@ export class TodoSidebarView extends ItemView {
       projectRow.createSpan({ text: name, cls: "warped-todo-project-frontmatter-value" });
     }
     if (project.localPath) {
-      const revealBtn = projectRow.createEl("a", {
-        cls: "warped-todo-project-frontmatter-reveal",
+      const actions = projectRow.createDiv({ cls: "warped-todo-project-frontmatter-actions" });
+
+      const revealBtn = actions.createEl("a", {
+        cls: "warped-todo-project-frontmatter-icon",
         attr: { title: `Reveal in Finder: ${homeRelativePath(project.localPath)}`, "aria-label": "Reveal in Finder" },
       });
       setIcon(revealBtn, "folder-open");
       revealBtn.addEventListener("click", () => this.revealProjectInFinder(project.localPath!));
+
+      // Less-frequent actions live behind this menu rather than growing the
+      // icon row further — a full-URL action row here already wrapped badly
+      // once in a narrow sidebar (see this method's doc comment), and reveal/
+      // remote are the only two actions used almost every visit.
+      const menuBtn = actions.createEl("a", {
+        cls: "warped-todo-project-frontmatter-icon",
+        attr: { title: "More actions", "aria-label": "More project actions" },
+      });
+      setIcon(menuBtn, "more-horizontal");
+      menuBtn.addEventListener("click", (evt) => this.showProjectActionsMenu(evt as MouseEvent, project));
     }
 
     if (project.stack && project.stack.length > 0) {
@@ -2873,6 +2933,77 @@ export class TodoSidebarView extends ItemView {
       console.error("[Warped Todo]", "Failed to reveal folder:", error);
       showNotice("Couldn't open Finder. See console for details.");
     }
+  }
+
+  /**
+   * The detail view's overflow menu — actions used occasionally rather than
+   * on nearly every visit (reveal-in-Finder and the remote link stay as
+   * their own inline icons for that reason; see renderProjectFrontmatter).
+   */
+  private showProjectActionsMenu(evt: MouseEvent, project: ProjectInfo): void {
+    if (!project.localPath) return;
+    const localPath = project.localPath;
+    const name = project.tag.replace(/^#/, "");
+    const options = this.getProjectsOptions();
+    const menu = new Menu();
+
+    menu.addItem((mi) => {
+      mi.setTitle("Copy path").setIcon("copy").onClick(async () => {
+        await navigator.clipboard.writeText(localPath);
+      });
+    });
+
+    if (project.remote) {
+      const remote = project.remote;
+      menu.addItem((mi) => {
+        mi.setTitle("Copy remote URL").setIcon("link").onClick(async () => {
+          await navigator.clipboard.writeText(remote);
+        });
+      });
+    }
+
+    menu.addItem((mi) => {
+      mi.setTitle("Open in Terminal").setIcon("terminal").onClick(() => {
+        this.openProjectInApp(localPath, options.terminalApp, "Terminal");
+      });
+    });
+
+    menu.addItem((mi) => {
+      mi.setTitle("Open in Editor").setIcon("code").onClick(() => {
+        this.openProjectInApp(localPath, options.editorApp, "editor");
+      });
+    });
+
+    menu.addItem((mi) => {
+      mi.setTitle("Resync items").setIcon("refresh-cw").onClick(async () => {
+        await this.resyncProject(name);
+        showNotice(`${name}: items resynced.`);
+      });
+    });
+
+    menu.showAtMouseEvent(evt);
+  }
+
+  /**
+   * Shells to macOS's `open -a <app>` — one step past revealProjectInFinder's
+   * Electron shell call, launching a named app instead of the file manager.
+   * macOS-only, consistent with this feature's existing platform scope (see
+   * ProjectSyncManager's fs.watch doc comment on the same decision); other
+   * platforms get a notice rather than a silent no-op.
+   */
+  private openProjectInApp(path: string, appName: string, label: string): void {
+    if (process.platform !== "darwin") {
+      showNotice(`Opening in ${label} isn't supported on this platform yet.`);
+      return;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { execFile } = require("child_process");
+    execFile("open", ["-a", appName, path], (error: Error | null) => {
+      if (error) {
+        console.error("[Warped Todo]", `Failed to open ${label} (${appName}):`, error);
+        showNotice(`Couldn't open ${label}. Check the app name in settings.`);
+      }
+    });
   }
 
   /** Opens a synced item's source file (a plain filesystem path, not necessarily inside the vault) in the OS default editor — the external-file equivalent of openFileAtLine for a vault TFile. */

@@ -2,6 +2,23 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.38.0] - 2026-08-20
+
+### Added — Auto-open, README summary, and an overflow menu for linked project notes
+
+- Opening a repo-matched project note anywhere in the vault now jumps the
+  sidebar straight to that project's Projects detail view, even from the
+  TODOs/Ideas tab — not just when the Projects tab was already active. Back
+  returns to whichever tab you were on. New setting, on by default:
+  Settings → Projects → "Auto-open Projects sidebar."
+- The detail view now shows the README's opening paragraph (after the
+  title, before the next heading), badge rows stripped, capped to roughly
+  2-3 lines (`ProjectMetadata.extractProjectSummary`).
+- Added a **⋯** overflow menu next to reveal-in-Finder for the
+  less-frequent actions: copy local path, copy remote URL, open in a
+  terminal or editor app (macOS `open -a`, app names configurable under
+  Settings → Projects), and resync a project's tracked items on demand.
+
 ## [0.37.1] - 2026-08-20
 
 ### Fixed — Project block styling fired on generic tags like #work, not just project notes

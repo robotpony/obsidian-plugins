@@ -66,6 +66,8 @@ export interface ProjectInfo {
   title?: string;
   /** Detected technologies (marker files, package.json deps). See ProjectMetadata.ts. */
   stack?: string[];
+  /** README's opening paragraph (after the title, before the next heading), capped to ~2-3 lines. See ProjectMetadata.ts. */
+  readmeSummary?: string;
 }
 
 /**
@@ -168,6 +170,12 @@ export interface WarpedTodoSettings {
   projectsBaseFolder: string;
   projectsExcludeDirs: string[];
   projectsScanDepth: number;
+  /** When true, opening a repo-matched project note jumps the sidebar to its Projects detail view even from Todos/Ideas. */
+  autoOpenProjectsOnLinkedNote: boolean;
+  /** App name passed to macOS `open -a` for the detail view's "Open in Terminal" action. */
+  projectsTerminalApp: string;
+  /** App name passed to macOS `open -a` for the detail view's "Open in Editor" action. */
+  projectsEditorApp: string;
 }
 
 export const DEFAULT_SETTINGS: WarpedTodoSettings = {
@@ -198,4 +206,7 @@ export const DEFAULT_SETTINGS: WarpedTodoSettings = {
   projectsBaseFolder: "",
   projectsExcludeDirs: ["node_modules", "dist", "build", "archive"],
   projectsScanDepth: 3,
+  autoOpenProjectsOnLinkedNote: true,
+  projectsTerminalApp: "Terminal",
+  projectsEditorApp: "Visual Studio Code",
 };

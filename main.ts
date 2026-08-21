@@ -439,6 +439,9 @@ export default class WarpedTodoPlugin extends Plugin {
       scanDepth: this.settings.projectsScanDepth,
       maxDepth: this.settings.projectsScanDepth,
       defaultTodoneFile: this.settings.defaultTodoneFile,
+      autoOpenOnLinkedNote: this.settings.autoOpenProjectsOnLinkedNote,
+      terminalApp: this.settings.projectsTerminalApp,
+      editorApp: this.settings.projectsEditorApp,
     };
   }
 
@@ -857,6 +860,44 @@ class WarpedTodoSettingTab extends PluginSettingTab {
               this.plugin.settings.projectsScanDepth = num;
               await this.plugin.saveSettings();
             }
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Auto-open Projects sidebar")
+      .setDesc("Opening a linked project note jumps the sidebar to its Projects summary, even from the TODOs/Ideas tab. Back returns to whatever tab you were on.")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.autoOpenProjectsOnLinkedNote)
+          .onChange(async (value) => {
+            this.plugin.settings.autoOpenProjectsOnLinkedNote = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Terminal app")
+      .setDesc("App name used by the Projects detail view's \"Open in Terminal\" action (macOS only).")
+      .addText((text) =>
+        text
+          .setPlaceholder("Terminal")
+          .setValue(this.plugin.settings.projectsTerminalApp)
+          .onChange(async (value) => {
+            this.plugin.settings.projectsTerminalApp = value.trim() || "Terminal";
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Editor app")
+      .setDesc("App name used by the Projects detail view's \"Open in Editor\" action (macOS only).")
+      .addText((text) =>
+        text
+          .setPlaceholder("Visual Studio Code")
+          .setValue(this.plugin.settings.projectsEditorApp)
+          .onChange(async (value) => {
+            this.plugin.settings.projectsEditorApp = value.trim() || "Visual Studio Code";
+            await this.plugin.saveSettings();
           })
       );
 

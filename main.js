@@ -2214,13 +2214,15 @@ function foldSyncedItemsIntoProjects(projects, getCachedItems) {
   });
 }
 function repoFields(scanned) {
+  var _a;
   return {
     localPath: scanned.localPath,
     remote: scanned.remote,
     branch: scanned.branch,
     gitStatus: scanned.gitStatus,
     title: scanned.title,
-    stack: scanned.stack
+    stack: scanned.stack,
+    readmeSummary: (_a = scanned.readmeSummary) != null ? _a : void 0
   };
 }
 
@@ -2461,6 +2463,48 @@ function extractProjectTitle(projectPath) {
   const title = match[1].replace(/[^\x20-\x7E]/g, "").replace(/\s+/g, " ").trim();
   return title || null;
 }
+var SUMMARY_MAX_CHARS = 220;
+function isBadgeLine(line) {
+  if (!line.includes("!["))
+    return false;
+  const stripped = line.replace(/\[!\[[^\]]*\]\([^)]*\)\]\([^)]*\)/g, "").replace(/!\[[^\]]*\]\([^)]*\)/g, "").trim();
+  return stripped === "";
+}
+function truncateSummary(text, max) {
+  if (text.length <= max)
+    return text;
+  const cut = text.slice(0, max);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${cut.slice(0, lastSpace > 0 ? lastSpace : max)}\u2026`;
+}
+function extractProjectSummary(projectPath) {
+  const readmePath = findReadme(projectPath);
+  if (!readmePath)
+    return null;
+  let content;
+  try {
+    content = (0, import_fs.readFileSync)(readmePath, "utf-8");
+  } catch (e) {
+    return null;
+  }
+  const lines = content.split("\n");
+  const headingIdx = lines.findIndex((line) => /^#\s+/.test(line));
+  if (headingIdx === -1)
+    return null;
+  const summaryLines = [];
+  for (const line of lines.slice(headingIdx + 1)) {
+    if (/^#{1,6}\s/.test(line))
+      break;
+    const trimmed = line.trim();
+    if (!trimmed || isBadgeLine(trimmed))
+      continue;
+    summaryLines.push(trimmed);
+  }
+  if (summaryLines.length === 0)
+    return null;
+  const summary = summaryLines.join(" ").replace(/[^\x20-\x7E]/g, "").replace(/\s+/g, " ").trim();
+  return summary ? truncateSummary(summary, SUMMARY_MAX_CHARS) : null;
+}
 
 // src/ProjectScanner.ts
 var MAX_BUFFER = 10 * 1024 * 1024;
@@ -2570,7 +2614,8 @@ var ProjectScanner = class {
       gitStatus,
       remote,
       title: (_a = extractProjectTitle(repoPath)) != null ? _a : name,
-      stack: detectStack(repoPath, excludeDirs)
+      stack: detectStack(repoPath, excludeDirs),
+      readmeSummary: extractProjectSummary(repoPath)
     };
   }
   /**
@@ -4352,10 +4397,12 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     this.activeProjectName = null;
     // Where the detail view's "← Back" link should go: null means the normal
     // "back to the Projects list" affordance; set when a project block's →
-    // arrow (TODOs/Ideas tab) opens the detail view directly, so back returns
-    // to the tab the user actually came from instead. Cleared by every other
-    // path into detail view (list row click, auto-follow) — see
-    // backToProjectsList and switchToProjectsTab.
+    // arrow (TODOs/Ideas tab) opens the detail view directly, or when
+    // auto-open (see handleProjectActiveFileChange) jumps here from Todos/
+    // Ideas on its own, so back returns to the tab the user actually came
+    // from instead. Cleared by every other path into detail view (list row
+    // click, auto-follow while already on this tab) — see backToProjectsList
+    // and switchToProjectsTab.
     this.projectDetailReturnTab = null;
     this.projectsFilterText = "";
     // Set at the top of the TODOs tab's render pass (renderTodosList) and read
@@ -6245,9 +6292,14 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     if (projectName) {
       if (this.projectsMode === "detail" && this.activeProjectName === projectName)
         return;
+      if (this.getProjectsOptions().autoOpenOnLinkedNote && !this.focusModeActive && this.activeTab !== "projects") {
+        this.projectDetailReturnTab = this.activeTab;
+        this.activeTab = "projects";
+      } else if (this.activeTab !== "projects") {
+        this.projectDetailReturnTab = null;
+      }
       this.projectsMode = "detail";
       this.activeProjectName = projectName;
-      this.projectDetailReturnTab = null;
     } else if (this.projectsMode === "detail") {
       this.projectsMode = "list";
       this.activeProjectName = null;
@@ -6447,8 +6499,27 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     const info = container.createDiv({ cls: "warped-todo-project-info" });
     this.renderProjectSummary(info, project, "detail");
     this.renderProjectFrontmatter(info, project);
+    if (project.readmeSummary) {
+      const summaryEl = info.createDiv({ cls: "warped-todo-project-readme-summary" });
+      void this.renderProjectReadmeSummary(summaryEl, project);
+    }
     const itemsContainer = container.createDiv({ cls: "warped-todo-project-items" });
     this.renderProjectItemGroups(itemsContainer, project);
+  }
+  /**
+   * Renders the README's opening paragraph (ProjectMetadata.
+   * extractProjectSummary, via ProjectInfo.readmeSummary) as markdown — the
+   * detail view's only hint at what a project actually is, beyond its name
+   * and git facts. Async because MarkdownRenderer.render is; the caller
+   * (a sync render pass) doesn't await it, same as the project-info popup's
+   * description render elsewhere in this file.
+   */
+  async renderProjectReadmeSummary(container, project) {
+    if (!project.readmeSummary || !project.localPath)
+      return;
+    const component = new import_obsidian12.Component();
+    component.load();
+    await import_obsidian12.MarkdownRenderer.render(this.app, project.readmeSummary, container, project.localPath, component);
   }
   /**
    * Compact Project/Stack/Status summary shown between the detail view's
@@ -6479,12 +6550,19 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       projectRow.createSpan({ text: name, cls: "warped-todo-project-frontmatter-value" });
     }
     if (project.localPath) {
-      const revealBtn = projectRow.createEl("a", {
-        cls: "warped-todo-project-frontmatter-reveal",
+      const actions = projectRow.createDiv({ cls: "warped-todo-project-frontmatter-actions" });
+      const revealBtn = actions.createEl("a", {
+        cls: "warped-todo-project-frontmatter-icon",
         attr: { title: `Reveal in Finder: ${homeRelativePath(project.localPath)}`, "aria-label": "Reveal in Finder" }
       });
       (0, import_obsidian12.setIcon)(revealBtn, "folder-open");
       revealBtn.addEventListener("click", () => this.revealProjectInFinder(project.localPath));
+      const menuBtn = actions.createEl("a", {
+        cls: "warped-todo-project-frontmatter-icon",
+        attr: { title: "More actions", "aria-label": "More project actions" }
+      });
+      (0, import_obsidian12.setIcon)(menuBtn, "more-horizontal");
+      menuBtn.addEventListener("click", (evt) => this.showProjectActionsMenu(evt, project));
     }
     if (project.stack && project.stack.length > 0) {
       const stackRow = block.createDiv({ cls: "warped-todo-project-frontmatter-row" });
@@ -6511,6 +6589,69 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       console.error("[Warped Todo]", "Failed to reveal folder:", error);
       showNotice2("Couldn't open Finder. See console for details.");
     }
+  }
+  /**
+   * The detail view's overflow menu — actions used occasionally rather than
+   * on nearly every visit (reveal-in-Finder and the remote link stay as
+   * their own inline icons for that reason; see renderProjectFrontmatter).
+   */
+  showProjectActionsMenu(evt, project) {
+    if (!project.localPath)
+      return;
+    const localPath = project.localPath;
+    const name = project.tag.replace(/^#/, "");
+    const options = this.getProjectsOptions();
+    const menu = new import_obsidian12.Menu();
+    menu.addItem((mi) => {
+      mi.setTitle("Copy path").setIcon("copy").onClick(async () => {
+        await navigator.clipboard.writeText(localPath);
+      });
+    });
+    if (project.remote) {
+      const remote = project.remote;
+      menu.addItem((mi) => {
+        mi.setTitle("Copy remote URL").setIcon("link").onClick(async () => {
+          await navigator.clipboard.writeText(remote);
+        });
+      });
+    }
+    menu.addItem((mi) => {
+      mi.setTitle("Open in Terminal").setIcon("terminal").onClick(() => {
+        this.openProjectInApp(localPath, options.terminalApp, "Terminal");
+      });
+    });
+    menu.addItem((mi) => {
+      mi.setTitle("Open in Editor").setIcon("code").onClick(() => {
+        this.openProjectInApp(localPath, options.editorApp, "editor");
+      });
+    });
+    menu.addItem((mi) => {
+      mi.setTitle("Resync items").setIcon("refresh-cw").onClick(async () => {
+        await this.resyncProject(name);
+        showNotice2(`${name}: items resynced.`);
+      });
+    });
+    menu.showAtMouseEvent(evt);
+  }
+  /**
+   * Shells to macOS's `open -a <app>` — one step past revealProjectInFinder's
+   * Electron shell call, launching a named app instead of the file manager.
+   * macOS-only, consistent with this feature's existing platform scope (see
+   * ProjectSyncManager's fs.watch doc comment on the same decision); other
+   * platforms get a notice rather than a silent no-op.
+   */
+  openProjectInApp(path, appName, label) {
+    if (process.platform !== "darwin") {
+      showNotice2(`Opening in ${label} isn't supported on this platform yet.`);
+      return;
+    }
+    const { execFile: execFile2 } = require("child_process");
+    execFile2("open", ["-a", appName, path], (error) => {
+      if (error) {
+        console.error("[Warped Todo]", `Failed to open ${label} (${appName}):`, error);
+        showNotice2(`Couldn't open ${label}. Check the app name in settings.`);
+      }
+    });
   }
   /** Opens a synced item's source file (a plain filesystem path, not necessarily inside the vault) in the OS default editor — the external-file equivalent of openFileAtLine for a vault TFile. */
   openExternalProjectFile(path) {
@@ -6745,7 +6886,10 @@ var DEFAULT_SETTINGS = {
   // Projects extension
   projectsBaseFolder: "",
   projectsExcludeDirs: ["node_modules", "dist", "build", "archive"],
-  projectsScanDepth: 3
+  projectsScanDepth: 3,
+  autoOpenProjectsOnLinkedNote: true,
+  projectsTerminalApp: "Terminal",
+  projectsEditorApp: "Visual Studio Code"
 };
 
 // src/SlackConverter.ts
@@ -7561,7 +7705,10 @@ var WarpedTodoPlugin = class extends import_obsidian13.Plugin {
       excludeDirs: this.settings.projectsExcludeDirs,
       scanDepth: this.settings.projectsScanDepth,
       maxDepth: this.settings.projectsScanDepth,
-      defaultTodoneFile: this.settings.defaultTodoneFile
+      defaultTodoneFile: this.settings.defaultTodoneFile,
+      autoOpenOnLinkedNote: this.settings.autoOpenProjectsOnLinkedNote,
+      terminalApp: this.settings.projectsTerminalApp,
+      editorApp: this.settings.projectsEditorApp
     };
   }
   onunload() {
@@ -7814,6 +7961,24 @@ var WarpedTodoSettingTab = class extends import_obsidian13.PluginSettingTab {
           this.plugin.settings.projectsScanDepth = num;
           await this.plugin.saveSettings();
         }
+      })
+    );
+    new import_obsidian13.Setting(containerEl).setName("Auto-open Projects sidebar").setDesc("Opening a linked project note jumps the sidebar to its Projects summary, even from the TODOs/Ideas tab. Back returns to whatever tab you were on.").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.autoOpenProjectsOnLinkedNote).onChange(async (value) => {
+        this.plugin.settings.autoOpenProjectsOnLinkedNote = value;
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian13.Setting(containerEl).setName("Terminal app").setDesc(`App name used by the Projects detail view's "Open in Terminal" action (macOS only).`).addText(
+      (text) => text.setPlaceholder("Terminal").setValue(this.plugin.settings.projectsTerminalApp).onChange(async (value) => {
+        this.plugin.settings.projectsTerminalApp = value.trim() || "Terminal";
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian13.Setting(containerEl).setName("Editor app").setDesc(`App name used by the Projects detail view's "Open in Editor" action (macOS only).`).addText(
+      (text) => text.setPlaceholder("Visual Studio Code").setValue(this.plugin.settings.projectsEditorApp).onChange(async (value) => {
+        this.plugin.settings.projectsEditorApp = value.trim() || "Visual Studio Code";
+        await this.plugin.saveSettings();
       })
     );
     containerEl.createEl("h3", { text: "Focus Mode" });

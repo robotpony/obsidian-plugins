@@ -29,6 +29,7 @@ function scannedFixture(overrides: Partial<ScannedProject> = {}): ScannedProject
     remote: "https://github.com/robotpony/peep.git",
     title: "peep",
     stack: [],
+    readmeSummary: null,
     ...overrides,
   };
 }

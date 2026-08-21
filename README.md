@@ -234,12 +234,25 @@ Point it at a folder in Settings → Projects → "Projects base folder" (e.g.
   todo, and so on).
 
 Click a project in the list to open its note and see a detail view: repo
-facts pinned at the top, and every tracked item grouped by type. Completing
-an item there writes back to the actual file in the repo, not just the
-vault note — the same familiar focus/snooze/priority actions from the
-TODOs sidebar work here too (no "move," since moving a synced item
-elsewhere would just have it reappear in its original note on the next
-sync).
+facts pinned at the top, the README's opening paragraph underneath (if it
+has one), and every tracked item grouped by type. Completing an item there
+writes back to the actual file in the repo, not just the vault note — the
+same familiar focus/snooze/priority actions from the TODOs sidebar work
+here too (no "move," since moving a synced item elsewhere would just have
+it reappear in its original note on the next sync).
+
+Opening any project's note anywhere in the vault (Quick Switcher, a
+wikilink, clicking through from a project block on the TODOs/Ideas tab)
+jumps the sidebar straight to that project's detail view, whatever tab it
+was showing before — Back returns you there. Turn this off in Settings →
+Projects → "Auto-open Projects sidebar" if you'd rather the sidebar stay
+put until you switch tabs yourself.
+
+The detail view's **⋯** menu covers the less-frequent actions: copy the
+repo's local path or remote URL, open it in a terminal or editor app (set
+which ones under Settings → Projects → "Terminal app"/"Editor app"; macOS
+only), or resync its tracked items on demand without waiting for the
+background watcher.
 
 Prose-style bug write-ups (a `### Title` under a `## Open`/`## Fixed`
 heading, rather than a flat checklist) complete the same way: the whole

@@ -2298,23 +2298,43 @@
   font-family: var(--font-monospace);
 }
 
-/* Icon-only reveal-in-Finder control, inline with the Project row rather
-   than its own row — keeps the block to three lines. */
-.warped-todo-project-frontmatter-reveal {
+/* Icon-only controls (reveal-in-Finder, the overflow menu), inline with the
+   Project row rather than their own row — keeps the block to three lines. */
+.warped-todo-project-frontmatter-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--size-4-2);
+  margin-left: auto;
+}
+
+.warped-todo-project-frontmatter-icon {
   display: inline-flex;
   align-items: center;
   color: var(--text-muted);
   cursor: pointer;
-  margin-left: auto;
 }
 
-.warped-todo-project-frontmatter-reveal:hover {
+.warped-todo-project-frontmatter-icon:hover {
   color: var(--text-accent);
 }
 
-.warped-todo-project-frontmatter-reveal svg {
+.warped-todo-project-frontmatter-icon svg {
   width: 14px;
   height: 14px;
+}
+
+/* README's opening paragraph — a summary strip like .warped-todo-project-
+   frontmatter above it, not a second reading of the project's data, so it
+   gets the same muted, compact treatment. */
+.warped-todo-project-readme-summary {
+  padding: 0 var(--size-4-2) var(--size-4-2);
+  color: var(--text-muted);
+  font-size: 0.85em;
+  line-height: 1.5;
+}
+
+.warped-todo-project-readme-summary p {
+  margin: 0;
 }
 
 /* Card grouping, matching the TODOs sidebar's same-source background block

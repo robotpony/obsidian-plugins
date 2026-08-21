@@ -22,6 +22,12 @@ export interface ProjectsSidebarOptions {
   scanDepth: number;
   /** Where completing a hand-typed vault item logs to — same setting TodoSidebarView's TODOs tab uses. */
   defaultTodoneFile: string;
+  /** When true, opening a repo-matched project note jumps the sidebar to its detail view even from Todos/Ideas. */
+  autoOpenOnLinkedNote: boolean;
+  /** App name for the detail view's "Open in Terminal" action (macOS `open -a`). */
+  terminalApp: string;
+  /** App name for the detail view's "Open in Editor" action (macOS `open -a`). */
+  editorApp: string;
 }
 
 // All three types get a checkbox, matching the main TODOs tab's ideaConfig

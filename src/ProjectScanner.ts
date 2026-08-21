@@ -2,7 +2,7 @@ import { execFile } from "child_process";
 import { existsSync } from "fs";
 import { readdir } from "fs/promises";
 import { basename, join } from "path";
-import { detectStack, extractProjectTitle } from "./ProjectMetadata";
+import { detectStack, extractProjectSummary, extractProjectTitle } from "./ProjectMetadata";
 
 const MAX_BUFFER = 10 * 1024 * 1024; // 10 MB — git output here is small, generous headroom
 const TAG = "[Warped Todo]";
@@ -36,6 +36,8 @@ export interface ScannedProject {
   title: string;
   /** Detected technologies (marker files, package.json deps, monorepo subdirs). See ProjectMetadata.ts. */
   stack: string[];
+  /** README's opening paragraph, capped to ~2-3 lines; null if there's no README or nothing to show. See ProjectMetadata.ts. */
+  readmeSummary: string | null;
 }
 
 export interface ProjectScannerOptions {
@@ -155,6 +157,7 @@ export class ProjectScanner {
       remote,
       title: extractProjectTitle(repoPath) ?? name,
       stack: detectStack(repoPath, excludeDirs),
+      readmeSummary: extractProjectSummary(repoPath),
     };
   }
 

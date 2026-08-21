@@ -260,3 +260,70 @@ export function extractProjectTitle(projectPath: string): string | null {
 
   return title || null;
 }
+
+// Character budget for extractProjectSummary's output — a hard line count
+// doesn't work since README prose wraps unpredictably at sidebar width, but
+// this many characters lands at roughly 2-3 lines there.
+const SUMMARY_MAX_CHARS = 220;
+
+/**
+ * A line that's entirely badge images (optionally link-wrapped), e.g. the
+ * shields.io row READMEs often place right under the title — not summary
+ * prose, so extractProjectSummary skips it.
+ */
+function isBadgeLine(line: string): boolean {
+  if (!line.includes("![")) return false;
+  const stripped = line
+    .replace(/\[!\[[^\]]*\]\([^)]*\)\]\([^)]*\)/g, "")
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+    .trim();
+  return stripped === "";
+}
+
+function truncateSummary(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${cut.slice(0, lastSpace > 0 ? lastSpace : max)}…`;
+}
+
+/**
+ * Extracts the README's opening summary: the prose between the first `#`
+ * heading and the next heading, badge rows and blank lines dropped, ASCII-
+ * filtered the same way extractProjectTitle is, and capped to roughly 2-3
+ * sidebar lines. Returns null if there's no README, no top-level heading, or
+ * nothing but badges/whitespace follows it — callers should just omit the
+ * summary block rather than show an empty one.
+ */
+export function extractProjectSummary(projectPath: string): string | null {
+  const readmePath = findReadme(projectPath);
+  if (!readmePath) return null;
+
+  let content: string;
+  try {
+    content = readFileSync(readmePath, "utf-8");
+  } catch {
+    return null;
+  }
+
+  const lines = content.split("\n");
+  const headingIdx = lines.findIndex((line) => /^#\s+/.test(line));
+  if (headingIdx === -1) return null;
+
+  const summaryLines: string[] = [];
+  for (const line of lines.slice(headingIdx + 1)) {
+    if (/^#{1,6}\s/.test(line)) break; // next heading — summary is over
+    const trimmed = line.trim();
+    if (!trimmed || isBadgeLine(trimmed)) continue;
+    summaryLines.push(trimmed);
+  }
+  if (summaryLines.length === 0) return null;
+
+  const summary = summaryLines
+    .join(" ")
+    .replace(/[^\x20-\x7E]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return summary ? truncateSummary(summary, SUMMARY_MAX_CHARS) : null;
+}

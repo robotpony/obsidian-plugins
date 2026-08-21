@@ -515,7 +515,7 @@ function foldSyncedItemsIntoProjects(
 
 function repoFields(
   scanned: ScannedProject
-): Pick<ProjectInfo, "localPath" | "remote" | "branch" | "gitStatus" | "title" | "stack"> {
+): Pick<ProjectInfo, "localPath" | "remote" | "branch" | "gitStatus" | "title" | "stack" | "readmeSummary"> {
   return {
     localPath: scanned.localPath,
     remote: scanned.remote,
@@ -523,5 +523,6 @@ function repoFields(
     gitStatus: scanned.gitStatus,
     title: scanned.title,
     stack: scanned.stack,
+    readmeSummary: scanned.readmeSummary ?? undefined,
   };
 }
