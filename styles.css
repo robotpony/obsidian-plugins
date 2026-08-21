@@ -2260,23 +2260,33 @@
   margin-bottom: var(--size-4-2);
 }
 
-/* Groups the Project/Stack/Status summary and README blurb into one visually
-   distinct card, set off from the detail view's header above and the TODO
-   list below — same subtle background as .warped-todo-project-item-group
-   further down, so the two card treatments in this view read as one system.
-   Horizontal inset matches .warped-todo-project-row's own padding so the
-   card doesn't touch the sidebar edges. --background-primary, not
-   --background-secondary: .sidebar-header above sets --background-secondary
-   as this whole view's own ambient colour (matching Obsidian's native
-   sidebar chrome), so a card meant to stand out against it needs the
-   *other* one — same reasoning as the .warped-todo-sidebar .muted-pill
-   "better contrast on grey background" override further up this file.
-   --background-secondary here rendered identically to the sidebar around
-   it, so the card was invisible no matter how many times the plugin got
-   rebuilt/reinstalled. */
+/* Sets the Project/Stack/Status summary off as its own boxed card, distinct
+   from the detail view's header above and the README blurb/TODO list below
+   — same subtle background as .warped-todo-project-item-group further
+   down, so the two card treatments in this view read as one system. Was
+   also wrapping the README blurb until it was reported sharing a
+   background it shouldn't (that's prose, not metadata) — see
+   renderProjectsDetail's comment; .warped-todo-project-readme-summary
+   below is a sibling now, not a child, and stays background-free.
+   No horizontal margin — flush to .warped-todo-project-info's own edges,
+   matching .warped-todo-project-item-group's box model exactly, so the two
+   card treatments line up edge-to-edge instead of this one sitting
+   noticeably narrower (reported via screenshot: it used to *also* carry a
+   size-4-2 horizontal margin on top of its padding, insetting it a further
+   8px past every other card in this view for no reason). The now-larger
+   box gets extra horizontal padding instead, so the text inset ends up
+   roughly where it was, just achieved by padding instead of margin.
+   --background-primary, not --background-secondary: .sidebar-header above
+   sets --background-secondary as this whole view's own ambient colour
+   (matching Obsidian's native sidebar chrome), so a card meant to stand
+   out against it needs the *other* one — same reasoning as the
+   .warped-todo-sidebar .muted-pill "better contrast on grey background"
+   override further up this file. --background-secondary here rendered
+   identically to the sidebar around it, so the card was invisible no
+   matter how many times the plugin got rebuilt/reinstalled. */
 .warped-todo-project-detail-card {
-  margin: var(--size-2-2) var(--size-4-2) var(--size-4-2);
-  padding: var(--size-4-1) var(--size-4-2);
+  margin-top: var(--size-2-2);
+  padding: var(--size-4-1) var(--size-4-3);
   background-color: var(--background-primary);
   border-radius: 3px;
 }
@@ -2348,9 +2358,15 @@
 
 /* README's opening paragraph — a summary strip like .warped-todo-project-
    frontmatter above it, not a second reading of the project's data, so it
-   gets the same muted, compact treatment. */
+   gets the same muted, compact treatment. Sibling of .warped-todo-project-
+   detail-card now, not a child (reported via screenshot: it shouldn't
+   share the card's boxed background, that's for the Project/Stack/Status
+   metadata specifically) — horizontal padding here matches the card's own
+   text inset so the two still line up left-edge-to-left-edge despite one
+   having a background and this one not. */
 .warped-todo-project-readme-summary {
   margin-top: var(--size-4-2);
+  padding: 0 var(--size-4-3);
   color: var(--text-muted);
   font-size: 0.85em;
   line-height: 1.5;

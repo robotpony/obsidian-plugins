@@ -6535,7 +6535,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     const card = info.createDiv({ cls: "warped-todo-project-detail-card" });
     this.renderProjectFrontmatter(card, project);
     if (project.readmeSummary) {
-      const summaryEl = card.createDiv({ cls: "warped-todo-project-readme-summary" });
+      const summaryEl = info.createDiv({ cls: "warped-todo-project-readme-summary" });
       void this.renderProjectReadmeSummary(summaryEl, project);
     }
     const itemsContainer = container.createDiv({ cls: "warped-todo-project-items" });

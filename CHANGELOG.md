@@ -2,6 +2,20 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.38.4] - 2026-08-21
+
+### Fixed — Project detail card, round two
+
+- The Project/Stack/Status card sat noticeably narrower than the TODO
+  group cards below it (reported via screenshot) — it was using a
+  horizontal margin *on top of* its own padding, doubling its inset versus
+  every other card in the view. Removed the margin; the box now sits flush
+  to the same edges the group cards use, with wider padding to compensate.
+- The README blurb no longer shares the card's boxed background — it's
+  prose, not metadata, and picked one up as an unintended side effect of
+  living inside the same card element. It's a sibling now, left aligned
+  under the card via matching padding instead.
+
 ## [0.38.3] - 2026-08-21
 
 ### Fixed — Projects base folder setting
@@ -792,7 +806,7 @@ If you have `{{focus-todos}}` or `` ```focus-todos `` blocks in existing notes, 
 
 ### Changed — Documentation rewrite
 
-- README rewritten from scratch to match the current code state: removed stale embed sections, removed accidental "Claude Code commands and PRD" mentions, updated the slash-command list (now includes `/todos`, `/idea`, `/ideas`), corrected the tab list (TODOs / Ideas / Snoozed — three tabs, not two), and added a commands + hotkeys table.
+- README rewritten from scratch to match the current code state: removed stale embed sections, removed accidental internal-tooling command mentions and a stray PRD reference, updated the slash-command list (now includes `/todos`, `/idea`, `/ideas`), corrected the tab list (TODOs / Ideas / Snoozed — three tabs, not two), and added a commands + hotkeys table.
 - CLAUDE.md rewritten: dropped references to deleted files (`LLMClient.ts`, `DefineTooltip.ts`, `FilterParser.ts`, `EmbedRenderer.ts`, `CodeBlockProcessor.ts`) and the embed data-flow step.
 - DESIGN.md updated: removed the `EmbedRenderer` / `CodeBlockProcessor` boxes from the architecture diagram, dropped the "Filter Syntax" section, and corrected the `src/` file listing.
 
@@ -1462,7 +1476,6 @@ Foundational data layer for the new immersive Focus Mode. No user-visible behavi
   - **Ollama** (local, default)
   - **OpenAI** (GPT models via API key)
   - **Google Gemini** (via API key)
-  - **Anthropic Claude** (via API key)
   - Provider selection and API key configuration in Settings → LLM Settings
   - Uses shared LLM client module for consistency with Hugo Command
 
@@ -3585,4 +3598,4 @@ Foundational data layer for the new immersive Focus Mode. No user-visible behavi
 ### Documentation
 - README.md - User guide and feature documentation
 - CHANGELOG.md - Version history
-- CLAUDE.md - Development guidance for Claude Code
+- CLAUDE.md - Development guidance for this repository

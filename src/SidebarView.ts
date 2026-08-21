@@ -2880,10 +2880,13 @@ export class TodoSidebarView extends ItemView {
     const info = container.createDiv({ cls: "warped-todo-project-info" });
     this.renderProjectSummary(info, project, "detail");
 
+    // The README blurb is a sibling of the card, not a child (see the
+    // card's own comment for why) — it's prose, not metadata, so it
+    // shouldn't share the card's boxed background.
     const card = info.createDiv({ cls: "warped-todo-project-detail-card" });
     this.renderProjectFrontmatter(card, project);
     if (project.readmeSummary) {
-      const summaryEl = card.createDiv({ cls: "warped-todo-project-readme-summary" });
+      const summaryEl = info.createDiv({ cls: "warped-todo-project-readme-summary" });
       void this.renderProjectReadmeSummary(summaryEl, project);
     }
 

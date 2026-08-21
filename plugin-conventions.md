@@ -478,7 +478,6 @@ this.addRibbonIcon("{icon-name}", "Open Plugin Name", () => this.sidebarManager.
 ├── tsconfig.json
 ├── esbuild.config.mjs
 ├── styles.css
-├── CLAUDE.md            # Plugin-specific architecture notes
 └── src/
     ├── types.ts         # Interfaces + DEFAULT_SETTINGS
     ├── SidebarView.ts   # ItemView subclass
