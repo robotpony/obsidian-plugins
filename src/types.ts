@@ -68,6 +68,15 @@ export interface ProjectInfo {
   stack?: string[];
   /** README's opening paragraph (after the title, before the next heading), capped to ~2-3 lines. See ProjectMetadata.ts. */
   readmeSummary?: string;
+  /**
+   * Epoch ms for the Projects list's Recently updated sort/date. Repo-
+   * matched projects only: CHANGELOG.md's mtime, falling back to README.md's
+   * (ProjectMetadata.getRepoLastUpdated), falling back further to the vault
+   * project note's own mtime if the repo has neither
+   * (ProjectManager.getProjects()'s fallback pass). Absent only if none of
+   * those exist.
+   */
+  lastUpdated?: number;
 }
 
 /**

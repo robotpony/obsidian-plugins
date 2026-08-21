@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, mkdir, writeFile, rm, chmod } from "fs/promises";
+import { mkdtemp, mkdir, writeFile, rm, chmod, utimes } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
-import { detectStack, extractProjectTitle } from "../ProjectMetadata";
+import { detectStack, extractProjectTitle, getRepoLastUpdated } from "../ProjectMetadata";
 
 // See PLAN-focus-canvas.md's sibling context and ~/projects/peep/p's
 // extract_project_name()/detect_technologies() — this module ports those
@@ -107,5 +107,45 @@ describe("detectStack", () => {
 
   it("returns an empty list for a directory with no signals at all", async () => {
     expect(detectStack(dir)).toEqual([]);
+  });
+});
+
+describe("getRepoLastUpdated", () => {
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), "warped-todo-lastupdated-"));
+  });
+
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("returns null for a repo with neither CHANGELOG.md nor README.md", () => {
+    expect(getRepoLastUpdated(dir)).toBeNull();
+  });
+
+  it("returns README.md's mtime when there's no CHANGELOG", async () => {
+    await writeFile(join(dir, "README.md"), "# A project\n");
+    const mtime = new Date("2026-01-15T00:00:00Z");
+    await utimes(join(dir, "README.md"), mtime, mtime);
+    expect(getRepoLastUpdated(dir)).toBe(mtime.getTime());
+  });
+
+  it("prefers CHANGELOG.md's mtime over README.md's, even when README is more recently modified", async () => {
+    await writeFile(join(dir, "CHANGELOG.md"), "## [1.0.0] - 2026-01-01\n");
+    await writeFile(join(dir, "README.md"), "# A project\n");
+    const changelogMtime = new Date("2026-01-01T00:00:00Z");
+    const readmeMtime = new Date("2026-06-01T00:00:00Z"); // later than the changelog
+    await utimes(join(dir, "CHANGELOG.md"), changelogMtime, changelogMtime);
+    await utimes(join(dir, "README.md"), readmeMtime, readmeMtime);
+    expect(getRepoLastUpdated(dir)).toBe(changelogMtime.getTime());
+  });
+
+  it("accepts a lowercase changelog.md", async () => {
+    await writeFile(join(dir, "changelog.md"), "## [1.0.0]\n");
+    const mtime = new Date("2026-03-01T00:00:00Z");
+    await utimes(join(dir, "changelog.md"), mtime, mtime);
+    expect(getRepoLastUpdated(dir)).toBe(mtime.getTime());
   });
 });

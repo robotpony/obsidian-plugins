@@ -123,38 +123,50 @@ tag-based flow) — the repo-scan fields (base folder, exclude dirs, scan
 depth) are added there, not a new section, since it's the same underlying
 "Projects" concept now that tag- and repo-derived `ProjectInfo` are unified.
 
-List view: flat list, sorted projects-with-tracked-items first (alphabetical
-within each group, no separate section headers — chosen over grouping/
-collapsing after seeing real data: only 2 of 26 real repos had anything
-tracked, but a flat sort with the busy ones on top reads fine without extra
-UI state). Each row opens its vault note on click (same target
+List view: flat list, sort chosen from the sort button (Default, Name (A–Z),
+Most items, Needs attention, Recently updated — see below), no separate
+section headers. Each row opens its vault note on click (same target
 `ProjectManager` already resolves via `getProjectFilePath()`).
 
 ```
 Projects                                              [⟳ Sync]
 
-  Filter: [________________________]
+  Filter: [________________________]  [sort ⇅]
 
-  peep .............................. main [M]
-    4 todo · 3 idea · 2 bug ................ synced 2m ago
+  peep
+  main M? · 4 todos · 1 idea · 2 bugs         3h ago
+  peep.md                                          →
 
-  widget-tool ........................ main [✓]
-    1 todo .................................. synced 5m ago
+  widget-tool
+  main                                        2d ago
+  widget-tool.md                                   →
 
-  obsidian-plugins .................... main [M?]
-  scorekeep ............................ main [-]
-  thwarter ............................. main [-]
+  obsidian-plugins
+  main
+  obsidian-plugins.md                              →
   ... (22 more)
 ```
 
-- Projects with at least one tracked item get two lines: name/branch/status,
-  then a per-type breakdown (`4 todo · 3 idea · 2 bug`, only non-zero types
-  shown) plus relative `lastSynced` time. Breakdown over a bare aggregate
-  count — the three types call for different attention, and it was cheap
-  once the row already has two lines.
-- Projects with nothing tracked collapse to one line: name, branch, git
-  status only. Keeps the common case (most repos, most of the time) from
-  dominating the sidebar.
+- Each row is three lines: name; branch+status (one monospace chunk,
+  status omitted when clean) + item counts on the left, Recently updated
+  on the right; filename+arrow at the bottom, right-aligned. Was two lines
+  with the filename/arrow squeezed onto the title line — that wrapped
+  badly once a repo name was long enough to compete with the filename for
+  width (reported via screenshot), so the filename+arrow moved to its own
+  line and the title line is name-only now, free to wrap on its own.
+- Recently updated: `getRepoLastUpdated` (ProjectMetadata.ts) — a repo's
+  CHANGELOG.md mtime, falling back to README.md's, falling back further to
+  the vault project note's own mtime if the repo has neither
+  (ProjectManager.applyNoteLastUpdatedFallback). CHANGELOG over an actual
+  git-log call: only touched on a real versioned change, not every
+  incidental edit, and free of a new git call per repo on every scan.
+- Sort button (`sortProjectRows`/`PROJECT_SORT_OPTIONS` in
+  ProjectsSidebarView.ts) opens a checkmarked menu, mirroring Obsidian's
+  own file-explorer "Change sort order" menu rather than inventing a new
+  pattern. Default is the list's original implicit sort (tracked-items
+  first, then name) kept as an explicit, reselectable option. Needs
+  attention: dirty git status or at least one open bug. Session-only, like
+  the filter text box — resets to Default on restart.
 - Filter box matches on project name only (not item content) — consistent
   with `ProjectManager`'s existing tag-based filtering elsewhere.
 - Empty state (no `projectsBaseFolder` configured): an inline message plus

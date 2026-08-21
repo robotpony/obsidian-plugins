@@ -1,5 +1,5 @@
 import { TFile } from "obsidian";
-import { TodoItem } from "./types";
+import { ProjectInfo, TodoItem } from "./types";
 import { ProjectItemType } from "./StructuredFileParser";
 
 /**
@@ -241,4 +241,69 @@ export function buildProjectPrincipleBlocks(items: TodoItem[]): ProjectPrinciple
   }
 
   return blocks;
+}
+
+// ===== Projects list sort =====
+// List view only — added alongside the row-layout rework (screenshot
+// review: the old two-line row wrapped badly for long repo names).
+
+export type ProjectSortKey = "default" | "name" | "mostItems" | "needsAttention" | "recentlyUpdated";
+
+/** In menu-display order. "Default" is the list's original implicit sort (active-with-items first, then name) — kept as an explicit, reselectable option rather than dropped once named alternatives exist. */
+export const PROJECT_SORT_OPTIONS: { key: ProjectSortKey; label: string }[] = [
+  { key: "default", label: "Default" },
+  { key: "name", label: "Name (A–Z)" },
+  { key: "mostItems", label: "Most items" },
+  { key: "needsAttention", label: "Needs attention" },
+  { key: "recentlyUpdated", label: "Recently updated" },
+];
+
+/**
+ * One row's sort-relevant facts, precomputed by the caller rather than
+ * derived here — `itemCount`/`needsAttention` depend on live synced-item
+ * state (ProjectSyncManager.getCachedItems(), via SidebarView's own
+ * projectItemCounts()) that this file deliberately has no access to (see
+ * this file's own module comment: no ItemView/app dependency, so the sort
+ * itself stays unit-testable without constructing one).
+ */
+export interface ProjectSortRow {
+  project: ProjectInfo;
+  /** Total non-completed tracked items (todo + idea + bug), vault and synced combined. */
+  itemCount: number;
+  /** Dirty git status (uncommitted changes) or at least one open bug. */
+  needsAttention: boolean;
+}
+
+/**
+ * Sorts Projects-list rows by the chosen key, always falling back to name
+ * (project.tag) to break ties — so re-sorting after an item count changes
+ * doesn't shuffle otherwise-equal rows around.
+ */
+export function sortProjectRows<T extends ProjectSortRow>(rows: readonly T[], sort: ProjectSortKey): T[] {
+  const byName = (a: T, b: T) => a.project.tag.localeCompare(b.project.tag);
+  const sorted = [...rows];
+
+  switch (sort) {
+    case "name":
+      sorted.sort(byName);
+      break;
+    case "mostItems":
+      sorted.sort((a, b) => b.itemCount - a.itemCount || byName(a, b));
+      break;
+    case "needsAttention":
+      sorted.sort((a, b) => Number(b.needsAttention) - Number(a.needsAttention) || byName(a, b));
+      break;
+    case "recentlyUpdated":
+      sorted.sort((a, b) => (b.project.lastUpdated ?? 0) - (a.project.lastUpdated ?? 0) || byName(a, b));
+      break;
+    case "default":
+    default:
+      sorted.sort((a, b) => {
+        const aActive = a.itemCount > 0 ? 1 : 0;
+        const bActive = b.itemCount > 0 ? 1 : 0;
+        return aActive !== bActive ? bActive - aActive : byName(a, b);
+      });
+  }
+
+  return sorted;
 }

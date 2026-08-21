@@ -1959,7 +1959,27 @@ var ProjectManager = class {
       });
     }
     const merged = mergeScannedProjects(projects, scannedProjects);
-    return getCachedItems ? foldSyncedItemsIntoProjects(merged, getCachedItems) : merged;
+    const withLastUpdated = this.applyNoteLastUpdatedFallback(merged);
+    return getCachedItems ? foldSyncedItemsIntoProjects(withLastUpdated, getCachedItems) : withLastUpdated;
+  }
+  /**
+   * Vault-note-mtime fallback for `lastUpdated`, for a repo with neither a
+   * CHANGELOG.md nor a README.md on disk (ProjectScanner/ProjectMetadata
+   * already tried both — see getRepoLastUpdated). The note's own
+   * last-modified time is the next-best "recently updated" signal, and
+   * unlike the repo's own files it's always resolvable here: ProjectManager
+   * owns the vault side, ProjectMetadata only knows about files in the repo
+   * itself.
+   */
+  applyNoteLastUpdatedFallback(projects) {
+    return projects.map((project) => {
+      if (!project.localPath || project.lastUpdated !== void 0)
+        return project;
+      const file = this.app.vault.getAbstractFileByPath(this.getProjectFilePath(project.tag));
+      if (!(file instanceof import_obsidian5.TFile) || !file.stat)
+        return project;
+      return { ...project, lastUpdated: file.stat.mtime };
+    });
   }
   getFocusProjects(limit) {
     const projects = this.getProjects();
@@ -2216,7 +2236,7 @@ function foldSyncedItemsIntoProjects(projects, getCachedItems) {
   });
 }
 function repoFields(scanned) {
-  var _a;
+  var _a, _b;
   return {
     localPath: scanned.localPath,
     remote: scanned.remote,
@@ -2224,7 +2244,8 @@ function repoFields(scanned) {
     gitStatus: scanned.gitStatus,
     title: scanned.title,
     stack: scanned.stack,
-    readmeSummary: (_a = scanned.readmeSummary) != null ? _a : void 0
+    readmeSummary: (_a = scanned.readmeSummary) != null ? _a : void 0,
+    lastUpdated: (_b = scanned.lastUpdated) != null ? _b : void 0
   };
 }
 
@@ -2449,6 +2470,25 @@ function findReadme(projectPath) {
   }
   return null;
 }
+function findChangelog(projectPath) {
+  for (const name of ["CHANGELOG.md", "changelog.md", "Changelog.md"]) {
+    const candidate = (0, import_path.join)(projectPath, name);
+    if ((0, import_fs.existsSync)(candidate))
+      return candidate;
+  }
+  return null;
+}
+function getRepoLastUpdated(projectPath) {
+  var _a;
+  const path = (_a = findChangelog(projectPath)) != null ? _a : findReadme(projectPath);
+  if (!path)
+    return null;
+  try {
+    return (0, import_fs.statSync)(path).mtimeMs;
+  } catch (e) {
+    return null;
+  }
+}
 function extractProjectTitle(projectPath) {
   const readmePath = findReadme(projectPath);
   if (!readmePath)
@@ -2617,7 +2657,8 @@ var ProjectScanner = class {
       remote,
       title: (_a = extractProjectTitle(repoPath)) != null ? _a : name,
       stack: detectStack(repoPath, excludeDirs),
-      readmeSummary: extractProjectSummary(repoPath)
+      readmeSummary: extractProjectSummary(repoPath),
+      lastUpdated: getRepoLastUpdated(repoPath)
     };
   }
   /**
@@ -4051,6 +4092,42 @@ function buildProjectPrincipleBlocks(items) {
   }
   return blocks;
 }
+var PROJECT_SORT_OPTIONS = [
+  { key: "default", label: "Default" },
+  { key: "name", label: "Name (A\u2013Z)" },
+  { key: "mostItems", label: "Most items" },
+  { key: "needsAttention", label: "Needs attention" },
+  { key: "recentlyUpdated", label: "Recently updated" }
+];
+function sortProjectRows(rows, sort) {
+  const byName = (a, b) => a.project.tag.localeCompare(b.project.tag);
+  const sorted = [...rows];
+  switch (sort) {
+    case "name":
+      sorted.sort(byName);
+      break;
+    case "mostItems":
+      sorted.sort((a, b) => b.itemCount - a.itemCount || byName(a, b));
+      break;
+    case "needsAttention":
+      sorted.sort((a, b) => Number(b.needsAttention) - Number(a.needsAttention) || byName(a, b));
+      break;
+    case "recentlyUpdated":
+      sorted.sort((a, b) => {
+        var _a, _b;
+        return ((_a = b.project.lastUpdated) != null ? _a : 0) - ((_b = a.project.lastUpdated) != null ? _b : 0) || byName(a, b);
+      });
+      break;
+    case "default":
+    default:
+      sorted.sort((a, b) => {
+        const aActive = a.itemCount > 0 ? 1 : 0;
+        const bActive = b.itemCount > 0 ? 1 : 0;
+        return aActive !== bActive ? bActive - aActive : byName(a, b);
+      });
+  }
+  return sorted;
+}
 
 // src/ContextMenuHandler.ts
 var import_obsidian11 = require("obsidian");
@@ -4449,6 +4526,9 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     // and switchToProjectsTab.
     this.projectDetailReturnTab = null;
     this.projectsFilterText = "";
+    // Session-only, like projectsFilterText above — resets to Default on
+    // restart rather than persisting to settings.
+    this.projectsSortKey = "default";
     // Set at the top of the TODOs tab's render pass (renderTodosList) and read
     // by renderListItem/renderOrphanSectionHeader while it runs — tag ->
     // whether that project is repo-matched (has a localPath). Lets a vault
@@ -6435,6 +6515,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     }
   }
   renderProjectsList(container) {
+    var _a, _b;
     const options = this.getProjectsOptions();
     if (!options.baseFolder) {
       const empty = container.createDiv({ cls: "warped-todo-projects-empty" });
@@ -6447,34 +6528,66 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       container.createEl("p", { text: "Syncing projects\u2026", cls: "warped-todo-projects-empty-msg" });
       return;
     }
-    const filterInput = container.createEl("input", {
+    const filterRow = container.createDiv({ cls: "warped-todo-projects-filter-row" });
+    const filterInput = filterRow.createEl("input", {
       type: "text",
       placeholder: "Filter\u2026",
       cls: "warped-todo-projects-filter"
     });
     filterInput.value = this.projectsFilterText;
     const listEl = container.createDiv({ cls: "warped-todo-projects-list" });
+    const sortBtn = filterRow.createEl("a", {
+      cls: "warped-todo-projects-sort-btn clickable-icon",
+      attr: {
+        title: `Sort: ${(_b = (_a = PROJECT_SORT_OPTIONS.find((o) => o.key === this.projectsSortKey)) == null ? void 0 : _a.label) != null ? _b : "Default"}`,
+        "aria-label": "Sort projects"
+      }
+    });
+    (0, import_obsidian12.setIcon)(sortBtn, "arrow-up-down");
+    sortBtn.addEventListener("click", (evt) => this.showProjectSortMenu(evt, listEl));
     filterInput.addEventListener("input", () => {
       this.projectsFilterText = filterInput.value;
       this.renderProjectRows(listEl);
     });
     this.renderProjectRows(listEl);
   }
+  /**
+   * Sort menu for the Projects list — mirrors Obsidian's own file-explorer
+   * "Change sort order" menu (checkmark on the active option, no icons per
+   * item) rather than inventing a new pattern. Only re-renders the row list
+   * on selection, not the whole tab — the sort button's own tooltip catches
+   * up next time renderProjectsList runs (tab switch), which is frequent
+   * enough that it's not worth a second render path just for that.
+   */
+  showProjectSortMenu(evt, listEl) {
+    const menu = new import_obsidian12.Menu();
+    for (const option of PROJECT_SORT_OPTIONS) {
+      menu.addItem((mi) => {
+        mi.setTitle(option.label).setChecked(this.projectsSortKey === option.key).onClick(() => {
+          this.projectsSortKey = option.key;
+          this.renderProjectRows(listEl);
+        });
+      });
+    }
+    menu.showAtMouseEvent(evt);
+  }
   renderProjectRows(listEl) {
     listEl.empty();
     const filterLower = this.projectsFilterText.toLowerCase();
-    const projects = this.projectManager.getProjects(this.scannedProjects).filter((p) => p.localPath).filter((p) => !filterLower || p.tag.toLowerCase().includes(filterLower)).sort((a, b) => {
-      const aActive = this.projectItemCounts(a).total > 0 ? 1 : 0;
-      const bActive = this.projectItemCounts(b).total > 0 ? 1 : 0;
-      if (aActive !== bActive)
-        return bActive - aActive;
-      return a.tag.localeCompare(b.tag);
+    const rows = this.projectManager.getProjects(this.scannedProjects).filter((p) => p.localPath).filter((p) => !filterLower || p.tag.toLowerCase().includes(filterLower)).map((project) => {
+      const counts = this.projectItemCounts(project);
+      return {
+        project,
+        itemCount: counts.total,
+        needsAttention: !!project.gitStatus || counts.bug > 0
+      };
     });
-    if (projects.length === 0) {
+    const sortedRows = sortProjectRows(rows, this.projectsSortKey);
+    if (sortedRows.length === 0) {
       listEl.createEl("p", { text: "No projects found.", cls: "warped-todo-projects-empty-msg" });
       return;
     }
-    for (const project of projects)
+    for (const { project } of sortedRows)
       this.renderProjectRow(listEl, project);
   }
   projectItemCounts(project) {
@@ -6533,33 +6646,13 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       text: variant === "detail" ? (_a = project.title) != null ? _a : name : name,
       cls: "warped-todo-project-name"
     });
-    const notePath = projectFilePath(this.getProjectsOptions().projectsFolder, name);
-    const noteFile = variant === "list" ? this.app.vault.getAbstractFileByPath(notePath) : null;
-    if (noteFile instanceof import_obsidian12.TFile) {
-      titleLine.createSpan({
-        cls: "header-filename",
-        text: noteFile.name,
-        attr: { title: noteFile.path }
-      });
-      const link = titleLine.createEl("a", {
-        cls: "todo-orphan-section-link",
-        text: "\u2192",
-        href: "#",
-        attr: { "aria-label": `Open ${noteFile.path}` }
-      });
-      link.addEventListener("click", (evt) => {
-        evt.preventDefault();
-        evt.stopPropagation();
-        this.openNoteAndSyncProjects(noteFile, 0);
-      });
-    }
     const metaChunks = [];
     if (variant === "list") {
       const counts = this.projectItemCounts(project);
-      if (project.branch)
-        metaChunks.push({ text: project.branch, cls: "warped-todo-project-branch" });
-      if (project.gitStatus)
-        metaChunks.push({ text: project.gitStatus, cls: "warped-todo-project-status" });
+      if (project.branch) {
+        const branchStatus = project.gitStatus ? `${project.branch} ${project.gitStatus}` : project.branch;
+        metaChunks.push({ text: branchStatus, cls: "warped-todo-project-branch-status" });
+      }
       if (counts.total > 0) {
         const parts = [];
         if (counts.todo > 0)
@@ -6571,12 +6664,43 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
         metaChunks.push({ text: parts.join(" \xB7 ") });
       }
     }
-    if (metaChunks.length > 0) {
+    const showUpdated = variant === "list" && project.lastUpdated !== void 0;
+    if (metaChunks.length > 0 || showUpdated) {
       const metaLine = row.createDiv({ cls: "warped-todo-project-row-meta" });
+      const metaLeft = metaLine.createSpan({ cls: "warped-todo-project-row-meta-left" });
       metaChunks.forEach((chunk, i) => {
         if (i > 0)
-          metaLine.createSpan({ text: " \xB7 " });
-        metaLine.createSpan({ text: chunk.text, cls: chunk.cls });
+          metaLeft.createSpan({ text: " \xB7 " });
+        metaLeft.createSpan({ text: chunk.text, cls: chunk.cls });
+      });
+      if (showUpdated) {
+        const updated = (0, import_obsidian12.moment)(project.lastUpdated);
+        metaLine.createSpan({
+          text: updated.fromNow(),
+          cls: "warped-todo-project-row-updated",
+          attr: { title: updated.format("D MMM YYYY, h:mm A") }
+        });
+      }
+    }
+    const notePath = projectFilePath(this.getProjectsOptions().projectsFolder, name);
+    const noteFile = variant === "list" ? this.app.vault.getAbstractFileByPath(notePath) : null;
+    if (noteFile instanceof import_obsidian12.TFile) {
+      const fileRow = row.createDiv({ cls: "warped-todo-project-row-file" });
+      fileRow.createSpan({
+        cls: "header-filename",
+        text: noteFile.name,
+        attr: { title: noteFile.path }
+      });
+      const link = fileRow.createEl("a", {
+        cls: "todo-orphan-section-link",
+        text: "\u2192",
+        href: "#",
+        attr: { "aria-label": `Open ${noteFile.path}` }
+      });
+      link.addEventListener("click", (evt) => {
+        evt.preventDefault();
+        evt.stopPropagation();
+        this.openNoteAndSyncProjects(noteFile, 0);
       });
     }
     return row;

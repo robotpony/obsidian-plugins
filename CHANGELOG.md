@@ -2,6 +2,38 @@
 
 All notable changes to the ␣⌘ Warped Command plugin will be documented in this file.
 
+## [0.40.0] - 2026-08-21
+
+### Added — Projects list: sort, recently-updated date, redesigned row
+
+The Projects tab's list view wrapped badly once a repo name was long
+enough to compete with the filename for space on the title line
+(reported via screenshot). Reworked the row layout and added the sort
+and recently-updated features that came out of that review.
+
+- **Row layout**: three lines now — name; branch+status (one monospace
+  chunk, e.g. `main M?`, matching the detail view's own treatment) and
+  item counts on the left, Recently updated on the right; filename+arrow
+  on their own line at the bottom, right-aligned. The title line is
+  name-only, so a long repo name wraps on its own instead of fighting the
+  filename for width.
+- **Recently updated**: new `getRepoLastUpdated` (`ProjectMetadata.ts`)
+  reads a repo's `CHANGELOG.md` mtime, falling back to `README.md`'s —
+  only touched on a real versioned change, not every incidental edit, and
+  no new `git` call per repo. Falls back further to the vault project
+  note's own mtime if the repo has neither
+  (`ProjectManager.applyNoteLastUpdatedFallback`). New `ProjectInfo.lastUpdated`
+  field; threaded through `ScannedProject`.
+- **Sort**: a sort icon beside the filter box opens a checkmarked menu —
+  Default (tracked-items first, then name; the list's original implicit
+  sort, kept as an explicit option), Name (A–Z), Most items, Needs
+  attention (dirty git status or an open bug), Recently updated. New
+  `sortProjectRows`/`PROJECT_SORT_OPTIONS` (`ProjectsSidebarView.ts`).
+  Session-only, like the filter text box — resets to Default on restart.
+- Test-only: `FakeTFile`/`FakeVault` (`src/__tests__/stubs/fakeVault.ts`)
+  now track a settable mtime, needed to test the lastUpdated fallback
+  chain.
+
 ## [0.39.0] - 2026-08-21
 
 ### Added — Guiding Principles in the Projects detail view

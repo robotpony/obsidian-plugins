@@ -2,7 +2,7 @@ import { execFile } from "child_process";
 import { existsSync } from "fs";
 import { readdir } from "fs/promises";
 import { basename, join } from "path";
-import { detectStack, extractProjectSummary, extractProjectTitle } from "./ProjectMetadata";
+import { detectStack, extractProjectSummary, extractProjectTitle, getRepoLastUpdated } from "./ProjectMetadata";
 
 const MAX_BUFFER = 10 * 1024 * 1024; // 10 MB — git output here is small, generous headroom
 const TAG = "[Warped Todo]";
@@ -38,6 +38,8 @@ export interface ScannedProject {
   stack: string[];
   /** README's opening paragraph, capped to ~2-3 lines; null if there's no README or nothing to show. See ProjectMetadata.ts. */
   readmeSummary: string | null;
+  /** CHANGELOG.md's mtime, falling back to README.md's; null if the repo has neither. See ProjectMetadata.getRepoLastUpdated. */
+  lastUpdated: number | null;
 }
 
 export interface ProjectScannerOptions {
@@ -158,6 +160,7 @@ export class ProjectScanner {
       title: extractProjectTitle(repoPath) ?? name,
       stack: detectStack(repoPath, excludeDirs),
       readmeSummary: extractProjectSummary(repoPath),
+      lastUpdated: getRepoLastUpdated(repoPath),
     };
   }
 

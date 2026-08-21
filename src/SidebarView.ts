@@ -22,6 +22,9 @@ import {
   cleanDisplayText,
   getProjectPrinciples,
   buildProjectPrincipleBlocks,
+  ProjectSortKey,
+  PROJECT_SORT_OPTIONS,
+  sortProjectRows,
   calculateFocusPriority as calculateProjectFocusPriority,
   calculateLaterPriority as calculateProjectLaterPriority,
 } from "./ProjectsSidebarView";
@@ -103,6 +106,9 @@ export class TodoSidebarView extends ItemView {
   // and switchToProjectsTab.
   private projectDetailReturnTab: 'todos' | 'ideas' | null = null;
   private projectsFilterText: string = '';
+  // Session-only, like projectsFilterText above — resets to Default on
+  // restart rather than persisting to settings.
+  private projectsSortKey: ProjectSortKey = "default";
   // Set at the top of the TODOs tab's render pass (renderTodosList) and read
   // by renderListItem/renderOrphanSectionHeader while it runs — tag ->
   // whether that project is repo-matched (has a localPath). Lets a vault
@@ -2727,7 +2733,11 @@ export class TodoSidebarView extends ItemView {
       return;
     }
 
-    const filterInput = container.createEl("input", {
+    // Filter input + sort button share one row — the button sits to its
+    // right rather than in its own row, matching how the detail view's own
+    // overflow menu sits inline with the row it belongs to.
+    const filterRow = container.createDiv({ cls: "warped-todo-projects-filter-row" });
+    const filterInput = filterRow.createEl("input", {
       type: "text",
       placeholder: "Filter…",
       cls: "warped-todo-projects-filter",
@@ -2735,6 +2745,17 @@ export class TodoSidebarView extends ItemView {
     filterInput.value = this.projectsFilterText;
 
     const listEl = container.createDiv({ cls: "warped-todo-projects-list" });
+
+    const sortBtn = filterRow.createEl("a", {
+      cls: "warped-todo-projects-sort-btn clickable-icon",
+      attr: {
+        title: `Sort: ${PROJECT_SORT_OPTIONS.find((o) => o.key === this.projectsSortKey)?.label ?? "Default"}`,
+        "aria-label": "Sort projects",
+      },
+    });
+    setIcon(sortBtn, "arrow-up-down");
+    sortBtn.addEventListener("click", (evt) => this.showProjectSortMenu(evt as MouseEvent, listEl));
+
     filterInput.addEventListener("input", () => {
       this.projectsFilterText = filterInput.value;
       this.renderProjectRows(listEl);
@@ -2743,27 +2764,53 @@ export class TodoSidebarView extends ItemView {
     this.renderProjectRows(listEl);
   }
 
+  /**
+   * Sort menu for the Projects list — mirrors Obsidian's own file-explorer
+   * "Change sort order" menu (checkmark on the active option, no icons per
+   * item) rather than inventing a new pattern. Only re-renders the row list
+   * on selection, not the whole tab — the sort button's own tooltip catches
+   * up next time renderProjectsList runs (tab switch), which is frequent
+   * enough that it's not worth a second render path just for that.
+   */
+  private showProjectSortMenu(evt: MouseEvent, listEl: HTMLElement): void {
+    const menu = new Menu();
+    for (const option of PROJECT_SORT_OPTIONS) {
+      menu.addItem((mi) => {
+        mi.setTitle(option.label)
+          .setChecked(this.projectsSortKey === option.key)
+          .onClick(() => {
+            this.projectsSortKey = option.key;
+            this.renderProjectRows(listEl);
+          });
+      });
+    }
+    menu.showAtMouseEvent(evt);
+  }
+
   private renderProjectRows(listEl: HTMLElement): void {
     listEl.empty();
     const filterLower = this.projectsFilterText.toLowerCase();
 
-    const projects = this.projectManager
+    const rows = this.projectManager
       .getProjects(this.scannedProjects)
       .filter((p) => p.localPath) // list view is repo-matched projects only
       .filter((p) => !filterLower || p.tag.toLowerCase().includes(filterLower))
-      .sort((a, b) => {
-        const aActive = this.projectItemCounts(a).total > 0 ? 1 : 0;
-        const bActive = this.projectItemCounts(b).total > 0 ? 1 : 0;
-        if (aActive !== bActive) return bActive - aActive;
-        return a.tag.localeCompare(b.tag);
+      .map((project) => {
+        const counts = this.projectItemCounts(project);
+        return {
+          project,
+          itemCount: counts.total,
+          needsAttention: !!project.gitStatus || counts.bug > 0,
+        };
       });
+    const sortedRows = sortProjectRows(rows, this.projectsSortKey);
 
-    if (projects.length === 0) {
+    if (sortedRows.length === 0) {
       listEl.createEl("p", { text: "No projects found.", cls: "warped-todo-projects-empty-msg" });
       return;
     }
 
-    for (const project of projects) this.renderProjectRow(listEl, project);
+    for (const { project } of sortedRows) this.renderProjectRow(listEl, project);
   }
 
   private projectItemCounts(project: ProjectInfo): { todo: number; idea: number; bug: number; total: number } {
@@ -2824,18 +2871,69 @@ export class TodoSidebarView extends ItemView {
       });
     }
 
+    // Name only on the title line now — no filename/arrow competing for its
+    // width. A long repo name (e.g. "hugo-auto-drafts-and-future-posts")
+    // wraps on its own instead of fighting the filename for space, and the
+    // filename+arrow moved to their own line at the bottom of the row (see
+    // below). Reported via screenshot: the combined line wrapped badly.
     titleLine.createSpan({
       text: variant === "detail" ? project.title ?? name : name,
       cls: "warped-todo-project-name",
     });
 
-    // Filename + arrow to the project's own note — the same "which file is
-    // this?" affordance TODOs' header/orphan-section rows give their source
-    // file. Reported missing here via screenshot comparison. Omitted (not
-    // guessed) if the note hasn't been synced into the vault yet.
-    // stopPropagation matters in the list view, where the row itself is
-    // also clickable (opens detail mode) — otherwise this arrow's click
-    // would bubble up and trigger that too, on top of opening the file.
+    // Branch+status (unified, one monospace string matching the detail
+    // view's own "main M? (git)" treatment — was two separately-styled
+    // chunks, branch in the default UI font and only the status glyph
+    // monospace, which read inconsistently. Reported via screenshot), item
+    // counts, and Recently updated share one line below the name.
+    //
+    // List view only — the detail view shows its own frontmatter block
+    // instead (see renderProjectFrontmatter), which covers branch/status,
+    // and counts are redundant there with the TODO list right below.
+    const metaChunks: { text: string; cls?: string }[] = [];
+    if (variant === "list") {
+      const counts = this.projectItemCounts(project);
+      if (project.branch) {
+        const branchStatus = project.gitStatus ? `${project.branch} ${project.gitStatus}` : project.branch;
+        metaChunks.push({ text: branchStatus, cls: "warped-todo-project-branch-status" });
+      }
+      if (counts.total > 0) {
+        const parts: string[] = [];
+        if (counts.todo > 0) parts.push(pluralize(counts.todo, "todo"));
+        if (counts.idea > 0) parts.push(pluralize(counts.idea, "idea"));
+        if (counts.bug > 0) parts.push(pluralize(counts.bug, "bug"));
+        metaChunks.push({ text: parts.join(" · ") });
+      }
+    }
+    const showUpdated = variant === "list" && project.lastUpdated !== undefined;
+    if (metaChunks.length > 0 || showUpdated) {
+      const metaLine = row.createDiv({ cls: "warped-todo-project-row-meta" });
+      const metaLeft = metaLine.createSpan({ cls: "warped-todo-project-row-meta-left" });
+      metaChunks.forEach((chunk, i) => {
+        if (i > 0) metaLeft.createSpan({ text: " · " });
+        metaLeft.createSpan({ text: chunk.text, cls: chunk.cls });
+      });
+      if (showUpdated) {
+        const updated = (moment as any)(project.lastUpdated);
+        metaLine.createSpan({
+          text: updated.fromNow(),
+          cls: "warped-todo-project-row-updated",
+          attr: { title: updated.format("D MMM YYYY, h:mm A") },
+        });
+      }
+    }
+
+    // Filename + arrow to the project's own note, now its own line at the
+    // bottom of the row rather than sharing the title line — the same
+    // "which file is this?" affordance TODOs' header/orphan-section rows
+    // give their source file. Reported missing here via screenshot
+    // comparison originally; moved to its own line in a later round once
+    // it started forcing the title line to wrap (see this method's earlier
+    // comment). Omitted (not guessed) if the note hasn't been synced into
+    // the vault yet. stopPropagation matters in the list view, where the
+    // row itself is also clickable (opens detail mode) — otherwise this
+    // arrow's click would bubble up and trigger that too, on top of
+    // opening the file.
     //
     // List view only — in the detail view this got cut off for width (the
     // title line has less room once it's showing the longer README-derived
@@ -2845,12 +2943,13 @@ export class TodoSidebarView extends ItemView {
     const notePath = projectFilePath(this.getProjectsOptions().projectsFolder, name);
     const noteFile = variant === "list" ? this.app.vault.getAbstractFileByPath(notePath) : null;
     if (noteFile instanceof TFile) {
-      titleLine.createSpan({
+      const fileRow = row.createDiv({ cls: "warped-todo-project-row-file" });
+      fileRow.createSpan({
         cls: "header-filename",
         text: noteFile.name,
         attr: { title: noteFile.path },
       });
-      const link = titleLine.createEl("a", {
+      const link = fileRow.createEl("a", {
         cls: "todo-orphan-section-link",
         text: "→",
         href: "#",
@@ -2863,37 +2962,6 @@ export class TodoSidebarView extends ItemView {
       });
     }
 
-    // Branch, git status, and item counts share one muted line below the
-    // name, dot-separated like the counts already were — branch used to
-    // sit on the title line instead, which wrapped badly for long project
-    // names and put it on a different line than everything else describing
-    // the repo's current state. Reported via screenshot. Each chunk keeps
-    // its own class (status keeps its accent colour/monospace) rather than
-    // joining into one plain string, the way counts alone used to.
-    //
-    // List view only — the detail view shows its own frontmatter block
-    // instead (see renderProjectFrontmatter), which covers branch/status,
-    // and counts are redundant there with the TODO list right below.
-    const metaChunks: { text: string; cls?: string }[] = [];
-    if (variant === "list") {
-      const counts = this.projectItemCounts(project);
-      if (project.branch) metaChunks.push({ text: project.branch, cls: "warped-todo-project-branch" });
-      if (project.gitStatus) metaChunks.push({ text: project.gitStatus, cls: "warped-todo-project-status" });
-      if (counts.total > 0) {
-        const parts: string[] = [];
-        if (counts.todo > 0) parts.push(pluralize(counts.todo, "todo"));
-        if (counts.idea > 0) parts.push(pluralize(counts.idea, "idea"));
-        if (counts.bug > 0) parts.push(pluralize(counts.bug, "bug"));
-        metaChunks.push({ text: parts.join(" · ") });
-      }
-    }
-    if (metaChunks.length > 0) {
-      const metaLine = row.createDiv({ cls: "warped-todo-project-row-meta" });
-      metaChunks.forEach((chunk, i) => {
-        if (i > 0) metaLine.createSpan({ text: " · " });
-        metaLine.createSpan({ text: chunk.text, cls: chunk.cls });
-      });
-    }
     return row;
   }
 

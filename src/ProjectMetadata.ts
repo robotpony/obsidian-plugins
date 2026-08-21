@@ -232,6 +232,34 @@ function findReadme(projectPath: string): string | null {
   return null;
 }
 
+function findChangelog(projectPath: string): string | null {
+  for (const name of ["CHANGELOG.md", "changelog.md", "Changelog.md"]) {
+    const candidate = join(projectPath, name);
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+/**
+ * Best available "last real update" signal for a repo, used by the Projects
+ * list's Recently updated sort and its per-row date. CHANGELOG.md's own
+ * mtime wins when the repo has one — it's only touched on an actual
+ * versioned change, not every incidental edit — falling back to README.md's
+ * mtime otherwise. Returns null if the repo has neither; the caller falls
+ * back further, to the vault project note's own mtime (ProjectManager,
+ * which owns the vault side — this module only knows about files on disk
+ * in the repo itself).
+ */
+export function getRepoLastUpdated(projectPath: string): number | null {
+  const path = findChangelog(projectPath) ?? findReadme(projectPath);
+  if (!path) return null;
+  try {
+    return statSync(path).mtimeMs;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Extracts a display title from a project's README first `# heading`, ASCII-
  * filtered (drops logo glyphs/emoji, e.g. "␣⌘ Warped Command for Obsidian"

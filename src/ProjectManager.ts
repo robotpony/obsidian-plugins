@@ -166,7 +166,26 @@ export class ProjectManager {
     }
 
     const merged = mergeScannedProjects(projects, scannedProjects);
-    return getCachedItems ? foldSyncedItemsIntoProjects(merged, getCachedItems) : merged;
+    const withLastUpdated = this.applyNoteLastUpdatedFallback(merged);
+    return getCachedItems ? foldSyncedItemsIntoProjects(withLastUpdated, getCachedItems) : withLastUpdated;
+  }
+
+  /**
+   * Vault-note-mtime fallback for `lastUpdated`, for a repo with neither a
+   * CHANGELOG.md nor a README.md on disk (ProjectScanner/ProjectMetadata
+   * already tried both — see getRepoLastUpdated). The note's own
+   * last-modified time is the next-best "recently updated" signal, and
+   * unlike the repo's own files it's always resolvable here: ProjectManager
+   * owns the vault side, ProjectMetadata only knows about files in the repo
+   * itself.
+   */
+  private applyNoteLastUpdatedFallback(projects: ProjectInfo[]): ProjectInfo[] {
+    return projects.map((project) => {
+      if (!project.localPath || project.lastUpdated !== undefined) return project;
+      const file = this.app.vault.getAbstractFileByPath(this.getProjectFilePath(project.tag));
+      if (!(file instanceof TFile) || !file.stat) return project;
+      return { ...project, lastUpdated: file.stat.mtime };
+    });
   }
 
   getFocusProjects(limit?: number): ProjectInfo[] {
@@ -519,7 +538,7 @@ function foldSyncedItemsIntoProjects(
 
 function repoFields(
   scanned: ScannedProject
-): Pick<ProjectInfo, "localPath" | "remote" | "branch" | "gitStatus" | "title" | "stack" | "readmeSummary"> {
+): Pick<ProjectInfo, "localPath" | "remote" | "branch" | "gitStatus" | "title" | "stack" | "readmeSummary" | "lastUpdated"> {
   return {
     localPath: scanned.localPath,
     remote: scanned.remote,
@@ -528,5 +547,6 @@ function repoFields(
     title: scanned.title,
     stack: scanned.stack,
     readmeSummary: scanned.readmeSummary ?? undefined,
+    lastUpdated: scanned.lastUpdated ?? undefined,
   };
 }

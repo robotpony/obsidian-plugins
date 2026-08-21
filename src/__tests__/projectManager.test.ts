@@ -1,10 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { App, TFile } from "obsidian";
+import { TFile } from "obsidian";
 import { ProjectManager } from "../ProjectManager";
 import { TodoScanner } from "../TodoScanner";
 import { ScannedProject } from "../ProjectScanner";
 import { TodoItem } from "../types";
 import { ParsedProjectItem } from "../StructuredFileParser";
+import { createFakeApp } from "./stubs/fakeVault";
 
 // Phase 5 (see PLAN.md): ProjectManager.getProjects() merging tag-derived and
 // repo-derived ProjectInfo. Uses a minimal fake TodoScanner (just getTodos()),
@@ -36,13 +37,19 @@ function scannedFixture(overrides: Partial<ScannedProject> = {}): ScannedProject
     title: "peep",
     stack: [],
     readmeSummary: null,
+    lastUpdated: null,
     ...overrides,
   };
 }
 
 function makeManager(todos: TodoItem[], excludeFolders: string[] = []): ProjectManager {
   const fakeScanner = { getTodos: () => todos } as unknown as TodoScanner;
-  return new ProjectManager(new App(), fakeScanner, "projects/", ["#p0", "#p1", "#p2", "#p3", "#p4"], excludeFolders);
+  // A real vault (FakeVault), not the bare `App` stub — getProjects()'s
+  // lastUpdated fallback (applyNoteLastUpdatedFallback) reads
+  // app.vault.getAbstractFileByPath(); an empty vault just means "no note
+  // file found," same as these tests' fixtures never having one.
+  const { app } = createFakeApp();
+  return new ProjectManager(app as any, fakeScanner, "projects/", ["#p0", "#p1", "#p2", "#p3", "#p4"], excludeFolders);
 }
 
 describe("ProjectManager.resolveProjectTags", () => {
@@ -165,6 +172,30 @@ describe("ProjectManager.getProjects: merging with scannedProjects", () => {
     const withEmpty = manager.getProjects([]);
     const withNone = manager.getProjects();
     expect(withEmpty).toEqual(withNone);
+  });
+});
+
+describe("ProjectManager.getProjects: lastUpdated fallback chain", () => {
+  it("uses the scanned repo's own lastUpdated (CHANGELOG/README mtime) when present", () => {
+    const manager = makeManager([todoFixture({ tags: ["#todo", "#peep"] })]);
+    const projects = manager.getProjects([scannedFixture({ lastUpdated: 5000 })]);
+    expect(projects[0].lastUpdated).toBe(5000);
+  });
+
+  it("falls back to the vault project note's own mtime when the repo has neither CHANGELOG nor README", () => {
+    const fakeScanner = { getTodos: () => [] } as unknown as TodoScanner;
+    const { app, vault } = createFakeApp();
+    vault.setRawContent("projects/peep.md", "#peep\n", 7777);
+    const manager = new ProjectManager(app as any, fakeScanner, "projects/", [], []);
+
+    const projects = manager.getProjects([scannedFixture({ lastUpdated: null })]);
+    expect(projects[0].lastUpdated).toBe(7777);
+  });
+
+  it("leaves lastUpdated undefined when the repo has neither file and no vault note exists", () => {
+    const manager = makeManager([todoFixture({ tags: ["#todo", "#peep"] })]);
+    const projects = manager.getProjects([scannedFixture({ lastUpdated: null })]);
+    expect(projects[0].lastUpdated).toBeUndefined();
   });
 });
 

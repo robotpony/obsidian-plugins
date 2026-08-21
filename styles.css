@@ -2143,9 +2143,24 @@
    screenshot as tighter than TODOs. Set explicitly here instead of
    broadening the shared selector, which risks pulling in some other
    non-div first-child elsewhere in the sidebar. */
-.warped-todo-projects-filter {
+/* Filter input + sort button share this row now (see renderProjectsList) —
+   the width/margin trick from the input's own former rule moves here
+   unchanged, just applied to the row instead of the input directly. */
+.warped-todo-projects-filter-row {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2);
   width: calc(100% + 4px);
   margin: 1em -4px var(--size-4-2) 0;
+}
+
+.warped-todo-projects-filter {
+  flex: 1;
+  min-width: 0;
+}
+
+.warped-todo-projects-sort-btn {
+  flex-shrink: 0;
 }
 
 .warped-todo-projects-empty,
@@ -2181,15 +2196,6 @@
   gap: var(--size-4-2);
 }
 
-/* Pushes the note-filename + arrow (when present) to the row's far right,
-   same affordance TODOs' own header/orphan-section rows give their source
-   file — everything before it (name/branch/status) keeps its normal gap,
-   `margin-left: auto` eats the rest of the row's width on its own.
-   Reported missing here via screenshot comparison against TODOs. */
-.warped-todo-project-row-title .header-filename {
-  margin-left: auto;
-}
-
 /* Detail view's inline back-to-list arrow, before the title — see
    backToProjectsList()'s comment for why this exists alongside the tab
    button doing the same thing. Same treatment as .todo-orphan-section-link
@@ -2211,24 +2217,51 @@
   color: var(--text-normal);
 }
 
-.warped-todo-project-branch {
-  color: var(--text-muted);
-  font-size: 0.85em;
-}
-
-.warped-todo-project-status {
-  color: var(--text-accent);
-  font-size: 0.85em;
+/* Branch + git status as one monospace chunk ("main M?"), matching the
+   detail view's own "main M? (git)" treatment — was two separately-styled
+   spans, branch in the default UI font and only the status glyph
+   monospace, which read inconsistently on the same line. Reported via
+   screenshot. */
+.warped-todo-project-branch-status {
   font-family: var(--font-monospace);
 }
 
-/* Branch, git status, and item counts — one muted line below the name,
-   dot-separated. Was .warped-todo-project-row-counts (counts only); branch
-   and status used to sit on the title line instead, which wrapped badly
-   for long project names — see renderProjectSummary's comment. */
+/* Branch+status and item counts (left), Recently updated (right) — one
+   muted line below the name. Was a single dot-joined run with no explicit
+   right side; branch and status used to sit on the title line instead,
+   which wrapped badly for long project names — see renderProjectSummary's
+   comment. */
 .warped-todo-project-row-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--size-4-2);
   color: var(--text-muted);
   font-size: 0.85em;
+  margin-top: var(--size-2-1);
+}
+
+.warped-todo-project-row-meta-left {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.warped-todo-project-row-updated {
+  flex-shrink: 0;
+  color: var(--text-faint);
+}
+
+/* Filename + arrow to the project's own note, its own line at the bottom
+   of the row — see renderProjectSummary's comment for why this moved off
+   the title line. .header-filename's own margin-left: auto still pushes
+   this whole line flush right, the same way it used to push just itself
+   within the title line. */
+.warped-todo-project-row-file {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   margin-top: var(--size-2-1);
 }
 
