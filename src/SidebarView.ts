@@ -20,6 +20,8 @@ import {
   homeRelativePath,
   groupHandTypedItems,
   cleanDisplayText,
+  getProjectPrinciples,
+  buildProjectPrincipleBlocks,
   calculateFocusPriority as calculateProjectFocusPriority,
   calculateLaterPriority as calculateProjectLaterPriority,
 } from "./ProjectsSidebarView";
@@ -1218,10 +1220,12 @@ export class TodoSidebarView extends ItemView {
         desc.appendText("No description available.");
       }
 
-      // Principle items - vault-wide items tagged with both #principle and this project's tag
-      const projectPrinciples = this.scanner.getPrinciples().filter(p =>
-        p.tags.includes(project.tag) || p.inferredFileTag === project.tag
-      );
+      // Principle items - vault-wide items tagged with both #principle and this
+      // project's tag, or a child of a #principles-tagged header that matches
+      // (see getProjectPrinciples). Header rows are labels, not principle
+      // statements, so they're excluded from this flat list.
+      const projectPrinciples = getProjectPrinciples(project.tag, this.scanner.getPrinciples())
+        .filter(p => !p.isHeader);
 
       if (projectPrinciples.length > 0) {
         popup.createEl("div", { cls: "project-info-separator" });
@@ -1231,18 +1235,10 @@ export class TodoSidebarView extends ItemView {
         const principlesList = popup.createEl("ul", { cls: "project-info-principle-items" });
         for (const principle of projectPrinciples) {
           const li = principlesList.createEl("li", { cls: "project-info-principle-item" });
-          // Strip #principle tag and project tag from display text
-          let displayText = principle.text
-            .replace(/#principles?\b/gi, "")
-            .replace(new RegExp(project.tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "\\b", "gi"), "")
-            .replace(/\s+/g, " ")
-            .trim();
-          // Remove leading list markers (-, *, +) if present
-          displayText = displayText.replace(/^[-*+]\s*/, "");
           // Render as markdown for styling (bold, italic, links, etc.)
           const principleComponent = new Component();
           principleComponent.load();
-          await MarkdownRenderer.render(this.app, displayText, li, info?.filepath || "", principleComponent);
+          await MarkdownRenderer.render(this.app, cleanDisplayText(principle.text), li, info?.filepath || "", principleComponent);
         }
       }
 
@@ -2924,9 +2920,42 @@ export class TodoSidebarView extends ItemView {
       const summaryEl = info.createDiv({ cls: "warped-todo-project-readme-summary" });
       void this.renderProjectReadmeSummary(summaryEl, project);
     }
+    // Guiding Principles is a sibling of the readme summary, still inside
+    // `info` — so info's own border-bottom (separating project context from
+    // the actual TODO list) ends up below the principles, not between them
+    // and the readme (reported via screenshot).
+    void this.renderProjectPrinciplesSection(info, project);
 
     const itemsContainer = container.createDiv({ cls: "warped-todo-project-items" });
     this.renderProjectItemGroups(itemsContainer, project);
+  }
+
+  /**
+   * Guiding Principles, shown below the header/readme and above the
+   * TODOs/Ideas/Bugs groups. Pulls the same vault-wide #principle/#principles
+   * items the project-info popup lists (see getProjectPrinciples) and
+   * renders them verbatim (buildProjectPrincipleBlocks) — a `#principles`-
+   * tagged header's own line plus its children render as one markdown pass,
+   * so the block reads exactly as written in the note: no synthesised
+   * title, and the original list markup (bulleted, numbered, or plain)
+   * comes through as-is instead of being reconstructed into a `<ul>`, which
+   * previously double-nested a source ordered list inside it (reported via
+   * screenshot). Renders nothing when the project has no principles — an
+   * empty template header with no content yet doesn't get a section.
+   * Async (MarkdownRenderer.render) but the caller doesn't await it, same
+   * as renderProjectReadmeSummary above.
+   */
+  private async renderProjectPrinciplesSection(container: HTMLElement, project: ProjectInfo): Promise<void> {
+    const blocks = buildProjectPrincipleBlocks(getProjectPrinciples(project.tag, this.scanner.getPrinciples()));
+    if (blocks.length === 0) return;
+
+    const section = container.createDiv({ cls: "warped-todo-project-principles" });
+    const component = new Component();
+    component.load();
+    for (const block of blocks) {
+      const blockEl = section.createDiv({ cls: "warped-todo-project-principles-block" });
+      await MarkdownRenderer.render(this.app, block.markdown, blockEl, block.filePath, component);
+    }
   }
 
   /**

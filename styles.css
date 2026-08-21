@@ -2367,6 +2367,69 @@
   margin-bottom: var(--size-4-2);
 }
 
+/* Guiding Principles, rendered verbatim from source markdown (see
+   renderProjectPrinciplesSection/buildProjectPrincipleBlocks) — a sibling
+   of .warped-todo-project-readme-summary within .warped-todo-project-info,
+   so info's own border-bottom (separating project context from the actual
+   TODO list below) ends up below this section rather than between it and
+   the readme (reported via screenshot). Matches the readme summary's own
+   horizontal inset and compact, muted treatment — this is still context
+   about the project, not the task list itself. No synthesised title here:
+   a #principles-tagged header's own line renders as the heading, exactly
+   as the author wrote it. */
+.warped-todo-project-principles {
+  margin-top: var(--size-4-2);
+  padding: 0 var(--size-4-3) var(--size-4-2);
+}
+
+.warped-todo-project-principles-block {
+  font-size: 0.85em;
+  line-height: 1.5;
+  color: var(--text-normal);
+}
+
+.warped-todo-project-principles-block + .warped-todo-project-principles-block {
+  margin-top: var(--size-4-2);
+}
+
+.warped-todo-project-principles-block p {
+  margin: 0 0 4px;
+}
+
+.warped-todo-project-principles-block > *:last-child {
+  margin-bottom: 0;
+}
+
+/* A #principles-tagged header renders verbatim too, but dialled down to
+   the sidebar's own compact heading scale (matches .todo-orphan-section-
+   text) rather than a full-size Obsidian heading, which read oversized in
+   a column this narrow. */
+.warped-todo-project-principles-block h1,
+.warped-todo-project-principles-block h2,
+.warped-todo-project-principles-block h3,
+.warped-todo-project-principles-block h4,
+.warped-todo-project-principles-block h5,
+.warped-todo-project-principles-block h6 {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin: 0 0 4px;
+}
+
+.warped-todo-project-principles-block ul,
+.warped-todo-project-principles-block ol {
+  margin: 0;
+  padding-left: 1.2em;
+}
+
+.warped-todo-project-principles-block li {
+  margin-bottom: 2px;
+}
+
+.warped-todo-project-principles-block li:last-child {
+  margin-bottom: 0;
+}
+
 /* Group heading and item rows reuse the TODOs sidebar's own classes
    (.todo-orphan-section*, .todo-item, .todo-checkbox*, .todo-text) — see
    ProjectsSidebarView.ts's renderGroupHeading/renderSyncedItemRow/

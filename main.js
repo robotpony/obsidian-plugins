@@ -2158,6 +2158,8 @@ var ProjectManager = class {
 
 ${tag}
 
+## Guiding Principles #principles
+
 ## Overview
 
 ## TODOs
@@ -2933,6 +2935,8 @@ var ProjectSyncManager = class {
       const frontmatter = serializeFrontmatter(mergeFrontmatter(/* @__PURE__ */ new Map(), scanned, now));
       const body2 = `
 #${scanned.name}
+
+## Guiding Principles #principles
 
 ## Overview
 
@@ -4014,6 +4018,38 @@ function groupHandTypedItems(items) {
     orphanGroups.get(label).items.push(item);
   }
   return [...headerGroups.values(), ...orphanGroups.values()].filter((g) => g.items.length > 0);
+}
+function getProjectPrinciples(projectTag, allPrinciples) {
+  const matchesTag = (item) => item.tags.includes(projectTag) || item.inferredFileTag === projectTag;
+  const matchedHeaderLines = new Set(
+    allPrinciples.filter((p) => p.isHeader && matchesTag(p)).map((p) => p.lineNumber)
+  );
+  return allPrinciples.filter(
+    (p) => matchesTag(p) || p.parentLineNumber !== void 0 && matchedHeaderLines.has(p.parentLineNumber)
+  );
+}
+function stripPrincipleTag(text) {
+  return text.replace(/#principles?\b\s?/gi, "").replace(/[ \t]+$/, "").replace(/^[ \t]+/, "");
+}
+function buildProjectPrincipleBlocks(items) {
+  const headers = items.filter((i) => i.isHeader);
+  const blocks = [];
+  const placed = /* @__PURE__ */ new Set();
+  for (const header of headers) {
+    const children = items.filter((i) => i.parentLineNumber === header.lineNumber).sort((a, b) => a.lineNumber - b.lineNumber);
+    if (children.length === 0)
+      continue;
+    children.forEach((c) => placed.add(c.lineNumber));
+    const markdown = [header, ...children].map((i) => stripPrincipleTag(i.text)).join("\n");
+    blocks.push({ filePath: header.filePath, markdown });
+  }
+  const headerLines = new Set(headers.map((h) => h.lineNumber));
+  for (const item of items) {
+    if (headerLines.has(item.lineNumber) || placed.has(item.lineNumber))
+      continue;
+    blocks.push({ filePath: item.filePath, markdown: stripPrincipleTag(item.text) });
+  }
+  return blocks;
 }
 
 // src/ContextMenuHandler.ts
@@ -5221,9 +5257,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
         const desc = popup.createEl("div", { cls: "project-info-description project-info-empty" });
         desc.appendText("No description available.");
       }
-      const projectPrinciples = this.scanner.getPrinciples().filter(
-        (p) => p.tags.includes(project.tag) || p.inferredFileTag === project.tag
-      );
+      const projectPrinciples = getProjectPrinciples(project.tag, this.scanner.getPrinciples()).filter((p) => !p.isHeader);
       if (projectPrinciples.length > 0) {
         popup.createEl("div", { cls: "project-info-separator" });
         const principlesHeader = popup.createEl("div", { cls: "project-info-section-header" });
@@ -5231,11 +5265,9 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
         const principlesList = popup.createEl("ul", { cls: "project-info-principle-items" });
         for (const principle of projectPrinciples) {
           const li = principlesList.createEl("li", { cls: "project-info-principle-item" });
-          let displayText = principle.text.replace(/#principles?\b/gi, "").replace(new RegExp(project.tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "gi"), "").replace(/\s+/g, " ").trim();
-          displayText = displayText.replace(/^[-*+]\s*/, "");
           const principleComponent = new import_obsidian12.Component();
           principleComponent.load();
-          await import_obsidian12.MarkdownRenderer.render(this.app, displayText, li, (info == null ? void 0 : info.filepath) || "", principleComponent);
+          await import_obsidian12.MarkdownRenderer.render(this.app, cleanDisplayText(principle.text), li, (info == null ? void 0 : info.filepath) || "", principleComponent);
         }
       }
       if (info.principles.length > 0) {
@@ -6565,8 +6597,36 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       const summaryEl = info.createDiv({ cls: "warped-todo-project-readme-summary" });
       void this.renderProjectReadmeSummary(summaryEl, project);
     }
+    void this.renderProjectPrinciplesSection(info, project);
     const itemsContainer = container.createDiv({ cls: "warped-todo-project-items" });
     this.renderProjectItemGroups(itemsContainer, project);
+  }
+  /**
+   * Guiding Principles, shown below the header/readme and above the
+   * TODOs/Ideas/Bugs groups. Pulls the same vault-wide #principle/#principles
+   * items the project-info popup lists (see getProjectPrinciples) and
+   * renders them verbatim (buildProjectPrincipleBlocks) — a `#principles`-
+   * tagged header's own line plus its children render as one markdown pass,
+   * so the block reads exactly as written in the note: no synthesised
+   * title, and the original list markup (bulleted, numbered, or plain)
+   * comes through as-is instead of being reconstructed into a `<ul>`, which
+   * previously double-nested a source ordered list inside it (reported via
+   * screenshot). Renders nothing when the project has no principles — an
+   * empty template header with no content yet doesn't get a section.
+   * Async (MarkdownRenderer.render) but the caller doesn't await it, same
+   * as renderProjectReadmeSummary above.
+   */
+  async renderProjectPrinciplesSection(container, project) {
+    const blocks = buildProjectPrincipleBlocks(getProjectPrinciples(project.tag, this.scanner.getPrinciples()));
+    if (blocks.length === 0)
+      return;
+    const section = container.createDiv({ cls: "warped-todo-project-principles" });
+    const component = new import_obsidian12.Component();
+    component.load();
+    for (const block of blocks) {
+      const blockEl = section.createDiv({ cls: "warped-todo-project-principles-block" });
+      await import_obsidian12.MarkdownRenderer.render(this.app, block.markdown, blockEl, block.filePath, component);
+    }
   }
   /**
    * Renders the README's opening paragraph (ProjectMetadata.

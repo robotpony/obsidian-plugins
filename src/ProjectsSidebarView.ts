@@ -165,3 +165,80 @@ export function groupHandTypedItems(items: TodoItem[]): HandTypedGroup[] {
 
   return [...headerGroups.values(), ...orphanGroups.values()].filter((g) => g.items.length > 0);
 }
+
+/**
+ * A project's #principle/#principles items — the vault-wide guiding
+ * principles that belong to it, whether tagged directly (`#principle
+ * #myproject`), living in the project's own note (matched via
+ * `inferredFileTag`, derived from the filename), or listed as children of a
+ * `#principles`-tagged header that itself matches the project (the header's
+ * tag/inferredFileTag covers the whole block; individual bullets under it
+ * don't need to repeat the tag). Shared by the project-info popup and the
+ * project detail view's Guiding Principles section (both in SidebarView.ts)
+ * so the two surfaces agree on the same set of items.
+ */
+export function getProjectPrinciples(projectTag: string, allPrinciples: TodoItem[]): TodoItem[] {
+  const matchesTag = (item: TodoItem) =>
+    item.tags.includes(projectTag) || item.inferredFileTag === projectTag;
+
+  const matchedHeaderLines = new Set(
+    allPrinciples.filter((p) => p.isHeader && matchesTag(p)).map((p) => p.lineNumber)
+  );
+
+  return allPrinciples.filter(
+    (p) => matchesTag(p) || (p.parentLineNumber !== undefined && matchedHeaderLines.has(p.parentLineNumber))
+  );
+}
+
+/** Strips only the plugin's own `#principle`/`#principles` marker tag from a line — everything else (heading markers, list markers, other tags, formatting) is left exactly as written, so the caller can render it verbatim. */
+export function stripPrincipleTag(text: string): string {
+  // Consumes one trailing space along with the tag so removing it mid-line
+  // ("data #principle #peep") doesn't leave a double space behind.
+  return text.replace(/#principles?\b\s?/gi, "").replace(/[ \t]+$/, "").replace(/^[ \t]+/, "");
+}
+
+export interface ProjectPrincipleBlock {
+  filePath: string;
+  /**
+   * Raw source markdown for this block — a `#principles`-tagged header
+   * joined with its own children's lines, or a single standalone item —
+   * with only the marker tag stripped. Rendered as one MarkdownRenderer
+   * pass so the original list type (bulleted, numbered, or a plain line)
+   * comes through exactly as written, instead of being reconstructed into
+   * a synthetic list (which double-nested a source `1.`/`2.` ordered list
+   * inside an outer `<ul>` — reported via screenshot).
+   */
+  markdown: string;
+}
+
+/**
+ * Builds verbatim, renderable blocks from a project's principle items (see
+ * getProjectPrinciples): each `#principles`-tagged header's own line plus
+ * its children's lines join into one block — the header's text becomes the
+ * block's heading exactly as the author wrote it, no synthesised label —
+ * and every remaining item (no header, or a header with no matched children
+ * of its own) becomes its own one-line block.
+ */
+export function buildProjectPrincipleBlocks(items: TodoItem[]): ProjectPrincipleBlock[] {
+  const headers = items.filter((i) => i.isHeader);
+  const blocks: ProjectPrincipleBlock[] = [];
+  const placed = new Set<number>();
+
+  for (const header of headers) {
+    const children = items
+      .filter((i) => i.parentLineNumber === header.lineNumber)
+      .sort((a, b) => a.lineNumber - b.lineNumber);
+    if (children.length === 0) continue;
+    children.forEach((c) => placed.add(c.lineNumber));
+    const markdown = [header, ...children].map((i) => stripPrincipleTag(i.text)).join("\n");
+    blocks.push({ filePath: header.filePath, markdown });
+  }
+
+  const headerLines = new Set(headers.map((h) => h.lineNumber));
+  for (const item of items) {
+    if (headerLines.has(item.lineNumber) || placed.has(item.lineNumber)) continue;
+    blocks.push({ filePath: item.filePath, markdown: stripPrincipleTag(item.text) });
+  }
+
+  return blocks;
+}

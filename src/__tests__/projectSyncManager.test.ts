@@ -63,7 +63,10 @@ describe("ProjectSyncManager.syncProject: creating a new note", () => {
     expect(content).toContain('remote: "https://github.com/robotpony/peep.git"');
     expect(content).toContain('branch: "main"');
     expect(content).toContain("#peep");
+    expect(content).toContain("## Guiding Principles #principles");
     expect(content).toContain("## Overview");
+    // Guiding Principles sits before Overview — "at the top" of the note.
+    expect(content!.indexOf("## Guiding Principles")).toBeLessThan(content!.indexOf("## Overview"));
     expect(content).toContain('cssclasses: "warped-todo-project-note"');
     // No leading "# name" heading — Obsidian's own file-title display already
     // shows the note's name; a duplicate heading here just repeated it

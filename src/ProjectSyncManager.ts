@@ -136,7 +136,12 @@ export class ProjectSyncManager {
       // already shows the note's name at the top; a duplicate heading in the
       // body just repeated it a second time (a third, alongside the sidebar's
       // own title, before that was also fixed — found via live testing).
-      const body = `\n#${scanned.name}\n\n## Overview\n\n`;
+      // Guiding Principles sits first, above Overview: the header's own
+      // #principles tag makes it a block (SidebarView's Projects tab lists
+      // its children at the top of the TODO list; see getProjectPrinciples/
+      // groupProjectPrinciples), so items just need to be added as bullets
+      // underneath, no per-line tagging required.
+      const body = `\n#${scanned.name}\n\n## Guiding Principles #principles\n\n## Overview\n\n`;
       await this.app.vault.create(filePath, frontmatter + body);
       return;
     }

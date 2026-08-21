@@ -193,11 +193,13 @@ Capture ideas separately from actionable TODOs:
 | Tag                              | Purpose                                       |
 |-----------------------------------|-----------------------------------------------|
 | `#idea` / `#ideas` / `#ideation`  | Something to capture (not yet actionable)     |
-| `#principle`                      | A guiding principle (reference only)          |
+| `#principle` / `#principles`      | A guiding principle (reference only)          |
 
 Click an idea's checkbox to dismiss it. Right-click to promote it to a TODO.
 
-`#principle` items don't appear in the Ideas tab; they show up in the project-info popup for any project they're tagged with, and the Stats modal still counts them.
+`#principle` items don't appear in the Ideas tab. They're a project-document feature: a "Guiding Principles" section lists them at the top of a project's TODO list in the Projects tab's detail view (below the header and readme), they show up in the project-info popup for any project they're tagged with, and the Stats modal still counts them.
+
+`#principles` also works as a block-header tag, the same way `#todo`/`#idea` headers do (see [Header TODOs](#header-todos)): tag a heading `## Guiding Principles #principles` and every bullet underneath it is picked up automatically, no per-line tagging needed. Both project note templates (tag-based and repo-synced) scaffold this heading for you.
 
 ## Moving TODOs between files
 
@@ -276,7 +278,7 @@ Point it at a folder in Settings → Projects → "Projects base folder" (e.g. `
 - Creates or updates a vault note with the repo's branch, git status, remote, and last-synced time in the frontmatter.
 - Pulls in `#todo`/`#idea`/`#bug` items from the repo's `BUGS.md`, `TODO.md`, `TODOS.md`, `IDEAS.md`, or `ISSUES.md`, tagged explicitly or not (an untagged line in `BUGS.md` is assumed to be a bug, in `TODO.md` a todo, and so on).
 
-Click a project in the list to open its note and see a detail view: repo facts pinned at the top, the README's opening paragraph underneath (if it has one), and every tracked item grouped by type. Completing an item there writes back to the actual file in the repo, not just the vault note; the same familiar focus/snooze/priority actions from the TODOs tab work here too (no "move," since moving a synced item elsewhere would just have it reappear in its original note on the next sync).
+Click a project in the list to open its note and see a detail view: repo facts pinned at the top, the README's opening paragraph underneath (if it has one), a "Guiding Principles" section for any `#principle`/`#principles` items tagged with the project (see [Ideas and principles](#ideas-and-principles)), and every tracked item grouped by type. Completing an item there writes back to the actual file in the repo, not just the vault note; the same familiar focus/snooze/priority actions from the TODOs tab work here too (no "move," since moving a synced item elsewhere would just have it reappear in its original note on the next sync).
 
 Opening any project's note anywhere in the vault (Quick Switcher, a wikilink, clicking through from a project block on the TODOs/Ideas tab) jumps the sidebar straight to that project's detail view, whatever tab it was showing before; Back returns you there. Turn this off in Settings → Projects → "Auto-open Projects sidebar" if you'd rather the sidebar stay put until you switch tabs yourself.
 

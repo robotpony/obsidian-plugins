@@ -2,6 +2,38 @@
 
 All notable changes to the ␣⌘ Warped Command plugin will be documented in this file.
 
+## [0.39.0] - 2026-08-21
+
+### Added — Guiding Principles in the Projects detail view
+
+`#principle`/`#principles` items now surface in the Projects tab's detail
+view, not just the project-info popup and Stats — a Guiding Principles
+section renders them below the header and readme summary, above the
+TODOs/Ideas/Bugs list.
+
+- New `getProjectPrinciples` helper (`ProjectsSidebarView.ts`) resolves a
+  project's principle items: matched by explicit tag, by
+  `inferredFileTag` (principles written in the project's own note), or as
+  children of a matched `#principles`-tagged header block — a header's
+  children no longer need to repeat the tag themselves. The project-info
+  popup's own Principles section now runs through the same helper,
+  picking up header-block children it previously missed.
+- `renderProjectPrinciplesSection` (`SidebarView.ts`) renders the section
+  verbatim from source: `buildProjectPrincipleBlocks` joins a
+  `#principles`-tagged header's own line with its children into one
+  markdown block, rendered in a single pass so it reads exactly as
+  written — no synthesised title, and the original list markup (numbered,
+  bulleted, or plain) comes through as-is instead of being reconstructed
+  into a `<ul>`. Renders nothing when a project has no principles yet.
+- Both project note templates (`ProjectManager.createProjectFile`,
+  `ProjectSyncManager.syncProject`) now scaffold a
+  `## Guiding Principles #principles` section above `## Overview` — items
+  added underneath it are picked up automatically, no per-line tagging
+  needed.
+- New CSS: `.warped-todo-project-principles`,
+  `.warped-todo-project-principles-block` (with scoped heading/list
+  resets to match the sidebar's compact scale).
+
 ## [0.38.7] - 2026-08-21
 
 ### Fixed

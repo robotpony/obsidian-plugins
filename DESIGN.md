@@ -111,10 +111,12 @@ folded into `TodoSidebarView` as a third tab (`activeTab: 'todos' | 'ideas'
 `switchToProjectsTab` already documented under SidebarView above.
 `src/ProjectsSidebarView.ts` is what's left of the original file: pure,
 `ItemView`-independent helpers (display formatting, hand-typed-item
-grouping, the `GROUP_ORDER` constant) the tab's rendering code in
-`SidebarView.ts` calls into — safe to unit-test directly
-(`groupHandTypedItems.test.ts`, `projectsSidebarDisplay.test.ts`), which was
-the point of keeping it a separate file rather than inlining it. Settings
+grouping, the `GROUP_ORDER` constant, `getProjectPrinciples`/
+`buildProjectPrincipleBlocks` for the Guiding Principles section below) the
+tab's rendering code in `SidebarView.ts` calls into — safe to unit-test
+directly (`groupHandTypedItems.test.ts`, `projectsSidebarDisplay.test.ts`,
+`projectPrinciples.test.ts`), which was the point of keeping it a separate
+file rather than inlining it. Settings
 live in the *existing* `WarpedTodoSettingTab`'s "Projects" `h3` section
 (already holds `defaultProjectsFolder`/`excludeFoldersFromProjects` for the
 tag-based flow) — the repo-scan fields (base folder, exclude dirs, scan
@@ -179,6 +181,10 @@ what's in the main pane.
   peep
   main [M] · synced 2m ago              [📁 reveal] [🔗 remote]
 
+  ## Guiding principles
+  1. Ship small, ship often
+  2. Users own their data
+
   ### TODOs
   - [x] Add error handling for malformed files
   - [ ] Add caching mechanism for git operations
@@ -196,7 +202,16 @@ what's in the main pane.
 The `### TODOs`/`### Ideas`/`### Bugs` groups above are sidebar UI only —
 nothing with those headings is written into the note. The last group
 ("Notes" here) is whatever the user hand-typed into the note itself, under
-its own real heading.
+its own real heading. "Guiding principles" above them, right below the
+README blurb, is a project's `#principle`/`#principles` items
+(`getProjectPrinciples`/`buildProjectPrincipleBlocks` in
+`ProjectsSidebarView.ts`), same set the project-info popup's own Principles
+section shows — rendered verbatim: a `#principles`-tagged header's own line
+joins with its children into one markdown block, so it reads exactly as
+written in the note (no synthesised title, original list markup as-is —
+an earlier version reconstructed its own `<ul>` around each item, which
+double-nested a source ordered list inside it; reported via screenshot).
+Omitted entirely when the project has none.
 
 Pinned fields (from frontmatter, not the full set): branch + git status,
 remote as a clickable link (opens the browsable URL), relative last-synced
@@ -718,15 +733,22 @@ lastSynced: 2026-08-14T15:30:00Z
 cssclasses: warped-todo-project-note
 ---
 
-# peep
-
 #peep
+
+## Guiding Principles #principles
 
 ## Overview
 
 Notes you write here survive every sync untouched — the whole body does,
 in fact: sync only ever touches the frontmatter block above.
 ```
+
+No leading `# peep` heading — Obsidian's own file-title display already
+shows it. `## Guiding Principles #principles` is scaffolded above
+`## Overview` for a freshly-created note; add bullets underneath it and
+they're picked up automatically as this project's principles, no per-line
+tagging needed (see the Detail view's Guiding Principles section above).
+An empty header with no children renders nothing.
 
 Synced `#todo`/`#idea`/`#bug` items don't appear in the note at all — see
 "Item list" above for where they live instead (the Projects sidebar's

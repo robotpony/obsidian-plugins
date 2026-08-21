@@ -429,9 +429,13 @@ export class ProjectManager {
       await this.app.vault.createFolder(folderPath);
     }
 
-    // Create the file with a basic template
+    // Create the file with a basic template. Guiding Principles sits first —
+    // the header's own #principles tag makes it a block (SidebarView's
+    // Projects tab lists its children at the top of the TODO list; see
+    // getProjectPrinciples/groupProjectPrinciples) — so items just need to be
+    // added as bullets underneath, no per-line tagging required.
     const projectName = tag.replace(/^#/, "");
-    const content = `# ${projectName}\n\n${tag}\n\n## Overview\n\n## TODOs\n\n`;
+    const content = `# ${projectName}\n\n${tag}\n\n## Guiding Principles #principles\n\n## Overview\n\n## TODOs\n\n`;
 
     const file = await this.app.vault.create(filepath, content);
 
