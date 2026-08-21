@@ -60,6 +60,8 @@ Why this holds up over time:
 - **No lock-in.** It's plain text. Disable the plugin and your TODOs are still there, still readable.
 - **One vault, one focus.** This is a working list, not a life-management system. It doesn't try to replace a full task manager, a calendar, or a wiki.
 
+That covers your vault. Warped Command also reaches outside it: point the **Projects** tab at a folder of git repos on disk, and it pulls `#todo`/`#idea`/`#bug` items straight out of each repo's `BUGS.md`/`TODO.md`, keeps them synced both ways, and shows them in the same sidebar as your vault TODOs. See [Projects](#projects).
+
 ## Quick start
 
 1. **Add a task**: put `#todo` on any line or header for a list of TODOs.
@@ -86,7 +88,7 @@ That's it. Everything below is optional, but if you've got several related tasks
 
 Items sort by: focus, then priority, then tag count (more tags means more context, so it sorts higher).
 
-**Project tags** group TODOs in the sidebar's tag cloud. Any tag that isn't a priority, lifecycle, or type tag becomes a project:
+**Project tags** group TODOs in the sidebar's tag cloud. Any tag that isn't a priority, lifecycle, or type tag becomes a project (this is separate from the **Projects tab**, which tracks git repos on disk rather than vault tags; see [Projects](#projects), though a project tag that matches a tracked repo pulls in that repo's items too):
 
 ```markdown
 - [ ] Write endpoint docs #todo #api #focus
