@@ -1,12 +1,14 @@
-# Space Command Architecture
+# Warped Command Architecture
 
-Space Command is a task management plugin that scans markdown files for tagged items (`#todo`, `#todone`, `#idea`, `#principle`) and provides interactive views for managing them. The architecture follows an event-driven pattern with clear separation between data scanning, mutation, and rendering layers.
+Warped Command is a task management plugin that scans markdown files for tagged items (`#todo`, `#todone`, `#idea`, `#principle`) and provides interactive views for managing them. The architecture follows an event-driven pattern with clear separation between data scanning, mutation, and rendering layers.
+
+The plugin has been renamed twice: `Space Command` → `Warped Todo` → `Warped Command` (see CHANGELOG.md). The `␣⌘` logo, a space glyph next to a command-key glyph, dates back to the original name and reads literally as "Space Command"; it survived both renames because it still works as a mark on its own, independent of what the product is called this week. The internal plugin `id` (`warped-todo`) is a fossil of the middle name for the same reason: renaming it would break every existing install's plugin folder path.
 
 ## High-Level Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    SpaceCommandPlugin (main.ts)                 │
+│                    WarpedTodoPlugin (main.ts)                   │
 │                    Entry point & component wiring               │
 └─────────────────────────────────┬───────────────────────────────┘
                                   │
@@ -94,8 +96,8 @@ The note body is never written to for items — see "Item list" below for why
 this changed from the original delimited-block design.
 
 - `syncAll(options)`: runs `ProjectScanner`, reads each project's structured files off disk, parses them via `StructuredFileParser`, and calls `syncProject()` for each. This is the manual "Sync projects" entry point (`main.ts`'s "Sync Projects" command) and what a completed watch-debounce cycle calls.
-- `syncProject(scanned, items, projectsFolder)`: finds/creates the note via `projectFilePath()` — a helper extracted from `ProjectManager` (not `createProjectFile()`, which is coupled to an interactive create-confirmation modal that shouldn't fire during an automatic background sync; see PLAN.md's Phase 4 notes). Updates the item cache (`getCachedItems()`/`updateCachedItems()`) regardless of whether the note itself needs writing.
-- Merges `ProjectScanner`-derived frontmatter keys (`project`, `repo`, `remote`, `branch`, `gitStatus`, `lastSynced`) into any existing frontmatter, rather than replacing it; unrecognized keys are preserved in their original order. **Only writes the note when something other than `lastSynced` actually changed** — bumping the timestamp unconditionally made every sync a write, which flooded Obsidian's own "modified externally" notice on a note open for editing; found via live testing, see PLAN.md. Since items no longer touch the note body, a sync where only the item list changed (the common case) now never writes the note at all.
+- `syncProject(scanned, items, projectsFolder)`: finds/creates the note via `projectFilePath()` — a helper extracted from `ProjectManager` (not `createProjectFile()`, which is coupled to an interactive create-confirmation modal that shouldn't fire during an automatic background sync). Updates the item cache (`getCachedItems()`/`updateCachedItems()`) regardless of whether the note itself needs writing.
+- Merges `ProjectScanner`-derived frontmatter keys (`project`, `repo`, `remote`, `branch`, `gitStatus`, `lastSynced`) into any existing frontmatter, rather than replacing it; unrecognized keys are preserved in their original order. **Only writes the note when something other than `lastSynced` actually changed** — bumping the timestamp unconditionally made every sync a write, which flooded Obsidian's own "modified externally" notice on a note open for editing, found via live testing. Since items no longer touch the note body, a sync where only the item list changed (the common case) now never writes the note at all.
 - `startWatching()`/`stopWatching()`: a single recursive `fs.watch` on the base folder, debounced 300ms, ignoring events under an excluded directory (`isUnderExcludedDir()`, same list the scan uses) and events within 1500ms of the last completed sync (absorbs `git status` touching `.git/index`, which sits inside the watched tree). Recursive `fs.watch` is only reliable on macOS/Windows, not Linux, which is fine given the macOS-only scope decision
 - Calls `onSynced(scanned)` once per `syncAll()` batch, passing the fresh scan results directly. Callers **must not** respond by triggering another `syncAll()` (e.g. a sidebar "full reload" method) — `main.ts` learned this the hard way: wiring `onSynced` through a view's `reload()` (which itself calls `syncAll()`) is an unbounded loop, found via live testing as a project note's `lastSynced` updating roughly every 200ms. `onSynced` exists only to hand fresh data to an already-open sidebar for a re-render.
 
@@ -255,8 +257,7 @@ fields that matter. Tag-only project notes are unaffected.
 
 **Item list — two sources, no reverse-mapping.** The list is two things
 concatenated, each already knowing how to mutate itself correctly without
-needing to track the other. This changed from the original design (see
-PLAN.md's round-4 write-up): items were originally rendered into a
+needing to track the other. This changed from the original design: items were originally rendered into a
 delimited block in the note body, rewritten on every sync; that block
 caused a genuine content-flicker loop against `TodoScanner`'s own
 checkbox↔tag correction, and — combined with a separate runaway-sync bug —
@@ -307,7 +308,7 @@ like:
   no line to toggle at all; "complete" moves the whole multi-line block to
   under the first closed-vocabulary `##` section (creating `## Fixed` at
   the end of the file if none exists), gated on a clean `git status` for
-  that file. Built as `HeaderBlockMover.ts` — see PLAN.md's Phase 6.
+  that file. Built as `HeaderBlockMover.ts`.
 - A standalone `##` item heading (`peep/ISSUES.md`'s `## Issue: ...` shape)
   completes by appending `" ✅ RESOLVED"` to its own heading line — no move,
   just Phase 1's single-line write path again.
@@ -393,8 +394,9 @@ by priority rather than shown in a separate section.
 
 Standalone parser, not part of `TodoScanner`: `parseStructuredFile(filename,
 content, sourceFile) => ParsedProjectItem[]`. Deliberately its own type
-rather than `TodoItem` — see "Known limitation" note below and PLAN.md's
-Phase 3 for why. Implements the filename-default-type table and the
+rather than `TodoItem`: a repo-sourced item has no vault `TFile`/line-number
+identity to hang off `TodoItem`'s shape, so it gets its own type instead of
+forcing a fit. Implements the filename-default-type table and the
 `###`-presence-based shape selection described under Structured-file
 parsing, below.
 
@@ -705,8 +707,9 @@ read from disk into an in-memory cache the sidebar displays directly (never
 written into the note — see "Item list" above for why), both in the
 Projects tab's own detail view and, interleaved with regular items, in the
 TODOs/Ideas tabs — see "Project blocks in the TODOs/Ideas tabs" above.
-Full rationale in [IDEAS.md](IDEAS.md); spec in [OUTLINE.md](OUTLINE.md).
-Desktop only —
+The pre-implementation design docs this extension was scoped from
+(`IDEAS.md`, `OUTLINE.md`) were removed from the repo root once the feature
+shipped; this document is now the source of truth for it. Desktop only —
 `ProjectScanner`/`ProjectSyncManager` need Node `fs`/`child_process`, so
 `manifest.json` moves to `isDesktopOnly: true`.
 
@@ -787,13 +790,14 @@ detail view, sourced from `ProjectSyncManager`'s in-memory cache).
 ## File Organization
 
 ```
-warped-command/          # repo root — flat since PLAN-repo-split.md's Phase 1a
+warped-command/          # repo root — flat since the repo split (Phase 1a)
 ├── main.ts              # Plugin entry, initialization
 ├── src/
 │   ├── TodoScanner.ts        # Vault + repo file scanning & caching
 │   ├── TodoProcessor.ts      # File mutations (vault or external sourceFile)
 │   ├── ProjectManager.ts     # Project grouping (tag- and repo-derived)
 │   ├── ProjectScanner.ts     # Git repo discovery & git fact-gathering
+│   ├── ProjectMetadata.ts    # Repo "recently updated" date (CHANGELOG/README mtime)
 │   ├── StructuredFileParser.ts # BUGS.md/TODO.md/etc. → ParsedProjectItem[]
 │   ├── ProjectSyncManager.ts # Vault note sync, fs.watch, manual sync command
 │   ├── ProjectItemMutator.ts # Mutates a ParsedProjectItem's source line/block
@@ -846,7 +850,7 @@ the active list automatically once every live child is done (see
 
 ### No New Runtime Dependencies
 
-Git facts use `child_process.execFile` (matching `warped-gdrive`'s `DriveProvider.ts` and its existing `rclone` pattern) instead of shelling out to an external tool like `p` — `git` itself is the only assumption. File watching uses native `fs.watch` rather than adding `chokidar`. Frontmatter is hand-parsed/generated the same way `warped-hugo`'s `src/utils.ts` already does it, no YAML library added. Both are sibling repos post-split (PLAN-repo-split.md), not paths in this one. Consistent with how the rest of this repo avoids dependencies where a small amount of native code covers the need.
+Git facts use `child_process.execFile` (matching `warped-gdrive`'s `DriveProvider.ts` and its existing `rclone` pattern) instead of shelling out to an external tool like `p` — `git` itself is the only assumption. File watching uses native `fs.watch` rather than adding `chokidar`. Frontmatter is hand-parsed/generated the same way `warped-hugo`'s `src/utils.ts` already does it, no YAML library added. Both are sibling repos post-split, not paths in this one. Consistent with how the rest of this repo avoids dependencies where a small amount of native code covers the need.
 
 ### Delimited Sync Regions
 

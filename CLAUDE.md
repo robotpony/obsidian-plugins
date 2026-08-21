@@ -59,6 +59,7 @@ Warped Command is an Obsidian plugin for tracking TODOs, Ideas, and Principles a
 | [types.ts](src/types.ts) | `TodoItem`, `ProjectInfo`, `WarpedTodoSettings`, `DEFAULT_SETTINGS`. |
 | [utils.ts](src/utils.ts) | Shared helpers: tag extraction, date formatting, priority math, checkbox parsing, `modifyExternalFileLine` (single-line writes outside the vault). |
 | [ProjectScanner.ts](src/ProjectScanner.ts) | Recursively finds git repos under a base folder (directory-`.git` only, submodules skipped); reads branch/status/remote via `git` (`execFile`). |
+| [ProjectMetadata.ts](src/ProjectMetadata.ts) | Computes a repo's "recently updated" date (`getRepoLastUpdated`) from its `CHANGELOG.md` mtime, falling back to `README.md`, then to the vault project note's own mtime. |
 | [StructuredFileParser.ts](src/StructuredFileParser.ts) | Parses `BUGS.md`/`TODO.md`/etc. into `ParsedProjectItem[]`. Filename-based default type, explicit-tag override, flat-list or header-report shape (`###`-presence decides), item `shape` for completion routing. |
 | [ProjectSyncManager.ts](src/ProjectSyncManager.ts) | Keeps each repo-matched project note in sync: frontmatter merge (sync-owned keys + `cssclasses`), delimited-block rewrite (preserves non-owned tags across resync by fingerprint match), `fs.watch`, manual sync entry point. |
 | [ProjectItemMutator.ts](src/ProjectItemMutator.ts) | Mutates a `ParsedProjectItem`'s source line directly (external file, not the vault) — completion (by item `shape`), priority, add/remove tag. Mirrors `TodoProcessor`'s vault-item methods. |
