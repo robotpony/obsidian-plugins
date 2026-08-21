@@ -161,4 +161,34 @@ describe("ProjectScanner", () => {
     const scanner = new ProjectScanner();
     expect(await scanner.scan({ baseFolder: "" })).toEqual([]);
   });
+
+  describe("scanOne", () => {
+    it("reads a single known repo's facts without walking the base folder", async () => {
+      const repoDir = join(base, "peep");
+      await mkdir(repoDir);
+      initRepo(repoDir, { remote: "https://github.com/robotpony/peep.git" });
+
+      const scanner = new ProjectScanner();
+      const project = await scanner.scanOne(repoDir);
+
+      expect(project.name).toBe("peep");
+      expect(project.localPath).toBe(repoDir);
+      expect(project.branch).toBe("main");
+      expect(project.remote).toBe("https://github.com/robotpony/peep.git");
+    });
+
+    it("reflects a git-fact change (new branch) immediately, unlike a cached ScannedProject would", async () => {
+      const repoDir = join(base, "peep");
+      await mkdir(repoDir);
+      initRepo(repoDir);
+      await writeFile(join(repoDir, "a.txt"), "one");
+      commitFile(repoDir, "a.txt", "one");
+      execFileSync("git", ["checkout", "-q", "-b", "feature"], { cwd: repoDir });
+
+      const scanner = new ProjectScanner();
+      const project = await scanner.scanOne(repoDir);
+
+      expect(project.branch).toBe("feature");
+    });
+  });
 });

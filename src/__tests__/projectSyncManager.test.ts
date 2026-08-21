@@ -3,7 +3,7 @@ import { execFileSync } from "child_process";
 import { mkdtemp, mkdir, writeFile, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
-import { ProjectSyncManager, isUnderExcludedDir } from "../ProjectSyncManager";
+import { ProjectSyncManager, isUnderExcludedDir, touchesGitDir } from "../ProjectSyncManager";
 import { ProjectScanner, ScannedProject } from "../ProjectScanner";
 import { ParsedProjectItem } from "../StructuredFileParser";
 import { createFakeApp, FakeVault } from "./stubs/fakeVault";
@@ -402,11 +402,13 @@ describe("isUnderExcludedDir", () => {
 });
 
 describe("ProjectSyncManager: watch cooldown after a completed sync", () => {
-  // scheduleSyncAll is only reachable via a real fs.watch callback in
+  // scheduleFlush/flush are only reachable via a real fs.watch callback in
   // production; accessed directly here (with fake timers) to test the
   // debounce+cooldown logic deterministically, without real fs events or
   // real waiting — same reasoning as "watch lifecycle" above for why this
-  // suite doesn't assert on real-time event delivery.
+  // suite doesn't assert on real-time event delivery. pendingFullResync is
+  // set directly to exercise the full-resync branch of flush() specifically
+  // — the scoped-resync branch has its own suite below.
   it("skips a watch-triggered sync that lands inside the cooldown of the previous one", async () => {
     vi.useFakeTimers();
     try {
@@ -416,7 +418,8 @@ describe("ProjectSyncManager: watch cooldown after a completed sync", () => {
       const options = { baseFolder: "/fake", projectsFolder: PROJECTS_FOLDER };
 
       (manager as any).lastSyncCompletedAt = Date.now();
-      (manager as any).scheduleSyncAll(options);
+      (manager as any).pendingFullResync = true;
+      (manager as any).scheduleFlush(options);
       await vi.advanceTimersByTimeAsync(500); // past the 300ms debounce, inside the 1500ms cooldown
 
       expect(syncAllSpy).not.toHaveBeenCalled();
@@ -434,12 +437,110 @@ describe("ProjectSyncManager: watch cooldown after a completed sync", () => {
       const options = { baseFolder: "/fake", projectsFolder: PROJECTS_FOLDER };
 
       (manager as any).lastSyncCompletedAt = Date.now() - 2000; // well past the 1500ms cooldown
-      (manager as any).scheduleSyncAll(options);
+      (manager as any).pendingFullResync = true;
+      (manager as any).scheduleFlush(options);
       await vi.advanceTimersByTimeAsync(500);
 
       expect(syncAllSpy).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("ProjectSyncManager: scoped watch-triggered resync", () => {
+  // A structured-file edit (BUGS.md etc.) inside a known project shouldn't
+  // re-walk the base folder or re-run git for every other project — only
+  // that one project's items (and, if the change touched .git/, its git
+  // facts) should refresh. See flush()/syncOneProject()'s doc comments.
+
+  it("resyncs only the touched project, leaving others untouched, when the changed path matches a known project and isn't under .git/", async () => {
+    vi.useFakeTimers();
+    try {
+      const { app, vault } = createFakeApp();
+      const manager = new ProjectSyncManager(app as any, new ProjectScanner());
+      const options = { baseFolder: "/fake", projectsFolder: PROJECTS_FOLDER };
+      const scanOneSpy = vi.spyOn((manager as any).scanner, "scanOne");
+      const syncAllSpy = vi.spyOn(manager, "syncAll");
+
+      (manager as any).lastScannedProjects = [
+        scannedFixture({ name: "peep", localPath: "/repos/peep" }),
+        scannedFixture({ name: "warped", localPath: "/repos/warped" }),
+      ];
+      (manager as any).lastSyncCompletedAt = Date.now() - 2000;
+
+      const project = (manager as any).findProjectForPath("/repos/peep/BUGS.md");
+      expect(project.name).toBe("peep");
+
+      (manager as any).pendingProjects.set("/repos/peep", false); // false = no .git/ touch seen
+      (manager as any).scheduleFlush(options);
+      await vi.advanceTimersByTimeAsync(500);
+
+      expect(syncAllSpy).not.toHaveBeenCalled();
+      // Reused the cached git facts — no reason to shell out to git for a
+      // BUGS.md edit, which can't have changed branch/status/remote.
+      expect(scanOneSpy).not.toHaveBeenCalled();
+      expect(vault.getRawContent("projects/peep.md")).toBeDefined();
+      expect(vault.getRawContent("projects/warped.md")).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("refreshes git facts via scanOne when the changed path is under .git/", async () => {
+    vi.useFakeTimers();
+    try {
+      const { app } = createFakeApp();
+      const manager = new ProjectSyncManager(app as any, new ProjectScanner());
+      const options = { baseFolder: "/fake", projectsFolder: PROJECTS_FOLDER };
+      const scanOneSpy = vi
+        .spyOn((manager as any).scanner, "scanOne")
+        .mockResolvedValue(scannedFixture({ localPath: "/repos/peep", branch: "feature" }));
+
+      (manager as any).lastScannedProjects = [scannedFixture({ localPath: "/repos/peep" })];
+      (manager as any).lastSyncCompletedAt = Date.now() - 2000;
+      (manager as any).pendingProjects.set("/repos/peep", true); // true = a .git/ path was touched
+
+      (manager as any).scheduleFlush(options);
+      await vi.advanceTimersByTimeAsync(500);
+
+      expect(scanOneSpy).toHaveBeenCalledWith("/repos/peep", expect.any(Array));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("falls back to a full syncAll when the changed path matches no known project", async () => {
+    vi.useFakeTimers();
+    try {
+      const { app } = createFakeApp();
+      const manager = new ProjectSyncManager(app as any, new ProjectScanner());
+      const options = { baseFolder: "/fake", projectsFolder: PROJECTS_FOLDER };
+      const syncAllSpy = vi.spyOn(manager, "syncAll").mockResolvedValue([]);
+
+      (manager as any).lastScannedProjects = [scannedFixture({ localPath: "/repos/peep" })];
+      (manager as any).lastSyncCompletedAt = Date.now() - 2000;
+
+      expect((manager as any).findProjectForPath("/repos/brand-new-repo/BUGS.md")).toBeUndefined();
+
+      (manager as any).pendingFullResync = true;
+      (manager as any).scheduleFlush(options);
+      await vi.advanceTimersByTimeAsync(500);
+
+      expect(syncAllSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("touchesGitDir", () => {
+  it("matches a path with .git as any segment", () => {
+    expect(touchesGitDir("peep/.git/index")).toBe(true);
+    expect(touchesGitDir("peep/.git/refs/heads/main")).toBe(true);
+  });
+
+  it("does not match a plain project file", () => {
+    expect(touchesGitDir("peep/BUGS.md")).toBe(false);
   });
 });

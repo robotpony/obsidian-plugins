@@ -39,10 +39,83 @@ function scannedFixture(overrides: Partial<ScannedProject> = {}): ScannedProject
   };
 }
 
-function makeManager(todos: TodoItem[]): ProjectManager {
+function makeManager(todos: TodoItem[], excludeFolders: string[] = []): ProjectManager {
   const fakeScanner = { getTodos: () => todos } as unknown as TodoScanner;
-  return new ProjectManager(new App(), fakeScanner, "projects/", ["#p0", "#p1", "#p2", "#p3", "#p4"]);
+  return new ProjectManager(new App(), fakeScanner, "projects/", ["#p0", "#p1", "#p2", "#p3", "#p4"], excludeFolders);
 }
+
+describe("ProjectManager.resolveProjectTags", () => {
+  // Extracted from getProjects()'s aggregation loop so render-path code
+  // (SidebarView styling a vault TODO block to match its project) can
+  // resolve one item's tag(s) without duplicating this precedence.
+
+  it("returns explicit project tags when present, ignoring folder inference entirely", () => {
+    const manager = makeManager([]);
+    const todo = todoFixture({ folder: "inbox", tags: ["#todo", "#peep"], inferredFileTag: "#unrelated" });
+    expect(manager.resolveProjectTags(todo)).toEqual(["#peep"]);
+  });
+
+  it("can return multiple explicit project tags on one TODO", () => {
+    const manager = makeManager([]);
+    const todo = todoFixture({ tags: ["#todo", "#peep", "#warped"] });
+    expect(manager.resolveProjectTags(todo)).toEqual(["#peep", "#warped"]);
+  });
+
+  it("falls back to the inferred file tag for a file under the projects folder with no explicit tag", () => {
+    const manager = makeManager([]);
+    const todo = todoFixture({ folder: "projects", tags: ["#todo"], inferredFileTag: "#portfolio-review" });
+    expect(manager.resolveProjectTags(todo)).toEqual(["#portfolio-review"]);
+  });
+
+  it("does not infer a project tag for a file outside the projects folder", () => {
+    const manager = makeManager([]);
+    const todo = todoFixture({ folder: "inbox", tags: ["#todo"], inferredFileTag: "#some-note" });
+    expect(manager.resolveProjectTags(todo)).toEqual([]);
+  });
+
+  it("does not infer a project tag for a file under an excluded subfolder of the projects folder", () => {
+    const manager = makeManager([], ["projects/archive"]);
+    const todo = todoFixture({ folder: "projects/archive", tags: ["#todo"], inferredFileTag: "#old-project" });
+    expect(manager.resolveProjectTags(todo)).toEqual([]);
+  });
+
+  it("returns nothing for a TODO with neither an explicit tag nor an inferred file tag", () => {
+    const manager = makeManager([]);
+    const todo = todoFixture({ folder: "projects", tags: ["#todo"] });
+    expect(manager.resolveProjectTags(todo)).toEqual([]);
+  });
+});
+
+describe("ProjectManager.isInProjectsFolder", () => {
+  // Backs SidebarView's project-block styling, deliberately independent of
+  // resolveProjectTags()'s explicit-tag-first precedence — a TODO tagged
+  // #work sitting in a projects/ note is still a projects/ note; a TODO
+  // tagged #work sitting in an unrelated folder is not. See
+  // resolveProjectBlockMatch's own comment for the bug this fixed: styling
+  // driven by resolveProjectTags() made any generic context tag (e.g.
+  // #work) look like a project, regardless of the file it was in.
+
+  it("is true for a file directly under the projects folder", () => {
+    const manager = makeManager([]);
+    expect(manager.isInProjectsFolder("projects")).toBe(true);
+  });
+
+  it("is true for a file in a subfolder of the projects folder", () => {
+    const manager = makeManager([]);
+    expect(manager.isInProjectsFolder("projects/archive")).toBe(true);
+  });
+
+  it("is false for a file outside the projects folder", () => {
+    const manager = makeManager([]);
+    expect(manager.isInProjectsFolder("logs")).toBe(false);
+  });
+
+  it("is false for a file under an excluded subfolder", () => {
+    const manager = makeManager([], ["projects/archive"]);
+    expect(manager.isInProjectsFolder("projects/archive")).toBe(false);
+    expect(manager.isInProjectsFolder("projects")).toBe(true); // exclusion is scoped to the subfolder
+  });
+});
 
 describe("ProjectManager.getProjects: tag-only (no scannedProjects passed)", () => {
   it("behaves exactly as before — unaffected by the merge when nothing is passed", () => {

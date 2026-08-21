@@ -77,6 +77,21 @@ export class ProjectScanner {
   }
 
   /**
+   * Re-reads git facts + metadata for one already-known repo, skipping the
+   * recursive walk entirely. For a caller (ProjectSyncManager's watch
+   * handler) that already knows exactly which project changed and just
+   * needs it refreshed, not rediscovered — a full scan() over a base folder
+   * with many repos redoes the walk plus every other repo's git calls for a
+   * change that only ever touched one of them.
+   */
+  async scanOne(repoPath: string, excludeDirs: string[] = [...DEFAULT_EXCLUDE_DIRS]): Promise<ScannedProject> {
+    if (!(await this.resolveGitPath())) {
+      throw new Error(`git binary not found in any search path: ${GIT_SEARCH_PATHS.join(", ")}`);
+    }
+    return this.readProject(repoPath, excludeDirs);
+  }
+
+  /**
    * Walks `dir` for git repos. A directory-`.git` entry marks a full repo and stops
    * recursion there — a repo's own working tree isn't scanned for further nested
    * projects, so an incidental clone vendored inside one repo doesn't surface as a

@@ -2,6 +2,95 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.37.1] - 2026-08-20
+
+### Fixed — Project block styling fired on generic tags like #work, not just project notes
+
+`resolveProjectBlockMatch` was using `ProjectManager.resolveProjectTags()`,
+which treats any non-lifecycle tag as an "explicit project tag" — correct
+for `getProjects()`'s background aggregate counts, but far too loose for
+visible block styling: a monthly log note's TODO tagged `#work` rendered
+with the project icon+accent bar, while an untagged block in the same file
+didn't. Found via live testing/screenshot review. Block styling is now
+keyed on the TODO's own file location (`ProjectManager.isInProjectsFolder()`,
+new) and that file's inferred tag, ignoring whatever explicit tag an
+individual item happens to carry — a block only looks like a project when
+its *note* is a project note.
+
+## [0.37.0] - 2026-08-20
+
+### Added — Project block styling extended to vault TODOs under the Projects folder
+
+A TODO block (header-with-children, or an orphan-item run under a
+synthesised section heading) whose file resolves to a project — an
+explicit project tag, or an inferred tag from living under the configured
+Projects folder — now gets the same folder-git icon and left accent bar a
+repo-synced `.todo-project-block` gets, in the TODOs tab. A project with no
+matching git repo gets a muted accent colour (`--text-faint` instead of
+`--interactive-accent`) rather than a different icon, so "this note isn't
+backed by an actual repo" is visible without a second icon to learn.
+
+`ProjectManager.resolveProjectTags()` is a new public method, extracted
+from `getProjects()`'s aggregation loop, so this render-path styling
+resolves a single item's project using the exact same explicit-tag/
+folder-inference precedence `getProjects()` already aggregates by, rather
+than duplicating (and risking drift from) that logic.
+
+## [0.36.4] - 2026-08-20
+
+### Fixed — Project block icon sat at the top of the row instead of centred
+
+`.todo-header-row` uses `align-items: flex-start`, which pinned the new
+folder-git icon to the row's top instead of the title's vertical centre.
+Same fix `.todo-checkbox-wrap` already used: an explicit height matching
+`.todo-text`'s line box, centred within that.
+
+### Fixed — Project blocks didn't appear until the Projects tab was opened once
+
+`ensureProjectsSynced()` was only ever triggered from switching to the
+Projects tab, and its render was gated on that tab being active. Neither
+made sense anymore now that project blocks render in the TODOs/Ideas tabs
+too: a session that never visited Projects first showed no project blocks
+at all, and even a background sync's results were dropped unless you
+happened to be on the Projects tab when it landed. `onOpen()` now kicks off
+the sync itself, and both it and `applyProjectSyncResult()` render
+unconditionally.
+
+### Changed — Watch-triggered project resync is now scoped to the changed project
+
+Every filesystem event under the Projects base folder used to trigger a
+full `syncAll()`: a recursive walk of the whole base folder, three `git`
+subprocess calls per repo, and a full reparse of every project's
+`BUGS.md`/`TODO.md`/etc., regardless of which single file actually changed.
+A changed path is now matched against the last known project list; only a
+path matching no known project (almost always a brand-new repo) still
+triggers the full walk. A matched project's git facts (branch/status/
+remote) are only re-read via `ProjectScanner.scanOne()` when the changed
+path is actually under `.git/` — a structured-file edit reuses the last
+known facts instead of re-shelling to `git`.
+
+## [0.36.3] - 2026-08-20
+
+### Changed — Project TODO blocks now visually distinct from note-header blocks
+
+`.todo-project-block` (a repo-matched project's collapsible block in the
+TODOs/Ideas tabs) had no CSS of its own and inherited the same styling as a
+plain note-header TODO block, making the two hard to tell apart at a
+glance. Added a left accent bar (`--interactive-accent`) down the block and
+a small folder-git icon before the title.
+
+## [0.36.2] - 2026-08-20
+
+### Fixed — Frontmatter panel never hid in Live Preview on project notes
+
+`.warped-todo-project-note` suppressed the Properties panel with a direct
+`.metadata-container { display: none }` rule, which only ever worked in
+Reading view. Live Preview gates the widget's rendering on the
+`--metadata-display-editing` CSS custom property, not on `display`, so
+edit mode kept showing the raw YAML. Now sets both
+`--metadata-display-editing` and `--metadata-display-reading` (with
+`!important`, matching this file's other Obsidian-style overrides).
+
 ## [0.36.1] - 2026-08-17
 
 ### Fixed — Project block's → arrow didn't open the project in the sidebar

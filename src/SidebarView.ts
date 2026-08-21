@@ -91,6 +91,15 @@ export class TodoSidebarView extends ItemView {
   // backToProjectsList and switchToProjectsTab.
   private projectDetailReturnTab: 'todos' | 'ideas' | null = null;
   private projectsFilterText: string = '';
+  // Set at the top of the TODOs tab's render pass (renderTodosList) and read
+  // by renderListItem/renderOrphanSectionHeader while it runs — tag ->
+  // whether that project is repo-matched (has a localPath). Lets a vault
+  // TODO block that resolves to a project (see ProjectManager.
+  // resolveProjectTags) get the same icon+accent-bar treatment a repo-synced
+  // .todo-project-block gets, distinguishing the two via accent colour
+  // rather than duplicating getProjects()'s O(n) pass per item. null outside
+  // a TODOs-tab render (e.g. Ideas), which is intentionally not styled this way.
+  private currentProjectMatchByTag: Map<string, boolean> | null = null;
   private scannedProjects: ScannedProject[] = [];
   private projectsSyncing: boolean = false;
   private projectsSyncedOnce: boolean = false;
@@ -342,6 +351,30 @@ export class TodoSidebarView extends ItemView {
     onContextMenu: (e, item) => this.contextMenuHandler.showIdeaMenu(e, item, () => this.render())
   };
 
+  /**
+   * Whether `item`'s own file lives under the configured Projects folder
+   * and, if so, whether that project is repo-matched. Returns null when the
+   * file isn't in the Projects folder, or when called outside the TODOs
+   * tab's render pass (currentProjectMatchByTag unset) — see that field's
+   * own comment.
+   *
+   * Deliberately keyed on folder location + the file's own inferredFileTag,
+   * NOT `ProjectManager.resolveProjectTags()`'s explicit-tag-first result:
+   * that precedence is right for getProjects()'s aggregate counts, but
+   * applied to visible block styling it made any TODO carrying a generic
+   * context tag (e.g. #work) look like a project, since resolveProjectTags
+   * treats any non-lifecycle tag as an "explicit project tag" — found via
+   * live testing (a monthly log note's #work-tagged TODO block rendered
+   * with the project icon+accent, while a same-file untagged block next to
+   * it didn't). A block only gets this styling when the note itself is a
+   * project note, regardless of what any individual item in it is tagged.
+   */
+  private resolveProjectBlockMatch(item: TodoItem): { repoMatched: boolean } | null {
+    if (!this.currentProjectMatchByTag) return null;
+    if (!item.inferredFileTag || !this.projectManager.isInProjectsFolder(item.folder)) return null;
+    return { repoMatched: this.currentProjectMatchByTag.get(item.inferredFileTag) ?? false };
+  }
+
   // Unified list item renderer for todos, ideas, and principles
   private renderListItem(
     list: HTMLElement,
@@ -368,13 +401,34 @@ export class TodoSidebarView extends ItemView {
     const isHeader = item.isHeader === true;
     const hasChildren = isHeader && item.childLineNumbers && item.childLineNumbers.length > 0;
 
+    // A top-level TODOs-tab header block, or a top-level orphan item (no
+    // parent header — grouped instead under a synthesised
+    // renderOrphanSectionHeader run), whose *file* lives under the
+    // configured Projects folder (see resolveProjectBlockMatch — folder
+    // location only, deliberately not keyed on the item's own tags) gets
+    // the same accent-bar identity a repo-synced .todo-project-block gets.
+    // An orphan
+    // item gets the bar but not the icon — the icon lives once on the run's
+    // section heading (renderOrphanSectionHeader), and every sibling <li>
+    // in the run needs the bar class individually for it to read as one
+    // continuous line down the run rather than nested children.
+    // currentProjectMatchByTag is only set during the TODOs tab's render
+    // pass, so this is a no-op for Ideas.
+    const isTopLevelOrphan = !isHeader && !isChild && item.parentLineNumber === undefined;
+    const projectMatch =
+      (hasChildren || isTopLevelOrphan) && !isChild && this.currentProjectMatchByTag
+        ? this.resolveProjectBlockMatch(item)
+        : null;
+
     // Build class list with type-specific prefix
     const itemClasses = [
       `${config.classPrefix}-item`,
       hasFocus ? `${config.classPrefix}-focus` : '',
       isHeader ? `${config.classPrefix}-header` : '',
       isChild ? `${config.classPrefix}-child` : '',
-      hasChildren ? `${config.classPrefix}-header-with-children` : ''
+      hasChildren ? `${config.classPrefix}-header-with-children` : '',
+      projectMatch ? 'todo-project-block' : '',
+      projectMatch && !projectMatch.repoMatched ? 'todo-project-block-unmatched' : ''
     ].filter(c => c).join(' ');
 
     const listItem = list.createEl("li", { cls: itemClasses });
@@ -391,6 +445,12 @@ export class TodoSidebarView extends ItemView {
     const rowContainer = hasChildren
       ? listItem.createEl("div", { cls: `${config.classPrefix}-header-row` })
       : listItem;
+
+    if (projectMatch && hasChildren) {
+      // Not for the orphan-item case — that run's icon already lives on its
+      // renderOrphanSectionHeader heading, once per run, not once per item.
+      setIcon(rowContainer.createSpan({ cls: "todo-project-block-icon" }), "folder-git-2");
+    }
 
     // Checkbox (if configured). Header items with children no longer get a
     // checkbox — completing a header used to cascade-complete its children,
@@ -564,6 +624,13 @@ export class TodoSidebarView extends ItemView {
     } else {
       this.render();
     }
+
+    // Kick off the lazy project sync here too, not only on first Projects-tab
+    // visit — project blocks render in the TODOs/Ideas tabs as well, so
+    // waiting on a tab click left them looking broken (empty) for however
+    // long the user spent on those tabs first. Fire-and-forget: it re-renders
+    // itself via ensureProjectsSynced() once the sync lands.
+    void this.ensureProjectsSynced();
   }
 
   async onClose(): Promise<void> {
@@ -750,6 +817,9 @@ export class TodoSidebarView extends ItemView {
   }
 
   private renderIdeasContent(container: HTMLElement): void {
+    // Not a TODOs-tab render — see currentProjectMatchByTag's own comment
+    // for why renderListItem/renderOrphanSectionHeader gate on this being set.
+    this.currentProjectMatchByTag = null;
     // No tab-level header — the tab name already says "IDEAs". Filter pills
     // surface inside the section that owns the matching items.
     // Principles are still scanned and surface in the project-info popup,
@@ -1338,6 +1408,16 @@ export class TodoSidebarView extends ItemView {
     const projectBlocks = this.buildProjectBlocks(["todo", "bug"]);
     const itemsByProjectTag = new Map(projectBlocks.map((b) => [b.project.tag, b.items]));
 
+    // For vault TODO blocks that resolve to a project (see
+    // ProjectManager.resolveProjectTags) — lets renderListItem/
+    // renderOrphanSectionHeader style them like a project block below,
+    // distinguishing repo-matched from folder-only via accent colour.
+    this.currentProjectMatchByTag = new Map(
+      this.projectManager
+        .getProjects(this.scannedProjects, (localPath) => this.syncManager.getCachedItems(localPath))
+        .map((p) => [p.tag, !!p.localPath])
+    );
+
     let entries: SortableEntry[] = [
       ...todos.map((item): SortableEntry => ({ kind: 'todo', item })),
       ...projectBlocks.map(({ project }): SortableEntry => ({ kind: 'project', project })),
@@ -1463,6 +1543,12 @@ export class TodoSidebarView extends ItemView {
     const li = list.createEl("li", { cls: "todo-item todo-header todo-header-with-children todo-project-block" });
 
     const rowContainer = li.createEl("div", { cls: "todo-header-row is-clickable" });
+    // Distinguishes this block from a plain note-header TODO block at a
+    // glance — .todo-project-block otherwise inherits identical styling
+    // (same bold text, same → link), and the only other tell is the
+    // item-count text replacing a filename. See styles.css's
+    // .todo-project-block rule for the matching left accent bar.
+    setIcon(rowContainer.createSpan({ cls: "todo-project-block-icon" }), "folder-git-2");
     rowContainer.createEl("span", { cls: "todo-text", text: project.title ?? name });
     rowContainer.createEl("span", { cls: "header-filename", text: pluralize(items.length, "item") });
     rowContainer.addEventListener("click", () => this.switchToProjectsTab(project.tag));
@@ -1506,7 +1592,21 @@ export class TodoSidebarView extends ItemView {
     label: string,
     sectionLine: number
   ): void {
-    const li = list.createEl("li", { cls: "todo-orphan-section" });
+    // Same project-block identity as a header-with-children TODO gets (see
+    // resolveProjectBlockMatch) — an orphan run's items are separate sibling
+    // <li>s rather than nested children, so each one below also needs the
+    // accent-bar class individually (renderListItem's own projectMatch
+    // check) for the bar to read as continuous down the whole run; the icon
+    // only goes on this heading.
+    const projectMatch = this.resolveProjectBlockMatch(item);
+    const classes = ["todo-orphan-section"];
+    if (projectMatch) classes.push("todo-project-block");
+    if (projectMatch && !projectMatch.repoMatched) classes.push("todo-project-block-unmatched");
+
+    const li = list.createEl("li", { cls: classes.join(" ") });
+    if (projectMatch) {
+      setIcon(li.createSpan({ cls: "todo-project-block-icon" }), "folder-git-2");
+    }
     li.createEl("span", { cls: "todo-orphan-section-text", text: label });
     const link = li.createEl("a", {
       cls: "todo-orphan-section-link",
@@ -2373,7 +2473,16 @@ export class TodoSidebarView extends ItemView {
   // for why this lives here instead of a second ItemView.
   // ===================================================================
 
-  /** Full rescan + resync of every project. Runs once per session, lazily, the first time the Projects tab is opened; "Sync" in the kebab menu forces a repeat by clearing projectsSyncedOnce first. */
+  /**
+   * Full rescan + resync of every project. Runs once per session, lazily —
+   * triggered from onOpen() so it's in flight before the user does anything,
+   * not just the first time the Projects tab is opened. That used to be the
+   * only trigger, which left synced items empty in the TODOs/Ideas tabs
+   * (project blocks are interleaved there too — see renderProjectBlockItem)
+   * for an entire session unless the user happened to visit Projects first.
+   * "Sync" in the kebab menu forces a repeat by clearing projectsSyncedOnce
+   * first.
+   */
   private async ensureProjectsSynced(): Promise<void> {
     if (this.projectsSyncedOnce || this.projectsSyncing) return;
     const options = this.getProjectsOptions();
@@ -2394,7 +2503,9 @@ export class TodoSidebarView extends ItemView {
       this.projectsSyncing = false;
       this.projectsSyncedOnce = true;
     }
-    if (this.activeTab === 'projects') this.render();
+    // Project blocks can now appear in any of the three tabs, not just
+    // Projects, so there's no tab where fresh sync data isn't relevant.
+    this.render();
   }
 
   /**
@@ -2405,13 +2516,14 @@ export class TodoSidebarView extends ItemView {
    * completion would trigger another sync completion, forever (see
    * ProjectSyncManager's constructor doc comment for how this was found —
    * the same hazard applies here, not just to the old standalone view).
-   * Only re-renders if the Projects tab is actually showing — a background
-   * sync shouldn't yank a full re-render onto whatever tab the user's on.
+   * Always re-renders — project blocks live in the TODOs/Ideas tabs now too
+   * (see renderProjectBlockItem), so a background sync is relevant to
+   * whatever tab the user's on, not just Projects.
    */
   applyProjectSyncResult(scanned: ScannedProject[]): void {
     this.scannedProjects = scanned;
     this.projectsSyncedOnce = true;
-    if (this.activeTab === 'projects') this.render();
+    this.render();
   }
 
   // ===== Sidebar/pane sync (auto-follow) =====

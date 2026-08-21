@@ -2,7 +2,7 @@ import { App, TFile } from "obsidian";
 import { existsSync, watch, FSWatcher } from "fs";
 import { readFile } from "fs/promises";
 import { join } from "path";
-import { ProjectScanner, ScannedProject } from "./ProjectScanner";
+import { DEFAULT_EXCLUDE_DIRS, ProjectScanner, ScannedProject } from "./ProjectScanner";
 import { parseStructuredFile, ParsedProjectItem } from "./StructuredFileParser";
 import { projectFilePath } from "./ProjectManager";
 
@@ -52,6 +52,19 @@ export class ProjectSyncManager {
   // the actual data source for the Projects sidebar's synced-item display
   // (list-view counts and the detail view), not the vault note.
   private lastItemsByPath = new Map<string, ParsedProjectItem[]>();
+  // The full project list from the most recent syncAll() pass — lets a
+  // watch-triggered resync (see scheduleFlush/flush below) know which known
+  // project a changed path belongs to, and reuse a project's git facts
+  // without recalling git, without waiting for the next full syncAll().
+  private lastScannedProjects: ScannedProject[] = [];
+  // Accumulates which known projects a burst of watch events touched, and
+  // whether any of those events pointed inside `.git/` — see flush()'s doc
+  // comment for what that distinction is for. Cleared by every flush.
+  private pendingProjects = new Map<string, boolean>();
+  // Set when a watch event can't be matched to a known project (most likely
+  // a brand-new repo that hasn't been discovered yet) — the one case that
+  // still needs scanner.scan()'s full recursive walk.
+  private pendingFullResync = false;
 
   constructor(
     private app: App,
@@ -80,6 +93,7 @@ export class ProjectSyncManager {
     }
 
     this.lastSyncCompletedAt = Date.now();
+    this.lastScannedProjects = projects;
     this.onSynced?.(projects);
     return projects;
   }
@@ -159,6 +173,15 @@ export class ProjectSyncManager {
    * list `ProjectScanner` skips while walking) are ignored here too — the walk
    * skipping them doesn't stop the raw watch from seeing activity inside, e.g.
    * a large `node_modules` tree churning on every `npm install`.
+   *
+   * Every event used to trigger a full `syncAll()` — a full recursive walk
+   * plus three `git` calls and a full structured-file reparse for *every*
+   * discovered project, no matter which one file actually changed. Now the
+   * changed path is matched against the last known project list
+   * (`findProjectForPath`) and queued for a scoped resync instead; only a
+   * path that matches no known project (almost always a brand-new repo)
+   * still falls back to the full walk. See flush()'s doc comment for what
+   * happens with the queue.
    */
   startWatching(options: SyncOptions): void {
     this.stopWatching();
@@ -167,8 +190,27 @@ export class ProjectSyncManager {
     const excludeDirs = new Set(options.excludeDirs ?? []);
     try {
       this.watcher = watch(options.baseFolder, { recursive: true }, (_event, filename) => {
-        if (filename && isUnderExcludedDir(filename, excludeDirs)) return;
-        this.scheduleSyncAll(options);
+        if (!filename) {
+          // No path info on this platform/event — can't scope it, so fall
+          // back to treating it like any other unmatched path below.
+          this.pendingFullResync = true;
+          this.scheduleFlush(options);
+          return;
+        }
+        if (isUnderExcludedDir(filename, excludeDirs)) return;
+
+        const absPath = join(options.baseFolder, filename);
+        const project = this.findProjectForPath(absPath);
+        if (!project) {
+          this.pendingFullResync = true;
+        } else {
+          // Once true for this project within the current burst, stays true —
+          // a later event in the same window shouldn't downgrade it back to
+          // "just reuse cached git facts".
+          const alreadyNeedsGitRefresh = this.pendingProjects.get(project.localPath) ?? false;
+          this.pendingProjects.set(project.localPath, alreadyNeedsGitRefresh || touchesGitDir(filename));
+        }
+        this.scheduleFlush(options);
       });
     } catch (error) {
       console.error(TAG, "Failed to watch base folder for Projects sync:", error);
@@ -184,19 +226,96 @@ export class ProjectSyncManager {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = null;
     }
+    this.pendingProjects.clear();
+    this.pendingFullResync = false;
   }
 
-  private scheduleSyncAll(options: SyncOptions): void {
+  /** The last known project whose localPath is (or contains) `absPath` — repos can't nest inside one another in this scanner's model (walk() stops recursing at the first .git dir found), so at most one can match. */
+  private findProjectForPath(absPath: string): ScannedProject | undefined {
+    return this.lastScannedProjects.find(
+      (p) => absPath === p.localPath || absPath.startsWith(p.localPath + "/")
+    );
+  }
+
+  private scheduleFlush(options: SyncOptions): void {
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
     this.debounceTimer = setTimeout(() => {
-      // Within the cooldown of our own last sync, a fresh event is more likely
-      // a side effect of that sync (e.g. `git status` touching `.git/index`)
-      // than a real external change — see WATCH_COOLDOWN_MS above.
-      if (Date.now() - this.lastSyncCompletedAt < WATCH_COOLDOWN_MS) return;
-      this.syncAll(options).catch((error) =>
+      this.flush(options).catch((error) =>
         console.error(TAG, "Watch-triggered project sync failed:", error)
       );
     }, WATCH_DEBOUNCE_MS);
+  }
+
+  /**
+   * Applies whatever the debounce window accumulated: a full `syncAll()` if
+   * any event couldn't be matched to a known project, otherwise a scoped
+   * resync of just the touched project(s) — see `syncOneProject`. Within the
+   * cooldown of our own last sync, everything queued is dropped rather than
+   * run — a fresh event this soon is more likely a side effect of that sync
+   * (e.g. `git status` touching `.git/index`) than a real external change
+   * (see WATCH_COOLDOWN_MS above). Dropped state isn't replayed later; if
+   * nothing else touches that project again, the change waits for the next
+   * manual "Sync" or session start. Same tradeoff the original full-resync
+   * version already had, just scoped to fewer projects now.
+   */
+  private async flush(options: SyncOptions): Promise<void> {
+    if (Date.now() - this.lastSyncCompletedAt < WATCH_COOLDOWN_MS) return;
+
+    if (this.pendingFullResync) {
+      this.pendingFullResync = false;
+      this.pendingProjects.clear();
+      await this.syncAll(options);
+      return;
+    }
+
+    const pending = [...this.pendingProjects.entries()];
+    this.pendingProjects.clear();
+    if (pending.length === 0) return;
+
+    const updated: ScannedProject[] = [];
+    for (const [localPath, needsGitRefresh] of pending) {
+      try {
+        const project = await this.syncOneProject(localPath, needsGitRefresh, options);
+        if (project) updated.push(project);
+      } catch (error) {
+        console.error(TAG, `Scoped resync failed for ${localPath}:`, error);
+      }
+    }
+    if (updated.length === 0) return;
+
+    this.lastSyncCompletedAt = Date.now();
+    // Merge into the full known list — onSynced callers expect the complete
+    // project set (same shape syncAll() hands them), not just what changed.
+    const byPath = new Map(this.lastScannedProjects.map((p) => [p.localPath, p]));
+    for (const project of updated) byPath.set(project.localPath, project);
+    this.lastScannedProjects = [...byPath.values()];
+    this.onSynced?.(this.lastScannedProjects);
+  }
+
+  /**
+   * Resyncs one already-known project without the recursive walk or (when
+   * nothing under `.git/` was touched) without re-running git at all —
+   * reuses the last known branch/status/remote/title/stack instead, since a
+   * structured-file edit can't have changed any of those. `needsGitRefresh`
+   * is true when a watch event pointed inside `.git/`, or when the project
+   * was never seen before (shouldn't happen here in practice — an unknown
+   * path takes the pendingFullResync branch above instead — but scanOne()
+   * is the correct fallback either way).
+   */
+  private async syncOneProject(
+    localPath: string,
+    needsGitRefresh: boolean,
+    options: SyncOptions
+  ): Promise<ScannedProject | null> {
+    const cached = this.lastScannedProjects.find((p) => p.localPath === localPath);
+    const scanned =
+      needsGitRefresh || !cached
+        ? await this.scanner.scanOne(localPath, options.excludeDirs ?? [...DEFAULT_EXCLUDE_DIRS])
+        : cached;
+
+    const items = await readProjectItems(localPath);
+    await this.syncProject(scanned, items, options.projectsFolder);
+    return scanned;
   }
 
   /**
@@ -257,6 +376,11 @@ function dedupeByName(projects: ScannedProject[]): ScannedProject[] {
 /** True if any path segment of `filename` (relative, as fs.watch reports it) matches an excluded directory name. */
 export function isUnderExcludedDir(filename: string, excludeDirs: Set<string>): boolean {
   return filename.split(/[\\/]/).some((segment) => excludeDirs.has(segment));
+}
+
+/** True if any path segment of `filename` (relative, as fs.watch reports it) is `.git` — the signal a scoped resync uses to decide whether git facts need re-reading at all (see flush()/syncOneProject()). */
+export function touchesGitDir(filename: string): boolean {
+  return filename.split(/[\\/]/).includes(".git");
 }
 
 async function readProjectItems(localPath: string): Promise<ParsedProjectItem[]> {

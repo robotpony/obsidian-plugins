@@ -1083,6 +1083,50 @@
   background-color: var(--background-modifier-hover);
 }
 
+/* Project TODO blocks (renderProjectBlockItem) otherwise inherit identical
+   styling to a plain note-header TODO block — same bold text, same → link —
+   so nothing marked them as a different kind of thing at a glance. The
+   accent bar carries the block's full height; the icon (set via setIcon in
+   SidebarView.ts) sits inline with the title.
+   Also applied (renderListItem/renderOrphanSectionHeader, gated on
+   SidebarView's resolveProjectBlockMatch) to a vault TODO block whose own
+   *file* lives under the configured Projects folder — deliberately keyed on
+   file location alone, not any tag the individual item happens to carry
+   (see resolveProjectBlockMatch's own comment for why: a generic context
+   tag like #work isn't a project). Same icon either way, since both cases
+   genuinely are a project, but a muted accent colour via .todo-project-block-unmatched
+   when that project isn't repo-matched, so "this note isn't backed by an
+   actual git repo" is visible without a second icon to learn. An orphan
+   run's items are separate sibling <li>s rather than nested children, so
+   each carries the class individually — adjacent borders with no vertical
+   gap between them read as one continuous bar down the run. */
+.todo-project-block {
+  border-left: 2px solid var(--interactive-accent);
+  padding-left: 8px;
+}
+
+.todo-project-block-unmatched {
+  border-left-color: var(--text-faint);
+}
+
+/* .todo-header-row uses align-items: flex-start (so a wrapping title's first
+   line, not its vertical centre, sets the row's baseline) — which left the
+   icon pinned to the top instead of centred on that first line. Same fix as
+   .todo-checkbox-wrap: give it an explicit height matching .todo-text's line
+   box (1em × 1.4 line-height) and centre within that. */
+.todo-project-block-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  height: calc(1em * 1.4);
+  color: var(--text-muted);
+}
+
+.todo-project-block-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
 /* Sort button for header TODOs */
 .todo-sort-btn {
   opacity: 0.4;
@@ -2078,15 +2122,15 @@
    the sidebar already surfaces branch/status/remote/last-synced, so the raw
    YAML is just noise in the editor. Applied via the `cssclasses` frontmatter
    key ProjectSyncManager sets (see DESIGN.md's Projects Extension).
-   Live Preview/editing and Reading view use different mechanisms: Live
-   Preview's Properties widget lives inside .cm-editor and responds to plain
-   display:none; Reading view's responds to a CSS custom property instead —
-   found via live testing that the first rule alone didn't cover both. */
-.warped-todo-project-note .metadata-container {
-  display: none;
-}
+   Live Preview/editing and Reading view are governed by separate CSS custom
+   properties Obsidian reads to decide whether to render the widget at all —
+   a plain `.metadata-container { display: none }` doesn't reliably suppress
+   it in Live Preview, since the widget's presence, not just its paint, is
+   gated on --metadata-display-editing. !important matches this file's other
+   overrides of Obsidian's own styling (e.g. the tag-pill rules below). */
 .warped-todo-project-note {
-  --metadata-display-reading: none;
+  --metadata-display-editing: none !important;
+  --metadata-display-reading: none !important;
 }
 
 /* Header itself (logo, title, back/kebab buttons) reuses .sidebar-header,

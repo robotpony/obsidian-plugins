@@ -1840,6 +1840,60 @@ var ProjectManager = class {
     this.excludeFolders = excludeFolders;
   }
   /**
+   * Resolves which project tag(s) a single TODO belongs to, in the same
+   * precedence `getProjects()` aggregates by: explicit project tags always
+   * win; only with none present does a file under the configured projects
+   * folder (and not excluded via `excludeFoldersFromProjects`) fall back to
+   * its inferred file tag. Extracted from `getProjects()`'s aggregation loop
+   * so render-path code (e.g. SidebarView styling a vault TODO block to
+   * match a project's identity) can resolve one item without duplicating —
+   * and risking drift from — this same precedence.
+   */
+  resolveProjectTags(todo) {
+    const excludedTags = /* @__PURE__ */ new Set([
+      "#todo",
+      "#todos",
+      "#todone",
+      "#todones",
+      "#idea",
+      "#ideas",
+      "#ideation",
+      "#principle",
+      "#principles",
+      "#future",
+      "#snooze",
+      "#snoozed",
+      "#focus",
+      "#today",
+      ...this.priorityTags
+    ]);
+    const explicitProjectTags = todo.tags.filter((tag) => !excludedTags.has(tag));
+    if (explicitProjectTags.length > 0)
+      return explicitProjectTags;
+    if (todo.inferredFileTag && this.isInProjectsFolder(todo.folder)) {
+      return [todo.inferredFileTag];
+    }
+    return [];
+  }
+  /**
+   * True when `folder` (a TodoItem's own folder, no filename) sits under the
+   * configured projects folder and isn't inside an `excludeFoldersFromProjects`
+   * subfolder. Exposed separately from `resolveProjectTags()` for a caller
+   * that wants "is this file itself a project note" independent of whatever
+   * explicit tags a specific TODO in it happens to carry — see SidebarView's
+   * resolveProjectBlockMatch, which styles a block by file location alone
+   * rather than resolveProjectTags()'s explicit-tag-first precedence (a
+   * generic context tag like #work isn't a project, but explicit-tag
+   * precedence would otherwise make it look like one).
+   */
+  isInProjectsFolder(folder) {
+    const isUnderProjectsFolder = folder.startsWith(this.projectsFolder.replace(/\/$/, ""));
+    const isExcluded = this.excludeFolders.some(
+      (excluded) => folder === excluded || folder.startsWith(excluded + "/")
+    );
+    return isUnderProjectsFolder && !isExcluded;
+  }
+  /**
    * `scannedProjects` merges in repo-derived facts (branch, status, remote,
    * local path) for any tag that matches a detected git repo's folder name —
    * a repo with zero tracked items still gets an entry, and a tag-only project
@@ -1858,34 +1912,7 @@ var ProjectManager = class {
     const todos = this.scanner.getTodos();
     const projectMap = /* @__PURE__ */ new Map();
     for (const todo of todos) {
-      const excludedTags = /* @__PURE__ */ new Set([
-        "#todo",
-        "#todos",
-        "#todone",
-        "#todones",
-        "#idea",
-        "#ideas",
-        "#ideation",
-        "#principle",
-        "#principles",
-        "#future",
-        "#snooze",
-        "#snoozed",
-        "#focus",
-        "#today",
-        ...this.priorityTags
-      ]);
-      const explicitProjectTags = todo.tags.filter((tag) => !excludedTags.has(tag));
-      let projectTags = explicitProjectTags;
-      if (projectTags.length === 0 && todo.inferredFileTag) {
-        const isInProjectsFolder = todo.folder.startsWith(this.projectsFolder.replace(/\/$/, ""));
-        const isInExcludedFolder = this.excludeFolders.some(
-          (folder) => todo.folder === folder || todo.folder.startsWith(folder + "/")
-        );
-        if (isInProjectsFolder && !isInExcludedFolder) {
-          projectTags = [todo.inferredFileTag];
-        }
-      }
+      const projectTags = this.resolveProjectTags(todo);
       const todoPriority = getPriorityValue(todo.tags);
       const todoHasFocus = hasTag(todo.tags, "#focus");
       for (const tag of projectTags) {
@@ -2477,6 +2504,20 @@ var ProjectScanner = class {
     return projects;
   }
   /**
+   * Re-reads git facts + metadata for one already-known repo, skipping the
+   * recursive walk entirely. For a caller (ProjectSyncManager's watch
+   * handler) that already knows exactly which project changed and just
+   * needs it refreshed, not rediscovered — a full scan() over a base folder
+   * with many repos redoes the walk plus every other repo's git calls for a
+   * change that only ever touched one of them.
+   */
+  async scanOne(repoPath, excludeDirs = [...DEFAULT_EXCLUDE_DIRS]) {
+    if (!await this.resolveGitPath()) {
+      throw new Error(`git binary not found in any search path: ${GIT_SEARCH_PATHS.join(", ")}`);
+    }
+    return this.readProject(repoPath, excludeDirs);
+  }
+  /**
    * Walks `dir` for git repos. A directory-`.git` entry marks a full repo and stops
    * recursion there — a repo's own working tree isn't scanned for further nested
    * projects, so an incidental clone vendored inside one repo doesn't surface as a
@@ -2790,6 +2831,19 @@ var ProjectSyncManager = class {
     // the actual data source for the Projects sidebar's synced-item display
     // (list-view counts and the detail view), not the vault note.
     this.lastItemsByPath = /* @__PURE__ */ new Map();
+    // The full project list from the most recent syncAll() pass — lets a
+    // watch-triggered resync (see scheduleFlush/flush below) know which known
+    // project a changed path belongs to, and reuse a project's git facts
+    // without recalling git, without waiting for the next full syncAll().
+    this.lastScannedProjects = [];
+    // Accumulates which known projects a burst of watch events touched, and
+    // whether any of those events pointed inside `.git/` — see flush()'s doc
+    // comment for what that distinction is for. Cleared by every flush.
+    this.pendingProjects = /* @__PURE__ */ new Map();
+    // Set when a watch event can't be matched to a known project (most likely
+    // a brand-new repo that hasn't been discovered yet) — the one case that
+    // still needs scanner.scan()'s full recursive walk.
+    this.pendingFullResync = false;
   }
   /** Discovers projects under `baseFolder`, reads their structured files, and syncs each note's frontmatter. */
   async syncAll(options) {
@@ -2805,6 +2859,7 @@ var ProjectSyncManager = class {
       await this.syncProject(project, items, options.projectsFolder);
     }
     this.lastSyncCompletedAt = Date.now();
+    this.lastScannedProjects = projects;
     (_a = this.onSynced) == null ? void 0 : _a.call(this, projects);
     return projects;
   }
@@ -2863,6 +2918,15 @@ var ProjectSyncManager = class {
    * list `ProjectScanner` skips while walking) are ignored here too — the walk
    * skipping them doesn't stop the raw watch from seeing activity inside, e.g.
    * a large `node_modules` tree churning on every `npm install`.
+   *
+   * Every event used to trigger a full `syncAll()` — a full recursive walk
+   * plus three `git` calls and a full structured-file reparse for *every*
+   * discovered project, no matter which one file actually changed. Now the
+   * changed path is matched against the last known project list
+   * (`findProjectForPath`) and queued for a scoped resync instead; only a
+   * path that matches no known project (almost always a brand-new repo)
+   * still falls back to the full walk. See flush()'s doc comment for what
+   * happens with the queue.
    */
   startWatching(options) {
     var _a;
@@ -2872,9 +2936,23 @@ var ProjectSyncManager = class {
     const excludeDirs = new Set((_a = options.excludeDirs) != null ? _a : []);
     try {
       this.watcher = (0, import_fs3.watch)(options.baseFolder, { recursive: true }, (_event, filename) => {
-        if (filename && isUnderExcludedDir(filename, excludeDirs))
+        var _a2;
+        if (!filename) {
+          this.pendingFullResync = true;
+          this.scheduleFlush(options);
           return;
-        this.scheduleSyncAll(options);
+        }
+        if (isUnderExcludedDir(filename, excludeDirs))
+          return;
+        const absPath = (0, import_path3.join)(options.baseFolder, filename);
+        const project = this.findProjectForPath(absPath);
+        if (!project) {
+          this.pendingFullResync = true;
+        } else {
+          const alreadyNeedsGitRefresh = (_a2 = this.pendingProjects.get(project.localPath)) != null ? _a2 : false;
+          this.pendingProjects.set(project.localPath, alreadyNeedsGitRefresh || touchesGitDir(filename));
+        }
+        this.scheduleFlush(options);
       });
     } catch (error) {
       console.error(TAG2, "Failed to watch base folder for Projects sync:", error);
@@ -2889,17 +2967,86 @@ var ProjectSyncManager = class {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = null;
     }
+    this.pendingProjects.clear();
+    this.pendingFullResync = false;
   }
-  scheduleSyncAll(options) {
+  /** The last known project whose localPath is (or contains) `absPath` — repos can't nest inside one another in this scanner's model (walk() stops recursing at the first .git dir found), so at most one can match. */
+  findProjectForPath(absPath) {
+    return this.lastScannedProjects.find(
+      (p) => absPath === p.localPath || absPath.startsWith(p.localPath + "/")
+    );
+  }
+  scheduleFlush(options) {
     if (this.debounceTimer)
       clearTimeout(this.debounceTimer);
     this.debounceTimer = setTimeout(() => {
-      if (Date.now() - this.lastSyncCompletedAt < WATCH_COOLDOWN_MS)
-        return;
-      this.syncAll(options).catch(
+      this.flush(options).catch(
         (error) => console.error(TAG2, "Watch-triggered project sync failed:", error)
       );
     }, WATCH_DEBOUNCE_MS);
+  }
+  /**
+   * Applies whatever the debounce window accumulated: a full `syncAll()` if
+   * any event couldn't be matched to a known project, otherwise a scoped
+   * resync of just the touched project(s) — see `syncOneProject`. Within the
+   * cooldown of our own last sync, everything queued is dropped rather than
+   * run — a fresh event this soon is more likely a side effect of that sync
+   * (e.g. `git status` touching `.git/index`) than a real external change
+   * (see WATCH_COOLDOWN_MS above). Dropped state isn't replayed later; if
+   * nothing else touches that project again, the change waits for the next
+   * manual "Sync" or session start. Same tradeoff the original full-resync
+   * version already had, just scoped to fewer projects now.
+   */
+  async flush(options) {
+    var _a;
+    if (Date.now() - this.lastSyncCompletedAt < WATCH_COOLDOWN_MS)
+      return;
+    if (this.pendingFullResync) {
+      this.pendingFullResync = false;
+      this.pendingProjects.clear();
+      await this.syncAll(options);
+      return;
+    }
+    const pending = [...this.pendingProjects.entries()];
+    this.pendingProjects.clear();
+    if (pending.length === 0)
+      return;
+    const updated = [];
+    for (const [localPath, needsGitRefresh] of pending) {
+      try {
+        const project = await this.syncOneProject(localPath, needsGitRefresh, options);
+        if (project)
+          updated.push(project);
+      } catch (error) {
+        console.error(TAG2, `Scoped resync failed for ${localPath}:`, error);
+      }
+    }
+    if (updated.length === 0)
+      return;
+    this.lastSyncCompletedAt = Date.now();
+    const byPath = new Map(this.lastScannedProjects.map((p) => [p.localPath, p]));
+    for (const project of updated)
+      byPath.set(project.localPath, project);
+    this.lastScannedProjects = [...byPath.values()];
+    (_a = this.onSynced) == null ? void 0 : _a.call(this, this.lastScannedProjects);
+  }
+  /**
+   * Resyncs one already-known project without the recursive walk or (when
+   * nothing under `.git/` was touched) without re-running git at all —
+   * reuses the last known branch/status/remote/title/stack instead, since a
+   * structured-file edit can't have changed any of those. `needsGitRefresh`
+   * is true when a watch event pointed inside `.git/`, or when the project
+   * was never seen before (shouldn't happen here in practice — an unknown
+   * path takes the pendingFullResync branch above instead — but scanOne()
+   * is the correct fallback either way).
+   */
+  async syncOneProject(localPath, needsGitRefresh, options) {
+    var _a;
+    const cached = this.lastScannedProjects.find((p) => p.localPath === localPath);
+    const scanned = needsGitRefresh || !cached ? await this.scanner.scanOne(localPath, (_a = options.excludeDirs) != null ? _a : [...DEFAULT_EXCLUDE_DIRS]) : cached;
+    const items = await readProjectItems(localPath);
+    await this.syncProject(scanned, items, options.projectsFolder);
+    return scanned;
   }
   /**
    * Fresh `ParsedProjectItem[]` for one project's structured files, for callers
@@ -2944,6 +3091,9 @@ function dedupeByName(projects) {
 }
 function isUnderExcludedDir(filename, excludeDirs) {
   return filename.split(/[\\/]/).some((segment) => excludeDirs.has(segment));
+}
+function touchesGitDir(filename) {
+  return filename.split(/[\\/]/).includes(".git");
 }
 async function readProjectItems(localPath) {
   const items = [];
@@ -4208,6 +4358,15 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     // backToProjectsList and switchToProjectsTab.
     this.projectDetailReturnTab = null;
     this.projectsFilterText = "";
+    // Set at the top of the TODOs tab's render pass (renderTodosList) and read
+    // by renderListItem/renderOrphanSectionHeader while it runs — tag ->
+    // whether that project is repo-matched (has a localPath). Lets a vault
+    // TODO block that resolves to a project (see ProjectManager.
+    // resolveProjectTags) get the same icon+accent-bar treatment a repo-synced
+    // .todo-project-block gets, distinguishing the two via accent colour
+    // rather than duplicating getProjects()'s O(n) pass per item. null outside
+    // a TODOs-tab render (e.g. Ideas), which is intentionally not styled this way.
+    this.currentProjectMatchByTag = null;
     this.scannedProjects = [];
     this.projectsSyncing = false;
     this.projectsSyncedOnce = false;
@@ -4378,6 +4537,32 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       }
     }
   }
+  /**
+   * Whether `item`'s own file lives under the configured Projects folder
+   * and, if so, whether that project is repo-matched. Returns null when the
+   * file isn't in the Projects folder, or when called outside the TODOs
+   * tab's render pass (currentProjectMatchByTag unset) — see that field's
+   * own comment.
+   *
+   * Deliberately keyed on folder location + the file's own inferredFileTag,
+   * NOT `ProjectManager.resolveProjectTags()`'s explicit-tag-first result:
+   * that precedence is right for getProjects()'s aggregate counts, but
+   * applied to visible block styling it made any TODO carrying a generic
+   * context tag (e.g. #work) look like a project, since resolveProjectTags
+   * treats any non-lifecycle tag as an "explicit project tag" — found via
+   * live testing (a monthly log note's #work-tagged TODO block rendered
+   * with the project icon+accent, while a same-file untagged block next to
+   * it didn't). A block only gets this styling when the note itself is a
+   * project note, regardless of what any individual item in it is tagged.
+   */
+  resolveProjectBlockMatch(item) {
+    var _a;
+    if (!this.currentProjectMatchByTag)
+      return null;
+    if (!item.inferredFileTag || !this.projectManager.isInProjectsFolder(item.folder))
+      return null;
+    return { repoMatched: (_a = this.currentProjectMatchByTag.get(item.inferredFileTag)) != null ? _a : false };
+  }
   // Unified list item renderer for todos, ideas, and principles
   renderListItem(list, item, config, isChild = false) {
     if (isChild && item.isSubheading) {
@@ -4392,12 +4577,16 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     const hasFocus = hasTag(item.tags, "#focus");
     const isHeader = item.isHeader === true;
     const hasChildren = isHeader && item.childLineNumbers && item.childLineNumbers.length > 0;
+    const isTopLevelOrphan = !isHeader && !isChild && item.parentLineNumber === void 0;
+    const projectMatch = (hasChildren || isTopLevelOrphan) && !isChild && this.currentProjectMatchByTag ? this.resolveProjectBlockMatch(item) : null;
     const itemClasses = [
       `${config.classPrefix}-item`,
       hasFocus ? `${config.classPrefix}-focus` : "",
       isHeader ? `${config.classPrefix}-header` : "",
       isChild ? `${config.classPrefix}-child` : "",
-      hasChildren ? `${config.classPrefix}-header-with-children` : ""
+      hasChildren ? `${config.classPrefix}-header-with-children` : "",
+      projectMatch ? "todo-project-block" : "",
+      projectMatch && !projectMatch.repoMatched ? "todo-project-block-unmatched" : ""
     ].filter((c) => c).join(" ");
     const listItem = list.createEl("li", { cls: itemClasses });
     if (config.onContextMenu) {
@@ -4407,6 +4596,9 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       });
     }
     const rowContainer = hasChildren ? listItem.createEl("div", { cls: `${config.classPrefix}-header-row` }) : listItem;
+    if (projectMatch && hasChildren) {
+      (0, import_obsidian12.setIcon)(rowContainer.createSpan({ cls: "todo-project-block-icon" }), "folder-git-2");
+    }
     if (config.showCheckbox && config.onComplete && !hasChildren) {
       const checkboxWrap = rowContainer.createEl("div", {
         cls: `${config.classPrefix}-checkbox-wrap`
@@ -4533,6 +4725,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     } else {
       this.render();
     }
+    void this.ensureProjectsSynced();
   }
   async onClose() {
     if (this.updateListener) {
@@ -4687,6 +4880,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     this.renderSummary(container);
   }
   renderIdeasContent(container) {
+    this.currentProjectMatchByTag = null;
     this.renderSimpleTagCloud(container, this.scanner.getIdeas());
     this.renderActiveIdeas(container);
   }
@@ -5126,6 +5320,9 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     todos = this.sortTodosByPriority(todos, allTodosForChildLookup);
     const projectBlocks = this.buildProjectBlocks(["todo", "bug"]);
     const itemsByProjectTag = new Map(projectBlocks.map((b) => [b.project.tag, b.items]));
+    this.currentProjectMatchByTag = new Map(
+      this.projectManager.getProjects(this.scannedProjects, (localPath) => this.syncManager.getCachedItems(localPath)).map((p) => [p.tag, !!p.localPath])
+    );
     let entries = [
       ...todos.map((item) => ({ kind: "todo", item })),
       ...projectBlocks.map(({ project }) => ({ kind: "project", project }))
@@ -5227,6 +5424,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     const name = project.tag.replace(/^#/, "");
     const li = list.createEl("li", { cls: "todo-item todo-header todo-header-with-children todo-project-block" });
     const rowContainer = li.createEl("div", { cls: "todo-header-row is-clickable" });
+    (0, import_obsidian12.setIcon)(rowContainer.createSpan({ cls: "todo-project-block-icon" }), "folder-git-2");
     rowContainer.createEl("span", { cls: "todo-text", text: (_a = project.title) != null ? _a : name });
     rowContainer.createEl("span", { cls: "header-filename", text: pluralize(items.length, "item") });
     rowContainer.addEventListener("click", () => this.switchToProjectsTab(project.tag));
@@ -5257,7 +5455,16 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
    * the source file. Keeps the click target predictable across both shapes.
    */
   renderOrphanSectionHeader(list, item, label, sectionLine) {
-    const li = list.createEl("li", { cls: "todo-orphan-section" });
+    const projectMatch = this.resolveProjectBlockMatch(item);
+    const classes = ["todo-orphan-section"];
+    if (projectMatch)
+      classes.push("todo-project-block");
+    if (projectMatch && !projectMatch.repoMatched)
+      classes.push("todo-project-block-unmatched");
+    const li = list.createEl("li", { cls: classes.join(" ") });
+    if (projectMatch) {
+      (0, import_obsidian12.setIcon)(li.createSpan({ cls: "todo-project-block-icon" }), "folder-git-2");
+    }
     li.createEl("span", { cls: "todo-orphan-section-text", text: label });
     const link = li.createEl("a", {
       cls: "todo-orphan-section-link",
@@ -5976,7 +6183,16 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
   // project on selection. See ProjectsSidebarView.ts's file-level comment
   // for why this lives here instead of a second ItemView.
   // ===================================================================
-  /** Full rescan + resync of every project. Runs once per session, lazily, the first time the Projects tab is opened; "Sync" in the kebab menu forces a repeat by clearing projectsSyncedOnce first. */
+  /**
+   * Full rescan + resync of every project. Runs once per session, lazily —
+   * triggered from onOpen() so it's in flight before the user does anything,
+   * not just the first time the Projects tab is opened. That used to be the
+   * only trigger, which left synced items empty in the TODOs/Ideas tabs
+   * (project blocks are interleaved there too — see renderProjectBlockItem)
+   * for an entire session unless the user happened to visit Projects first.
+   * "Sync" in the kebab menu forces a repeat by clearing projectsSyncedOnce
+   * first.
+   */
   async ensureProjectsSynced() {
     if (this.projectsSyncedOnce || this.projectsSyncing)
       return;
@@ -5998,8 +6214,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       this.projectsSyncing = false;
       this.projectsSyncedOnce = true;
     }
-    if (this.activeTab === "projects")
-      this.render();
+    this.render();
   }
   /**
    * Applies scan results this view didn't itself request — from a
@@ -6009,14 +6224,14 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
    * completion would trigger another sync completion, forever (see
    * ProjectSyncManager's constructor doc comment for how this was found —
    * the same hazard applies here, not just to the old standalone view).
-   * Only re-renders if the Projects tab is actually showing — a background
-   * sync shouldn't yank a full re-render onto whatever tab the user's on.
+   * Always re-renders — project blocks live in the TODOs/Ideas tabs now too
+   * (see renderProjectBlockItem), so a background sync is relevant to
+   * whatever tab the user's on, not just Projects.
    */
   applyProjectSyncResult(scanned) {
     this.scannedProjects = scanned;
     this.projectsSyncedOnce = true;
-    if (this.activeTab === "projects")
-      this.render();
+    this.render();
   }
   // ===== Sidebar/pane sync (auto-follow) =====
   async handleProjectActiveFileChange() {

@@ -37,6 +37,54 @@ export class ProjectManager {
   }
 
   /**
+   * Resolves which project tag(s) a single TODO belongs to, in the same
+   * precedence `getProjects()` aggregates by: explicit project tags always
+   * win; only with none present does a file under the configured projects
+   * folder (and not excluded via `excludeFoldersFromProjects`) fall back to
+   * its inferred file tag. Extracted from `getProjects()`'s aggregation loop
+   * so render-path code (e.g. SidebarView styling a vault TODO block to
+   * match a project's identity) can resolve one item without duplicating —
+   * and risking drift from — this same precedence.
+   */
+  resolveProjectTags(todo: TodoItem): string[] {
+    // Extract all tags except #todo(s), #todone(s), #idea(s)/#ideation, #principle(s), snooze tags, #focus, #today, and priority tags
+    const excludedTags = new Set([
+      "#todo", "#todos", "#todone", "#todones",
+      "#idea", "#ideas", "#ideation", "#principle", "#principles",
+      "#future", "#snooze", "#snoozed", "#focus", "#today",
+      ...this.priorityTags
+    ]);
+    const explicitProjectTags = todo.tags.filter(tag => !excludedTags.has(tag));
+    if (explicitProjectTags.length > 0) return explicitProjectTags;
+
+    // No explicit tag — fall back to the inferred file tag, but only for
+    // files in the projects folder and not in an excluded folder.
+    if (todo.inferredFileTag && this.isInProjectsFolder(todo.folder)) {
+      return [todo.inferredFileTag];
+    }
+    return [];
+  }
+
+  /**
+   * True when `folder` (a TodoItem's own folder, no filename) sits under the
+   * configured projects folder and isn't inside an `excludeFoldersFromProjects`
+   * subfolder. Exposed separately from `resolveProjectTags()` for a caller
+   * that wants "is this file itself a project note" independent of whatever
+   * explicit tags a specific TODO in it happens to carry — see SidebarView's
+   * resolveProjectBlockMatch, which styles a block by file location alone
+   * rather than resolveProjectTags()'s explicit-tag-first precedence (a
+   * generic context tag like #work isn't a project, but explicit-tag
+   * precedence would otherwise make it look like one).
+   */
+  isInProjectsFolder(folder: string): boolean {
+    const isUnderProjectsFolder = folder.startsWith(this.projectsFolder.replace(/\/$/, ""));
+    const isExcluded = this.excludeFolders.some(excluded =>
+      folder === excluded || folder.startsWith(excluded + "/")
+    );
+    return isUnderProjectsFolder && !isExcluded;
+  }
+
+  /**
    * `scannedProjects` merges in repo-derived facts (branch, status, remote,
    * local path) for any tag that matches a detected git repo's folder name —
    * a repo with zero tracked items still gets an entry, and a tag-only project
@@ -61,28 +109,7 @@ export class ProjectManager {
 
     // Aggregate project data from all todos
     for (const todo of todos) {
-      // Extract all tags except #todo(s), #todone(s), #idea(s)/#ideation, #principle(s), snooze tags, #focus, #today, and priority tags
-      const excludedTags = new Set([
-        "#todo", "#todos", "#todone", "#todones",
-        "#idea", "#ideas", "#ideation", "#principle", "#principles",
-        "#future", "#snooze", "#snoozed", "#focus", "#today",
-        ...this.priorityTags
-      ]);
-      const explicitProjectTags = todo.tags.filter(tag => !excludedTags.has(tag));
-
-      // Use explicit project tags if present, otherwise fall back to inferred file tag
-      // This implements "manual tags win" - items with explicit project tags won't get file-level grouping
-      // Only use inferred tags for files in the projects folder and not in excluded folders
-      let projectTags = explicitProjectTags;
-      if (projectTags.length === 0 && todo.inferredFileTag) {
-        const isInProjectsFolder = todo.folder.startsWith(this.projectsFolder.replace(/\/$/, ""));
-        const isInExcludedFolder = this.excludeFolders.some(folder =>
-          todo.folder === folder || todo.folder.startsWith(folder + "/")
-        );
-        if (isInProjectsFolder && !isInExcludedFolder) {
-          projectTags = [todo.inferredFileTag];
-        }
-      }
+      const projectTags = this.resolveProjectTags(todo);
 
       const todoPriority = getPriorityValue(todo.tags);
       const todoHasFocus = hasTag(todo.tags, "#focus");
