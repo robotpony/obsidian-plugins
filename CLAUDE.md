@@ -96,3 +96,14 @@ When making changes, keep these in sync:
 
 - Use `AskUserQuestion` when clarifying requirements or approach
 - Run `npm run build` before declaring done; the build runs the type checker
+
+## Commit conventions
+
+This repo is often worked on by more than one Claude Code session at once, with no worktree isolation between them, so commit discipline matters more here than usual. `.claude/hooks/commit-gate.sh` enforces the mechanical parts (it asks for confirmation on every `git commit`, `git push`, and broad `git add -A`/`--all`/`.`, regardless of permission mode); the rest is on the agent doing the committing.
+
+- **Commit only when asked.** Don't commit automatically at the end of a task.
+- **Draft the message and show it before committing.** The hook forces a confirmation prompt, but don't rely on it alone; state the message in the conversation so it's reviewed on purpose, not just clicked through.
+- **Stage explicitly.** Never `git add -A`/`git add .`. List the specific files this task touched. If `git status` shows changes you didn't make, they belong to another session; leave them and tell the user rather than sweeping them into your commit.
+- **One commit, one coherent change.** A task that touches both a fix and unrelated cleanup is two commits, not one.
+- **Specific subject lines.** No bare `Fixes:`, `Fixes.`, `Updates.`, or `WIP`; say what changed in the first line. Use a bullet list in the body for multi-part changes, matching `CHANGELOG.md`'s voice.
+- **Never push automatically.** Push is a separate, explicit ask, kept apart from commit even when both are requested together. This repo is public; a bad push is live immediately.
