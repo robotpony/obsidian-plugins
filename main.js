@@ -6663,24 +6663,30 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
           parts.push(pluralize(counts.bug, "bug"));
         metaChunks.push({ text: parts.join(" \xB7 ") });
       }
-    }
-    const showUpdated = variant === "list" && project.lastUpdated !== void 0;
-    if (metaChunks.length > 0 || showUpdated) {
-      const metaLine = row.createDiv({ cls: "warped-todo-project-row-meta" });
-      const metaLeft = metaLine.createSpan({ cls: "warped-todo-project-row-meta-left" });
-      metaChunks.forEach((chunk, i) => {
-        if (i > 0)
-          metaLeft.createSpan({ text: " \xB7 " });
-        metaLeft.createSpan({ text: chunk.text, cls: chunk.cls });
-      });
-      if (showUpdated) {
+      if (project.lastUpdated !== void 0) {
         const updated = (0, import_obsidian12.moment)(project.lastUpdated);
-        metaLine.createSpan({
+        metaChunks.push({
           text: updated.fromNow(),
           cls: "warped-todo-project-row-updated",
-          attr: { title: updated.format("D MMM YYYY, h:mm A") }
+          title: updated.format("D MMM YYYY, h:mm A")
         });
       }
+    }
+    if (metaChunks.length > 0) {
+      const metaLine = row.createDiv({ cls: "warped-todo-project-row-meta" });
+      metaChunks.forEach((chunk, i) => {
+        if (i > 0)
+          metaLine.createSpan({ text: " \xB7 " });
+        metaLine.createSpan({
+          text: chunk.text,
+          cls: chunk.cls,
+          attr: chunk.title ? { title: chunk.title } : void 0
+        });
+      });
+    }
+    if (variant === "list" && project.readmeSummary) {
+      const summaryEl = row.createDiv({ cls: "warped-todo-project-readme-summary" });
+      void this.renderProjectReadmeSummary(summaryEl, project);
     }
     const notePath = projectFilePath(this.getProjectsOptions().projectsFolder, name);
     const noteFile = variant === "list" ? this.app.vault.getAbstractFileByPath(notePath) : null;

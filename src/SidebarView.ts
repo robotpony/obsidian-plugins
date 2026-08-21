@@ -2885,12 +2885,15 @@ export class TodoSidebarView extends ItemView {
     // view's own "main M? (git)" treatment — was two separately-styled
     // chunks, branch in the default UI font and only the status glyph
     // monospace, which read inconsistently. Reported via screenshot), item
-    // counts, and Recently updated share one line below the name.
+    // counts, and Recently updated share one dot-joined line below the
+    // name — Recently updated used to float right on its own; reported as
+    // not fitting visually, folded into the same run as everything else on
+    // the line instead.
     //
     // List view only — the detail view shows its own frontmatter block
     // instead (see renderProjectFrontmatter), which covers branch/status,
     // and counts are redundant there with the TODO list right below.
-    const metaChunks: { text: string; cls?: string }[] = [];
+    const metaChunks: { text: string; cls?: string; title?: string }[] = [];
     if (variant === "list") {
       const counts = this.projectItemCounts(project);
       if (project.branch) {
@@ -2904,23 +2907,36 @@ export class TodoSidebarView extends ItemView {
         if (counts.bug > 0) parts.push(pluralize(counts.bug, "bug"));
         metaChunks.push({ text: parts.join(" · ") });
       }
-    }
-    const showUpdated = variant === "list" && project.lastUpdated !== undefined;
-    if (metaChunks.length > 0 || showUpdated) {
-      const metaLine = row.createDiv({ cls: "warped-todo-project-row-meta" });
-      const metaLeft = metaLine.createSpan({ cls: "warped-todo-project-row-meta-left" });
-      metaChunks.forEach((chunk, i) => {
-        if (i > 0) metaLeft.createSpan({ text: " · " });
-        metaLeft.createSpan({ text: chunk.text, cls: chunk.cls });
-      });
-      if (showUpdated) {
+      if (project.lastUpdated !== undefined) {
         const updated = (moment as any)(project.lastUpdated);
-        metaLine.createSpan({
+        metaChunks.push({
           text: updated.fromNow(),
           cls: "warped-todo-project-row-updated",
-          attr: { title: updated.format("D MMM YYYY, h:mm A") },
+          title: updated.format("D MMM YYYY, h:mm A"),
         });
       }
+    }
+    if (metaChunks.length > 0) {
+      const metaLine = row.createDiv({ cls: "warped-todo-project-row-meta" });
+      metaChunks.forEach((chunk, i) => {
+        if (i > 0) metaLine.createSpan({ text: " · " });
+        metaLine.createSpan({
+          text: chunk.text,
+          cls: chunk.cls,
+          attr: chunk.title ? { title: chunk.title } : undefined,
+        });
+      });
+    }
+
+    // README excerpt — same rendering the detail view uses
+    // (renderProjectReadmeSummary), just below the meta line here instead
+    // of below the frontmatter card. Gives the list a hint at what a
+    // project actually is without opening it, the same reason the detail
+    // view has it. List view only, and only when there's actually
+    // something to show.
+    if (variant === "list" && project.readmeSummary) {
+      const summaryEl = row.createDiv({ cls: "warped-todo-project-readme-summary" });
+      void this.renderProjectReadmeSummary(summaryEl, project);
     }
 
     // Filename + arrow to the project's own note, now its own line at the

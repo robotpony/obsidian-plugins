@@ -2226,30 +2226,20 @@
   font-family: var(--font-monospace);
 }
 
-/* Branch+status and item counts (left), Recently updated (right) — one
-   muted line below the name. Was a single dot-joined run with no explicit
-   right side; branch and status used to sit on the title line instead,
-   which wrapped badly for long project names — see renderProjectSummary's
-   comment. */
+/* Branch+status, item counts, and Recently updated — one dot-joined muted
+   line below the name. Recently updated used to float right on its own
+   (justify-content: space-between); reported as not fitting visually, so
+   it's folded into the same left-aligned run as everything else here,
+   delineated the same " · " way the other chunks already are. Branch and
+   status used to sit on the title line instead, which wrapped badly for
+   long project names — see renderProjectSummary's comment. */
 .warped-todo-project-row-meta {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--size-4-2);
   color: var(--text-muted);
   font-size: 0.85em;
   margin-top: var(--size-2-1);
 }
 
-.warped-todo-project-row-meta-left {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .warped-todo-project-row-updated {
-  flex-shrink: 0;
   color: var(--text-faint);
 }
 
@@ -2384,6 +2374,18 @@
 
 .warped-todo-project-readme-summary p {
   margin: 0;
+}
+
+/* List-row reuse (renderProjectSummary, variant "list") — same typography
+   as the detail view's own excerpt, but the base rule's horizontal padding
+   assumed sitting next to the detail card's own inset, which doesn't apply
+   here: .warped-todo-project-row already supplies the row's padding, so
+   the same padding again would indent the excerpt past the name/meta/file
+   lines above and below it. Margin also tightens to match the row's own
+   line-to-line spacing instead of the detail view's larger gap. */
+.warped-todo-project-row .warped-todo-project-readme-summary {
+  margin-top: var(--size-2-1);
+  padding: 0;
 }
 
 /* Groups items by source file (e.g. "August grind" + "Obsidian plugins mini

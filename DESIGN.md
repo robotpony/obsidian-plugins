@@ -134,11 +134,13 @@ Projects                                              [⟳ Sync]
   Filter: [________________________]  [sort ⇅]
 
   peep
-  main M? · 4 todos · 1 idea · 2 bugs         3h ago
+  main M? · 4 todos · 1 idea · 2 bugs · 3h ago
+  Focus on the right next task. Plain #todo tags,
+  surfaced in a sidebar when you need them.
   peep.md                                          →
 
   widget-tool
-  main                                        2d ago
+  main · 2d ago
   widget-tool.md                                   →
 
   obsidian-plugins
@@ -147,13 +149,18 @@ Projects                                              [⟳ Sync]
   ... (22 more)
 ```
 
-- Each row is three lines: name; branch+status (one monospace chunk,
-  status omitted when clean) + item counts on the left, Recently updated
-  on the right; filename+arrow at the bottom, right-aligned. Was two lines
-  with the filename/arrow squeezed onto the title line — that wrapped
-  badly once a repo name was long enough to compete with the filename for
-  width (reported via screenshot), so the filename+arrow moved to its own
-  line and the title line is name-only now, free to wrap on its own.
+- Each row is up to four lines: name; branch+status (one monospace chunk,
+  status omitted when clean) + item counts + Recently updated, one
+  dot-joined run; the repo's README excerpt (same
+  `renderProjectReadmeSummary` the detail view uses), omitted when the repo
+  has none; filename+arrow at the bottom, right-aligned. Was two lines with
+  the filename/arrow squeezed onto the title line — that wrapped badly once
+  a repo name was long enough to compete with the filename for width
+  (reported via screenshot), so the filename+arrow moved to its own line
+  and the title line is name-only now, free to wrap on its own. Recently
+  updated first shipped floated right on its own line
+  (`justify-content: space-between`); reported as not fitting visually, so
+  it moved into the dot-joined run with everything else on the meta line.
 - Recently updated: `getRepoLastUpdated` (ProjectMetadata.ts) — a repo's
   CHANGELOG.md mtime, falling back to README.md's, falling back further to
   the vault project note's own mtime if the repo has neither

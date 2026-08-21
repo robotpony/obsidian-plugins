@@ -2,6 +2,22 @@
 
 All notable changes to the ␣⌘ Warped Command plugin will be documented in this file.
 
+## [0.41.0] - 2026-08-21
+
+### Added — README excerpt in the Projects list row
+
+Follow-up to 0.40.0's row redesign, from the same review.
+
+- Each list row now shows the repo's README excerpt (same
+  `renderProjectReadmeSummary` the detail view uses), below the meta line
+  and above the filename+arrow line. Omitted, not guessed, when the repo
+  has no README/opening paragraph.
+- Recently updated moved from floating right on its own
+  (`justify-content: space-between`) into the same left-aligned,
+  dot-joined run as branch+status and item counts — reported as not
+  fitting visually on its own; now delineated the same " · " way the rest
+  of the line already is.
+
 ## [0.40.0] - 2026-08-21
 
 ### Added — Projects list: sort, recently-updated date, redesigned row
