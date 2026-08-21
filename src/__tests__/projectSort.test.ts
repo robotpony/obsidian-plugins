@@ -76,14 +76,14 @@ describe("sortProjectRows: recentlyUpdated", () => {
   });
 });
 
-describe("sortProjectRows: default", () => {
+describe("sortProjectRows: activeFirst", () => {
   it("sorts rows with tracked items before rows with none, ties broken by name", () => {
     const rows = [
       row({ project: projectFixture({ tag: "#empty-b" }), itemCount: 0 }),
       row({ project: projectFixture({ tag: "#busy" }), itemCount: 3 }),
       row({ project: projectFixture({ tag: "#empty-a" }), itemCount: 0 }),
     ];
-    const sorted = sortProjectRows(rows, "default");
+    const sorted = sortProjectRows(rows, "activeFirst");
     expect(sorted.map((r) => r.project.tag)).toEqual(["#busy", "#empty-a", "#empty-b"]);
   });
 });
@@ -101,10 +101,10 @@ describe("sortProjectRows: does not mutate the input array", () => {
 });
 
 describe("PROJECT_SORT_OPTIONS", () => {
-  it("has one entry per ProjectSortKey, default listed first", () => {
-    expect(PROJECT_SORT_OPTIONS[0].key).toBe("default");
+  it("has one entry per ProjectSortKey, activeFirst listed first", () => {
+    expect(PROJECT_SORT_OPTIONS[0].key).toBe("activeFirst");
     expect(PROJECT_SORT_OPTIONS.map((o) => o.key)).toEqual([
-      "default",
+      "activeFirst",
       "name",
       "mostItems",
       "needsAttention",

@@ -1,5 +1,6 @@
 import {
   App,
+  FileSystemAdapter,
   MarkdownView,
   Modal,
   Plugin,
@@ -7,7 +8,9 @@ import {
   Setting,
   TFile,
   TextComponent,
+  Vault,
 } from "obsidian";
+import { join, sep } from "path";
 import { TodoScanner } from "./src/TodoScanner";
 import { TodoProcessor } from "./src/TodoProcessor";
 import { ProjectManager } from "./src/ProjectManager";
@@ -33,7 +36,7 @@ import { TabLockManager } from "./src/TabLockManager";
 import { createHeaderSortPlugin } from "./src/HeaderSortExtension";
 import { createHeaderChecklistExtension } from "./src/HeaderChecklistExtension";
 import { SidebarManager } from "./src/shared";
-import { guessProjectsFolder } from "./src/ProjectsSidebarView";
+import { guessProjectsFolder, PROJECT_SORT_OPTIONS } from "./src/ProjectsSidebarView";
 
 export default class WarpedTodoPlugin extends Plugin {
   settings: WarpedTodoSettings;
@@ -216,7 +219,6 @@ export default class WarpedTodoPlugin extends Plugin {
           this.settings.defaultTodoneFile,
           this.settings.priorityTags,
           this.settings.activeTodosLimit,
-          this.settings.focusListLimit,
           this.settings.makeLinksClickable,
           () => this.showAboutModal(),
           () => this.showStatsModal(),
@@ -228,7 +230,8 @@ export default class WarpedTodoPlugin extends Plugin {
           async (active: boolean) => {
             this.settings.focusModeActive = active;
             await this.saveSettings();
-          }
+          },
+          this.settings.defaultProjectsSortKey
         )
     );
 
@@ -397,8 +400,9 @@ export default class WarpedTodoPlugin extends Plugin {
     );
 
     this.addCommand({
+      // id unchanged — renaming it would silently drop anyone's existing hotkey binding.
       id: "toggle-projects-sidebar",
-      name: "Toggle Projects Sidebar",
+      name: "Toggle Projects Tab",
       callback: () => {
         this.openProjectsTab();
       },
@@ -478,7 +482,7 @@ export default class WarpedTodoPlugin extends Plugin {
 
   /**
    * Opens (if closed) the TODO sidebar and switches it to the Projects
-   * tab — Settings' "Open Projects sidebar" button and the
+   * tab — Settings' "Open Projects tab" button and the
    * "toggle-projects-sidebar" command both go through this. With a tag,
    * jumps straight to that project's detail view.
    */
@@ -644,6 +648,48 @@ function chooseFolder(defaultPath: string): string | null {
   }
 }
 
+/**
+ * Native OS file/folder picker for settings that store a vault-relative
+ * path — as opposed to chooseFolder() above, whose Projects base folder
+ * setting stores an absolute filesystem path to a folder of git repos
+ * outside the vault entirely. Opens starting at the vault's own root plus
+ * the current value, and relativizes the result back against the vault's
+ * base path: Electron's dialog has no way to restrict navigation to a
+ * subtree, so a pick outside the vault is rejected with a notice rather
+ * than silently writing a broken value into a vault-relative setting.
+ * Folder results get a trailing slash, matching this plugin's own
+ * folder-path convention (e.g. defaultProjectsFolder's "projects/").
+ * Returns null on cancel, a pick outside the vault, or failure (mobile
+ * has no FileSystemAdapter, but this plugin is desktop-only anyway).
+ */
+function chooseVaultPath(vault: Vault, kind: "file" | "folder", title: string, currentValue: string): string | null {
+  const adapter = vault.adapter;
+  if (!(adapter instanceof FileSystemAdapter)) return null;
+  const basePath = adapter.getBasePath();
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const electron = require("electron");
+    const dialog = electron.remote?.dialog ?? electron.dialog;
+    const result = dialog.showOpenDialogSync({
+      title,
+      defaultPath: currentValue ? join(basePath, currentValue) : basePath,
+      properties: kind === "folder" ? ["openDirectory", "createDirectory"] : ["openFile"],
+    });
+    if (!result || result.length === 0) return null;
+    const chosen = result[0];
+    if (chosen !== basePath && !chosen.startsWith(basePath + sep)) {
+      showNotice("Choose a location inside your vault.");
+      return null;
+    }
+    const relative = chosen === basePath ? "" : chosen.slice(basePath.length + 1).split(sep).join("/");
+    return kind === "folder" && relative ? `${relative}/` : relative;
+  } catch (error) {
+    console.error("[Warped Todo]", "Failed to open picker:", error);
+    showNotice("Couldn't open the picker. See console for details.");
+    return null;
+  }
+}
+
 class WarpedTodoSettingTab extends PluginSettingTab {
   plugin: WarpedTodoPlugin;
   // Set inside display() by the Projects base folder field; applies the
@@ -738,16 +784,46 @@ class WarpedTodoSettingTab extends PluginSettingTab {
     // TODOs section
     containerEl.createEl("h3", { text: "TODOs" });
 
+    {
+      let todoneFileText: TextComponent;
+      new Setting(containerEl)
+        .setName("Default TODONE file")
+        .setDesc("Default file path for logging completed TODOs")
+        .addText((text) => {
+          todoneFileText = text;
+          text
+            .setPlaceholder("todos/done.md")
+            .setValue(this.plugin.settings.defaultTodoneFile)
+            .onChange(async (value) => {
+              this.plugin.settings.defaultTodoneFile = value;
+              await this.plugin.saveSettings();
+            });
+        })
+        .addExtraButton((btn) =>
+          btn
+            .setIcon("file")
+            .setTooltip("Choose a file")
+            .onClick(async () => {
+              const chosen = chooseVaultPath(this.app.vault, "file", "Choose TODONE file", this.plugin.settings.defaultTodoneFile);
+              if (!chosen) return;
+              todoneFileText.setValue(chosen);
+              this.plugin.settings.defaultTodoneFile = chosen;
+              await this.plugin.saveSettings();
+            })
+        );
+    }
+
     new Setting(containerEl)
-      .setName("Default TODONE file")
-      .setDesc("Default file path for logging completed TODOs")
-      .addText((text) =>
-        text
-          .setPlaceholder("todos/done.md")
-          .setValue(this.plugin.settings.defaultTodoneFile)
+      .setName("Exclude TODONE archive from lists")
+      .setDesc("Don't scan the TODONE file (set above) for TODOs, ideas, or principles — keeps completed-task logs out of your active lists.")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.excludeTodoneFilesFromRecent)
           .onChange(async (value) => {
-            this.plugin.settings.defaultTodoneFile = value;
+            this.plugin.settings.excludeTodoneFilesFromRecent = value;
+            this.plugin.scanner.setExcludeFiles(value ? [this.plugin.settings.defaultTodoneFile] : []);
             await this.plugin.saveSettings();
+            await this.plugin.scanner.scanVault();
           })
       );
 
@@ -768,47 +844,6 @@ class WarpedTodoSettingTab extends PluginSettingTab {
           })
       );
 
-    // Projects section
-    containerEl.createEl("h3", { text: "Projects" });
-
-    new Setting(containerEl)
-      .setName("Projects sidebar")
-      .setDesc("Open the Projects sidebar directly from settings.")
-      .addButton((btn) =>
-        btn.setButtonText("Open Projects sidebar").onClick(() => {
-          this.plugin.openProjectsTab();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName("Default projects folder")
-      .setDesc("Folder scanned for project files. TODOs here get automatic project tags if no explicit tag is set (e.g., projects/)")
-      .addText((text) =>
-        text
-          .setPlaceholder("projects/")
-          .setValue(this.plugin.settings.defaultProjectsFolder)
-          .onChange(async (value) => {
-            this.plugin.settings.defaultProjectsFolder = value;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName("Project list limit")
-      .setDesc("Maximum number of projects to show in the tag cloud")
-      .addText((text) =>
-        text
-          .setPlaceholder("5")
-          .setValue(String(this.plugin.settings.focusListLimit))
-          .onChange(async (value) => {
-            const num = parseInt(value);
-            if (!isNaN(num) && num > 0) {
-              this.plugin.settings.focusListLimit = num;
-              await this.plugin.saveSettings();
-            }
-          })
-      );
-
     new Setting(containerEl)
       .setName("Active TODOs limit")
       .setDesc("Maximum number of TODOs to show in sidebar (0 for unlimited)")
@@ -825,8 +860,49 @@ class WarpedTodoSettingTab extends PluginSettingTab {
           })
       );
 
+    // Projects section
+    containerEl.createEl("h3", { text: "Projects" });
+
     new Setting(containerEl)
-      .setName("Exclude folders from projects")
+      .setName("Open Projects tab")
+      .setDesc("Jump to the Projects tab directly from settings.")
+      .addButton((btn) =>
+        btn.setButtonText("Open Projects tab").onClick(() => {
+          this.plugin.openProjectsTab();
+        })
+      );
+
+    {
+      let projectsFolderVaultText: TextComponent;
+      new Setting(containerEl)
+        .setName("Default projects folder")
+        .setDesc("Folder scanned for project files. TODOs here get automatic project tags if no explicit tag is set (e.g., projects/)")
+        .addText((text) => {
+          projectsFolderVaultText = text;
+          text
+            .setPlaceholder("projects/")
+            .setValue(this.plugin.settings.defaultProjectsFolder)
+            .onChange(async (value) => {
+              this.plugin.settings.defaultProjectsFolder = value;
+              await this.plugin.saveSettings();
+            });
+        })
+        .addExtraButton((btn) =>
+          btn
+            .setIcon("folder-open")
+            .setTooltip("Choose a folder")
+            .onClick(async () => {
+              const chosen = chooseVaultPath(this.app.vault, "folder", "Choose projects folder", this.plugin.settings.defaultProjectsFolder);
+              if (!chosen) return;
+              projectsFolderVaultText.setValue(chosen);
+              this.plugin.settings.defaultProjectsFolder = chosen;
+              await this.plugin.saveSettings();
+            })
+        );
+    }
+
+    new Setting(containerEl)
+      .setName("Exclude folders from auto-tagging")
       .setDesc("Comma-separated folders to exclude from inferred project tags (e.g., log, archive)")
       .addText((text) =>
         text
@@ -846,6 +922,33 @@ class WarpedTodoSettingTab extends PluginSettingTab {
               this.plugin.settings.defaultProjectsFolder,
               this.plugin.settings.priorityTags,
               folders
+            );
+
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Priority tags")
+      .setDesc("Comma-separated tags excluded from automatic project-tag inference (e.g., #focus, #today, #p0). This only controls what's excluded here — it doesn't change what any of these tags actually do elsewhere in the plugin.")
+      .addText((text) =>
+        text
+          .setPlaceholder("#p0, #p1, #p2, #p3, #p4")
+          .setValue(this.plugin.settings.priorityTags.join(", "))
+          .onChange(async (value) => {
+            const tags = value
+              .split(",")
+              .map((t) => t.trim())
+              .filter((t) => t.length > 0);
+
+            this.plugin.settings.priorityTags = tags;
+
+            this.plugin.projectManager = new ProjectManager(
+              this.app,
+              this.plugin.scanner,
+              this.plugin.settings.defaultProjectsFolder,
+              tags,
+              this.plugin.settings.excludeFoldersFromProjects
             );
 
             await this.plugin.saveSettings();
@@ -917,7 +1020,7 @@ class WarpedTodoSettingTab extends PluginSettingTab {
     }
 
     new Setting(containerEl)
-      .setName("Projects exclude directories")
+      .setName("Exclude repo directories from scan")
       .setDesc("Comma-separated directory names to skip while scanning for repos (e.g., node_modules, dist, build, archive)")
       .addText((text) =>
         text
@@ -934,22 +1037,20 @@ class WarpedTodoSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Projects scan depth")
-      .setDesc("How many folder levels deep to look for repos under the base folder")
-      .addText((text) =>
-        text
-          .setPlaceholder("3")
-          .setValue(String(this.plugin.settings.projectsScanDepth))
+      .setDesc("How many folder levels deep to look for repos under the base folder (0 = base folder only)")
+      .addSlider((slider) =>
+        slider
+          .setLimits(0, 6, 1)
+          .setValue(this.plugin.settings.projectsScanDepth)
+          .setDynamicTooltip()
           .onChange(async (value) => {
-            const num = parseInt(value);
-            if (!isNaN(num) && num >= 0) {
-              this.plugin.settings.projectsScanDepth = num;
-              await this.plugin.saveSettings();
-            }
+            this.plugin.settings.projectsScanDepth = value;
+            await this.plugin.saveSettings();
           })
       );
 
     new Setting(containerEl)
-      .setName("Auto-open Projects sidebar")
+      .setName("Auto-open Projects tab")
       .setDesc("Opening a linked project note jumps the sidebar to its Projects summary, even from the TODOs/Ideas tab. Back returns to whatever tab you were on.")
       .addToggle((toggle) =>
         toggle
@@ -985,6 +1086,20 @@ class WarpedTodoSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
       );
+
+    new Setting(containerEl)
+      .setName("Default projects sort")
+      .setDesc("Sort the Projects list opens with each session. Changing the sort from the list's own sort button doesn't update this — it's session-only, same as the filter box.")
+      .addDropdown((dropdown) => {
+        for (const option of PROJECT_SORT_OPTIONS) {
+          dropdown.addOption(option.key, option.label);
+        }
+        dropdown.setValue(this.plugin.settings.defaultProjectsSortKey);
+        dropdown.onChange(async (value) => {
+          this.plugin.settings.defaultProjectsSortKey = value as WarpedTodoSettings["defaultProjectsSortKey"];
+          await this.plugin.saveSettings();
+        });
+      });
 
     // Focus Mode section
     containerEl.createEl("h3", { text: "Focus Mode" });
@@ -1031,6 +1146,19 @@ class WarpedTodoSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
             this.display();
           })
+      )
+      .addExtraButton((btn) =>
+        btn
+          .setIcon("file")
+          .setTooltip("Choose a file")
+          .onClick(async () => {
+            const chosen = chooseVaultPath(this.app.vault, "file", "Choose team file", this.plugin.settings.teamFilePath);
+            if (!chosen) return;
+            this.plugin.settings.teamFilePath = chosen;
+            this.plugin.teamManager.setFilePath(chosen);
+            await this.plugin.saveSettings();
+            this.display(); // rebuilds this field with the new value, same as the text input's own onChange
+          })
       );
 
     const teamFile = this.app.vault.getAbstractFileByPath(this.plugin.settings.teamFilePath);
@@ -1059,13 +1187,13 @@ class WarpedTodoSettingTab extends PluginSettingTab {
 
     const team = this.plugin.teamManager.getTeam();
     if (team.length > 0) {
-      const teamList = containerEl.createEl("div", { cls: "sc-team-list" });
+      const teamList = containerEl.createEl("div", { cls: "warped-todo-team-list" });
       for (const member of team) {
-        const entry = teamList.createEl("div", { cls: "sc-team-entry" });
-        entry.createEl("span", { cls: "sc-team-handle", text: `@${member.handle}` });
-        entry.createEl("span", { cls: "sc-team-name", text: member.name });
+        const entry = teamList.createEl("div", { cls: "warped-todo-team-entry" });
+        entry.createEl("span", { cls: "warped-todo-team-handle", text: `@${member.handle}` });
+        entry.createEl("span", { cls: "warped-todo-team-name", text: member.name });
         if (member.isMe) {
-          entry.createEl("span", { cls: "sc-team-me-badge", text: "(me)" });
+          entry.createEl("span", { cls: "warped-todo-team-me-badge", text: "(me)" });
         }
       }
 
@@ -1088,5 +1216,33 @@ class WarpedTodoSettingTab extends PluginSettingTab {
         });
     }
 
+    this.widenTextInputs(containerEl);
+  }
+
+  /**
+   * Widens every text-input field in this settings tab to 125% of its own
+   * rendered width, clamped to whatever room is actually left in its row
+   * (label + description on the left leave less space than a bare short
+   * label does) so it never overflows or forces the row to wrap. File/
+   * folder-path fields in particular read cramped at Obsidian's default
+   * input width. Measures the real rendered width rather than hardcoding
+   * a pixel value, since Obsidian's own default isn't a value this plugin
+   * controls or should assume stays constant across versions/themes.
+   * Toggles, sliders, and dropdowns are untouched — this only targets
+   * `<input type="text">`.
+   */
+  private widenTextInputs(containerEl: HTMLElement): void {
+    const inputs = containerEl.querySelectorAll<HTMLInputElement>(".setting-item-control input[type='text']");
+    inputs.forEach((input) => {
+      const natural = input.getBoundingClientRect().width;
+      if (natural <= 0) return; // not laid out (e.g. hidden) — nothing to measure
+      const row = input.closest(".setting-item") as HTMLElement | null;
+      const info = row?.querySelector(".setting-item-info") as HTMLElement | null;
+      const rowWidth = row?.getBoundingClientRect().width ?? natural;
+      const infoWidth = info?.getBoundingClientRect().width ?? 0;
+      const available = Math.max(natural, rowWidth - infoWidth - 24); // 24px ~= the row's own label/control gap
+      const target = Math.min(natural * 1.25, available);
+      if (target > natural) input.style.width = `${target}px`;
+    });
   }
 }

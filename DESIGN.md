@@ -170,10 +170,21 @@ Projects                                              [⟳ Sync]
 - Sort button (`sortProjectRows`/`PROJECT_SORT_OPTIONS` in
   ProjectsSidebarView.ts) opens a checkmarked menu, mirroring Obsidian's
   own file-explorer "Change sort order" menu rather than inventing a new
-  pattern. Default is the list's original implicit sort (tracked-items
-  first, then name) kept as an explicit, reselectable option. Needs
-  attention: dirty git status or at least one open bug. Session-only, like
-  the filter text box — resets to Default on restart.
+  pattern. "Active items first" (`ProjectSortKey` value `"activeFirst"`)
+  is the list's original implicit sort (tracked-items first, then name)
+  kept as an explicit, reselectable option — named to avoid colliding with
+  the settings tab's own "Default projects sort" (see below), not literally
+  called "Default" itself. Needs attention: dirty git status or at least
+  one open bug. Picking a sort from this menu is session-only, like the
+  filter text box — it doesn't write back to settings.
+- Settings → Projects → "Default projects sort"
+  (`WarpedTodoSettings.defaultProjectsSortKey`) seeds `projectsSortKey`
+  once, in `TodoSidebarView`'s constructor — not re-read on every render,
+  which would stomp an in-session sort-menu pick back to the configured
+  default on the next todo update. Ships defaulting to Recently updated
+  (`DEFAULT_SETTINGS`), not Active items first — the list reads better
+  landing on what changed lately than on a fixed tracked-items-first
+  ordering.
 - Filter box matches on project name only (not item content) — consistent
   with `ProjectManager`'s existing tag-based filtering elsewhere.
 - Empty state (no `projectsBaseFolder` configured): an inline message plus

@@ -247,11 +247,19 @@ export function buildProjectPrincipleBlocks(items: TodoItem[]): ProjectPrinciple
 // List view only — added alongside the row-layout rework (screenshot
 // review: the old two-line row wrapped badly for long repo names).
 
-export type ProjectSortKey = "default" | "name" | "mostItems" | "needsAttention" | "recentlyUpdated";
+export type ProjectSortKey = "activeFirst" | "name" | "mostItems" | "needsAttention" | "recentlyUpdated";
 
-/** In menu-display order. "Default" is the list's original implicit sort (active-with-items first, then name) — kept as an explicit, reselectable option rather than dropped once named alternatives exist. */
+/**
+ * In menu-display order. "activeFirst" is the list's original implicit
+ * sort (active-with-items first, then name) — kept as an explicit,
+ * reselectable option rather than dropped once named alternatives exist.
+ * Named "activeFirst" rather than "default" since the plugin settings
+ * tab's own "Default projects sort" now owns that word — a settings
+ * value literally named "default" would read confusingly next to a
+ * setting called Default.
+ */
 export const PROJECT_SORT_OPTIONS: { key: ProjectSortKey; label: string }[] = [
-  { key: "default", label: "Default" },
+  { key: "activeFirst", label: "Active items first" },
   { key: "name", label: "Name (A–Z)" },
   { key: "mostItems", label: "Most items" },
   { key: "needsAttention", label: "Needs attention" },
@@ -296,7 +304,7 @@ export function sortProjectRows<T extends ProjectSortRow>(rows: readonly T[], so
     case "recentlyUpdated":
       sorted.sort((a, b) => (b.project.lastUpdated ?? 0) - (a.project.lastUpdated ?? 0) || byName(a, b));
       break;
-    case "default":
+    case "activeFirst":
     default:
       sorted.sort((a, b) => {
         const aActive = a.itemCount > 0 ? 1 : 0;

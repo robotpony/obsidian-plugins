@@ -59,7 +59,6 @@ export class TodoSidebarView extends ItemView {
   // Summary section starts collapsed every session; the user can expand it
   // for the current session but the default never sticks as expanded.
   private summaryExpanded: boolean = false;
-  private focusListLimit: number;
   private makeLinksClickable: boolean;
   private activeTab: 'todos' | 'ideas' | 'projects' = 'todos';
   private activeTagFilter: string | null = null;
@@ -106,9 +105,11 @@ export class TodoSidebarView extends ItemView {
   // and switchToProjectsTab.
   private projectDetailReturnTab: 'todos' | 'ideas' | null = null;
   private projectsFilterText: string = '';
-  // Session-only, like projectsFilterText above — resets to Default on
-  // restart rather than persisting to settings.
-  private projectsSortKey: ProjectSortKey = "default";
+  // Seeded once from settings.defaultProjectsSortKey in the constructor
+  // below, then session-only from there — like projectsFilterText above,
+  // picking a different sort from the sort menu doesn't write back to
+  // settings, so it resets to the configured default on restart.
+  private projectsSortKey: ProjectSortKey;
   // Set at the top of the TODOs tab's render pass (renderTodosList) and read
   // by renderListItem/renderOrphanSectionHeader while it runs — tag ->
   // whether that project is repo-matched (has a localPath). Lets a vault
@@ -141,7 +142,6 @@ export class TodoSidebarView extends ItemView {
     defaultTodoneFile: string,
     priorityTags: string[],
     activeTodosLimit: number,
-    focusListLimit: number,
     makeLinksClickable: boolean,
     onShowAbout: () => void,
     onShowStats: () => void,
@@ -150,7 +150,8 @@ export class TodoSidebarView extends ItemView {
     defaultAssignee: string = "",
     focusQueueLimit: number = 1,
     focusModeActive: boolean = false,
-    setFocusModeActive: (active: boolean) => Promise<void> = async () => {}
+    setFocusModeActive: (active: boolean) => Promise<void> = async () => {},
+    defaultProjectsSortKey: ProjectSortKey = "recentlyUpdated"
   ) {
     super(leaf);
     this.scanner = scanner;
@@ -162,7 +163,6 @@ export class TodoSidebarView extends ItemView {
     this.onOpenSettings = onOpenSettings;
     this.defaultTodoneFile = defaultTodoneFile;
     this.activeTodosLimit = activeTodosLimit;
-    this.focusListLimit = focusListLimit;
     this.makeLinksClickable = makeLinksClickable;
     this.onShowAbout = onShowAbout;
     this.onShowStats = onShowStats;
@@ -172,6 +172,7 @@ export class TodoSidebarView extends ItemView {
     this.focusQueueLimit = focusQueueLimit;
     this.focusModeActive = focusModeActive;
     this.setFocusModeActive = setFocusModeActive;
+    this.projectsSortKey = defaultProjectsSortKey;
 
     // Initialize context menu handler
     this.contextMenuHandler = new ContextMenuHandler(
@@ -2363,7 +2364,7 @@ export class TodoSidebarView extends ItemView {
   }
 
   /**
-   * Public entry point for main.ts — Settings' "Open Projects sidebar"
+   * Public entry point for main.ts — Settings' "Open Projects tab"
    * button and the "toggle-projects-sidebar" command, both of which need
    * to switch this view's tab from outside it (unlike the tab button and
    * the "Show in Projects" context-menu entries, which call

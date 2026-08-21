@@ -258,7 +258,7 @@ Date keywords take priority over user handles. Unknown handles are auto-added to
 | Move TODO to another file      | —                    | Open the file picker; relocates the line at cursor      |
 | Copy as Slack Markdown         | `Cmd/Ctrl+Shift+C`   | Converts selected text to Slack's mrkdwn (headings to bold, adjusted emphasis) |
 | Copy as Notion Markdown        | `Cmd/Ctrl+Shift+N`   | Strips Obsidian-specific syntax (wiki links, embeds, plugin tags) for clean Notion paste |
-| Toggle Projects sidebar        | —                    | Switch to the Projects tab (named for an earlier version, when Projects was a separate panel) |
+| Toggle Projects tab            | —                    | Switch to the Projects tab                              |
 | Sync Projects                  | —                    | Re-scan every repo under the configured base folder and update their notes |
 
 The ribbon icon toggles the sidebar. The kebab (⋯) button at the right of the tab row opens the menu for **Stats**, **Refresh**, **About**, and **Settings**; **Sync** joins that list while you're on the Projects tab.
@@ -271,18 +271,18 @@ The ribbon icon toggles the sidebar. The kebab (⋯) button at the right of the 
 
 ## Projects
 
-The Projects tab tracks work across a folder of git repos on disk, instead of vault notes. It's the third tab in the sidebar, alongside TODOs and Ideas, not a separate panel; earlier versions of the plugin gave it its own sidebar, which is why a couple of settings and commands still say "Projects sidebar."
+The Projects tab tracks work across a folder of git repos on disk, instead of vault notes. It's the third tab in the sidebar, alongside TODOs and Ideas, not a separate panel — earlier versions of the plugin gave it its own sidebar, which is where the `ProjectsSidebarView.ts` filename comes from.
 
-Point it at a folder in Settings → Projects → "Projects base folder" (e.g. `/Users/you/projects`). It finds every git repo underneath (skipping `node_modules`, `dist`, `build`, `archive`, and anything else you add to "Projects exclude directories"), and for each one:
+Point it at a folder in Settings → Projects → "Projects base folder" (e.g. `/Users/you/projects`). It finds every git repo underneath (skipping `node_modules`, `dist`, `build`, `archive`, and anything else you add to "Exclude repo directories from scan"), and for each one:
 
 - Creates or updates a vault note with the repo's branch, git status, remote, and last-synced time in the frontmatter.
 - Pulls in `#todo`/`#idea`/`#bug` items from the repo's `BUGS.md`, `TODO.md`, `TODOS.md`, `IDEAS.md`, or `ISSUES.md`, tagged explicitly or not (an untagged line in `BUGS.md` is assumed to be a bug, in `TODO.md` a todo, and so on).
 
-Each row shows branch and git status, item counts, and a relative "recently updated" date (the repo's `CHANGELOG.md`, falling back to `README.md`, whichever it has), all on one dot-separated line, plus the repo's own README excerpt below it when it has one. The sort icon beside the filter box switches between Default, Name (A–Z), Most items, Needs attention (dirty git status or an open bug), and Recently updated.
+Each row shows branch and git status, item counts, and a relative "recently updated" date (the repo's `CHANGELOG.md`, falling back to `README.md`, whichever it has), all on one dot-separated line, plus the repo's own README excerpt below it when it has one. The sort icon beside the filter box switches between Active items first, Name (A–Z), Most items, Needs attention (dirty git status or an open bug), and Recently updated — set which one the list opens with each session in Settings → Projects → "Default projects sort" (Recently updated by default); picking a different sort from the list's own sort button is session-only and doesn't change that setting.
 
 Click a project in the list to open its note and see a detail view: repo facts pinned at the top, the README's opening paragraph underneath (if it has one), a "Guiding Principles" section for any `#principle`/`#principles` items tagged with the project (see [Ideas and principles](#ideas-and-principles)), and every tracked item grouped by type. Completing an item there writes back to the actual file in the repo, not just the vault note; the same familiar focus/snooze/priority actions from the TODOs tab work here too (no "move," since moving a synced item elsewhere would just have it reappear in its original note on the next sync).
 
-Opening any project's note anywhere in the vault (Quick Switcher, a wikilink, clicking through from a project block on the TODOs/Ideas tab) jumps the sidebar straight to that project's detail view, whatever tab it was showing before; Back returns you there. Turn this off in Settings → Projects → "Auto-open Projects sidebar" if you'd rather the sidebar stay put until you switch tabs yourself.
+Opening any project's note anywhere in the vault (Quick Switcher, a wikilink, clicking through from a project block on the TODOs/Ideas tab) jumps the sidebar straight to that project's detail view, whatever tab it was showing before; Back returns you there. Turn this off in Settings → Projects → "Auto-open Projects tab" if you'd rather the sidebar stay put until you switch tabs yourself.
 
 Each project's detail view has its own **⋯** overflow menu (separate from the sidebar header's kebab menu) for the less-frequent actions: copy the repo's local path or remote URL, open it in a terminal or editor app (set which ones under Settings → Projects → "Terminal app"/"Editor app"; macOS only), or resync its tracked items on demand without waiting for the background watcher.
 

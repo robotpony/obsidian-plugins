@@ -2,6 +2,86 @@
 
 All notable changes to the ␣⌘ Warped Command plugin will be documented in this file.
 
+## [0.44.0] - 2026-08-21
+
+### Changed — Settings panel cleanup
+
+A review of the whole settings tab (naming, ordering, missing fields, how
+fields are represented) turned up two real bugs and several
+inconsistencies.
+
+- **Removed "Project list limit".** It was stored, threaded through
+  `TodoSidebarView`'s constructor, and exposed in settings, but never
+  read anywhere after that — the tag cloud it claimed to control is
+  actually capped by a hardcoded constant, unrelated to this setting.
+  Rather than wire it up to a feature it never controlled, it's gone:
+  `focusListLimit` removed from `WarpedTodoSettings`.
+- **Moved "Active TODOs limit" into the TODOs section.** It's a real,
+  working setting (caps the TODOs tab's active list) that was filed
+  under "Projects" for no reason — it has nothing to do with the
+  Projects feature.
+- **Renamed settings for clarity:**
+  - "Exclude folders from projects" → "Exclude folders from
+    auto-tagging" and "Projects exclude directories" → "Exclude repo
+    directories from scan" — same two settings, previously worded as
+    near-duplicates despite controlling different systems (vault
+    tag-inference vs. repo scanning). "Folders" now consistently means
+    vault-relative, "directories" the repo-scanning side.
+  - "Projects sidebar" → "Open Projects tab", "Auto-open Projects
+    sidebar" → "Auto-open Projects tab" — stale terminology from when
+    Projects was a separate sidebar, not a tab; also fixes the
+    "Toggle Projects Sidebar" command's display name (its `id` is
+    unchanged, so existing hotkey bindings survive) and two code
+    comments quoting the old button text.
+  - Settings-tab-only CSS classes `sc-team-*` (stale "Space Command"
+    branding, predating the rename to Warped Command) → `warped-todo-team-*`.
+- **Added missing settings:** "Priority tags" (`priorityTags` — which
+  tags are excluded from automatic project-tag inference) and "Exclude
+  TODONE archive from lists" (`excludeTodoneFilesFromRecent`) were real,
+  actively-used settings with no UI; only editable by hand-editing
+  `data.json` before now.
+- **"Projects scan depth" is now a slider** (0–6), matching "Focus queue
+  limit"'s existing bounded-range treatment instead of free text with
+  manual parsing — it was the odd one out among this plugin's
+  loosely-bounded numeric settings.
+
+## [0.43.0] - 2026-08-21
+
+### Added — Folder/file pickers and wider text fields in Settings
+
+- Added a native folder/file picker button to every settings field that
+  stores a single vault-relative path: Default TODONE file, Default
+  projects folder, Team file path. Matches Projects base folder's own
+  existing picker button, but relativizes the OS dialog's result against
+  the vault's own base path (`FileSystemAdapter.getBasePath()`) rather
+  than storing an absolute path — a pick outside the vault is rejected
+  with a notice. New `chooseVaultPath()` in `main.ts`.
+- Every text-input field in the settings tab is now 125% of its own
+  rendered width, clamped to whatever room its row actually has (never
+  overflows or wraps). File/folder-path fields read cramped at Obsidian's
+  default input width. New `widenTextInputs()`, run once at the end of
+  `display()`; measures the real rendered width rather than assuming a
+  fixed pixel default.
+
+## [0.42.0] - 2026-08-21
+
+### Added — Default projects sort setting
+
+The Projects list now opens sorted by Recently updated instead of the
+original tracked-items-first ordering, and which sort it opens with is
+configurable.
+
+- New Settings → Projects → "Default projects sort" dropdown
+  (`WarpedTodoSettings.defaultProjectsSortKey`), listing the same options
+  as the list's own sort menu. Seeds `TodoSidebarView`'s `projectsSortKey`
+  once, in the constructor — picking a different sort from the list's own
+  sort button stays session-only and doesn't write back to this setting.
+- `DEFAULT_SETTINGS.defaultProjectsSortKey` ships as `"recentlyUpdated"`.
+- Renamed the sort option previously labelled "Default" to "Active items
+  first" (`ProjectSortKey` value `"default"` → `"activeFirst"`) — now that
+  a real "Default projects sort" setting exists, a sort option also
+  called "Default" read confusingly next to it.
+
 ## [0.41.0] - 2026-08-21
 
 ### Added — README excerpt in the Projects list row

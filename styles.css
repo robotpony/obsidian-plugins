@@ -1728,11 +1728,11 @@
 }
 
 /* Team list in settings */
-.sc-team-list {
+.warped-todo-team-list {
   margin-top: 8px;
 }
 
-.sc-team-entry {
+.warped-todo-team-entry {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1740,17 +1740,17 @@
   font-size: 13px;
 }
 
-.sc-team-handle {
+.warped-todo-team-handle {
   font-family: var(--font-monospace);
   font-size: 12px;
   color: var(--text-muted);
 }
 
-.sc-team-name {
+.warped-todo-team-name {
   color: var(--text-normal);
 }
 
-.sc-team-me-badge {
+.warped-todo-team-me-badge {
   font-size: 11px;
   color: var(--interactive-accent);
   opacity: 0.8;

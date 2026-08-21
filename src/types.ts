@@ -1,4 +1,8 @@
 import { TFile } from "obsidian";
+// Type-only — erased at compile time, so this doesn't create a runtime
+// circular dependency even though ProjectsSidebarView.ts itself imports
+// ProjectInfo/TodoItem from this file.
+import type { ProjectSortKey } from "./ProjectsSidebarView";
 
 export interface TeamMember {
   handle: string;
@@ -153,7 +157,6 @@ export interface WarpedTodoSettings {
   dateFormat: string;
   excludeTodoneFilesFromRecent: boolean;
   defaultProjectsFolder: string;
-  focusListLimit: number;
   activeTodosLimit: number;
   priorityTags: string[];
   excludeFoldersFromProjects: string[];
@@ -185,6 +188,8 @@ export interface WarpedTodoSettings {
   projectsTerminalApp: string;
   /** App name passed to macOS `open -a` for the detail view's "Open in Editor" action. */
   projectsEditorApp: string;
+  /** Sort the Projects list opens with each session (see PROJECT_SORT_OPTIONS). The list itself stays session-only after that — picking a different sort from its own menu doesn't change this setting. */
+  defaultProjectsSortKey: ProjectSortKey;
 }
 
 export const DEFAULT_SETTINGS: WarpedTodoSettings = {
@@ -193,7 +198,6 @@ export const DEFAULT_SETTINGS: WarpedTodoSettings = {
   dateFormat: "YYYY-MM-DD",
   excludeTodoneFilesFromRecent: true,
   defaultProjectsFolder: "projects/",
-  focusListLimit: 5,
   activeTodosLimit: 0,
   priorityTags: ["#p0", "#p1", "#p2", "#p3", "#p4"],
   excludeFoldersFromProjects: ["log"],
@@ -218,4 +222,5 @@ export const DEFAULT_SETTINGS: WarpedTodoSettings = {
   autoOpenProjectsOnLinkedNote: true,
   projectsTerminalApp: "Terminal",
   projectsEditorApp: "Visual Studio Code",
+  defaultProjectsSortKey: "recentlyUpdated",
 };
