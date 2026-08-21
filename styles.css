@@ -777,7 +777,6 @@
   background-color: var(--background-primary);
 }
 
-/* Completion date styling in embeds */
 .todo-date {
   margin-left: 6px;
 }
@@ -963,28 +962,6 @@
 .summary-backlog-warn {
   color: var(--text-warning);
   font-weight: 600;
-}
-
-/* Embed header with refresh button */
-.embed-header {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 4px;
-  margin-top: -2px;
-  margin-right: 22px !important;
-}
-
-.embed-refresh-btn {
-  padding: 2px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  opacity: 0.4;
-  transition: opacity 0.2s;
-}
-
-.embed-refresh-btn:hover {
-  opacity: 1;
 }
 
 /* Focus tag highlighting in sidebar — edge-to-edge background. The +6px on

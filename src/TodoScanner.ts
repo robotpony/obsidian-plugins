@@ -364,7 +364,7 @@ export class TodoScanner extends Events {
       // A child is "active" if it exists in the todos array and is not snoozed.
       // Moved children never enter childLineNumbers (scanner skips #moved before
       // child registration), so an empty childLineNumbers means all children are
-      // gone. This runs at scan time so both sidebar and embeds see clean data.
+      // gone. This runs at scan time so the sidebar sees clean data.
       const activeTodos = todos.filter(todo => {
         if (!todo.isHeader || !todo.childLineNumbers) return true;
         if (todo.childLineNumbers.length === 0) return false;

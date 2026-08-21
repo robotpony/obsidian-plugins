@@ -1,6 +1,47 @@
 # Changelog
 
-All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
+All notable changes to the ␣⌘ Warped Command plugin will be documented in this file.
+
+## [0.38.5] - 2026-08-21
+
+### Changed — README rewritten for newcomers, plus a real LICENSE
+
+- README overhauled for someone exploring the plugin cold: a "What it
+  solves" section leads with a concrete before/after example instead of a
+  bare feature list, a table of contents (the doc runs past 300 lines
+  now), and new Installation, Troubleshooting, Known limitations, and
+  Releases sections. Fixed two lingering bugs while at it: the
+  manual-install instructions pointed at
+  `.obsidian/plugins/space-command/` instead of the actual `warped-todo`
+  plugin id, and the license link pointed at `../LICENSE`, one directory
+  above the repo, which never existed.
+- Added a real `LICENSE` file (MIT). `package.json` has claimed MIT since
+  the start, but nothing backed it up, so GitHub showed the repo as
+  unlicensed.
+- Added `CONTRIBUTING.md` and `.github/ISSUE_TEMPLATE/` (bug report and
+  feature request forms) for anyone opening an issue or PR.
+
+### Fixed — display name history wasn't documented
+
+The plugin has been renamed twice: `Space Command` → `Warped Todo` at
+0.25.4 (documented at the time), then `Warped Todo` → `Warped Command` at
+0.35.0 (the "Phase 1a: rename this repo to warped-command" commit), which
+never got a changelog entry. This file's own header still said "Space
+Command" until now. The plugin id (`warped-todo`) is unchanged through
+both renames and stays that way; only the display name and repo moved.
+
+### Removed — lingering "live embeds" references
+
+The embed feature (`{{focus-todos}}` and friends) was removed back in
+0.22.0; the cross-file tracking it was reaching for ended up covered by
+the Projects tab instead, added much later. The description in
+`manifest.json` and the GitHub repo description still advertised "live
+embeds" years after the feature was gone; both updated. Also removed two
+orphaned CSS rules (`.embed-header`, `.embed-refresh-btn`) with no
+remaining references in `src/`, and a stale code comment in
+`TodoScanner.ts` that still mentioned embeds reading scan data.
+`NotionConverter.ts`'s embed-stripping (Obsidian's native `![[file]]`
+syntax) is unrelated and untouched.
 
 ## [0.38.4] - 2026-08-21
 

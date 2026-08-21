@@ -27,4 +27,4 @@ To test changes in Obsidian, run `./install.sh` to copy the built plugin into a 
 
 ## Reporting bugs
 
-Open an issue with the plugin version (`manifest.json`), your Obsidian version, and steps to reproduce. For anything involving the Projects tab, include whether the target folder contains real git repos and what `git --version` reports.
+[Open an issue](https://github.com/robotpony/warped-command/issues/new/choose) using the bug report template. It'll ask for the plugin version, your Obsidian version, and steps to reproduce; for anything involving the Projects tab, it also asks whether the target folder contains real git repos and what `git --version` reports.
