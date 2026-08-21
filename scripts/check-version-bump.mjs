@@ -45,8 +45,20 @@ function main() {
   const diff = git(["diff", "--name-only", "HEAD"]);
   if (diff === null) return;
 
-  const substantive = diff
-    .split("\n")
+  // `git diff --name-only HEAD` only covers tracked files (staged or not) —
+  // it silently skips a brand-new source file until it's `git add`ed, which
+  // let real substantive changes through the check unnoticed. Union in
+  // untracked files (respecting .gitignore) so a freshly-created src/*.ts
+  // counts too.
+  const untracked = git(["ls-files", "--others", "--exclude-standard"]);
+  if (untracked === null) return;
+
+  const changed = new Set([
+    ...diff.split("\n"),
+    ...untracked.split("\n"),
+  ]);
+
+  const substantive = [...changed]
     .filter((f) => f && SUBSTANTIVE_RE.test(f) && !TEST_RE.test(f));
   if (substantive.length === 0) return;
 

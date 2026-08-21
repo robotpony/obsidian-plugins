@@ -2,6 +2,28 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.38.2] - 2026-08-21
+
+### Fixed
+
+- Project detail view's back button now returns to whichever Todos/Ideas
+  tab you actually came from, not always the Projects list — fixes a
+  project block's header click and the "Show in Projects" context-menu
+  entries, which previously forgot the originating tab even though the
+  block's own → arrow already remembered it correctly.
+- The Project detail card and item-group card backgrounds (added in
+  0.38.1) were invisible: both used `--background-secondary`, the same
+  colour as the sidebar's own ambient background, so the "card" painted
+  identically to its surroundings no matter how many times the plugin was
+  rebuilt or reinstalled. Switched both to `--background-primary`, the
+  established contrast colour other sidebar elements already use against
+  the grey chrome.
+- `npm run build`'s version-bump check (`check-version-bump.mjs`) only
+  looked at `git diff --name-only HEAD`, which never lists untracked
+  files — a brand-new `src/*.ts` file could slip through unbumped until
+  it was `git add`ed. Now also unions in untracked files via
+  `git ls-files --others --exclude-standard`.
+
 ## [0.38.1] - 2026-08-20
 
 ### Changed — Project detail card now visually grouped

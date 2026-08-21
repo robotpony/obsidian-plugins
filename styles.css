@@ -2265,11 +2265,19 @@
    list below — same subtle background as .warped-todo-project-item-group
    further down, so the two card treatments in this view read as one system.
    Horizontal inset matches .warped-todo-project-row's own padding so the
-   card doesn't touch the sidebar edges. */
+   card doesn't touch the sidebar edges. --background-primary, not
+   --background-secondary: .sidebar-header above sets --background-secondary
+   as this whole view's own ambient colour (matching Obsidian's native
+   sidebar chrome), so a card meant to stand out against it needs the
+   *other* one — same reasoning as the .warped-todo-sidebar .muted-pill
+   "better contrast on grey background" override further up this file.
+   --background-secondary here rendered identically to the sidebar around
+   it, so the card was invisible no matter how many times the plugin got
+   rebuilt/reinstalled. */
 .warped-todo-project-detail-card {
   margin: var(--size-2-2) var(--size-4-2) var(--size-4-2);
   padding: var(--size-4-1) var(--size-4-2);
-  background-color: var(--background-secondary);
+  background-color: var(--background-primary);
   border-radius: 3px;
 }
 
@@ -2354,11 +2362,15 @@
 
 /* Card grouping, matching the TODOs sidebar's same-source background block
    (e.g. "August grind" + "Obsidian plugins mini plan" sharing one card since
-   both come from the same file). */
+   both come from the same file). --background-primary, not
+   --background-secondary — same "better contrast on grey background"
+   reasoning as .warped-todo-project-detail-card above: this whole view's
+   ambient colour already is --background-secondary (.sidebar-header), so
+   --background-secondary here painted the same as its own surroundings. */
 .warped-todo-project-item-group {
   padding: var(--size-4-2);
   margin-bottom: var(--size-4-2);
-  background-color: var(--background-secondary);
+  background-color: var(--background-primary);
   border-radius: var(--radius-m);
 }
 

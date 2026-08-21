@@ -4398,8 +4398,9 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     this.projectsMode = "list";
     this.activeProjectName = null;
     // Where the detail view's "← Back" link should go: null means the normal
-    // "back to the Projects list" affordance; set when a project block's →
-    // arrow (TODOs/Ideas tab) opens the detail view directly, or when
+    // "back to the Projects list" affordance; set whenever switchToProjectsTab
+    // jumps to a project's detail view from the Todos/Ideas tab (project block
+    // header/arrow, "Show in Projects" context-menu entries), or when
     // auto-open (see handleProjectActiveFileChange) jumps here from Todos/
     // Ideas on its own, so back returns to the tab the user actually came
     // from instead. Cleared by every other path into detail view (list row
@@ -5492,8 +5493,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     link.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      const returnTab = this.activeTab === "ideas" ? "ideas" : "todos";
-      this.switchToProjectsTab(project.tag, returnTab);
+      this.switchToProjectsTab(project.tag);
     });
     const childrenContainer = li.createEl("ul", { cls: "todo-children" });
     for (const item of items) {
@@ -6061,15 +6061,28 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
    * Projects" context-menu entries, or a project block's header click),
    * jumps straight to that project's detail view instead.
    *
-   * `returnTab`, when given, is remembered so the detail view's back button
-   * returns there instead of the Projects list — used by a project block's
-   * → arrow (`renderProjectBlockItem`), which opens the detail view *in
-   * addition to* the note rather than instead of it, so "back" should feel
-   * like returning to where you were, not browsing into Projects. Omitted
-   * (defaulting to the normal list) by every other caller.
+   * `returnTab` lets a caller pin exactly where the detail view's back
+   * button should return to; when omitted and `tag` is given (jumping
+   * straight into a project's detail view), it defaults to whichever of
+   * Todos/Ideas was active before this call, so back always returns to the
+   * tab the user actually came from — a project block's header or → arrow,
+   * and the "Show in Projects" context-menu entries, all get this for free.
+   * Already being on the Projects tab (e.g. an in-detail-view wikilink to
+   * another project) leaves any earlier remembered tab alone rather than
+   * resetting it — see handleProjectActiveFileChange's matching comment.
+   * With no tag (the tab button's own click), always clears it: that's the
+   * "back to the Projects list" affordance.
    */
   switchToProjectsTab(tag, returnTab) {
-    this.projectDetailReturnTab = returnTab != null ? returnTab : null;
+    if (tag) {
+      if (this.activeTab !== "projects") {
+        this.projectDetailReturnTab = returnTab != null ? returnTab : this.activeTab === "ideas" ? "ideas" : "todos";
+      } else if (returnTab) {
+        this.projectDetailReturnTab = returnTab;
+      }
+    } else {
+      this.projectDetailReturnTab = null;
+    }
     if (this.focusModeActive) {
       this.focusModeActive = false;
       this.focusQueue = null;
