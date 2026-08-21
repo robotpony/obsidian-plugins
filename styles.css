@@ -1085,46 +1085,54 @@
 
 /* Project TODO blocks (renderProjectBlockItem) otherwise inherit identical
    styling to a plain note-header TODO block — same bold text, same → link —
-   so nothing marked them as a different kind of thing at a glance. The
-   accent bar carries the block's full height; the icon (set via setIcon in
-   SidebarView.ts) sits inline with the title.
+   so the icon (set via setIcon in SidebarView.ts) is what marks this as a
+   different kind of thing at a glance. It sits flush at the row's own left
+   edge, same as a plain header's text would (no indent, no border) — an
+   earlier left-accent-bar-plus-icon treatment put a visible bar ahead of
+   the title and let the icon overlap into the title text at some sidebar
+   widths, reported via screenshot. .todo-project-block itself no longer
+   carries any styling of its own; it's kept as a marker class so the
+   colour distinction below still has something to key off.
    Also applied (renderListItem/renderOrphanSectionHeader, gated on
    SidebarView's resolveProjectBlockMatch) to a vault TODO block whose own
    *file* lives under the configured Projects folder — deliberately keyed on
    file location alone, not any tag the individual item happens to carry
    (see resolveProjectBlockMatch's own comment for why: a generic context
-   tag like #work isn't a project). Same icon either way, since both cases
-   genuinely are a project, but a muted accent colour via .todo-project-block-unmatched
-   when that project isn't repo-matched, so "this note isn't backed by an
-   actual git repo" is visible without a second icon to learn. An orphan
-   run's items are separate sibling <li>s rather than nested children, so
-   each carries the class individually — adjacent borders with no vertical
-   gap between them read as one continuous bar down the run. */
-.todo-project-block {
-  border-left: 2px solid var(--interactive-accent);
-  padding-left: 8px;
-}
-
-.todo-project-block-unmatched {
-  border-left-color: var(--text-faint);
-}
-
-/* .todo-header-row uses align-items: flex-start (so a wrapping title's first
-   line, not its vertical centre, sets the row's baseline) — which left the
-   icon pinned to the top instead of centred on that first line. Same fix as
-   .todo-checkbox-wrap: give it an explicit height matching .todo-text's line
-   box (1em × 1.4 line-height) and centre within that. */
+   tag like #work isn't a project). Different icon shape per case (plain
+   folder for an in-vault Projects-folder note, folder-git-2 for a
+   repo-synced block — see the PROJECT_PAGE_ICON_TITLE/PROJECT_LINK_ICON_TITLE
+   hover titles set alongside setIcon in SidebarView.ts) since only one of
+   them is actually backed by an external repo; .todo-project-block-unmatched
+   still mutes the (plain-folder) icon's own colour when an in-vault
+   project note isn't repo-matched, so "this note isn't backed by an actual
+   git repo" is still visible without a second icon to learn. */
 .todo-project-block-icon {
   display: flex;
   align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  width: 14px;
+  /* .todo-header-row uses align-items: flex-start (so a wrapping title's
+     first line, not its vertical centre, sets the row's baseline) — which
+     left the icon pinned to the top instead of centred on that first line.
+     Same fix as .todo-checkbox-wrap: give it an explicit height matching
+     .todo-text's line box (1em × 1.4 line-height) and centre within that. */
   height: calc(1em * 1.4);
-  color: var(--text-muted);
+  color: var(--interactive-accent);
+  overflow: hidden;
 }
 
+.todo-project-block-unmatched .todo-project-block-icon {
+  color: var(--text-faint);
+}
+
+/* !important defeats Obsidian's own icon-size rules, which otherwise win on
+   specificity for a plain setIcon()-inserted svg and were the actual source
+   of the icon/title overlap above — the container's fixed 14px width alone
+   couldn't stop a larger svg from painting past it. */
 .todo-project-block-icon svg {
-  width: 14px;
-  height: 14px;
+  width: 14px !important;
+  height: 14px !important;
 }
 
 /* Sort button for header TODOs */
@@ -2252,16 +2260,23 @@
   margin-bottom: var(--size-4-2);
 }
 
-/* Compact Project/Stack/Status summary between the detail view's header and
-   its TODO list — see renderProjectFrontmatter(). Horizontal padding lives
-   here (and on .warped-todo-project-row above it), not on
-   .warped-todo-project-info itself — the summary row supplies its own, and
-   doubling up on the container would widen the left/right margins past what
-   the row uses. Deliberately small (font-size, line-height) — this is a
-   summary strip, not a second reading of the project's data. */
+/* Groups the Project/Stack/Status summary and README blurb into one visually
+   distinct card, set off from the detail view's header above and the TODO
+   list below — same subtle background as .warped-todo-project-item-group
+   further down, so the two card treatments in this view read as one system.
+   Horizontal inset matches .warped-todo-project-row's own padding so the
+   card doesn't touch the sidebar edges. */
+.warped-todo-project-detail-card {
+  margin: var(--size-2-2) var(--size-4-2) var(--size-4-2);
+  padding: var(--size-4-1) var(--size-4-2);
+  background-color: var(--background-secondary);
+  border-radius: 3px;
+}
+
+/* Compact Project/Stack/Status summary at the top of the detail card — see
+   renderProjectFrontmatter(). Deliberately small (font-size, line-height) —
+   this is a summary strip, not a second reading of the project's data. */
 .warped-todo-project-frontmatter {
-  padding: 0 var(--size-4-2) var(--size-4-2);
-  margin-top: var(--size-2-2);
   font-size: 0.85em;
 }
 
@@ -2327,7 +2342,7 @@
    frontmatter above it, not a second reading of the project's data, so it
    gets the same muted, compact treatment. */
 .warped-todo-project-readme-summary {
-  padding: 0 var(--size-4-2) var(--size-4-2);
+  margin-top: var(--size-4-2);
   color: var(--text-muted);
   font-size: 0.85em;
   line-height: 1.5;

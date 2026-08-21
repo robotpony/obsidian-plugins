@@ -4365,6 +4365,8 @@ var ContextMenuHandler = class {
 
 // src/SidebarView.ts
 var VIEW_TYPE_TODO_SIDEBAR = "warped-todo-sidebar";
+var PROJECT_PAGE_ICON_TITLE = "Project page (a note in this vault)";
+var PROJECT_LINK_ICON_TITLE = "Project link (synced from a repo outside the vault)";
 var TodoSidebarView = class extends import_obsidian12.ItemView {
   constructor(leaf, scanner, processor, projectManager, projectScanner, syncManager, getProjectsOptions, onOpenSettings, defaultTodoneFile, priorityTags, activeTodosLimit, focusListLimit, makeLinksClickable, onShowAbout, onShowStats, getMoveHistory = () => [], teamManager, defaultAssignee = "", focusQueueLimit = 1, focusModeActive = false, setFocusModeActive = async () => {
   }) {
@@ -4644,7 +4646,10 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     }
     const rowContainer = hasChildren ? listItem.createEl("div", { cls: `${config.classPrefix}-header-row` }) : listItem;
     if (projectMatch && hasChildren) {
-      (0, import_obsidian12.setIcon)(rowContainer.createSpan({ cls: "todo-project-block-icon" }), "folder-git-2");
+      (0, import_obsidian12.setIcon)(
+        rowContainer.createSpan({ cls: "todo-project-block-icon", attr: { title: PROJECT_PAGE_ICON_TITLE } }),
+        "folder"
+      );
     }
     if (config.showCheckbox && config.onComplete && !hasChildren) {
       const checkboxWrap = rowContainer.createEl("div", {
@@ -5471,7 +5476,10 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     const name = project.tag.replace(/^#/, "");
     const li = list.createEl("li", { cls: "todo-item todo-header todo-header-with-children todo-project-block" });
     const rowContainer = li.createEl("div", { cls: "todo-header-row is-clickable" });
-    (0, import_obsidian12.setIcon)(rowContainer.createSpan({ cls: "todo-project-block-icon" }), "folder-git-2");
+    (0, import_obsidian12.setIcon)(
+      rowContainer.createSpan({ cls: "todo-project-block-icon", attr: { title: PROJECT_LINK_ICON_TITLE } }),
+      "folder-git-2"
+    );
     rowContainer.createEl("span", { cls: "todo-text", text: (_a = project.title) != null ? _a : name });
     rowContainer.createEl("span", { cls: "header-filename", text: pluralize(items.length, "item") });
     rowContainer.addEventListener("click", () => this.switchToProjectsTab(project.tag));
@@ -5510,7 +5518,10 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       classes.push("todo-project-block-unmatched");
     const li = list.createEl("li", { cls: classes.join(" ") });
     if (projectMatch) {
-      (0, import_obsidian12.setIcon)(li.createSpan({ cls: "todo-project-block-icon" }), "folder-git-2");
+      (0, import_obsidian12.setIcon)(
+        li.createSpan({ cls: "todo-project-block-icon", attr: { title: PROJECT_PAGE_ICON_TITLE } }),
+        "folder"
+      );
     }
     li.createEl("span", { cls: "todo-orphan-section-text", text: label });
     const link = li.createEl("a", {
@@ -6498,9 +6509,10 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     }
     const info = container.createDiv({ cls: "warped-todo-project-info" });
     this.renderProjectSummary(info, project, "detail");
-    this.renderProjectFrontmatter(info, project);
+    const card = info.createDiv({ cls: "warped-todo-project-detail-card" });
+    this.renderProjectFrontmatter(card, project);
     if (project.readmeSummary) {
-      const summaryEl = info.createDiv({ cls: "warped-todo-project-readme-summary" });
+      const summaryEl = card.createDiv({ cls: "warped-todo-project-readme-summary" });
       void this.renderProjectReadmeSummary(summaryEl, project);
     }
     const itemsContainer = container.createDiv({ cls: "warped-todo-project-items" });

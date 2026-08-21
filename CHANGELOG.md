@@ -2,6 +2,14 @@
 
 All notable changes to the ␣⌘ Space Command plugin will be documented in this file.
 
+## [0.38.1] - 2026-08-20
+
+### Changed — Project detail card now visually grouped
+
+- The Project/Stack/Status summary and README blurb in the Projects
+  detail view now sit inside one subtly-shaded, rounded card (`3px`),
+  set off from the project title above and the TODO list below.
+
 ## [0.38.0] - 2026-08-20
 
 ### Added — Auto-open, README summary, and an overflow menu for linked project notes

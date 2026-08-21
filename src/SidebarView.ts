@@ -30,6 +30,13 @@ import { getPriorityValue, compareTodoItems, compareWithEffectivePriority, compa
 
 export const VIEW_TYPE_TODO_SIDEBAR = "warped-todo-sidebar";
 
+// Hover titles for the project icon that appears in the TODOs/Ideas tabs'
+// left margin (see renderListItem, renderOrphanSectionHeader,
+// renderProjectBlockItem) — icon shape tells the two cases apart (plain
+// folder vs folder-git-2), the title spells out why.
+const PROJECT_PAGE_ICON_TITLE = "Project page (a note in this vault)";
+const PROJECT_LINK_ICON_TITLE = "Project link (synced from a repo outside the vault)";
+
 export class TodoSidebarView extends ItemView {
   private scanner: TodoScanner;
   private processor: TodoProcessor;
@@ -451,7 +458,14 @@ export class TodoSidebarView extends ItemView {
     if (projectMatch && hasChildren) {
       // Not for the orphan-item case — that run's icon already lives on its
       // renderOrphanSectionHeader heading, once per run, not once per item.
-      setIcon(rowContainer.createSpan({ cls: "todo-project-block-icon" }), "folder-git-2");
+      // Plain folder, not folder-git-2: this block's file is a vault note
+      // under the Projects folder, not a repo-synced block (see
+      // renderProjectBlockItem's icon for that case) — the icon shape itself
+      // should tell them apart, backed up by the hover title.
+      setIcon(
+        rowContainer.createSpan({ cls: "todo-project-block-icon", attr: { title: PROJECT_PAGE_ICON_TITLE } }),
+        "folder"
+      );
     }
 
     // Checkbox (if configured). Header items with children no longer get a
@@ -1550,7 +1564,10 @@ export class TodoSidebarView extends ItemView {
     // (same bold text, same → link), and the only other tell is the
     // item-count text replacing a filename. See styles.css's
     // .todo-project-block rule for the matching left accent bar.
-    setIcon(rowContainer.createSpan({ cls: "todo-project-block-icon" }), "folder-git-2");
+    setIcon(
+      rowContainer.createSpan({ cls: "todo-project-block-icon", attr: { title: PROJECT_LINK_ICON_TITLE } }),
+      "folder-git-2"
+    );
     rowContainer.createEl("span", { cls: "todo-text", text: project.title ?? name });
     rowContainer.createEl("span", { cls: "header-filename", text: pluralize(items.length, "item") });
     rowContainer.addEventListener("click", () => this.switchToProjectsTab(project.tag));
@@ -1607,7 +1624,12 @@ export class TodoSidebarView extends ItemView {
 
     const li = list.createEl("li", { cls: classes.join(" ") });
     if (projectMatch) {
-      setIcon(li.createSpan({ cls: "todo-project-block-icon" }), "folder-git-2");
+      // Same in-vault case as renderListItem's icon above — plain folder,
+      // not folder-git-2.
+      setIcon(
+        li.createSpan({ cls: "todo-project-block-icon", attr: { title: PROJECT_PAGE_ICON_TITLE } }),
+        "folder"
+      );
     }
     li.createEl("span", { cls: "todo-orphan-section-text", text: label });
     const link = li.createEl("a", {
@@ -2830,9 +2852,11 @@ export class TodoSidebarView extends ItemView {
 
     const info = container.createDiv({ cls: "warped-todo-project-info" });
     this.renderProjectSummary(info, project, "detail");
-    this.renderProjectFrontmatter(info, project);
+
+    const card = info.createDiv({ cls: "warped-todo-project-detail-card" });
+    this.renderProjectFrontmatter(card, project);
     if (project.readmeSummary) {
-      const summaryEl = info.createDiv({ cls: "warped-todo-project-readme-summary" });
+      const summaryEl = card.createDiv({ cls: "warped-todo-project-readme-summary" });
       void this.renderProjectReadmeSummary(summaryEl, project);
     }
 
