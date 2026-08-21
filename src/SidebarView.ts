@@ -547,7 +547,7 @@ export class TodoSidebarView extends ItemView {
         const blockEnd = item.childLineNumbers?.length
           ? Math.max(...item.childLineNumbers)
           : undefined;
-        openFileAtLine(this.app, item.file, item.lineNumber, blockEnd);
+        this.openNoteAndSyncProjects(item.file, item.lineNumber, blockEnd);
       });
     }
 
@@ -1643,7 +1643,7 @@ export class TodoSidebarView extends ItemView {
     });
     link.addEventListener("click", (e) => {
       e.preventDefault();
-      openFileAtLine(this.app, item.file, sectionLine);
+      this.openNoteAndSyncProjects(item.file, sectionLine);
     });
   }
 
@@ -2003,7 +2003,7 @@ export class TodoSidebarView extends ItemView {
         const blockEnd = item.childLineNumbers?.length
           ? Math.max(...item.childLineNumbers)
           : undefined;
-        openFileAtLine(this.app, item.file, item.lineNumber, blockEnd);
+        this.openNoteAndSyncProjects(item.file, item.lineNumber, blockEnd);
       });
     }
 
@@ -2579,20 +2579,34 @@ export class TodoSidebarView extends ItemView {
 
   // ===== Sidebar/pane sync (auto-follow) =====
 
-  private async handleProjectActiveFileChange(): Promise<void> {
+  /**
+   * `force`, set by openNoteAndSyncProjects, bypasses the "path unchanged"
+   * skip below for a deliberate in-sidebar navigation, where the caller
+   * knows exactly which file just opened and needs the sidebar to actually
+   * reflect it — see that method's comment for why the passive event
+   * listener alone can't be trusted for this.
+   */
+  private async handleProjectActiveFileChange(force = false): Promise<void> {
     const activeFile = this.app.workspace.getActiveFile();
     const currentPath = activeFile?.path ?? null;
     // Obsidian fires active-leaf-change/file-open often for reasons that
     // aren't "the user navigated somewhere new" (focus changes, layout
     // events). Only re-derive state when the active file itself actually
-    // changed.
-    if (currentPath === this.lastKnownProjectFilePath) return;
+    // changed — unless forced.
+    if (!force && currentPath === this.lastKnownProjectFilePath) return;
     this.lastKnownProjectFilePath = currentPath;
 
     const projectName = activeFile ? this.projectNameForNotePath(activeFile.path) : null;
 
     if (projectName) {
-      if (this.projectsMode === 'detail' && this.activeProjectName === projectName) return;
+      // Also requires activeTab === 'projects' — projectsMode/
+      // activeProjectName persist across a manual tab switch (switchTab
+      // only touches activeTab), so without this a project note left open
+      // while the user browsed back to Todos/Ideas would look "already in
+      // sync" internally and skip switching the tab back, even though the
+      // user just re-clicked a link to that exact project. Reported as
+      // "feels disconnected."
+      if (this.projectsMode === 'detail' && this.activeProjectName === projectName && this.activeTab === 'projects') return;
 
       // Auto-open (a settings toggle, default on): jump the whole sidebar to
       // the Projects tab when the note opened while Todos/Ideas was active,
@@ -2633,6 +2647,27 @@ export class TodoSidebarView extends ItemView {
       return;
     }
     if (this.activeTab === 'projects') this.render();
+  }
+
+  /**
+   * Every in-sidebar "open this note" click (a header/orphan-section arrow,
+   * a project's own note link) should go through here instead of calling
+   * openFileAtLine directly. openFileAtLine reuses an already-open leaf when
+   * the target file is already open elsewhere (see its own comment) —
+   * Obsidian doesn't reliably fire active-leaf-change/file-open for that
+   * "already there" case, so the passive auto-follow listener
+   * (handleProjectActiveFileChange, registered in onOpen) silently never
+   * runs. That left the sidebar stuck on whatever tab it was already
+   * showing even though the user just clicked a link straight to a
+   * project's note — worked fine for a note that wasn't already open,
+   * failed for one that was (reported as "feels disconnected"). Forcing the
+   * sync here, once navigation actually settles, doesn't depend on Obsidian
+   * firing anything.
+   */
+  private openNoteAndSyncProjects(file: TFile, line: number, blockEndLine?: number): void {
+    void openFileAtLine(this.app, file, line, blockEndLine).then(() =>
+      this.handleProjectActiveFileChange(true)
+    );
   }
 
   private projectNameForNotePath(filePath: string): string | null {
@@ -2828,7 +2863,7 @@ export class TodoSidebarView extends ItemView {
       link.addEventListener("click", (evt) => {
         evt.preventDefault();
         evt.stopPropagation();
-        openFileAtLine(this.app, noteFile, 0);
+        this.openNoteAndSyncProjects(noteFile, 0);
       });
     }
 
@@ -3112,7 +3147,7 @@ export class TodoSidebarView extends ItemView {
       this.renderProjectGroupHeading(groupEl, group.label, {
         displayName: group.file.name,
         path: group.file.path,
-        onOpen: () => openFileAtLine(this.app, group.file, group.lineNumber),
+        onOpen: () => this.openNoteAndSyncProjects(group.file, group.lineNumber),
       });
       for (const item of group.items) this.renderHandTypedProjectItemRow(groupEl, item);
     }

@@ -958,12 +958,21 @@ export async function modifyExternalFileLine(
   await writeFile(filePath, lines.join("\n"), "utf-8");
 }
 
+/**
+ * Returns the navigation promise (rather than firing-and-forgetting it) so a
+ * caller that needs to act once the file is actually showing — e.g.
+ * SidebarView's openNoteAndSyncProjects, which can't trust Obsidian's own
+ * active-leaf-change/file-open events to fire reliably when the target file
+ * was already open (see that method's comment) — can chain onto it. Existing
+ * call sites that don't care are unaffected; they already ignored the return
+ * value.
+ */
 export function openFileAtLine(
   app: App,
   file: TFile,
   line: number,
   blockEndLine?: number
-): void {
+): Promise<void> {
   // Reuse an existing leaf that already has the file open
   let leaf: WorkspaceLeaf | null = null;
   app.workspace.iterateAllLeaves((l) => {
@@ -974,7 +983,7 @@ export function openFileAtLine(
   if (!leaf) leaf = app.workspace.getLeaf(false);
 
   app.workspace.setActiveLeaf(leaf, { focus: true });
-  leaf.openFile(file, { active: true }).then(() => {
+  return leaf.openFile(file, { active: true }).then(() => {
     const view = app.workspace.getActiveViewOfType(MarkdownView);
     if (view?.editor) {
       const editor = view.editor;

@@ -2,6 +2,30 @@
 
 All notable changes to the ␣⌘ Warped Command plugin will be documented in this file.
 
+## [0.38.6] - 2026-08-21
+
+### Fixed — clicking a project note link didn't always switch the sidebar
+
+- Opening a repo-matched project's note from a header/orphan-section arrow
+  in the TODOs/Ideas tab worked, and jumped the sidebar to that project's
+  Projects detail view, only when the note *wasn't already open*. If it
+  was already open (in another tab, or already the active file), the click
+  did nothing to the sidebar — it stayed wherever it was, disconnected
+  from what the editor was now showing.
+  Root cause: `openFileAtLine` reuses an already-open leaf rather than
+  opening a new one, and Obsidian doesn't reliably fire
+  `active-leaf-change`/`file-open` for navigating to a file that's already
+  showing — the event the sidebar's auto-follow relied on to notice.
+  A second, related bug compounded it: the auto-follow's own "nothing to
+  do" check compared only the file path and the sidebar's internal
+  project/mode state, never the *visible tab* — so even on a genuine
+  event, if the user had manually switched back to Todos/Ideas while the
+  project note stayed open, re-clicking its link left the tab unchanged.
+  Fixed both: note-opening clicks in the sidebar now force a direct
+  resync after navigation settles, instead of depending on the event, and
+  the resync's own "already in sync" check now requires the Projects tab
+  to actually be active too.
+
 ## [0.38.5] - 2026-08-21
 
 ### Changed — README rewritten for newcomers, plus a real LICENSE
