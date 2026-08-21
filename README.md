@@ -8,26 +8,33 @@ Focus on the right next task. Plain `#todo` tags in your markdown, surfaced in a
 
 ## Contents
 
-- [What it solves](#what-it-solves)
-- [Quick start](#quick-start)
-- [Organize with tags](#organize-with-tags)
-- [Focus mode](#focus-mode)
-- [Two tabs](#two-tabs)
-- [Mentions and delegation](#mentions-and-delegation)
-- [Header TODOs](#header-todos)
-- [Ideas and principles](#ideas-and-principles)
-- [Moving TODOs between files](#moving-todos-between-files)
-- [Automatic file tags](#automatic-file-tags)
-- [Editor shortcuts](#editor-shortcuts)
-- [Commands and hotkeys](#commands-and-hotkeys)
-- [Sidebar utilities](#sidebar-utilities)
-- [Projects](#projects)
-- [Installation](#installation)
-- [Troubleshooting](#troubleshooting)
-- [Known limitations](#known-limitations)
-- [Releases and changelog](#releases-and-changelog)
-- [Contributing](#contributing)
-- [License](#license)
+- [␣⌘ Warped Command for Obsidian](#-warped-command-for-obsidian)
+  - [Contents](#contents)
+  - [What it solves](#what-it-solves)
+  - [Quick start](#quick-start)
+  - [Organize with tags](#organize-with-tags)
+  - [Focus mode](#focus-mode)
+  - [Tabs](#tabs)
+  - [Mentions and delegation](#mentions-and-delegation)
+    - [Team file](#team-file)
+  - [Header TODOs](#header-todos)
+  - [Ideas and principles](#ideas-and-principles)
+  - [Moving TODOs between files](#moving-todos-between-files)
+  - [Automatic file tags](#automatic-file-tags)
+  - [Editor shortcuts](#editor-shortcuts)
+    - [Slash commands](#slash-commands)
+    - [@ suggestions](#-suggestions)
+  - [Commands and hotkeys](#commands-and-hotkeys)
+  - [Sidebar utilities](#sidebar-utilities)
+  - [Projects](#projects)
+  - [Installation](#installation)
+    - [Option 1: install script (recommended)](#option-1-install-script-recommended)
+    - [Option 2: manual build](#option-2-manual-build)
+  - [Troubleshooting](#troubleshooting)
+  - [Known limitations](#known-limitations)
+  - [Releases and changelog](#releases-and-changelog)
+  - [Contributing](#contributing)
+  - [License](#license)
 
 ## What it solves
 
@@ -35,15 +42,16 @@ Action items get lost. A fix mentioned in a meeting note, an idea scattered in a
 
 Warped Command's fix is one plain tag, `#todo`. Write it inline, wherever the thought happens. The plugin scans your vault, finds every tagged line, and surfaces it in a sidebar sorted by priority, so the fix you noted last Tuesday shows up again when you need it, not just when you happen to reopen that file.
 
+Tag a single line for a one-off task. For a cluster of related tasks, tag the heading instead (`#todo` or `#todos`) and skip tagging each line:
+
 ```markdown
 <!-- meetings/2026-08-14-standup.md -->
-## Standup notes
-Discussed the login bug again. Sarah's going to check the token refresh logic.
-- [ ] Check token refresh logic #todo @sarah #p1
-- [ ] Write a regression test once the fix lands #todo
+## Standup notes #todos
+- [ ] Check token refresh logic @sarah #p1
+- [ ] Write a regression test once the fix lands
 ```
 
-Both lines appear in the sidebar right away, sorted by priority, still living in the meeting note where the context is. Nothing moved to a separate app, nothing got retyped into a task manager.
+Both items appear in the sidebar right away as one block under "Standup notes," sorted by priority, still living in the meeting note where the context is. Nothing moved to a separate app, nothing got retyped into a task manager. See [Header TODOs](#header-todos) for the full pattern, including sub-sections and moving the whole block at once.
 
 Why this holds up over time:
 
@@ -54,17 +62,17 @@ Why this holds up over time:
 
 ## Quick start
 
-1. **Add a TODO**: put `#todo` on any line.
+1. **Add a task**: put `#todo` on any line or header for a list of TODOs.
 
    ```markdown
    - [ ] Review the API spec #todo
    ```
 
-2. **See your TODOs**: open the sidebar with `Cmd/Ctrl+Shift+T`.
+2. **See your tasks**: open the sidebar with `Cmd/Ctrl+Shift+T`.
 
-3. **Complete it**: click the checkbox. The line becomes `#todone @YYYY-MM-DD` and is appended to your TODONE log file.
+3. **Complete a task**: click the checkbox. The line becomes `#todone @YYYY-MM-DD` and is appended to your TODONE log file.
 
-That's it. Everything below is optional.
+That's it. Everything below is optional, but if you've got several related tasks (a sprint, a meeting's action items).
 
 ## Organize with tags
 
@@ -105,18 +113,22 @@ The queue is built from `#focus`-tagged TODOs first; if none exist, it falls bac
 
 Mode state persists across sessions by default; configure via the `focusQueueLimit` (1–5, default 1) and `focusModePersist` settings.
 
-## Two tabs
+## Tabs
 
-The sidebar has two tabs:
+The sidebar's header has four buttons, plus a kebab (⋯) menu:
 
-| Tab     | Shows                                                                                  |
-|---------|----------------------------------------------------------------------------------------|
-| TODOs   | Active `#todo` items, grouped by header where applicable. Default tab.                |
-| Ideas   | Active `#idea` / `#ideas` / `#ideation` items                                          |
+| Button              | Shows                                                                                  |
+|----------------------|----------------------------------------------------------------------------------------|
+| TODOs                | Active `#todo` items, grouped by header where applicable. Default tab.                |
+| Focus (eye icon)     | Toggles [Focus mode](#focus-mode), an immersive single-item queue. Not a fourth tab: the other three stay clickable while it's active, and clicking one exits focus and switches in one click. |
+| Ideas                | Active `#idea` / `#ideas` / `#ideation` items                                          |
+| Projects             | Git repos tracked from a folder on disk, not vault notes. See [Projects](#projects).   |
 
-Snoozed items (`#future` / `#snooze` / `#snoozed`) show up in both tabs like any other tag; right-click a row to Snooze/Unsnooze it. The only place snoozed items are excluded is Focus Mode's queue.
+Snoozed items (`#future` / `#snooze` / `#snoozed`) show up in TODOs and Ideas like any other tag; right-click a row to Snooze/Unsnooze it. The only place snoozed items are excluded is Focus Mode's queue.
 
-Below the lists, the **Summary** section shows priority breakdown, completion velocity (today / week / month), top backlogs, and a link to your TODONE log file.
+Below the TODOs list (not Ideas), the **Summary** section shows priority breakdown, completion velocity (today / week / month), top backlogs, and a link to your TODONE log file.
+
+The kebab menu, next to the four buttons, covers Refresh, Stats, About, and Settings from any tab; it adds Sync when you're on the Projects tab. See [Sidebar utilities](#sidebar-utilities).
 
 ## Mentions and delegation
 
@@ -244,35 +256,35 @@ Date keywords take priority over user handles. Unknown handles are auto-added to
 | Move TODO to another file      | —                    | Open the file picker; relocates the line at cursor      |
 | Copy as Slack Markdown         | `Cmd/Ctrl+Shift+C`   | Converts selected text to Slack's mrkdwn (headings to bold, adjusted emphasis) |
 | Copy as Notion Markdown        | `Cmd/Ctrl+Shift+N`   | Strips Obsidian-specific syntax (wiki links, embeds, plugin tags) for clean Notion paste |
-| Toggle Projects sidebar        | —                    | Show or hide the Projects sidebar                       |
+| Toggle Projects sidebar        | —                    | Switch to the Projects tab (named for an earlier version, when Projects was a separate panel) |
 | Sync Projects                  | —                    | Re-scan every repo under the configured base folder and update their notes |
 
-The ribbon icon toggles the sidebar; right-click in the sidebar's header gear menu for **Stats**, **Refresh**, and other utilities.
+The ribbon icon toggles the sidebar. The kebab (⋯) button at the right of the tab row opens the menu for **Stats**, **Refresh**, **About**, and **Settings**; **Sync** joins that list while you're on the Projects tab.
 
 ## Sidebar utilities
 
-- **Stats**: chart icon (or right-click menu) opens a modal showing counts of active TODOs, focused items, snoozed items, ideas, and principles.
+- **Stats**: kebab menu → Stats opens a modal showing counts of active TODOs, focused items, snoozed items, ideas, and principles.
 - **Clickable links**: wiki links (`[[page]]`) and external links in TODOs, ideas, and principles are clickable in the sidebar. Disable in Settings → "Make links clickable in lists."
-- **Tab lock**: enable in Settings → "Show tab lock buttons." Click the padlock icon on any tab header; locked tabs force links to open in new tabs instead of replacing the current view.
+- **Tab lock**: enable in Settings → "Show tab lock buttons." Adds a padlock icon to Obsidian's own document tab headers (not the plugin's sidebar tabs); locking one forces links you click from the sidebar to open in a new tab instead of replacing what's there.
 
 ## Projects
 
-A second sidebar, separate from the TODOs one, for tracking work across a folder of git repos rather than vault notes.
+The Projects tab tracks work across a folder of git repos on disk, instead of vault notes. It's the third tab in the sidebar, alongside TODOs and Ideas, not a separate panel; earlier versions of the plugin gave it its own sidebar, which is why a couple of settings and commands still say "Projects sidebar."
 
 Point it at a folder in Settings → Projects → "Projects base folder" (e.g. `/Users/you/projects`). It finds every git repo underneath (skipping `node_modules`, `dist`, `build`, `archive`, and anything else you add to "Projects exclude directories"), and for each one:
 
 - Creates or updates a vault note with the repo's branch, git status, remote, and last-synced time in the frontmatter.
 - Pulls in `#todo`/`#idea`/`#bug` items from the repo's `BUGS.md`, `TODO.md`, `TODOS.md`, `IDEAS.md`, or `ISSUES.md`, tagged explicitly or not (an untagged line in `BUGS.md` is assumed to be a bug, in `TODO.md` a todo, and so on).
 
-Click a project in the list to open its note and see a detail view: repo facts pinned at the top, the README's opening paragraph underneath (if it has one), and every tracked item grouped by type. Completing an item there writes back to the actual file in the repo, not just the vault note; the same familiar focus/snooze/priority actions from the TODOs sidebar work here too (no "move," since moving a synced item elsewhere would just have it reappear in its original note on the next sync).
+Click a project in the list to open its note and see a detail view: repo facts pinned at the top, the README's opening paragraph underneath (if it has one), and every tracked item grouped by type. Completing an item there writes back to the actual file in the repo, not just the vault note; the same familiar focus/snooze/priority actions from the TODOs tab work here too (no "move," since moving a synced item elsewhere would just have it reappear in its original note on the next sync).
 
 Opening any project's note anywhere in the vault (Quick Switcher, a wikilink, clicking through from a project block on the TODOs/Ideas tab) jumps the sidebar straight to that project's detail view, whatever tab it was showing before; Back returns you there. Turn this off in Settings → Projects → "Auto-open Projects sidebar" if you'd rather the sidebar stay put until you switch tabs yourself.
 
-The detail view's **⋯** menu covers the less-frequent actions: copy the repo's local path or remote URL, open it in a terminal or editor app (set which ones under Settings → Projects → "Terminal app"/"Editor app"; macOS only), or resync its tracked items on demand without waiting for the background watcher.
+Each project's detail view has its own **⋯** overflow menu (separate from the sidebar header's kebab menu) for the less-frequent actions: copy the repo's local path or remote URL, open it in a terminal or editor app (set which ones under Settings → Projects → "Terminal app"/"Editor app"; macOS only), or resync its tracked items on demand without waiting for the background watcher.
 
 Prose-style bug write-ups (a `### Title` under a `## Open`/`## Fixed` heading, rather than a flat checklist) complete the same way: the whole write-up moves to the first section that reads as "done" (creating one if the file doesn't have one yet), and moves back just as easily if you uncheck it. This refuses if the file has changes it hasn't committed yet; commit or stash first, so a mistake is always one `git checkout` away from undone.
 
-Structured files stay in sync automatically (a background watcher picks up changes on disk), or trigger a sync manually with the sidebar's **Sync** button or the "Sync Projects" command. Requires the plugin's desktop build (`git` and filesystem access aren't available on mobile).
+Structured files stay in sync automatically (a background watcher picks up changes on disk), or trigger a sync manually with **Sync** in the kebab menu (while on the Projects tab) or the "Sync Projects" command. Requires the plugin's desktop build (`git` and filesystem access aren't available on mobile).
 
 Frontmatter is hidden in the note's editor view for these project notes; the sidebar already shows the fields that matter, so the raw YAML would just be noise. Note content you write by hand (an `## Overview` section, your own notes) is never touched by syncing.
 
@@ -314,7 +326,7 @@ Check that it's not inside a code block or wrapped in backticks; the scanner ski
 Three common causes: no base folder is set (Settings → Projects → "Projects base folder"), `git` isn't installed or isn't on your PATH, or none of the folders under the base path are git repos with a top-level `.git` directory (submodules are skipped on purpose).
 
 **Projects sync isn't picking up a change I made to `BUGS.md` or `TODO.md`.**
-The background watcher should catch it automatically. If it doesn't, run the "Sync Projects" command or click **Sync** in the Projects sidebar to force a rescan.
+The background watcher should catch it automatically. If it doesn't, run the "Sync Projects" command or use **Sync** in the Projects tab's kebab menu to force a rescan.
 
 **A prose-style bug write-up won't move to "Fixed."**
 The mover refuses to relocate a block if the file has uncommitted changes, so a mistake can't strand your work partway through a move. Commit or stash first, then try again.

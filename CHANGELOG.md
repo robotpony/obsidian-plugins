@@ -2,6 +2,20 @@
 
 All notable changes to the ␣⌘ Warped Command plugin will be documented in this file.
 
+## [0.38.7] - 2026-08-21
+
+### Fixed
+
+- The Ideas/Bugs/TODOs task groups in the Projects detail view still had a
+  boxed background after the previous round of fixes (reported via
+  screenshot) — that round only pulled the README blurb out of the
+  Project/Stack/Status card, it didn't touch the task groups' own
+  matching background further down. Removed it: the boxed-card look reads
+  right once, for the summary card, but wrong repeated per group down a
+  whole task list. Groups keep their padding/spacing, just with nothing
+  behind them now — the Project/Stack/Status card is the only boxed
+  background left in this view.
+
 ## [0.38.6] - 2026-08-21
 
 ### Fixed — clicking a project note link didn't always switch the sidebar

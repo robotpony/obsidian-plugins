@@ -2238,21 +2238,21 @@
 }
 
 /* Sets the Project/Stack/Status summary off as its own boxed card, distinct
-   from the detail view's header above and the README blurb/TODO list below
-   — same subtle background as .warped-todo-project-item-group further
-   down, so the two card treatments in this view read as one system. Was
-   also wrapping the README blurb until it was reported sharing a
+   from the detail view's header above and the README blurb/TODO list
+   below. The only boxed-background element left in this view — the
+   Ideas/Bugs/TODOs group cards below (.warped-todo-project-item-group)
+   used to match it, but that read wrong repeated once per group down a
+   whole task list (reported via screenshot); spacing alone there now.
+   Was also wrapping the README blurb until it was reported sharing a
    background it shouldn't (that's prose, not metadata) — see
    renderProjectsDetail's comment; .warped-todo-project-readme-summary
    below is a sibling now, not a child, and stays background-free.
-   No horizontal margin — flush to .warped-todo-project-info's own edges,
-   matching .warped-todo-project-item-group's box model exactly, so the two
-   card treatments line up edge-to-edge instead of this one sitting
-   noticeably narrower (reported via screenshot: it used to *also* carry a
-   size-4-2 horizontal margin on top of its padding, insetting it a further
-   8px past every other card in this view for no reason). The now-larger
-   box gets extra horizontal padding instead, so the text inset ends up
-   roughly where it was, just achieved by padding instead of margin.
+   No horizontal margin — flush to .warped-todo-project-info's own edges
+   (reported via screenshot: it used to *also* carry a size-4-2 horizontal
+   margin on top of its padding, insetting it a further 8px past every
+   other element in this view for no reason). The now-larger box gets
+   extra horizontal padding instead, so the text inset ends up roughly
+   where it was, just achieved by padding instead of margin.
    --background-primary, not --background-secondary: .sidebar-header above
    sets --background-secondary as this whole view's own ambient colour
    (matching Obsidian's native sidebar chrome), so a card meant to stand
@@ -2353,18 +2353,18 @@
   margin: 0;
 }
 
-/* Card grouping, matching the TODOs sidebar's same-source background block
-   (e.g. "August grind" + "Obsidian plugins mini plan" sharing one card since
-   both come from the same file). --background-primary, not
-   --background-secondary — same "better contrast on grey background"
-   reasoning as .warped-todo-project-detail-card above: this whole view's
-   ambient colour already is --background-secondary (.sidebar-header), so
-   --background-secondary here painted the same as its own surroundings. */
+/* Groups items by source file (e.g. "August grind" + "Obsidian plugins mini
+   plan" sharing one group since both come from the same file) with spacing
+   alone — no background/border-radius. Used to be boxed like
+   .warped-todo-project-detail-card above; reported via screenshot as
+   unwanted for the task list specifically (the boxed-card treatment reads
+   right for the one-off Project/Stack/Status summary, wrong repeated once
+   per group down a whole list of tasks). Padding stays, for the same
+   horizontal text inset the boxed version had, just with nothing behind
+   it. */
 .warped-todo-project-item-group {
   padding: var(--size-4-2);
   margin-bottom: var(--size-4-2);
-  background-color: var(--background-primary);
-  border-radius: var(--radius-m);
 }
 
 /* Group heading and item rows reuse the TODOs sidebar's own classes
