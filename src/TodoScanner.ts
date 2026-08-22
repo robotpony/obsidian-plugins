@@ -319,6 +319,10 @@ export class TodoScanner extends Events {
           // Child item under a header idea (only if not already a todo/todone)
           // Skip empty children
           if (!this.hasContent(line)) continue;
+          // Same "completed ideas aren't tracked" rule as the top-level branch
+          // above — a child idea has no #idea tag of its own to strip, so just
+          // stop tracking it once its checkbox is checked.
+          if (isCheckboxChecked(line)) continue;
           const childItem = this.createTodoItem(file, i, line, tags, 'idea');
           childItem.parentLineNumber = currentHeaderIdea.lineNumber;
           currentHeaderIdea.todoItem.childLineNumbers!.push(i);

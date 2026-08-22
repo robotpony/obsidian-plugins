@@ -497,6 +497,11 @@ export class TodoSidebarView extends ItemView {
         const success = await config.onComplete!(item);
         if (!success) {
           checkbox.disabled = false;
+          // Native checkbox toggling already flipped `checked` before this
+          // handler ran; a failed mutation left it stuck showing complete
+          // (or unchecked, on an un-complete failure) even though the file
+          // was untouched. Restore it so the row matches reality.
+          checkbox.checked = !checkbox.checked;
         }
       });
     }

@@ -2,6 +2,35 @@
 
 All notable changes to the ␣⌘ Warped Command plugin will be documented in this file.
 
+## [0.45.2] - 2026-08-22
+
+### Fixed — some ideas couldn't be completed
+
+A child idea — one nested under a `## Something #idea` header, like a
+sub-bullet with no `#idea`/`#ideas`/`#ideation` tag of its own — could
+never be checked off. Reported with a real example: a `## Ideas #ideas`
+header with `- [ ] HUGO food site` under it and `- [ ] work on EAT WELL`
+nested under that.
+
+- `TodoProcessor.completeIdea`'s validation required the item's own line
+  to carry an explicit idea tag before writing. Child ideas never carry
+  one — they inherit it from the header — so every completion attempt
+  threw and got refused. Fixed with the same `isChildItem` exception
+  `TodoProcessor` already uses for TODOs.
+- The sidebar checkbox made the failure invisible: clicking it flips the
+  native checkbox to checked immediately (before any of this plugin's
+  code runs); when the write then failed, nothing reset it back. The row
+  looked completed while the file underneath was untouched. Fixed: a
+  failed completion now flips the checkbox back to match reality.
+- `TodoScanner` also never stopped tracking a checked child idea (unlike
+  top-level ideas, which drop out of the list once checked and their tag
+  is stripped) — checking one via a native `[x]` edit would leave it
+  showing up in the Ideas list forever. Now skipped on scan, same as
+  top-level completed ideas.
+- Added `completeIdea.test.ts` covering the top-level case, the
+  newly-fixed child case, and confirming the original "line was actually
+  modified externally" refusal still works.
+
 ## [0.45.1] - 2026-08-22
 
 ### Fixed — dangling references to deleted design docs

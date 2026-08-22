@@ -857,6 +857,8 @@ var TodoScanner = class extends import_obsidian3.Events {
         } else if (currentHeaderIdea && this.isListItem(line) && !tags.includes("#todo") && !tags.includes("#todone")) {
           if (!this.hasContent(line))
             continue;
+          if (isCheckboxChecked(line))
+            continue;
           const childItem = this.createTodoItem(file, i, line, tags, "idea");
           childItem.parentLineNumber = currentHeaderIdea.lineNumber;
           currentHeaderIdea.todoItem.childLineNumbers.push(i);
@@ -1406,12 +1408,13 @@ ${text}` : text;
   }
   async completeIdea(idea) {
     try {
+      const isChildItem = idea.parentLineNumber !== void 0;
       await modifyFileLine(
         this.app.vault,
         idea.file,
         idea.lineNumber,
         (line) => markCheckboxComplete(removeIdeaTag(line)),
-        (line) => !/#idea(?:s|tion)?\b/.test(line) ? `Line ${idea.lineNumber} in ${idea.filePath} no longer contains #idea/#ideas/#ideation tag. File may have been modified.` : null,
+        (line) => !/#idea(?:s|tion)?\b/.test(line) && !isChildItem ? `Line ${idea.lineNumber} in ${idea.filePath} no longer contains #idea/#ideas/#ideation tag. File may have been modified.` : null,
         idea.fingerprint
       );
       if (this.scanner)
@@ -4736,6 +4739,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
         const success = await config.onComplete(item);
         if (!success) {
           checkbox.disabled = false;
+          checkbox.checked = !checkbox.checked;
         }
       });
     }

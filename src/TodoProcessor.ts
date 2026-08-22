@@ -361,12 +361,18 @@ export class TodoProcessor {
 
   async completeIdea(idea: TodoItem): Promise<boolean> {
     try {
+      // Child ideas (nested under a `## Something #idea` header) carry no
+      // #idea/#ideas/#ideation tag of their own — they inherit it from the
+      // header. Same isChildItem exception updateSourceFile uses for TODOs
+      // below, so completing one doesn't fail validation over a tag that was
+      // never on that line to begin with.
+      const isChildItem = idea.parentLineNumber !== undefined;
       await modifyFileLine(
         this.app.vault,
         idea.file,
         idea.lineNumber,
         (line) => markCheckboxComplete(removeIdeaTag(line)),
-        (line) => !/#idea(?:s|tion)?\b/.test(line)
+        (line) => (!/#idea(?:s|tion)?\b/.test(line) && !isChildItem)
           ? `Line ${idea.lineNumber} in ${idea.filePath} no longer contains #idea/#ideas/#ideation tag. File may have been modified.`
           : null,
         idea.fingerprint
