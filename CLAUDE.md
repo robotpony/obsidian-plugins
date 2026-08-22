@@ -43,7 +43,7 @@ Warped Command is an Obsidian plugin for tracking TODOs, Ideas, and Principles a
 | File | Purpose |
 |------|---------|
 | [TodoScanner.ts](src/TodoScanner.ts) | Scans vault for `#todo`/`#todone`/`#idea`/`#principle`. Maintains per-file caches, watches file changes, emits `todos-updated` events. |
-| [TodoProcessor.ts](src/TodoProcessor.ts) | Mutations: complete TODO (`#todo` → `#todone @date`, append to TODONE log), change priority, snooze, move file. |
+| [TodoProcessor.ts](src/TodoProcessor.ts) | Mutations: complete TODO (`#todo` → `#todone @date`, in place), change priority, snooze, move file. |
 | [ProjectManager.ts](src/ProjectManager.ts) | Aggregates items by project tag (excludes `#focus`/priority/lifecycle tags). Reads project description from project files. |
 | [SidebarView.ts](src/SidebarView.ts) | Custom `ItemView` with TODOs / Ideas / Projects tabs, tag cloud, immersive Focus Mode, summary stats. Repo-matched projects with synced items render as collapsible blocks interleaved into the TODOs/Ideas active lists by priority (`renderProjectBlockItem`/`compareSortableEntries`), not just in the Projects tab's own detail view. Snoozed items are an ordinary tag (no dedicated tab), excluded only from the Focus Mode queue. |
 | [ContextMenuHandler.ts](src/ContextMenuHandler.ts) | Right-click menu on sidebar rows: priority, focus, snooze, move, copy, delete. |
@@ -71,7 +71,7 @@ Warped Command is an Obsidian plugin for tracking TODOs, Ideas, and Principles a
 1. **Scan**: `TodoScanner` reads all markdown files, extracts lines tagged `#todo` / `#todone` / `#idea` / `#principle`, skipping code blocks and inline backticked tags.
 2. **Cache**: Results land in `Map<filePath, TodoItem[]>`. File watchers re-scan affected files; `todos-updated` fires on any change.
 3. **Render**: The sidebar listens for `todos-updated` and re-renders. Filters (active tag, assignee, focus) apply at render time.
-4. **Mutate**: User actions (checkbox click, context menu, slash command) call `TodoProcessor` which writes back to source and (for completion) appends to the TODONE log.
+4. **Mutate**: User actions (checkbox click, context menu, slash command) call `TodoProcessor` which writes back to source.
 5. **Refresh**: Mutations trigger file changes → scanner rescans → events fire → sidebar re-renders.
 
 ## Conventions

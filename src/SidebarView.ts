@@ -46,7 +46,6 @@ export class TodoSidebarView extends ItemView {
   private scanner: TodoScanner;
   private processor: TodoProcessor;
   private projectManager: ProjectManager;
-  private defaultTodoneFile: string;
   private updateListener: (() => void) | null = null;
   private contextMenuHandler: ContextMenuHandler;
   private activeTodosLimit: number;
@@ -139,7 +138,6 @@ export class TodoSidebarView extends ItemView {
     syncManager: ProjectSyncManager,
     getProjectsOptions: () => ProjectsSidebarOptions,
     onOpenSettings: () => void,
-    defaultTodoneFile: string,
     priorityTags: string[],
     activeTodosLimit: number,
     makeLinksClickable: boolean,
@@ -161,7 +159,6 @@ export class TodoSidebarView extends ItemView {
     this.syncManager = syncManager;
     this.getProjectsOptions = getProjectsOptions;
     this.onOpenSettings = onOpenSettings;
-    this.defaultTodoneFile = defaultTodoneFile;
     this.activeTodosLimit = activeTodosLimit;
     this.makeLinksClickable = makeLinksClickable;
     this.onShowAbout = onShowAbout;
@@ -357,7 +354,7 @@ export class TodoSidebarView extends ItemView {
     classPrefix: 'todo',
     tagToStrip: /#todos?\b/g,
     showCheckbox: true,
-    onComplete: (item) => this.processor.completeTodo(item, this.defaultTodoneFile),
+    onComplete: (item) => this.processor.completeTodo(item),
     onContextMenu: (e, item) => this.contextMenuHandler.showTodoMenu(e, item, () => this.render())
   };
 
@@ -1677,23 +1674,6 @@ export class TodoSidebarView extends ItemView {
     const preview = header.createEl("span", { cls: "summary-preview" });
     this.renderSummaryPreview(preview);
 
-    // Right-side arrow opens the done file. Stops propagation so it doesn't
-    // also toggle the section.
-    const fileLink = header.createEl("a", {
-      cls: "summary-done-link",
-      text: "→",
-      href: "#",
-      attr: { "aria-label": `Open ${this.defaultTodoneFile}`, title: this.defaultTodoneFile },
-    });
-    fileLink.addEventListener("click", async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const file = this.app.vault.getAbstractFileByPath(this.defaultTodoneFile);
-      if (file instanceof TFile) {
-        await this.app.workspace.getLeaf(false).openFile(file);
-      }
-    });
-
     // Toggle expand/collapse on header click and on Enter / Space when focused.
     const toggle = () => {
       this.summaryExpanded = !this.summaryExpanded;
@@ -2390,7 +2370,7 @@ export class TodoSidebarView extends ItemView {
     const card = this.containerEl.querySelector(".focus-card") as HTMLElement | null;
     // No card in the DOM (edge case): just write and let the normal render flow run.
     if (!card) {
-      await this.processor.completeTodo(item, this.defaultTodoneFile);
+      await this.processor.completeTodo(item);
       return;
     }
 
@@ -2402,7 +2382,7 @@ export class TodoSidebarView extends ItemView {
     this.pendingFocusEnter = "complete";
     card.classList.add("focus-card--leaving-complete");
 
-    const writePromise = this.processor.completeTodo(item, this.defaultTodoneFile);
+    const writePromise = this.processor.completeTodo(item);
     await Promise.all([
       writePromise,
       this.waitForAnimationEnd(card, 700),
@@ -3369,7 +3349,7 @@ export class TodoSidebarView extends ItemView {
       cb.checked = false; // getTodos() only returns active items — never pre-checked
       cb.addEventListener("click", async (evt) => {
         evt.stopPropagation();
-        const ok = await this.processor.completeTodo(item, this.getProjectsOptions().defaultTodoneFile);
+        const ok = await this.processor.completeTodo(item);
         if (ok) this.render();
       });
     }

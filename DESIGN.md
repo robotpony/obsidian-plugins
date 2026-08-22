@@ -57,7 +57,7 @@ private principlesCache: Map<string, TodoItem[]>
 
 Handles all file mutations:
 
-- Complete/uncomplete TODOs (replace tags, mark checkboxes, log to TODONE file)
+- Complete/uncomplete TODOs (replace tags, mark checkboxes, in place)
 - Refuses to complete a header TODO that has children directly (`completeTodo`
   shows a notice instead) — children must be completed individually. Avoids
   accidentally cascading a single click into a whole block; see "Header-Child
@@ -410,8 +410,8 @@ Custom Obsidian sidebar panel:
 - **TODOs tab** (`renderTodosContent`): tag cloud (`renderProjects`,
   `#focus`/`#p0` pinned first), the active TODO list grouped by header
   where applicable (`renderActiveTodos`), then a collapsible **Summary**
-  section (priority counts, assignee stats, top backlogs, a Done
-  today/week/month preview, and a link straight to the TODONE log file).
+  section (priority counts, assignee stats, top backlogs, and a Done
+  today/week/month preview).
   Repo-matched projects with non-completed synced `#todo`/`#bug` items
   interleave into the same active list as one collapsible block per
   project, sorted by priority alongside regular TODOs rather than in a
@@ -452,10 +452,9 @@ Manages right-click menus:
 2. Handler calls processor.completeTodo()
 3. Processor reads file, updates line (#todo → #todone @date)
 4. Marks checkbox [x]
-5. Appends to TODONE file (skipped for sourceFile items — no vault-side log yet)
-6. Triggers rescan (skipped for sourceFile items — not in the vault scanner's cache)
-7. Scanner emits todos-updated
-8. UI components re-render
+5. Triggers rescan (skipped for sourceFile items — not in the vault scanner's cache)
+6. Scanner emits todos-updated
+7. UI components re-render
 ```
 
 If `todo.isHeader` and it has children, step 2 short-circuits: `completeTodo`

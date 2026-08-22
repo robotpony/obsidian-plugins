@@ -648,16 +648,12 @@ var TodoScanner = class extends import_obsidian3.Events {
     this.todonesCache = /* @__PURE__ */ new Map();
     this.ideasCache = /* @__PURE__ */ new Map();
     this.principlesCache = /* @__PURE__ */ new Map();
-    this.excludeFiles = /* @__PURE__ */ new Set();
     this.app = app;
     this.debouncedScanFile = (0, import_obsidian3.debounce)(
       (file) => this.scanFile(file),
       100,
       true
     );
-  }
-  setExcludeFiles(filePaths) {
-    this.excludeFiles = new Set(filePaths);
   }
   // Remove all cached items for a given file path across all four caches.
   evictFile(filePath) {
@@ -1015,19 +1011,14 @@ var TodoScanner = class extends import_obsidian3.Events {
   }
   getTodos() {
     const allTodos = [];
-    for (const [filePath, todos] of this.todosCache.entries()) {
-      if (this.excludeFiles.has(filePath))
-        continue;
+    for (const todos of this.todosCache.values()) {
       allTodos.push(...todos);
     }
     return allTodos.sort((a, b) => a.dateCreated - b.dateCreated);
   }
   getTodones(limit) {
     const allTodones = [];
-    for (const [filePath, todones] of this.todonesCache.entries()) {
-      if (this.excludeFiles.has(filePath)) {
-        continue;
-      }
+    for (const todones of this.todonesCache.values()) {
       allTodones.push(...todones);
     }
     const sorted = allTodones.sort((a, b) => b.dateCreated - a.dateCreated);
@@ -1035,20 +1026,14 @@ var TodoScanner = class extends import_obsidian3.Events {
   }
   getIdeas() {
     const allIdeas = [];
-    for (const [filePath, ideas] of this.ideasCache.entries()) {
-      if (this.excludeFiles.has(filePath)) {
-        continue;
-      }
+    for (const ideas of this.ideasCache.values()) {
       allIdeas.push(...ideas);
     }
     return allIdeas.sort((a, b) => a.dateCreated - b.dateCreated);
   }
   getPrinciples() {
     const allPrinciples = [];
-    for (const [filePath, principles] of this.principlesCache.entries()) {
-      if (this.excludeFiles.has(filePath)) {
-        continue;
-      }
+    for (const principles of this.principlesCache.values()) {
       allPrinciples.push(...principles);
     }
     return allPrinciples.sort((a, b) => a.dateCreated - b.dateCreated);
@@ -1150,7 +1135,7 @@ var TodoProcessor = class {
   setOnMoveHistoryUpdate(callback) {
     this.onMoveHistoryUpdate = callback;
   }
-  async completeTodo(todo, todoneFilePath) {
+  async completeTodo(todo) {
     if (todo.isHeader && todo.childLineNumbers && todo.childLineNumbers.length > 0) {
       showNotice2("Header TODOs with children can't be completed directly. Complete each child instead.");
       return false;
@@ -1158,9 +1143,6 @@ var TodoProcessor = class {
     try {
       const today = formatDate(/* @__PURE__ */ new Date(), this.dateFormat);
       await this.updateSourceFile(todo, today);
-      if (!todo.sourceFile) {
-        await this.appendToTodoneFile(todo, todoneFilePath, today);
-      }
       if (this.scanner && !todo.sourceFile) {
         await this.scanner.scanFile(todo.file);
       }
@@ -1323,35 +1305,6 @@ ${text}` : text;
       return;
     }
     await modifyFileLine(this.app.vault, todo.file, todo.lineNumber, transform, validate, todo.fingerprint);
-  }
-  async appendToTodoneFile(todo, todoneFilePath, date) {
-    let todoneFile = this.app.vault.getAbstractFileByPath(todoneFilePath);
-    if (!todoneFile) {
-      const pathParts = todoneFilePath.split("/");
-      const fileName = pathParts.pop();
-      const folderPath = pathParts.join("/");
-      if (folderPath) {
-        await this.ensureFolderExists(folderPath);
-      }
-      todoneFile = await this.app.vault.create(todoneFilePath, "");
-    }
-    if (!(todoneFile instanceof import_obsidian4.TFile)) {
-      throw new Error(`${todoneFilePath} is not a file`);
-    }
-    let todoneText = todo.text;
-    if (todo.isHeader) {
-      todoneText = todoneText.replace(/^#{1,6}\s+/, "");
-    }
-    todoneText = replaceTodoWithTodone(todoneText, date);
-    if (todo.hasCheckbox) {
-      todoneText = markCheckboxComplete(todoneText);
-    } else {
-      todoneText = `- [x] ${todoneText}`;
-    }
-    const currentContent = await this.app.vault.read(todoneFile);
-    const newContent = currentContent ? `${currentContent}
-${todoneText}` : todoneText;
-    await this.app.vault.modify(todoneFile, newContent);
   }
   async ensureFolderExists(folderPath) {
     const folder = this.app.vault.getAbstractFileByPath(folderPath);
@@ -4487,7 +4440,7 @@ var VIEW_TYPE_TODO_SIDEBAR = "warped-todo-sidebar";
 var PROJECT_PAGE_ICON_TITLE = "Project page (a note in this vault)";
 var PROJECT_LINK_ICON_TITLE = "Project link (synced from a repo outside the vault)";
 var TodoSidebarView = class extends import_obsidian12.ItemView {
-  constructor(leaf, scanner, processor, projectManager, projectScanner, syncManager, getProjectsOptions, onOpenSettings, defaultTodoneFile, priorityTags, activeTodosLimit, makeLinksClickable, onShowAbout, onShowStats, getMoveHistory = () => [], teamManager, defaultAssignee = "", focusQueueLimit = 1, focusModeActive = false, setFocusModeActive = async () => {
+  constructor(leaf, scanner, processor, projectManager, projectScanner, syncManager, getProjectsOptions, onOpenSettings, priorityTags, activeTodosLimit, makeLinksClickable, onShowAbout, onShowStats, getMoveHistory = () => [], teamManager, defaultAssignee = "", focusQueueLimit = 1, focusModeActive = false, setFocusModeActive = async () => {
   }, defaultProjectsSortKey = "recentlyUpdated") {
     super(leaf);
     this.updateListener = null;
@@ -4552,7 +4505,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       classPrefix: "todo",
       tagToStrip: /#todos?\b/g,
       showCheckbox: true,
-      onComplete: (item) => this.processor.completeTodo(item, this.defaultTodoneFile),
+      onComplete: (item) => this.processor.completeTodo(item),
       onContextMenu: (e, item) => this.contextMenuHandler.showTodoMenu(e, item, () => this.render())
     };
     this.ideaConfig = {
@@ -4570,7 +4523,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     this.syncManager = syncManager;
     this.getProjectsOptions = getProjectsOptions;
     this.onOpenSettings = onOpenSettings;
-    this.defaultTodoneFile = defaultTodoneFile;
     this.activeTodosLimit = activeTodosLimit;
     this.makeLinksClickable = makeLinksClickable;
     this.onShowAbout = onShowAbout;
@@ -5672,20 +5624,6 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
     titleSpan.textContent = "SUMMARY";
     const preview = header.createEl("span", { cls: "summary-preview" });
     this.renderSummaryPreview(preview);
-    const fileLink = header.createEl("a", {
-      cls: "summary-done-link",
-      text: "\u2192",
-      href: "#",
-      attr: { "aria-label": `Open ${this.defaultTodoneFile}`, title: this.defaultTodoneFile }
-    });
-    fileLink.addEventListener("click", async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const file = this.app.vault.getAbstractFileByPath(this.defaultTodoneFile);
-      if (file instanceof import_obsidian12.TFile) {
-        await this.app.workspace.getLeaf(false).openFile(file);
-      }
-    });
     const toggle = () => {
       this.summaryExpanded = !this.summaryExpanded;
       this.render();
@@ -6258,13 +6196,13 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
   async handleFocusDone(item) {
     const card = this.containerEl.querySelector(".focus-card");
     if (!card) {
-      await this.processor.completeTodo(item, this.defaultTodoneFile);
+      await this.processor.completeTodo(item);
       return;
     }
     this.animatingFocusTransition = true;
     this.pendingFocusEnter = "complete";
     card.classList.add("focus-card--leaving-complete");
-    const writePromise = this.processor.completeTodo(item, this.defaultTodoneFile);
+    const writePromise = this.processor.completeTodo(item);
     await Promise.all([
       writePromise,
       this.waitForAnimationEnd(card, 700)
@@ -7043,7 +6981,7 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
       cb.checked = false;
       cb.addEventListener("click", async (evt) => {
         evt.stopPropagation();
-        const ok = await this.processor.completeTodo(item, this.getProjectsOptions().defaultTodoneFile);
+        const ok = await this.processor.completeTodo(item);
         if (ok)
           this.render();
       });
@@ -7110,10 +7048,8 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
 
 // src/types.ts
 var DEFAULT_SETTINGS = {
-  defaultTodoneFile: "todos/done.md",
   showSidebarByDefault: true,
   dateFormat: "YYYY-MM-DD",
-  excludeTodoneFilesFromRecent: true,
   defaultProjectsFolder: "projects/",
   activeTodosLimit: 0,
   priorityTags: ["#p0", "#p1", "#p2", "#p3", "#p4"],
@@ -7698,9 +7634,6 @@ var WarpedTodoPlugin = class extends import_obsidian13.Plugin {
         this.tabLockManager.enable();
       });
     }
-    if (this.settings.excludeTodoneFilesFromRecent) {
-      this.scanner.setExcludeFiles([this.settings.defaultTodoneFile]);
-    }
     this.processor.setOnCompleteCallback(() => {
       this.app.workspace.trigger("markdown-changed");
     });
@@ -7744,10 +7677,7 @@ var WarpedTodoPlugin = class extends import_obsidian13.Plugin {
             (t) => t.file.path === file.path && t.lineNumber === i
           );
           if (todo) {
-            await this.processor.completeTodo(
-              todo,
-              this.settings.defaultTodoneFile
-            );
+            await this.processor.completeTodo(todo);
             break;
           }
         }
@@ -7767,7 +7697,6 @@ var WarpedTodoPlugin = class extends import_obsidian13.Plugin {
           this.app.setting.open();
           this.app.setting.openTabById(this.manifest.id);
         },
-        this.settings.defaultTodoneFile,
         this.settings.priorityTags,
         this.settings.activeTodosLimit,
         this.settings.makeLinksClickable,
@@ -7956,7 +7885,6 @@ var WarpedTodoPlugin = class extends import_obsidian13.Plugin {
       excludeDirs: this.settings.projectsExcludeDirs,
       scanDepth: this.settings.projectsScanDepth,
       maxDepth: this.settings.projectsScanDepth,
-      defaultTodoneFile: this.settings.defaultTodoneFile,
       autoOpenOnLinkedNote: this.settings.autoOpenProjectsOnLinkedNote,
       terminalApp: this.settings.projectsTerminalApp,
       editorApp: this.settings.projectsEditorApp
@@ -8185,33 +8113,6 @@ var WarpedTodoSettingTab = class extends import_obsidian13.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: "TODOs" });
-    {
-      let todoneFileText;
-      new import_obsidian13.Setting(containerEl).setName("Default TODONE file").setDesc("Default file path for logging completed TODOs").addText((text) => {
-        todoneFileText = text;
-        text.setPlaceholder("todos/done.md").setValue(this.plugin.settings.defaultTodoneFile).onChange(async (value) => {
-          this.plugin.settings.defaultTodoneFile = value;
-          await this.plugin.saveSettings();
-        });
-      }).addExtraButton(
-        (btn) => btn.setIcon("file").setTooltip("Choose a file").onClick(async () => {
-          const chosen = chooseVaultPath(this.app.vault, "file", "Choose TODONE file", this.plugin.settings.defaultTodoneFile);
-          if (!chosen)
-            return;
-          todoneFileText.setValue(chosen);
-          this.plugin.settings.defaultTodoneFile = chosen;
-          await this.plugin.saveSettings();
-        })
-      );
-    }
-    new import_obsidian13.Setting(containerEl).setName("Exclude TODONE archive from lists").setDesc("Don't scan the TODONE file (set above) for TODOs, ideas, or principles \u2014 keeps completed-task logs out of your active lists.").addToggle(
-      (toggle) => toggle.setValue(this.plugin.settings.excludeTodoneFilesFromRecent).onChange(async (value) => {
-        this.plugin.settings.excludeTodoneFilesFromRecent = value;
-        this.plugin.scanner.setExcludeFiles(value ? [this.plugin.settings.defaultTodoneFile] : []);
-        await this.plugin.saveSettings();
-        await this.plugin.scanner.scanVault();
-      })
-    );
     new import_obsidian13.Setting(containerEl).setName("Date format").setDesc("Format for completion dates. e.g. YYYY-MM-DD \u2192 2026-05-09, D/M/YYYY \u2192 9/5/2026").addText(
       (text) => text.setPlaceholder("YYYY-MM-DD").setValue(this.plugin.settings.dateFormat).onChange(async (value) => {
         this.plugin.settings.dateFormat = value;

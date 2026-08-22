@@ -72,7 +72,7 @@ That covers your vault. Warped Command also reaches outside it: point the **Proj
 
 2. **See your tasks**: open the sidebar with `Cmd/Ctrl+Shift+T`.
 
-3. **Complete a task**: click the checkbox. The line becomes `#todone @YYYY-MM-DD` and is appended to your TODONE log file.
+3. **Complete a task**: click the checkbox. The line becomes `#todone @YYYY-MM-DD` in place.
 
 That's it. Everything below is optional, but if you've got several related tasks (a sprint, a meeting's action items).
 
@@ -128,7 +128,7 @@ The sidebar's header has four buttons, plus a kebab (⋯) menu:
 
 Snoozed items (`#future` / `#snooze` / `#snoozed`) show up in TODOs and Ideas like any other tag; right-click a row to Snooze/Unsnooze it. The only place snoozed items are excluded is Focus Mode's queue.
 
-Below the TODOs list (not Ideas), the **Summary** section shows priority breakdown, completion velocity (today / week / month), top backlogs, and a link to your TODONE log file.
+Below the TODOs list (not Ideas), the **Summary** section shows priority breakdown, completion velocity (today / week / month), and top backlogs.
 
 The kebab menu, next to the four buttons, covers Refresh, Stats, About, and Settings from any tab; it adds Sync when you're on the Projects tab. See [Sidebar utilities](#sidebar-utilities).
 

@@ -48,7 +48,7 @@ describe("TodoProcessor with TodoItem.sourceFile set", () => {
       sourceFile: filePath,
     };
 
-    const result = await processor.completeTodo(todo, "todos/done.md");
+    const result = await processor.completeTodo(todo);
 
     expect(result).toBe(true);
     const content = await readFile(filePath, "utf-8");
@@ -90,7 +90,7 @@ describe("TodoProcessor with TodoItem.sourceFile set", () => {
       sourceFile: filePath,
     };
 
-    const result = await processor.completeTodo(todo, "todos/done.md");
+    const result = await processor.completeTodo(todo);
 
     expect(result).toBe(true);
     const content = await readFile(filePath, "utf-8");
@@ -109,7 +109,7 @@ describe("TodoProcessor with TodoItem.sourceFile set", () => {
     };
 
     // Already #todone on disk — completeTodo's validate should reject the mutation.
-    const result = await processor.completeTodo(todo, "todos/done.md");
+    const result = await processor.completeTodo(todo);
     expect(result).toBe(false);
   });
 });

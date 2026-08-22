@@ -2,6 +2,30 @@
 
 All notable changes to the ␣⌘ Warped Command plugin will be documented in this file.
 
+## [0.45.0] - 2026-08-21
+
+### Removed — TODONE archive log
+
+Completing a TODO already marks it in place (`#todo` → `#todone @date`,
+checkbox checked), so the separate archive-file copy was redundant.
+
+- Removed the TODONE archive file feature: `TodoProcessor.completeTodo()`
+  no longer appends a copy of the completed line to a log file. It still
+  updates the source line in place; that behaviour is unchanged.
+- Removed the now-pointless `defaultTodoneFile` and
+  `excludeTodoneFilesFromRecent` settings, their settings-tab UI ("Default
+  TODONE file", "Exclude TODONE archive from lists"), and
+  `TodoScanner.setExcludeFiles()` (its only caller).
+- Removed the Summary section's "open TODONE file" arrow link — there's
+  no longer a single file for it to point at.
+- "Completed" counts and Done velocity (today/week/month) are unaffected:
+  they were always computed by scanning `#todone` tags vault-wide
+  (`TodoScanner.getTodones()`), not from the archive file.
+- If you had "Exclude TODONE archive from lists" on, your old archive
+  file (default `todos/done.md`) is left on disk untouched, but it's no
+  longer excluded from scans — any `#todone` items still in it now count
+  toward Completed/Done-velocity stats.
+
 ## [0.44.0] - 2026-08-21
 
 ### Changed — Settings panel cleanup

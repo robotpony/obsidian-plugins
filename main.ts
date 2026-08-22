@@ -103,11 +103,6 @@ export default class WarpedTodoPlugin extends Plugin {
       });
     }
 
-    // Configure scanner to exclude TODONE archive file from all lists
-    if (this.settings.excludeTodoneFilesFromRecent) {
-      this.scanner.setExcludeFiles([this.settings.defaultTodoneFile]);
-    }
-
     // Set up processor callback to trigger re-scan after completion
     this.processor.setOnCompleteCallback(() => {
       // File will be modified, which will trigger scanner's file watcher
@@ -190,10 +185,7 @@ export default class WarpedTodoPlugin extends Plugin {
           );
 
           if (todo) {
-            await this.processor.completeTodo(
-              todo,
-              this.settings.defaultTodoneFile
-            );
+            await this.processor.completeTodo(todo);
             break; // Process one at a time
           }
         }
@@ -216,7 +208,6 @@ export default class WarpedTodoPlugin extends Plugin {
             (this.app as any).setting.open();
             (this.app as any).setting.openTabById(this.manifest.id);
           },
-          this.settings.defaultTodoneFile,
           this.settings.priorityTags,
           this.settings.activeTodosLimit,
           this.settings.makeLinksClickable,
@@ -444,7 +435,6 @@ export default class WarpedTodoPlugin extends Plugin {
       excludeDirs: this.settings.projectsExcludeDirs,
       scanDepth: this.settings.projectsScanDepth,
       maxDepth: this.settings.projectsScanDepth,
-      defaultTodoneFile: this.settings.defaultTodoneFile,
       autoOpenOnLinkedNote: this.settings.autoOpenProjectsOnLinkedNote,
       terminalApp: this.settings.projectsTerminalApp,
       editorApp: this.settings.projectsEditorApp,
@@ -783,49 +773,6 @@ class WarpedTodoSettingTab extends PluginSettingTab {
 
     // TODOs section
     containerEl.createEl("h3", { text: "TODOs" });
-
-    {
-      let todoneFileText: TextComponent;
-      new Setting(containerEl)
-        .setName("Default TODONE file")
-        .setDesc("Default file path for logging completed TODOs")
-        .addText((text) => {
-          todoneFileText = text;
-          text
-            .setPlaceholder("todos/done.md")
-            .setValue(this.plugin.settings.defaultTodoneFile)
-            .onChange(async (value) => {
-              this.plugin.settings.defaultTodoneFile = value;
-              await this.plugin.saveSettings();
-            });
-        })
-        .addExtraButton((btn) =>
-          btn
-            .setIcon("file")
-            .setTooltip("Choose a file")
-            .onClick(async () => {
-              const chosen = chooseVaultPath(this.app.vault, "file", "Choose TODONE file", this.plugin.settings.defaultTodoneFile);
-              if (!chosen) return;
-              todoneFileText.setValue(chosen);
-              this.plugin.settings.defaultTodoneFile = chosen;
-              await this.plugin.saveSettings();
-            })
-        );
-    }
-
-    new Setting(containerEl)
-      .setName("Exclude TODONE archive from lists")
-      .setDesc("Don't scan the TODONE file (set above) for TODOs, ideas, or principles — keeps completed-task logs out of your active lists.")
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.excludeTodoneFilesFromRecent)
-          .onChange(async (value) => {
-            this.plugin.settings.excludeTodoneFilesFromRecent = value;
-            this.plugin.scanner.setExcludeFiles(value ? [this.plugin.settings.defaultTodoneFile] : []);
-            await this.plugin.saveSettings();
-            await this.plugin.scanner.scanVault();
-          })
-      );
 
     new Setting(containerEl)
       .setName("Date format")

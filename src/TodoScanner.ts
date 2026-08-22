@@ -8,7 +8,6 @@ export class TodoScanner extends Events {
   private todonesCache: Map<string, TodoItem[]> = new Map();
   private ideasCache: Map<string, TodoItem[]> = new Map();
   private principlesCache: Map<string, TodoItem[]> = new Map();
-  private excludeFiles: Set<string> = new Set();
 
   // Debounced scan function to prevent rapid re-scans on file changes
   private debouncedScanFile: (file: TFile) => void;
@@ -23,10 +22,6 @@ export class TodoScanner extends Events {
       100,
       true
     );
-  }
-
-  setExcludeFiles(filePaths: string[]): void {
-    this.excludeFiles = new Set(filePaths);
   }
 
   // Remove all cached items for a given file path across all four caches.
@@ -526,8 +521,7 @@ export class TodoScanner extends Events {
 
   getTodos(): TodoItem[] {
     const allTodos: TodoItem[] = [];
-    for (const [filePath, todos] of this.todosCache.entries()) {
-      if (this.excludeFiles.has(filePath)) continue;
+    for (const todos of this.todosCache.values()) {
       allTodos.push(...todos);
     }
     // Sort by date created (oldest first)
@@ -536,11 +530,7 @@ export class TodoScanner extends Events {
 
   getTodones(limit?: number): TodoItem[] {
     const allTodones: TodoItem[] = [];
-    for (const [filePath, todones] of this.todonesCache.entries()) {
-      // Skip excluded files (e.g., the archive file)
-      if (this.excludeFiles.has(filePath)) {
-        continue;
-      }
+    for (const todones of this.todonesCache.values()) {
       allTodones.push(...todones);
     }
     // Sort by date created (newest first for recent items)
@@ -550,11 +540,7 @@ export class TodoScanner extends Events {
 
   getIdeas(): TodoItem[] {
     const allIdeas: TodoItem[] = [];
-    for (const [filePath, ideas] of this.ideasCache.entries()) {
-      // Skip excluded files (e.g., the archive file)
-      if (this.excludeFiles.has(filePath)) {
-        continue;
-      }
+    for (const ideas of this.ideasCache.values()) {
       allIdeas.push(...ideas);
     }
     // Sort by date created (oldest first)
@@ -563,11 +549,7 @@ export class TodoScanner extends Events {
 
   getPrinciples(): TodoItem[] {
     const allPrinciples: TodoItem[] = [];
-    for (const [filePath, principles] of this.principlesCache.entries()) {
-      // Skip excluded files (e.g., the archive file)
-      if (this.excludeFiles.has(filePath)) {
-        continue;
-      }
+    for (const principles of this.principlesCache.values()) {
       allPrinciples.push(...principles);
     }
     // Sort by date created (oldest first)

@@ -871,19 +871,6 @@
   color: var(--text-faint);
 }
 
-.summary-done-link {
-  flex-shrink: 0;
-  color: var(--text-faint);
-  text-decoration: none;
-  padding: 0 2px;
-  font-size: 1em;
-  transition: color 120ms ease;
-}
-
-.summary-done-link:hover {
-  color: var(--text-accent);
-}
-
 /* Section opens with a subtle slide-down so it doesn't snap into place. */
 .summary-header-expanded ~ .summary-counts-grid,
 .summary-header-expanded ~ .sc-assignee-stats,

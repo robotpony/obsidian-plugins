@@ -152,10 +152,8 @@ export interface ItemRenderConfig {
 }
 
 export interface WarpedTodoSettings {
-  defaultTodoneFile: string;
   showSidebarByDefault: boolean;
   dateFormat: string;
-  excludeTodoneFilesFromRecent: boolean;
   defaultProjectsFolder: string;
   activeTodosLimit: number;
   priorityTags: string[];
@@ -193,10 +191,8 @@ export interface WarpedTodoSettings {
 }
 
 export const DEFAULT_SETTINGS: WarpedTodoSettings = {
-  defaultTodoneFile: "todos/done.md",
   showSidebarByDefault: true,
   dateFormat: "YYYY-MM-DD",
-  excludeTodoneFilesFromRecent: true,
   defaultProjectsFolder: "projects/",
   activeTodosLimit: 0,
   priorityTags: ["#p0", "#p1", "#p2", "#p3", "#p4"],

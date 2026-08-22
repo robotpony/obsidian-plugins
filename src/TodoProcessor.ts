@@ -40,10 +40,7 @@ export class TodoProcessor {
     this.onMoveHistoryUpdate = callback;
   }
 
-  async completeTodo(
-    todo: TodoItem,
-    todoneFilePath: string
-  ): Promise<boolean> {
+  async completeTodo(todo: TodoItem): Promise<boolean> {
     // Header TODOs that have children can't be completed as a unit. Children
     // are completed individually. This avoids accidental bulk completion of
     // an entire header block from a single click.
@@ -55,16 +52,10 @@ export class TodoProcessor {
     try {
       const today = formatDate(new Date(), this.dateFormat);
 
-      // Step 1: Update the source file
+      // Update the source file: #todo -> #todone @date, checkbox checked.
       await this.updateSourceFile(todo, today);
 
-      // Step 2: Append to TODONE log file (source-file items have no vault-side
-      // TODONE log of their own yet — that's a Phase 3/4 concern, not this spike's)
-      if (!todo.sourceFile) {
-        await this.appendToTodoneFile(todo, todoneFilePath, today);
-      }
-
-      // Step 3: Immediately rescan the file to update cache (don't wait for debounced watcher).
+      // Immediately rescan the file to update cache (don't wait for debounced watcher).
       // Source-file items aren't in the vault scanner's cache yet — TodoScanner doesn't read
       // external files until Phase 3 — so there's nothing to rescan here.
       if (this.scanner && !todo.sourceFile) {
@@ -89,8 +80,6 @@ export class TodoProcessor {
     try {
       // Update the source file - revert #todone @date to #todo
       await this.revertSourceFile(todo);
-
-      // Note: We do NOT remove from the TODONE log file as it serves as history
 
       // Immediately rescan the file to update cache (vault items only — see completeTodo)
       if (this.scanner && !todo.sourceFile) {
@@ -269,57 +258,6 @@ export class TodoProcessor {
     }
 
     await modifyFileLine(this.app.vault, todo.file, todo.lineNumber, transform, validate, todo.fingerprint);
-  }
-
-  private async appendToTodoneFile(
-    todo: TodoItem,
-    todoneFilePath: string,
-    date: string
-  ): Promise<void> {
-    // Ensure the file exists
-    let todoneFile = this.app.vault.getAbstractFileByPath(todoneFilePath);
-
-    if (!todoneFile) {
-      // Create the file (and parent folders if needed)
-      const pathParts = todoneFilePath.split("/");
-      const fileName = pathParts.pop();
-      const folderPath = pathParts.join("/");
-
-      if (folderPath) {
-        await this.ensureFolderExists(folderPath);
-      }
-
-      todoneFile = await this.app.vault.create(todoneFilePath, "");
-    }
-
-    if (!(todoneFile instanceof TFile)) {
-      throw new Error(`${todoneFilePath} is not a file`);
-    }
-
-    // Format the TODONE entry
-    let todoneText = todo.text;
-
-    // Strip heading markers from header TODOs (e.g., "## Task" -> "Task")
-    if (todo.isHeader) {
-      todoneText = todoneText.replace(/^#{1,6}\s+/, "");
-    }
-
-    todoneText = replaceTodoWithTodone(todoneText, date);
-
-    // Ensure it has the completed checkbox format
-    if (todo.hasCheckbox) {
-      todoneText = markCheckboxComplete(todoneText);
-    } else {
-      // For plain text TODOs, prepend checkbox
-      todoneText = `- [x] ${todoneText}`;
-    }
-
-    // Append to file
-    const currentContent = await this.app.vault.read(todoneFile);
-    const newContent = currentContent
-      ? `${currentContent}\n${todoneText}`
-      : todoneText;
-    await this.app.vault.modify(todoneFile, newContent);
   }
 
   private async ensureFolderExists(folderPath: string): Promise<void> {
