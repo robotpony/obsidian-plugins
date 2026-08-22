@@ -497,6 +497,13 @@
   padding: 10px 0;
 }
 
+.todo-empty-example {
+  color: var(--text-faint);
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+  padding: 0 0 10px;
+}
+
 .todo-more-indicator {
   color: var(--text-muted);
   font-size: var(--font-ui-smaller);

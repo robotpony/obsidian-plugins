@@ -2,6 +2,23 @@
 
 All notable changes to the ␣⌘ Warped Command plugin will be documented in this file.
 
+## [0.46.0] - 2026-08-22
+
+### Added — first-use help note and richer empty states
+
+- A `Warped Command Help.md` note is created in the vault (and opened) the
+  first time the plugin runs, and reopened on any later minor version bump.
+  It's a live example, not documentation: real `#todo`/`#idea` lines the
+  user can check off and edit directly. `HelpNoteManager` creates it once
+  and never overwrites it, so edits and completed practice items survive
+  future reopens. Reachable any time via the new Help section at the
+  bottom of Settings → "Show onboarding doc again".
+- Empty states in the TODOs and Ideas tabs, the focus tag cloud, and the
+  Projects list now show a one-line example alongside the existing message
+  (e.g. "Try: - [ ] Review the API spec #todo").
+- The "GitHub" links in the About modal and Settings now point directly at
+  `README.md` instead of the repo root.
+
 ## [0.45.3] - 2026-08-22
 
 ### Fixed — header sort button no longer no-ops on a second press

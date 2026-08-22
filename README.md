@@ -76,6 +76,8 @@ That covers your vault. Warped Command also reaches outside it: point the **Proj
 
 That's it. Everything below is optional, but if you've got several related tasks (a sprint, a meeting's action items).
 
+The first time you install the plugin, it also drops a `Warped Command Help.md` note into your vault and opens it: a live example with real `#todo`/`#idea` lines to try, not a separate manual. It's never overwritten, so edit or delete it freely; reopen it any time from the Help section at the bottom of Settings → "Show onboarding doc again."
+
 ## Organize with tags
 
 **Priority tags** control sort order:

@@ -188,6 +188,8 @@ export interface WarpedTodoSettings {
   projectsEditorApp: string;
   /** Sort the Projects list opens with each session (see PROJECT_SORT_OPTIONS). The list itself stays session-only after that — picking a different sort from its own menu doesn't change this setting. */
   defaultProjectsSortKey: ProjectSortKey;
+  /** "major.minor" of the plugin version the help note was last revealed at ("" = never). Drives HelpNoteManager: reopens (never overwrites) the help note when this falls behind the running version's major.minor. */
+  helpNoteLastSeenVersion: string;
 }
 
 export const DEFAULT_SETTINGS: WarpedTodoSettings = {
@@ -219,4 +221,5 @@ export const DEFAULT_SETTINGS: WarpedTodoSettings = {
   projectsTerminalApp: "Terminal",
   projectsEditorApp: "Visual Studio Code",
   defaultProjectsSortKey: "recentlyUpdated",
+  helpNoteLastSeenVersion: "",
 };

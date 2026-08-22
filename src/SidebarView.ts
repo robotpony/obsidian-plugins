@@ -994,6 +994,10 @@ export class TodoSidebarView extends ItemView {
         text: "No focus tags yet",
         cls: "todo-empty",
       });
+      section.createEl("div", {
+        text: "Tag a TODO #focus or #p0–#p4 to see it here",
+        cls: "todo-empty-example",
+      });
       return;
     }
 
@@ -1469,6 +1473,10 @@ export class TodoSidebarView extends ItemView {
         text: emptyText,
         cls: "todo-empty",
       });
+      section.createEl("div", {
+        text: "Try: - [ ] Review the API spec #todo",
+        cls: "todo-empty-example",
+      });
       return;
     }
 
@@ -1884,6 +1892,10 @@ export class TodoSidebarView extends ItemView {
       section.createEl("div", {
         text: emptyText,
         cls: "todo-empty",
+      });
+      section.createEl("div", {
+        text: "Try: A lighter onboarding flow for repeat users #idea",
+        cls: "todo-empty-example",
       });
       return;
     }
@@ -2793,6 +2805,10 @@ export class TodoSidebarView extends ItemView {
 
     if (sortedRows.length === 0) {
       listEl.createEl("p", { text: "No projects found.", cls: "warped-todo-projects-empty-msg" });
+      listEl.createEl("p", {
+        text: "Check the base folder and scan depth in Settings → Projects.",
+        cls: "warped-todo-projects-empty-msg",
+      });
       return;
     }
 

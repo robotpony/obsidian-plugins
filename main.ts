@@ -19,6 +19,7 @@ import { ProjectSyncManager } from "./src/ProjectSyncManager";
 import { SlashCommandSuggest } from "./src/SlashCommandSuggest";
 import { AtSuggest } from "./src/AtSuggest";
 import { TeamManager } from "./src/TeamManager";
+import { HelpNoteManager, majorMinor } from "./src/HelpNoteManager";
 import {
   TodoSidebarView,
   VIEW_TYPE_TODO_SIDEBAR,
@@ -47,6 +48,7 @@ export default class WarpedTodoPlugin extends Plugin {
   projectSyncManager: ProjectSyncManager;
   tabLockManager: TabLockManager;
   teamManager: TeamManager;
+  helpNoteManager: HelpNoteManager;
   private sidebarManager: SidebarManager;
 
   async onload() {
@@ -68,6 +70,9 @@ export default class WarpedTodoPlugin extends Plugin {
     // Initialize team manager
     this.teamManager = new TeamManager(this.app, this.settings.teamFilePath);
     this.teamManager.watchFile();
+
+    // Initialize help note manager
+    this.helpNoteManager = new HelpNoteManager(this.app);
 
     // Initialize core components
     this.scanner = new TodoScanner(this.app);
@@ -134,6 +139,15 @@ export default class WarpedTodoPlugin extends Plugin {
       // Activate the sidebar after the scan so it has data to show on first render.
       if (this.settings.showSidebarByDefault) {
         this.sidebarManager.activate();
+      }
+
+      // First-use help note: reveal on install, and again on any minor
+      // version bump (see HelpNoteManager — creates once, never overwrites).
+      const currentVersionKey = majorMinor(this.manifest.version);
+      if (this.settings.helpNoteLastSeenVersion !== currentVersionKey) {
+        this.settings.helpNoteLastSeenVersion = currentVersionKey;
+        await this.saveSettings();
+        void this.helpNoteManager.open();
       }
     });
 
@@ -527,7 +541,7 @@ class AboutModal extends Modal {
     repoLink.appendText("Repository: ");
     repoLink.createEl("a", {
       text: "github.com/robotpony/warped-command",
-      href: "https://github.com/robotpony/warped-command",
+      href: "https://github.com/robotpony/warped-command/blob/main/README.md",
     });
 
     details.createEl("p", { text: "Made in 🇨🇦", cls: "about-made-in" });
@@ -723,7 +737,7 @@ class WarpedTodoSettingTab extends PluginSettingTab {
     aboutDetails.appendText(" · ");
     aboutDetails.createEl("a", {
       text: "GitHub",
-      href: "https://github.com/robotpony/warped-command",
+      href: "https://github.com/robotpony/warped-command/blob/main/README.md",
     });
 
     // Sidebar section (first)
@@ -1162,6 +1176,18 @@ class WarpedTodoSettingTab extends PluginSettingTab {
           });
         });
     }
+
+    // Help section (last)
+    containerEl.createEl("h3", { text: "Help" });
+
+    new Setting(containerEl)
+      .setName("Onboarding")
+      .setDesc("Reopen the first-use help note, with live #todo/#idea examples you can try.")
+      .addButton((btn) =>
+        btn.setButtonText("Show onboarding doc again").onClick(async () => {
+          await this.plugin.helpNoteManager.open();
+        })
+      );
 
     this.widenTextInputs(containerEl);
   }
