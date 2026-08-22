@@ -90,8 +90,20 @@ styles, settings tab structure, TypeScript conventions, and file layout.
 
 When making changes, keep these in sync:
 
-1. **Version** in `manifest.json`, `package.json`, and `CHANGELOG.md` (top-of-file entry)
+1. **Version** in `manifest.json`, `package.json`, and `CHANGELOG.md` (top-of-file entry) — see "Versioning" below for which segment to bump.
 2. **Documentation**: update `README.md` if user-visible features, settings, or vocabulary changed; update this file if architecture shifted
+
+### Versioning
+
+`major.minor.patch`, all pre-1.0 (`0.x.y`). Pick the segment by what the change *is*, not by habit — the project has drifted before into bumping minor for everything, which erases the signal a version number is supposed to carry:
+
+- **patch (Z)**: bug fixes, visual/UX tweaks to something that already exists, refactors, renames, cleanup, dead-code removal, doc-only changes. Nothing a user would describe as a new or missing capability. CHANGELOG header is usually `### Fixed` or `### Changed`.
+  Example: `0.38.3` "Fixed — Projects base folder setting" (a debounce bug), `0.38.5` "Changed — README rewritten for newcomers."
+- **minor (Y)**: a capability was added or removed — a new setting, a new tab/section, a feature taken out. CHANGELOG header is usually `### Added` or `### Removed`.
+  Example: `0.39.0` "Added — Guiding Principles in the Projects detail view", `0.45.0` "Removed — TODONE archive log."
+- **major (X)**: reserved. Don't bump it without the user explicitly asking — not for this plugin's own judgment call, even for a large change.
+
+If a change is borderline (e.g. a big `### Changed` that reshapes how an existing feature works), default to patch; minor is for things a user would notice as *new* or *gone*, not just *different*. When a single commit bundles both a fix and a feature, bump for the higher tier (minor) and let the CHANGELOG entry's own headers (`### Added` / `### Fixed`) describe the mix.
 
 ## Working with Claude Code
 
