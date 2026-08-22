@@ -1,6 +1,6 @@
 {
   "name": "warped-command",
-  "version": "0.46.0",
+  "version": "0.46.1",
   "description": "Warped Command - Obsidian plugin for managing TODOs, TODONEs, and workflows",
   "main": "main.js",
   "scripts": {

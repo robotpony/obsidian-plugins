@@ -124,9 +124,9 @@ The sidebar's header has four buttons, plus a kebab (⋯) menu:
 | Button              | Shows                                                                                  |
 |----------------------|----------------------------------------------------------------------------------------|
 | TODOs                | Active `#todo` items, grouped by header where applicable. Default tab.                |
-| Focus (eye icon)     | Toggles [Focus mode](#focus-mode), an immersive single-item queue. Not a fourth tab: the other three stay clickable while it's active, and clicking one exits focus and switches in one click. |
-| Ideas                | Active `#idea` / `#ideas` / `#ideation` items                                          |
 | Projects             | Git repos tracked from a folder on disk, not vault notes. See [Projects](#projects).   |
+| Ideas                | Active `#idea` / `#ideas` / `#ideation` items                                          |
+| Focus (eye icon)     | Toggles [Focus mode](#focus-mode), an immersive single-item queue. Not a fourth tab: the other three stay clickable while it's active, and clicking one exits focus and switches in one click. |
 
 Snoozed items (`#future` / `#snooze` / `#snoozed`) show up in TODOs and Ideas like any other tag; right-click a row to Snooze/Unsnooze it. The only place snoozed items are excluded is Focus Mode's queue.
 

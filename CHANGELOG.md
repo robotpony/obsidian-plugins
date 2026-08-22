@@ -2,6 +2,14 @@
 
 All notable changes to the ␣⌘ Warped Command plugin will be documented in this file.
 
+## [0.46.1] - 2026-08-22
+
+### Changed — sidebar tab order
+
+Reordered the sidebar's header buttons to TODOs, Projects, Ideas, Focus
+(was TODOs, Focus, Ideas, Projects). No behaviour change, just the visual
+order the buttons render in.
+
 ## [0.46.0] - 2026-08-22
 
 ### Added — first-use help note and richer empty states
