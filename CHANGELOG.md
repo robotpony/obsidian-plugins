@@ -2,6 +2,22 @@
 
 All notable changes to the ␣⌘ Warped Command plugin will be documented in this file.
 
+## [0.47.0] - 2026-08-22
+
+### Added — "Send selection to project" command
+
+- Select text in a project note (one with `repo` in frontmatter) and run
+  "Send selection to project" to append it as a new open `#todo` item in
+  that project's `TODO.md`, prompted for a title first. Only available
+  from project notes; there's nowhere to send a selection from a note with
+  no linked repo.
+- `ProjectQueue.appendQueuedTodo` picks the append format (a `- [ ]`
+  bullet, or a bare `##` heading) based on whichever shape the target
+  `TODO.md` is already using (`StructuredFileParser.hasHeaderReportShape`,
+  now exported), not a fixed format — appending in the wrong shape would
+  silently produce an item the parser can't see. Creates `TODO.md` if the
+  project doesn't have one yet.
+
 ## [0.46.1] - 2026-08-22
 
 ### Changed — sidebar tab order

@@ -27,8 +27,8 @@ __export(main_exports, {
   default: () => WarpedTodoPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian14 = require("obsidian");
-var import_path5 = require("path");
+var import_obsidian15 = require("obsidian");
+var import_path6 = require("path");
 
 // src/TodoScanner.ts
 var import_obsidian3 = require("obsidian");
@@ -7272,6 +7272,77 @@ function convertToNotionMarkdown(markdown) {
   return result.join("\n");
 }
 
+// src/SendToProjectModal.ts
+var import_obsidian14 = require("obsidian");
+var SendToProjectModal = class extends import_obsidian14.Modal {
+  constructor(app, suggestedTitle, onSubmit) {
+    super(app);
+    this.title = suggestedTitle;
+    this.onSubmit = onSubmit;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.addClass("warped-todo-send-to-project-modal");
+    contentEl.createEl("h2", { text: "Send selection to project" });
+    let textEl;
+    new import_obsidian14.Setting(contentEl).setName("Title").setDesc("Becomes the heading for this item in the project's TODO.md.").addText((text) => {
+      textEl = text.inputEl;
+      text.setValue(this.title).onChange((value) => {
+        this.title = value;
+      });
+      text.inputEl.focus();
+      text.inputEl.select();
+      text.inputEl.addEventListener("keydown", (evt) => {
+        if (evt.key === "Enter") {
+          evt.preventDefault();
+          this.submit();
+        }
+      });
+    });
+    new import_obsidian14.Setting(contentEl).addButton(
+      (btn) => btn.setButtonText("Send").setCta().onClick(() => this.submit())
+    );
+  }
+  submit() {
+    const trimmed = this.title.trim();
+    this.close();
+    this.onSubmit(trimmed || "Untitled");
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
+
+// src/ProjectQueue.ts
+var import_fs4 = require("fs");
+var import_promises5 = require("fs/promises");
+var import_path5 = require("path");
+var QUEUE_FILENAME = "TODO.md";
+async function appendQueuedTodo(localPath, title, body) {
+  const filePath = (0, import_path5.join)(localPath, QUEUE_FILENAME);
+  const existing = (0, import_fs4.existsSync)(filePath) ? await (0, import_promises5.readFile)(filePath, "utf-8") : "";
+  const useHeaderReport = existing.length > 0 && hasHeaderReportShape(existing.split("\n"));
+  const block = useHeaderReport ? buildHeaderReportBlock(title, body) : buildFlatListBlock(title, body);
+  const separator = existing.length === 0 ? "" : existing.endsWith("\n\n") ? "" : existing.endsWith("\n") ? "\n" : "\n\n";
+  await (0, import_promises5.writeFile)(filePath, existing + separator + block, "utf-8");
+  return filePath;
+}
+function buildFlatListBlock(title, body) {
+  const indented = indentLines(body.trim(), "  ");
+  return `- [ ] ${title} #todo
+${indented}
+`;
+}
+function buildHeaderReportBlock(title, body) {
+  return `## ${title} #todo
+
+${body.trim()}
+`;
+}
+function indentLines(text, indent) {
+  return text.split("\n").map((line) => line.length === 0 ? line : indent + line).join("\n");
+}
+
 // src/TabLockManager.ts
 var TabLockManager = class {
   constructor(app) {
@@ -7700,7 +7771,7 @@ function createHeaderChecklistExtension() {
 }
 
 // main.ts
-var WarpedTodoPlugin = class extends import_obsidian14.Plugin {
+var WarpedTodoPlugin = class extends import_obsidian15.Plugin {
   async onload() {
     await this.loadSettings();
     if (!this.settings.focusModePersist && this.settings.focusModeActive) {
@@ -7878,7 +7949,7 @@ var WarpedTodoPlugin = class extends import_obsidian14.Plugin {
           showNotice2("Cursor is not on a #todo line");
           return;
         }
-        const file = (_a = this.app.workspace.getActiveViewOfType(import_obsidian14.MarkdownView)) == null ? void 0 : _a.file;
+        const file = (_a = this.app.workspace.getActiveViewOfType(import_obsidian15.MarkdownView)) == null ? void 0 : _a.file;
         if (!file)
           return;
         const todos = this.scanner.getTodos();
@@ -7897,6 +7968,30 @@ var WarpedTodoPlugin = class extends import_obsidian14.Plugin {
             await this.processor.moveTodo(todo, targetFile.path);
           }
         ).open();
+      }
+    });
+    this.addCommand({
+      id: "send-selection-to-project",
+      name: "Send selection to project",
+      editorCheckCallback: (checking, editor, ctx) => {
+        var _a, _b;
+        const file = ctx.file;
+        const repo = file ? (_b = (_a = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a.frontmatter) == null ? void 0 : _b.repo : void 0;
+        const selection = editor.getSelection();
+        if (!repo || !selection.trim())
+          return false;
+        if (checking)
+          return true;
+        new SendToProjectModal(this.app, file.basename, async (title) => {
+          try {
+            const filePath = await appendQueuedTodo(repo, title, selection);
+            showNotice2(`Sent to ${filePath}`);
+          } catch (error) {
+            console.error("[Warped Todo]", "Failed to send selection to project:", error);
+            showNotice2("Couldn't send selection to the project. See console for details.");
+          }
+        }).open();
+        return true;
       }
     });
     this.addCommand({
@@ -8033,7 +8128,7 @@ var WarpedTodoPlugin = class extends import_obsidian14.Plugin {
     new StatsModal(this.app, this.scanner).open();
   }
 };
-var AboutModal = class extends import_obsidian14.Modal {
+var AboutModal = class extends import_obsidian15.Modal {
   constructor(app, version) {
     super(app);
     this.version = version;
@@ -8064,7 +8159,7 @@ var AboutModal = class extends import_obsidian14.Modal {
     this.contentEl.empty();
   }
 };
-var StatsModal = class extends import_obsidian14.Modal {
+var StatsModal = class extends import_obsidian15.Modal {
   constructor(app, scanner) {
     super(app);
     this.scanner = scanner;
@@ -8133,7 +8228,7 @@ function chooseFolder(defaultPath) {
 function chooseVaultPath(vault, kind, title, currentValue) {
   var _a, _b;
   const adapter = vault.adapter;
-  if (!(adapter instanceof import_obsidian14.FileSystemAdapter))
+  if (!(adapter instanceof import_obsidian15.FileSystemAdapter))
     return null;
   const basePath = adapter.getBasePath();
   try {
@@ -8141,17 +8236,17 @@ function chooseVaultPath(vault, kind, title, currentValue) {
     const dialog = (_b = (_a = electron.remote) == null ? void 0 : _a.dialog) != null ? _b : electron.dialog;
     const result = dialog.showOpenDialogSync({
       title,
-      defaultPath: currentValue ? (0, import_path5.join)(basePath, currentValue) : basePath,
+      defaultPath: currentValue ? (0, import_path6.join)(basePath, currentValue) : basePath,
       properties: kind === "folder" ? ["openDirectory", "createDirectory"] : ["openFile"]
     });
     if (!result || result.length === 0)
       return null;
     const chosen = result[0];
-    if (chosen !== basePath && !chosen.startsWith(basePath + import_path5.sep)) {
+    if (chosen !== basePath && !chosen.startsWith(basePath + import_path6.sep)) {
       showNotice2("Choose a location inside your vault.");
       return null;
     }
-    const relative = chosen === basePath ? "" : chosen.slice(basePath.length + 1).split(import_path5.sep).join("/");
+    const relative = chosen === basePath ? "" : chosen.slice(basePath.length + 1).split(import_path6.sep).join("/");
     return kind === "folder" && relative ? `${relative}/` : relative;
   } catch (error) {
     console.error("[Warped Todo]", "Failed to open picker:", error);
@@ -8159,7 +8254,7 @@ function chooseVaultPath(vault, kind, title, currentValue) {
     return null;
   }
 }
-var WarpedTodoSettingTab = class extends import_obsidian14.PluginSettingTab {
+var WarpedTodoSettingTab = class extends import_obsidian15.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     // Set inside display() by the Projects base folder field; applies the
@@ -8196,13 +8291,13 @@ var WarpedTodoSettingTab = class extends import_obsidian14.PluginSettingTab {
       href: "https://github.com/robotpony/warped-command/blob/main/README.md"
     });
     containerEl.createEl("h3", { text: "Sidebar" });
-    new import_obsidian14.Setting(containerEl).setName("Show sidebar by default").setDesc("Show the TODO sidebar when Obsidian starts").addToggle(
+    new import_obsidian15.Setting(containerEl).setName("Show sidebar by default").setDesc("Show the TODO sidebar when Obsidian starts").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.showSidebarByDefault).onChange(async (value) => {
         this.plugin.settings.showSidebarByDefault = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian14.Setting(containerEl).setName("Show tab lock buttons").setDesc("Add lock buttons to tab headers. Locked tabs force links to open in new tabs.").addToggle(
+    new import_obsidian15.Setting(containerEl).setName("Show tab lock buttons").setDesc("Add lock buttons to tab headers. Locked tabs force links to open in new tabs.").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.showTabLockButton).onChange(async (value) => {
         this.plugin.settings.showTabLockButton = value;
         if (value) {
@@ -8213,7 +8308,7 @@ var WarpedTodoSettingTab = class extends import_obsidian14.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian14.Setting(containerEl).setName("Make links clickable in lists").setDesc("Render wiki links and markdown links as clickable in the sidebar. When disabled, links display as plain text without markdown syntax.").addToggle(
+    new import_obsidian15.Setting(containerEl).setName("Make links clickable in lists").setDesc("Render wiki links and markdown links as clickable in the sidebar. When disabled, links display as plain text without markdown syntax.").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.makeLinksClickable).onChange(async (value) => {
         this.plugin.settings.makeLinksClickable = value;
         await this.plugin.saveSettings();
@@ -8221,7 +8316,7 @@ var WarpedTodoSettingTab = class extends import_obsidian14.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: "TODOs" });
-    new import_obsidian14.Setting(containerEl).setName("Date format").setDesc("Format for completion dates. e.g. YYYY-MM-DD \u2192 2026-05-09, D/M/YYYY \u2192 9/5/2026").addText(
+    new import_obsidian15.Setting(containerEl).setName("Date format").setDesc("Format for completion dates. e.g. YYYY-MM-DD \u2192 2026-05-09, D/M/YYYY \u2192 9/5/2026").addText(
       (text) => text.setPlaceholder("YYYY-MM-DD").setValue(this.plugin.settings.dateFormat).onChange(async (value) => {
         this.plugin.settings.dateFormat = value;
         this.plugin.processor = new TodoProcessor(
@@ -8231,7 +8326,7 @@ var WarpedTodoSettingTab = class extends import_obsidian14.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian14.Setting(containerEl).setName("Active TODOs limit").setDesc("Maximum number of TODOs to show in sidebar (0 for unlimited)").addText(
+    new import_obsidian15.Setting(containerEl).setName("Active TODOs limit").setDesc("Maximum number of TODOs to show in sidebar (0 for unlimited)").addText(
       (text) => text.setPlaceholder("5").setValue(String(this.plugin.settings.activeTodosLimit)).onChange(async (value) => {
         const num = parseInt(value);
         if (!isNaN(num) && num >= 0) {
@@ -8241,14 +8336,14 @@ var WarpedTodoSettingTab = class extends import_obsidian14.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: "Projects" });
-    new import_obsidian14.Setting(containerEl).setName("Open Projects tab").setDesc("Jump to the Projects tab directly from settings.").addButton(
+    new import_obsidian15.Setting(containerEl).setName("Open Projects tab").setDesc("Jump to the Projects tab directly from settings.").addButton(
       (btn) => btn.setButtonText("Open Projects tab").onClick(() => {
         this.plugin.openProjectsTab();
       })
     );
     {
       let projectsFolderVaultText;
-      new import_obsidian14.Setting(containerEl).setName("Default projects folder").setDesc("Folder scanned for project files. TODOs here get automatic project tags if no explicit tag is set (e.g., projects/)").addText((text) => {
+      new import_obsidian15.Setting(containerEl).setName("Default projects folder").setDesc("Folder scanned for project files. TODOs here get automatic project tags if no explicit tag is set (e.g., projects/)").addText((text) => {
         projectsFolderVaultText = text;
         text.setPlaceholder("projects/").setValue(this.plugin.settings.defaultProjectsFolder).onChange(async (value) => {
           this.plugin.settings.defaultProjectsFolder = value;
@@ -8265,7 +8360,7 @@ var WarpedTodoSettingTab = class extends import_obsidian14.PluginSettingTab {
         })
       );
     }
-    new import_obsidian14.Setting(containerEl).setName("Exclude folders from auto-tagging").setDesc("Comma-separated folders to exclude from inferred project tags (e.g., log, archive)").addText(
+    new import_obsidian15.Setting(containerEl).setName("Exclude folders from auto-tagging").setDesc("Comma-separated folders to exclude from inferred project tags (e.g., log, archive)").addText(
       (text) => text.setPlaceholder("log").setValue(this.plugin.settings.excludeFoldersFromProjects.join(", ")).onChange(async (value) => {
         const folders = value.split(",").map((f) => f.trim()).filter((f) => f.length > 0);
         this.plugin.settings.excludeFoldersFromProjects = folders;
@@ -8279,7 +8374,7 @@ var WarpedTodoSettingTab = class extends import_obsidian14.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian14.Setting(containerEl).setName("Priority tags").setDesc("Comma-separated tags excluded from automatic project-tag inference (e.g., #focus, #today, #p0). This only controls what's excluded here \u2014 it doesn't change what any of these tags actually do elsewhere in the plugin.").addText(
+    new import_obsidian15.Setting(containerEl).setName("Priority tags").setDesc("Comma-separated tags excluded from automatic project-tag inference (e.g., #focus, #today, #p0). This only controls what's excluded here \u2014 it doesn't change what any of these tags actually do elsewhere in the plugin.").addText(
       (text) => text.setPlaceholder("#p0, #p1, #p2, #p3, #p4").setValue(this.plugin.settings.priorityTags.join(", ")).onChange(async (value) => {
         const tags = value.split(",").map((t) => t.trim()).filter((t) => t.length > 0);
         this.plugin.settings.priorityTags = tags;
@@ -8314,7 +8409,7 @@ var WarpedTodoSettingTab = class extends import_obsidian14.PluginSettingTab {
       };
       this.pendingProjectsBaseFolderApply = applyBaseFolderChange;
       let projectsFolderText;
-      new import_obsidian14.Setting(containerEl).setName("Projects base folder").setDesc("Folder of git repos scanned for project notes (e.g., /Users/you/projects). Leave blank to disable repo syncing.").addText((text) => {
+      new import_obsidian15.Setting(containerEl).setName("Projects base folder").setDesc("Folder of git repos scanned for project notes (e.g., /Users/you/projects). Leave blank to disable repo syncing.").addText((text) => {
         projectsFolderText = text;
         text.setPlaceholder("/Users/you/projects").setValue(this.plugin.settings.projectsBaseFolder).onChange(async (value) => {
           this.plugin.settings.projectsBaseFolder = value;
@@ -8335,37 +8430,37 @@ var WarpedTodoSettingTab = class extends import_obsidian14.PluginSettingTab {
         })
       );
     }
-    new import_obsidian14.Setting(containerEl).setName("Exclude repo directories from scan").setDesc("Comma-separated directory names to skip while scanning for repos (e.g., node_modules, dist, build, archive)").addText(
+    new import_obsidian15.Setting(containerEl).setName("Exclude repo directories from scan").setDesc("Comma-separated directory names to skip while scanning for repos (e.g., node_modules, dist, build, archive)").addText(
       (text) => text.setPlaceholder("node_modules, dist, build, archive").setValue(this.plugin.settings.projectsExcludeDirs.join(", ")).onChange(async (value) => {
         this.plugin.settings.projectsExcludeDirs = value.split(",").map((d) => d.trim()).filter((d) => d.length > 0);
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian14.Setting(containerEl).setName("Projects scan depth").setDesc("How many folder levels deep to look for repos under the base folder (0 = base folder only)").addSlider(
+    new import_obsidian15.Setting(containerEl).setName("Projects scan depth").setDesc("How many folder levels deep to look for repos under the base folder (0 = base folder only)").addSlider(
       (slider) => slider.setLimits(0, 6, 1).setValue(this.plugin.settings.projectsScanDepth).setDynamicTooltip().onChange(async (value) => {
         this.plugin.settings.projectsScanDepth = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian14.Setting(containerEl).setName("Auto-open Projects tab").setDesc("Opening a linked project note jumps the sidebar to its Projects summary, even from the TODOs/Ideas tab. Back returns to whatever tab you were on.").addToggle(
+    new import_obsidian15.Setting(containerEl).setName("Auto-open Projects tab").setDesc("Opening a linked project note jumps the sidebar to its Projects summary, even from the TODOs/Ideas tab. Back returns to whatever tab you were on.").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.autoOpenProjectsOnLinkedNote).onChange(async (value) => {
         this.plugin.settings.autoOpenProjectsOnLinkedNote = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian14.Setting(containerEl).setName("Terminal app").setDesc(`App name used by the Projects detail view's "Open in Terminal" action (macOS only).`).addText(
+    new import_obsidian15.Setting(containerEl).setName("Terminal app").setDesc(`App name used by the Projects detail view's "Open in Terminal" action (macOS only).`).addText(
       (text) => text.setPlaceholder("Terminal").setValue(this.plugin.settings.projectsTerminalApp).onChange(async (value) => {
         this.plugin.settings.projectsTerminalApp = value.trim() || "Terminal";
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian14.Setting(containerEl).setName("Editor app").setDesc(`App name used by the Projects detail view's "Open in Editor" action (macOS only).`).addText(
+    new import_obsidian15.Setting(containerEl).setName("Editor app").setDesc(`App name used by the Projects detail view's "Open in Editor" action (macOS only).`).addText(
       (text) => text.setPlaceholder("Visual Studio Code").setValue(this.plugin.settings.projectsEditorApp).onChange(async (value) => {
         this.plugin.settings.projectsEditorApp = value.trim() || "Visual Studio Code";
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian14.Setting(containerEl).setName("Default projects sort").setDesc("Sort the Projects list opens with each session. Changing the sort from the list's own sort button doesn't update this \u2014 it's session-only, same as the filter box.").addDropdown((dropdown) => {
+    new import_obsidian15.Setting(containerEl).setName("Default projects sort").setDesc("Sort the Projects list opens with each session. Changing the sort from the list's own sort button doesn't update this \u2014 it's session-only, same as the filter box.").addDropdown((dropdown) => {
       for (const option of PROJECT_SORT_OPTIONS) {
         dropdown.addOption(option.key, option.label);
       }
@@ -8376,20 +8471,20 @@ var WarpedTodoSettingTab = class extends import_obsidian14.PluginSettingTab {
       });
     });
     containerEl.createEl("h3", { text: "Focus Mode" });
-    new import_obsidian14.Setting(containerEl).setName("Focus queue limit").setDesc("How many items to show at once in Focus Mode (1\u20135). 1 means strict single-task focus.").addSlider(
+    new import_obsidian15.Setting(containerEl).setName("Focus queue limit").setDesc("How many items to show at once in Focus Mode (1\u20135). 1 means strict single-task focus.").addSlider(
       (slider) => slider.setLimits(1, 5, 1).setValue(this.plugin.settings.focusQueueLimit).setDynamicTooltip().onChange(async (value) => {
         this.plugin.settings.focusQueueLimit = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian14.Setting(containerEl).setName("Persist focus mode across sessions").setDesc("When on, Focus Mode stays active after closing and reopening Obsidian.").addToggle(
+    new import_obsidian15.Setting(containerEl).setName("Persist focus mode across sessions").setDesc("When on, Focus Mode stays active after closing and reopening Obsidian.").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.focusModePersist).onChange(async (value) => {
         this.plugin.settings.focusModePersist = value;
         await this.plugin.saveSettings();
       })
     );
     containerEl.createEl("h3", { text: "Team" });
-    new import_obsidian14.Setting(containerEl).setName("Team file path").setDesc("Path to the team definition file in your vault").addText(
+    new import_obsidian15.Setting(containerEl).setName("Team file path").setDesc("Path to the team definition file in your vault").addText(
       (text) => text.setPlaceholder("team.md").setValue(this.plugin.settings.teamFilePath).onChange(async (value) => {
         this.plugin.settings.teamFilePath = value;
         this.plugin.teamManager.setFilePath(value);
@@ -8408,8 +8503,8 @@ var WarpedTodoSettingTab = class extends import_obsidian14.PluginSettingTab {
       })
     );
     const teamFile = this.app.vault.getAbstractFileByPath(this.plugin.settings.teamFilePath);
-    const teamButtonSetting = new import_obsidian14.Setting(containerEl);
-    if (teamFile instanceof import_obsidian14.TFile) {
+    const teamButtonSetting = new import_obsidian15.Setting(containerEl);
+    if (teamFile instanceof import_obsidian15.TFile) {
       teamButtonSetting.setName("Manage team file").addButton(
         (btn) => btn.setButtonText("Open team file").onClick(async () => {
           await this.app.workspace.getLeaf(false).openFile(teamFile);
@@ -8435,7 +8530,7 @@ var WarpedTodoSettingTab = class extends import_obsidian14.PluginSettingTab {
           entry.createEl("span", { cls: "warped-todo-team-me-badge", text: "(me)" });
         }
       }
-      new import_obsidian14.Setting(containerEl).setName("Default assignee").setDesc("Unattributed tasks are treated as belonging to this person when filtering").addDropdown((dropdown) => {
+      new import_obsidian15.Setting(containerEl).setName("Default assignee").setDesc("Unattributed tasks are treated as belonging to this person when filtering").addDropdown((dropdown) => {
         dropdown.addOption("", "None");
         dropdown.addOption("me", "@me");
         for (const member of team) {
@@ -8451,7 +8546,7 @@ var WarpedTodoSettingTab = class extends import_obsidian14.PluginSettingTab {
       });
     }
     containerEl.createEl("h3", { text: "Help" });
-    new import_obsidian14.Setting(containerEl).setName("Onboarding").setDesc("Reopen the first-use help note, with live #todo/#idea examples you can try.").addButton(
+    new import_obsidian15.Setting(containerEl).setName("Onboarding").setDesc("Reopen the first-use help note, with live #todo/#idea examples you can try.").addButton(
       (btn) => btn.setButtonText("Show onboarding doc again").onClick(async () => {
         await this.plugin.helpNoteManager.open();
       })

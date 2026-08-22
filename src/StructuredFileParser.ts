@@ -89,7 +89,13 @@ export function parseStructuredFile(
     : parseFlatList(lines, defaultType, sourceFile);
 }
 
-function hasHeaderReportShape(lines: string[]): boolean {
+/**
+ * Exported for ProjectQueue.ts: appending a new item has to match whichever
+ * shape parseStructuredFile will actually use for this file, or the
+ * appended block won't be recognized as an item at all — see
+ * ProjectQueue.ts's own comment for what goes wrong otherwise.
+ */
+export function hasHeaderReportShape(lines: string[]): boolean {
   let inCodeBlock = false;
   for (const line of lines) {
     if (/^```/.test(line.trim())) {

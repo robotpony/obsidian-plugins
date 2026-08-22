@@ -27,6 +27,7 @@ Focus on the right next task. Plain `#todo` tags in your markdown, surfaced in a
   - [Commands and hotkeys](#commands-and-hotkeys)
   - [Sidebar utilities](#sidebar-utilities)
   - [Projects](#projects)
+    - [Sending work to a project](#sending-work-to-a-project)
   - [Installation](#installation)
     - [Option 1: install script (recommended)](#option-1-install-script-recommended)
     - [Option 2: manual build](#option-2-manual-build)
@@ -264,6 +265,7 @@ Date keywords take priority over user handles. Unknown handles are auto-added to
 | Copy as Notion Markdown        | `Cmd/Ctrl+Shift+N`   | Strips Obsidian-specific syntax (wiki links, embeds, plugin tags) for clean Notion paste |
 | Toggle Projects tab            | —                    | Switch to the Projects tab                              |
 | Sync Projects                  | —                    | Re-scan every repo under the configured base folder and update their notes |
+| Send selection to project      | —                    | From a project note only: appends the current selection as a new `#todo` item in that project's `TODO.md`. See [Sending work to a project](#sending-work-to-a-project). |
 
 The ribbon icon toggles the sidebar. The kebab (⋯) button at the right of the tab row opens the menu for **Stats**, **Refresh**, **About**, and **Settings**; **Sync** joins that list while you're on the Projects tab.
 
@@ -295,6 +297,12 @@ Prose-style bug write-ups (a `### Title` under a `## Open`/`## Fixed` heading, r
 Structured files stay in sync automatically (a background watcher picks up changes on disk), or trigger a sync manually with **Sync** in the kebab menu (while on the Projects tab) or the "Sync Projects" command. Requires the plugin's desktop build (`git` and filesystem access aren't available on mobile).
 
 Frontmatter is hidden in the note's editor view for these project notes; the sidebar already shows the fields that matter, so the raw YAML would just be noise. Note content you write by hand (an `## Overview` section, your own notes) is never touched by syncing.
+
+### Sending work to a project
+
+Write in a project's note, whether that's a spec, a plan worked out with an agent, or your own notes, select a chunk of it, and run **Send selection to project** (command palette, or bind it to a hotkey). A small prompt asks for a title, then the selection is appended to that project's `TODO.md` as a new open `#todo` item, tagged and ready for whatever picks up work in that repo next, an agent or you.
+
+This only appears on notes that are themselves project notes (the ones with `repo` in frontmatter, described above); there's nowhere to send a selection from a note with no linked repo. `TODO.md` is created if the project doesn't have one yet.
 
 ## Installation
 

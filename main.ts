@@ -33,6 +33,8 @@ import { convertToSlackMarkdown } from "./src/SlackConverter";
 import { convertToNotionMarkdown } from "./src/NotionConverter";
 import { extractTags, showNotice } from "./src/utils";
 import { MoveTargetModal } from "./src/MoveTargetModal";
+import { SendToProjectModal } from "./src/SendToProjectModal";
+import { appendQueuedTodo } from "./src/ProjectQueue";
 import { TabLockManager } from "./src/TabLockManager";
 import { createHeaderSortPlugin } from "./src/HeaderSortExtension";
 import { createHeaderChecklistExtension } from "./src/HeaderChecklistExtension";
@@ -330,6 +332,34 @@ export default class WarpedTodoPlugin extends Plugin {
             await this.processor.moveTodo(todo, targetFile.path);
           }
         ).open();
+      },
+    });
+
+    // Only available from a project note (has `repo` in frontmatter, written
+    // by ProjectSyncManager) with an active selection — checkCallback so it
+    // just doesn't appear where it can't do anything, rather than erroring.
+    this.addCommand({
+      id: "send-selection-to-project",
+      name: "Send selection to project",
+      editorCheckCallback: (checking, editor, ctx) => {
+        const file = ctx.file;
+        const repo = file
+          ? (this.app.metadataCache.getFileCache(file)?.frontmatter?.repo as string | undefined)
+          : undefined;
+        const selection = editor.getSelection();
+        if (!repo || !selection.trim()) return false;
+        if (checking) return true;
+
+        new SendToProjectModal(this.app, file!.basename, async (title) => {
+          try {
+            const filePath = await appendQueuedTodo(repo, title, selection);
+            showNotice(`Sent to ${filePath}`);
+          } catch (error) {
+            console.error("[Warped Todo]", "Failed to send selection to project:", error);
+            showNotice("Couldn't send selection to the project. See console for details.");
+          }
+        }).open();
+        return true;
       },
     });
 
