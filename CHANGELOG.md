@@ -2,6 +2,16 @@
 
 All notable changes to the ␣⌘ Warped Command plugin will be documented in this file.
 
+## [0.45.3] - 2026-08-22
+
+### Fixed — header sort button no longer no-ops on a second press
+
+Pressing a header's sort button a second time re-ran the identical sort
+and just reported "Items already sorted." Now it reverses the order
+instead: `TodoProcessor.sortHeaderChildren` tracks the last direction
+applied per header and alternates between ascending and descending on
+each press.
+
 ## [0.45.2] - 2026-08-22
 
 ### Fixed — some ideas couldn't be completed

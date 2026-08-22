@@ -22,6 +22,10 @@ export class TodoProcessor {
   private onComplete?: () => void;
   private onMoveHistoryUpdate?: (path: string) => void;
   private scanner?: TodoScanner;
+  // Last sort direction applied per header ("filePath#lineNumber"), so a second
+  // consecutive press of a header's sort button reverses the previous order
+  // instead of re-running an identical sort that leaves the list unchanged.
+  private lastHeaderSortDirection: Map<string, 'asc' | 'desc'> = new Map();
 
   constructor(app: App, dateFormat: string = "YYYY-MM-DD") {
     this.app = app;
@@ -658,7 +662,8 @@ export class TodoProcessor {
   /**
    * Sort children of a header TODO by status (open first) then completion date (newest first).
    * Respects subheading sections: items are sorted within their section, not across sections.
-   * Indented sub-items stay attached to their parent item.
+   * Indented sub-items stay attached to their parent item. Pressing the sort button again
+   * for the same header reverses the order instead of repeating a no-op sort.
    */
   async sortHeaderChildren(headerTodo: TodoItem): Promise<boolean> {
     if (!headerTodo.isHeader || !headerTodo.childLineNumbers || headerTodo.childLineNumbers.length < 2) {
@@ -709,9 +714,20 @@ export class TodoProcessor {
         }
       }
 
+      // Toggle direction from the last press of this header's sort button, so
+      // pressing it again reverses the order instead of no-op'ing.
+      const sortKey = `${headerTodo.filePath}#${headerTodo.lineNumber}`;
+      const direction: 'asc' | 'desc' =
+        this.lastHeaderSortDirection.get(sortKey) === 'asc' ? 'desc' : 'asc';
+      this.lastHeaderSortDirection.set(sortKey, direction);
+      const directionalCompare = (a: ChildLine, b: ChildLine) =>
+        direction === 'desc'
+          ? compareByStatusAndDate(b, a)
+          : compareByStatusAndDate(a, b);
+
       // Sort units within each section (subheadings stay anchored)
       for (const section of sections) {
-        section.units.sort((a, b) => compareByStatusAndDate(a.primary, b.primary));
+        section.units.sort((a, b) => directionalCompare(a.primary, b.primary));
       }
 
       // Flatten back to ordered list

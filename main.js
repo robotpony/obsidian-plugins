@@ -1125,6 +1125,10 @@ var TodoScanner = class extends import_obsidian3.Events {
 var import_obsidian4 = require("obsidian");
 var TodoProcessor = class {
   constructor(app, dateFormat = "YYYY-MM-DD") {
+    // Last sort direction applied per header ("filePath#lineNumber"), so a second
+    // consecutive press of a header's sort button reverses the previous order
+    // instead of re-running an identical sort that leaves the list unchanged.
+    this.lastHeaderSortDirection = /* @__PURE__ */ new Map();
     this.app = app;
     this.dateFormat = dateFormat;
   }
@@ -1690,7 +1694,8 @@ ${text}` : text;
   /**
    * Sort children of a header TODO by status (open first) then completion date (newest first).
    * Respects subheading sections: items are sorted within their section, not across sections.
-   * Indented sub-items stay attached to their parent item.
+   * Indented sub-items stay attached to their parent item. Pressing the sort button again
+   * for the same header reverses the order instead of repeating a no-op sort.
    */
   async sortHeaderChildren(headerTodo) {
     if (!headerTodo.isHeader || !headerTodo.childLineNumbers || headerTodo.childLineNumbers.length < 2) {
@@ -1725,8 +1730,12 @@ ${text}` : text;
           }
         }
       }
+      const sortKey = `${headerTodo.filePath}#${headerTodo.lineNumber}`;
+      const direction = this.lastHeaderSortDirection.get(sortKey) === "asc" ? "desc" : "asc";
+      this.lastHeaderSortDirection.set(sortKey, direction);
+      const directionalCompare = (a, b) => direction === "desc" ? compareByStatusAndDate(b, a) : compareByStatusAndDate(a, b);
       for (const section of sections) {
-        section.units.sort((a, b) => compareByStatusAndDate(a.primary, b.primary));
+        section.units.sort((a, b) => directionalCompare(a.primary, b.primary));
       }
       const sorted = [];
       for (const section of sections) {
