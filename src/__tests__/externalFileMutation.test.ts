@@ -4,8 +4,8 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { modifyExternalFileLine } from "../utils";
 
-// Exercises the write-back path for TodoItem.sourceFile (Phase 1 spike, see
-// warped-todo/PLAN.md). Uses real temp files rather than mocks — the whole
+// Exercises the write-back path for TodoItem.sourceFile. Uses real temp
+// files rather than mocks — the whole
 // point of this primitive is that it talks to the filesystem directly, not
 // through the Obsidian Vault API.
 

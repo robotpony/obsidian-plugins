@@ -5,7 +5,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { ProjectScanner } from "../ProjectScanner";
 
-// Phase 2 (see PLAN.md): repo discovery + git fact-gathering. Uses real `git init`
+// Repo discovery + git fact-gathering. Uses real `git init`
 // fixtures rather than fabricated `.git` directories — readProject() shells to the
 // real `git` binary, so the fixtures need to actually be repos for those calls to
 // succeed, same as the walk-boundary cases need a real `.git` directory vs. file.

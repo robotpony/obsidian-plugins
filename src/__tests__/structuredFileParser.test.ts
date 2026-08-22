@@ -1,13 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { parseStructuredFile } from "../StructuredFileParser";
 
-// Phase 3 (see PLAN.md): filename → default type, explicit-tag override, and the
-// two item shapes (flat list, header report). Fixtures below are modeled on real
-// files rather than read live, so the suite stays hermetic — including the
-// exit-criteria test at the bottom, which originally read this repo's actual
-// BUGS.md live (that's what Phase 3's exit criteria asked for) but was frozen
-// to a fixture once that entry was fixed and cleared; see that test's own
-// comment for why.
+// Filename → default type, explicit-tag override, and the two item shapes
+// (flat list, header report). Fixtures below are modeled on real files
+// rather than read live, so the suite stays hermetic — including the
+// exit-criteria test at the bottom, which originally read this repo's own
+// BUGS.md live but was frozen to a fixture once that entry was fixed and
+// cleared; see that test's own comment for why.
 
 describe("parseStructuredFile: filename defaults and unrecognized files", () => {
   it("returns [] for a filename outside the recognized set", () => {
@@ -193,9 +192,9 @@ describe("parseStructuredFile: neither shape matches", () => {
 });
 
 describe("parseStructuredFile: exit criteria — real BUGS.md shape (frozen fixture)", () => {
-  // Originally read this repo's actual BUGS.md live, per Phase 3's exit
-  // criteria (see PLAN.md): a prose bug write-up under "## Open", no
-  // explicit #bug tag, parses as type bug and open. Frozen to a fixture
+  // Originally read this repo's own BUGS.md live: a prose bug write-up
+  // under "## Open", no explicit #bug tag, parses as type bug and open.
+  // Frozen to a fixture
   // once that entry was fixed and cleared from BUGS.md — as its own header
   // comment says, BUGS.md is a working log whose content is expected to
   // churn; this test's job is the parsing behaviour, not that file's

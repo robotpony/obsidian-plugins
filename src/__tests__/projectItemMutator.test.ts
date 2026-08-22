@@ -10,11 +10,11 @@ import {
 } from "../ProjectItemMutator";
 import { ParsedProjectItem, ItemShape } from "../StructuredFileParser";
 
-// Phase 5/6 (see PLAN.md): completion routing by item shape. "checkbox" and
-// "plainBullet" are Phase 5 (single-line, no new risk). "headerStandalone" is
-// Phase 6 Case 2 (also single-line, reuses Phase 1's write path unchanged).
-// "headerNested" is Phase 6 Case 1 — the real block-move — deliberately NOT
-// implemented yet; this module just needs to refuse it cleanly.
+// Completion routing by item shape. "checkbox" and "plainBullet" are
+// single-line edits, no special risk. "headerStandalone" is also
+// single-line, reusing the same write path unchanged. "headerNested" is
+// the real block-move (delegates to moveHeaderBlock, see below) — the
+// riskiest case, since it rewrites multiple lines of an external file.
 
 function fixture(overrides: Partial<ParsedProjectItem> = {}): ParsedProjectItem {
   return {

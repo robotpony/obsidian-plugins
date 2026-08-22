@@ -48,7 +48,7 @@ export class ContextMenuHandler {
    * sidebar passes false: moving a project-note item elsewhere conflicts with it
    * reappearing in its original note on the next sync (see DESIGN.md's Projects
    * Extension detail-view notes; the plugin-wide move feature is separately
-   * tracked for removal in PLAN.md, unrelated to Projects).
+   * tracked for removal, unrelated to Projects).
    */
   showTodoMenu(evt: MouseEvent, todo: TodoItem, onRefresh: () => void, includeMove: boolean = true): void {
     const menu = new Menu();

@@ -8,7 +8,7 @@ import { ProjectScanner, ScannedProject } from "../ProjectScanner";
 import { ParsedProjectItem } from "../StructuredFileParser";
 import { createFakeApp, FakeVault } from "./stubs/fakeVault";
 
-// Phase 4 (see PLAN.md), reworked per "remove the in-doc listing of TODOs":
+// Reworked per "remove the in-doc listing of TODOs":
 // the vault note now carries frontmatter (git facts) only — synced items live
 // in ProjectSyncManager's in-memory cache, read by the Projects sidebar, and
 // are never written into the note body. See ProjectSyncManager's class doc

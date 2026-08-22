@@ -302,7 +302,7 @@ describe("buildFocusQueue", () => {
   });
 
   // -------------------------------------------------------------------------
-  // tagFilter (PLAN.md's Phase 7: focus mode respects the project scope)
+  // tagFilter (focus mode respects the project scope)
   // -------------------------------------------------------------------------
 
   it("scopes the queue to items matching tagFilter", () => {

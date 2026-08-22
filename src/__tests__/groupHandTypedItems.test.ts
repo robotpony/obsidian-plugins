@@ -3,7 +3,7 @@ import { TFile } from "obsidian";
 import { groupHandTypedItems } from "../ProjectsSidebarView";
 import { TodoItem } from "../types";
 
-// Bug found via live testing (see BUGS.md/PLAN.md): every scanned hand-typed
+// Bug found via live testing: every scanned hand-typed
 // item was rendered as an independent checkbox row, so a header TODO's own
 // line ("### bugs #todo #obsidian-plugins") showed up as its own raw,
 // uncleaned row on top of its children, which fell into an "Untitled

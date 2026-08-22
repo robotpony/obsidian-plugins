@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { homedir } from "os";
 import { browsableUrl, homeRelativePath, guessProjectsFolder } from "../ProjectsSidebarView";
 
-// UI-review round (see PLAN.md): remote should display as a bare, browsable
+// UI-review round: remote should display as a bare, browsable
 // URL with no protocol, and local path should display home-relativized —
 // both so the sidebar shows something immediately recognizable rather than
 // a raw string, with the full value still available via a title tooltip.

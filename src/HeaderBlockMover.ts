@@ -15,12 +15,12 @@ export interface MoveResult {
 }
 
 /**
- * Phase 6 Case 1: moves a `headerNested` item's block (### heading through the
- * line before the next ##/### heading, or EOF — same span StructuredFileParser
- * uses to build the item) from its current section to one matching the target
- * completion state. Multi-line file surgery on an external repo file — see
- * PLAN.md's Phase 6 for the full design (target-section rule, git-clean
- * safety net, reversibility) this implements.
+ * Moves a `headerNested` item's block (### heading through the line before
+ * the next ##/### heading, or EOF — same span StructuredFileParser uses to
+ * build the item) from its current section to one matching the target
+ * completion state. Multi-line file surgery on an external repo file: picks
+ * the target section, checks the file's git status is clean first (see
+ * below), and the move is reversible (toggle again to move it back).
  */
 export async function moveHeaderBlock(
   item: ParsedProjectItem,

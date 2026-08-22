@@ -2,6 +2,38 @@
 
 All notable changes to the ␣⌘ Warped Command plugin will be documented in this file.
 
+## [0.45.1] - 2026-08-22
+
+### Fixed — dangling references to deleted design docs
+
+`PLAN.md`, `OUTLINE.md`, and `IDEAS.md` (the original Projects-feature
+planning trio) were deleted by accident on 2026-08-17, in a commit whose
+stated purpose was unrelated (`install.sh`'s banner text). `BUGS.md` was
+lost in the same commit. Nobody caught it because nothing in the working
+plugin depends on those files at runtime — only comments cited them.
+
+- Scrubbed roughly 20 "see PLAN.md's Phase N" / "see OUTLINE.md" / "see
+  IDEAS.md" citations across `src/` and its tests. Where the citation was
+  the only content, it's just gone; where it sat next to real explanation,
+  the explanation stayed and the dead pointer was dropped.
+- Along the way, fixed two comments that had gone stale independently of
+  the deleted docs: `StructuredFileParser.ts` and a `ProjectItemMutator`
+  test both still said the `headerNested` block-move was "not implemented
+  yet" — it's been implemented (`HeaderBlockMover.ts`) and tested for a
+  while.
+- Removed the unrelated Focus Canvas `PLAN.md` (a prototype plan, unrelated
+  to the above) — its prototype script stays at `prototype/focus-canvas.mjs`
+  for later.
+- Removed unused `@typescript-eslint/eslint-plugin` /
+  `@typescript-eslint/parser` devDependencies — no `.eslintrc`/`eslint.config.*`
+  or lint script has ever used them in this repo.
+- Removed 13 dead CSS selector blocks with zero references in `src/`:
+  leftovers from a removed LLM "Define" feature, pre-kebab-menu sidebar
+  buttons, and pre-redesign summary/count styling.
+- Reworded `src/shared/README.md`, which still described "the Obsidian
+  plugins monorepo" and "all three plugins" — stale since the flatten to
+  a single plugin.
+
 ## [0.45.0] - 2026-08-21
 
 ### Removed — TODONE archive log

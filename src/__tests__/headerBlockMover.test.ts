@@ -7,7 +7,7 @@ import { moveHeaderBlock } from "../HeaderBlockMover";
 import { parseStructuredFile, ParsedProjectItem } from "../StructuredFileParser";
 import { ProjectScanner } from "../ProjectScanner";
 
-// Phase 6 Case 1 (see PLAN.md): the header-block move, the riskiest mutation
+// The header-block move, the riskiest mutation
 // in this whole feature — multi-line surgery on a file that might not even be
 // open in Obsidian. Most tests here use a fake "always clean" scanner to
 // isolate section-placement logic from git; a separate describe block tests

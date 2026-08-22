@@ -238,12 +238,6 @@
   white-space: nowrap;
 }
 
-.sidebar-button-group {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-}
-
 /* Tab navigation */
 .sidebar-tab-nav {
   display: flex;
@@ -304,26 +298,6 @@
   animation: rotate 0.5s ease-in-out;
 }
 
-.sidebar-refresh-btn {
-  padding: 4px;
-  border: none !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  cursor: pointer;
-  opacity: 0.7;
-  transition: opacity 0.2s, transform 0.2s, background-color 0.15s;
-  border-radius: 4px;
-}
-
-.sidebar-refresh-btn:hover {
-  opacity: 1;
-  background-color: var(--background-modifier-hover) !important;
-}
-
-.sidebar-refresh-btn.rotating {
-  animation: rotate 0.5s ease-in-out;
-}
-
 @keyframes rotate {
   from {
     transform: rotate(0deg);
@@ -333,8 +307,7 @@
   }
 }
 
-.todo-section,
-.todone-section {
+.todo-section {
   margin-bottom: 20px;
 }
 
@@ -357,16 +330,6 @@
 
 .todone-header {
   cursor: pointer;
-}
-
-/* Muted styling for DONE section to show it's less important */
-.todone-section {
-  opacity: 0.7;
-  font-size: .85em;
-}
-
-.todone-section:hover {
-  opacity: 1;
 }
 
 .todo-section-title {
@@ -408,11 +371,6 @@
 
 .filter-indicator-btn:hover .filter-indicator-x {
   opacity: 1;
-}
-
-.collapse-icon {
-  display: inline-block;
-  transition: transform 0.2s;
 }
 
 .todo-list {
@@ -474,11 +432,6 @@
   color: var(--text-normal);
   line-height: 1.4;
   word-wrap: break-word;
-}
-
-.todone-text {
-  color: var(--text-muted);
-  text-decoration: line-through;
 }
 
 .todo-link {
@@ -695,19 +648,6 @@
   color: var(--text-accent);
 }
 
-/* Count styling for ideas */
-.idea-count {
-  opacity: 0.65;
-  background-color: var(--background-modifier-border);
-  border-radius: 4px;
-  padding: 1px 5px;
-  font-size: 0.8em;
-}
-
-.warped-todo-sidebar .idea-count {
-  background-color: var(--background-primary);
-}
-
 /* Tag styling for editor and reading mode - consistent sizing and alignment */
 /* Reading Mode tags */
 .markdown-preview-view .tag,
@@ -760,25 +700,9 @@
   font-size: 0.8em;
 }
 
-/* Count styling */
-.todo-count,
-.project-count {
-  opacity: 0.65;
-  background-color: var(--background-modifier-border);
-  border-radius: 4px;
-  padding: 1px 5px;
-  font-size: 0.8em;
-}
-
 /* Sidebar-specific override for better contrast on grey background */
-.warped-todo-sidebar .muted-pill,
-.warped-todo-sidebar .todo-count,
-.warped-todo-sidebar .project-count {
+.warped-todo-sidebar .muted-pill {
   background-color: var(--background-primary);
-}
-
-.todo-date {
-  margin-left: 6px;
 }
 
 /* Slash Command & Date Suggest Styles */
@@ -954,8 +878,7 @@
 /* Focus tag highlighting in sidebar — edge-to-edge background. The +6px on
    each side keeps text aligned with non-focus rows, which carry a 6px inline
    padding from .project-item. */
-.warped-todo-sidebar .todo-focus,
-.warped-todo-sidebar .project-focus {
+.warped-todo-sidebar .todo-focus {
   background-color: color-mix(in srgb, var(--interactive-accent) 15%, transparent);
   margin-left: -16px;
   margin-right: -16px;
@@ -963,8 +886,7 @@
   padding-right: 22px;
 }
 
-.warped-todo-sidebar .todo-focus:hover,
-.warped-todo-sidebar .project-focus:hover {
+.warped-todo-sidebar .todo-focus:hover {
   background-color: color-mix(in srgb, var(--interactive-accent) 25%, transparent);
 }
 
@@ -1183,12 +1105,6 @@
   margin-left: 4px;
 }
 
-/* Completed header styling - strikethrough the header text */
-.todo-header.todone-item > .todo-text {
-  text-decoration: line-through;
-  color: var(--text-muted);
-}
-
 /* Idea header styling */
 .idea-header > .idea-text,
 .idea-header .idea-header-row > .idea-text {
@@ -1242,36 +1158,6 @@
   white-space: nowrap;
   align-self: center;
   margin-left: auto;
-}
-
-/* Tag dropdown styles - styled to match Obsidian's tag appearance */
-.tag-dropdown-menu {
-  background-color: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  padding: 4px 0;
-  min-width: 120px;
-  max-width: 200px;
-  z-index: 1000;
-}
-
-.tag-dropdown-item {
-  padding: 6px 12px;
-  cursor: pointer;
-  font-size: 0.9em;
-  color: var(--text-normal);
-  transition: background-color 0.1s;
-}
-
-.tag-dropdown-item:hover {
-  background-color: var(--background-modifier-hover);
-}
-
-/* Tag dropdown item with submenu */
-.tag-dropdown-item-label {
-  flex: 0 0 auto;
-  display: inline-block;
 }
 
 /* Project info popup styles (popup helper retained; the inline ⓘ trigger
@@ -1435,171 +1321,6 @@
   margin-top: 6px;
 }
 
-/* Define Tooltip Styles */
-.define-tooltip {
-  position: fixed;
-  background-color: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-  padding: 12px 16px;
-  max-width: 400px;
-  min-width: 200px;
-  max-height: 60vh;
-  z-index: 1000;
-  font-size: 0.9em;
-  line-height: 1.5;
-  display: flex;
-  flex-direction: column;
-}
-
-.define-tooltip-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--background-modifier-border);
-}
-
-.define-tooltip-logo {
-  font-size: 0.85em;
-  flex-shrink: 0;
-}
-
-.define-tooltip-command-type {
-  font-weight: 500;
-  color: var(--text-normal);
-  flex: 1;
-}
-
-.define-tooltip-close {
-  padding: 2px 6px;
-  border: none !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  cursor: pointer;
-  color: var(--text-muted);
-  font-size: 16px;
-  line-height: 1;
-  opacity: 0.6;
-  transition: opacity 0.15s, background-color 0.15s;
-  flex-shrink: 0;
-  border-radius: 4px;
-}
-
-.define-tooltip-close:hover {
-  opacity: 1;
-  background-color: var(--background-modifier-hover) !important;
-}
-
-.define-tooltip-content {
-  color: var(--text-normal);
-  overflow-y: auto;
-  flex: 1;
-  min-height: 0;
-}
-
-/* Remove default paragraph margins in tooltip content */
-.define-tooltip-content p {
-  margin: 0 0 0.5em 0;
-}
-
-.define-tooltip-content p:last-child {
-  margin-bottom: 0;
-}
-
-/* Style lists in tooltip content */
-.define-tooltip-content ul,
-.define-tooltip-content ol {
-  margin: 0.5em 0;
-  padding-left: 1.5em;
-}
-
-/* Style code in tooltip content */
-.define-tooltip-content code {
-  background-color: var(--background-secondary);
-  padding: 1px 4px;
-  border-radius: 3px;
-  font-size: 0.9em;
-}
-
-.define-tooltip-loading .define-tooltip-content {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-muted);
-}
-
-.define-tooltip-spinner {
-  width: 14px;
-  height: 14px;
-  border: 2px solid var(--background-modifier-border);
-  border-top-color: var(--interactive-accent);
-  border-radius: 50%;
-  animation: define-spin 0.8s linear infinite;
-}
-
-@keyframes define-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.define-tooltip-highlight {
-  background-color: var(--text-highlight-bg);
-  color: inherit;
-  padding: 0 2px;
-  border-radius: 2px;
-}
-
-/* Tooltip Actions Bar */
-.define-tooltip-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 12px;
-  padding-top: 10px;
-  border-top: 1px solid var(--background-modifier-border);
-}
-
-.define-tooltip-btn {
-  padding: 4px 12px;
-  border: none;
-  border-radius: 4px;
-  font-size: 0.85em;
-  cursor: pointer;
-  transition: background-color 0.15s, opacity 0.15s;
-}
-
-.define-tooltip-copy-btn {
-  background-color: var(--background-modifier-hover);
-  color: var(--text-normal);
-}
-
-.define-tooltip-copy-btn:hover {
-  background-color: var(--background-modifier-border);
-}
-
-.define-tooltip-apply-btn {
-  background-color: var(--interactive-accent);
-  color: var(--text-on-accent);
-}
-
-.define-tooltip-apply-btn:hover {
-  background-color: var(--interactive-accent-hover);
-}
-
-.define-tooltip-settings-link {
-  color: var(--interactive-accent);
-  cursor: pointer;
-  text-decoration: underline;
-}
-
-.define-tooltip-settings-link:hover {
-  color: var(--interactive-accent-hover);
-}
-
 /* Tab Lock Button Styles */
 .warped-todo-tab-lock-btn {
   display: flex;
@@ -1752,15 +1473,6 @@
 
 .markdown-preview-view p:has(a.tag[href="#moved"]):hover,
 .markdown-preview-view li:has(a.tag[href="#moved"]):hover {
-  opacity: 0.8;
-}
-
-/* Live Preview: dim the editor line containing #moved */
-.cm-line:has(.cm-tag-moved) {
-  opacity: 0.45;
-}
-
-.cm-line:has(.cm-tag-moved):hover {
   opacity: 0.8;
 }
 

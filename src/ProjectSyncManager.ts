@@ -34,12 +34,12 @@ export interface SyncOptions {
 /**
  * Keeps each repo-matched project's vault note's frontmatter (git facts) in
  * sync with disk. Does **not** write items into the note body — the Projects
- * sidebar is the only place synced #todo/#idea/#bug items are shown (see
- * PLAN.md's "in-doc listing removed" writeup for why: writing a rendered
- * `#todo`/`#todone` block into the vault put this system at odds with
- * TodoScanner's own vault-wide checkbox<->tag correction, which produced a
- * genuine content-flicker loop, plus every sync writing the note — however
- * lightly — was disruptive to a note open for editing). Everything else in
+ * sidebar is the only place synced #todo/#idea/#bug items are shown. Items
+ * used to be written into the note body as a rendered `#todo`/`#todone`
+ * block; that put this system at odds with TodoScanner's own vault-wide
+ * checkbox<->tag correction, which produced a genuine content-flicker loop,
+ * plus every sync writing the note — however lightly — was disruptive to a
+ * note open for editing. Removed for that reason. Everything else in
  * the note (e.g. a hand-written `## Overview`) is left untouched.
  */
 export class ProjectSyncManager {
@@ -173,8 +173,8 @@ export class ProjectSyncManager {
   /**
    * Watches the base folder recursively for changes (new/removed repos, edited
    * structured files) and re-syncs on a debounce. Recursive `fs.watch` is only
-   * reliable on macOS/Windows, not Linux — acceptable given the macOS-only scope
-   * decision in OUTLINE.md/IDEAS.md. Events under an excluded directory (same
+   * reliable on macOS/Windows, not Linux — acceptable given the plugin's
+   * existing macOS-only scope (`isDesktopOnly`). Events under an excluded directory (same
    * list `ProjectScanner` skips while walking) are ignored here too — the walk
    * skipping them doesn't stop the raw watch from seeing activity inside, e.g.
    * a large `node_modules` tree churning on every `npm install`.
@@ -342,8 +342,8 @@ export class ProjectSyncManager {
 
 /**
  * Two repos with the same folder name (an archived or deployed copy alongside
- * the original — real and common; found via the dry run against ~/projects,
- * see PLAN.md's Phase 5 notes) would otherwise silently overwrite each other's
+ * the original — real and common; found via the dry run against ~/projects)
+ * would otherwise silently overwrite each other's
  * synced note, since the note path is keyed on name alone. Keeps the shallowest
  * path per name (a top-level checkout is more likely the canonical one than
  * something nested under archive/ or a deploy folder) and logs the rest.

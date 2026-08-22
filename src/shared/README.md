@@ -1,6 +1,6 @@
 # Shared Utilities
 
-Shared utilities for the Obsidian plugins monorepo. These modules provide common patterns used across all three plugins.
+Warped Command's own copy of a small set of shared Obsidian-plugin utilities, carried over from before this repo was flattened to a single plugin (see `package.json`'s description). No longer synced with any sibling plugin — this copy drifts independently.
 
 ## Modules
 
@@ -56,15 +56,8 @@ this.sidebarManager.forEach<MySidebarView>((view) => {
 
 ## Development
 
-The shared module has its own `package.json` to provide TypeScript types for `obsidian`. When building a plugin, TypeScript resolves types from the shared module's `node_modules`.
-
-```bash
-cd shared
-npm install  # Only needed once for type checking
-```
-
-Plugins import from the shared module using relative paths:
+The `package.json` here is vestigial (kept for the description field's history note above) — this is plain TypeScript source compiled as part of the main plugin build, not a separate installable package. `main.ts` and `utils.ts` import from it directly:
 
 ```ts
-import { SidebarManager, createNoticeFactory } from "../shared";
+import { SidebarManager, createNoticeFactory } from "./shared";
 ```

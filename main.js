@@ -2563,7 +2563,7 @@ var ProjectScanner = class {
    * projects, so an incidental clone vendored inside one repo doesn't surface as a
    * top-level project of its own. A `.git` *file* marks a submodule or worktree
    * checkout — not a project on its own, but the walk still recurses past it to
-   * find real repos nested deeper (see OUTLINE.md's submodule-skip decision).
+   * find real repos nested deeper.
    */
   async walk(dir, depth, maxDepth, excludeDirs, found) {
     if (depth > maxDepth)
@@ -2957,8 +2957,8 @@ var ProjectSyncManager = class {
   /**
    * Watches the base folder recursively for changes (new/removed repos, edited
    * structured files) and re-syncs on a debounce. Recursive `fs.watch` is only
-   * reliable on macOS/Windows, not Linux — acceptable given the macOS-only scope
-   * decision in OUTLINE.md/IDEAS.md. Events under an excluded directory (same
+   * reliable on macOS/Windows, not Linux — acceptable given the plugin's
+   * existing macOS-only scope (`isDesktopOnly`). Events under an excluded directory (same
    * list `ProjectScanner` skips while walking) are ignored here too — the walk
    * skipping them doesn't stop the raw watch from seeing activity inside, e.g.
    * a large `node_modules` tree churning on every `npm install`.
@@ -4203,7 +4203,7 @@ var ContextMenuHandler = class {
    * sidebar passes false: moving a project-note item elsewhere conflicts with it
    * reappearing in its original note on the next sync (see DESIGN.md's Projects
    * Extension detail-view notes; the plugin-wide move feature is separately
-   * tracked for removal in PLAN.md, unrelated to Projects).
+   * tracked for removal, unrelated to Projects).
    */
   showTodoMenu(evt, todo, onRefresh, includeMove = true) {
     const menu = new import_obsidian11.Menu();
@@ -4866,9 +4866,9 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
    * pattern the assignee filter already uses.
    *
    * Matching goes through `itemMatchesTagFilter` (explicit tag or
-   * `inferredFileTag`), shared with the focus queue's own tag scoping —
-   * see PLAN.md's Phase 7 — so a project's untagged note items are scoped
-   * consistently everywhere, not just counted in `ProjectManager`'s stats.
+   * `inferredFileTag`), shared with the focus queue's own tag scoping, so a
+   * project's untagged note items are scoped consistently everywhere, not
+   * just counted in `ProjectManager`'s stats.
    */
   filterByActiveTag(items, allItemsForChildLookup) {
     if (!this.activeTagFilter)
@@ -5827,8 +5827,8 @@ var TodoSidebarView = class extends import_obsidian12.ItemView {
   }
   /**
    * Build the focus queue from current scanner data; respects continue-mode
-   * and the active project/tag scope (PLAN.md's Phase 7) — scoping to a
-   * project and opening Focus Mode only surfaces that project's items.
+   * and the active project/tag scope — scoping to a project and opening
+   * Focus Mode only surfaces that project's items.
    */
   rebuildFocusQueue() {
     var _a;

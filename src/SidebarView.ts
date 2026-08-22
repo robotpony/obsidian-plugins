@@ -673,9 +673,9 @@ export class TodoSidebarView extends ItemView {
    * pattern the assignee filter already uses.
    *
    * Matching goes through `itemMatchesTagFilter` (explicit tag or
-   * `inferredFileTag`), shared with the focus queue's own tag scoping —
-   * see PLAN.md's Phase 7 — so a project's untagged note items are scoped
-   * consistently everywhere, not just counted in `ProjectManager`'s stats.
+   * `inferredFileTag`), shared with the focus queue's own tag scoping, so a
+   * project's untagged note items are scoped consistently everywhere, not
+   * just counted in `ProjectManager`'s stats.
    */
   private filterByActiveTag(items: TodoItem[], allItemsForChildLookup: TodoItem[]): TodoItem[] {
     if (!this.activeTagFilter) return items;
@@ -1921,8 +1921,8 @@ export class TodoSidebarView extends ItemView {
 
   /**
    * Build the focus queue from current scanner data; respects continue-mode
-   * and the active project/tag scope (PLAN.md's Phase 7) — scoping to a
-   * project and opening Focus Mode only surfaces that project's items.
+   * and the active project/tag scope — scoping to a project and opening
+   * Focus Mode only surfaces that project's items.
    */
   private rebuildFocusQueue(): void {
     const active = this.getActiveTodosForFocus();

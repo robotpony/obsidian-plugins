@@ -55,7 +55,7 @@ export function hasTag(tags: string[], tag: string): boolean {
  * fallback, e.g. `projects/peep.md` → `#peep`). Shared by list filtering
  * (`filterByActiveTag` in SidebarView.ts) and the focus queue
  * (`buildFocusQueue` below) so scoping to a project behaves identically
- * whichever surface you're looking at it from — see PLAN.md's Phase 7.
+ * whichever surface you're looking at it from.
  *
  * Unlike `ProjectManager.getProjects()`'s own use of `inferredFileTag`
  * (which only counts it inside the configured projects folder, excluding

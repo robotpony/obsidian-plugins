@@ -38,7 +38,7 @@ export interface TodoItem {
   mentions: string[];
   // Absolute filesystem path outside the vault (e.g. a repo's BUGS.md). When set,
   // mutations write to this path via Node fs instead of the Obsidian vault API.
-  // See OUTLINE.md and DESIGN.md's Projects Extension.
+  // See DESIGN.md's Projects Extension.
   sourceFile?: string;
 }
 

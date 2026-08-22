@@ -7,9 +7,9 @@ import { TodoItem } from "../types";
 import { ParsedProjectItem } from "../StructuredFileParser";
 import { createFakeApp } from "./stubs/fakeVault";
 
-// Phase 5 (see PLAN.md): ProjectManager.getProjects() merging tag-derived and
-// repo-derived ProjectInfo. Uses a minimal fake TodoScanner (just getTodos()),
-// same pattern as Phase 1's fake scanner for TodoProcessor.
+// ProjectManager.getProjects() merging tag-derived and repo-derived
+// ProjectInfo. Uses a minimal fake TodoScanner (just getTodos()), same
+// pattern as the fake scanner used for TodoProcessor.
 
 function todoFixture(overrides: Partial<TodoItem> = {}): TodoItem {
   return {

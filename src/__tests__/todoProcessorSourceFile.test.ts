@@ -6,7 +6,7 @@ import { App, TFile } from "obsidian";
 import { TodoProcessor } from "../TodoProcessor";
 import type { TodoItem } from "../types";
 
-// Phase 1 spike (see PLAN.md): proves TodoProcessor routes a TodoItem.sourceFile
+// Proves TodoProcessor routes a TodoItem.sourceFile
 // mutation to the external file instead of the Obsidian vault, end to end through
 // the public completeTodo/uncompleteTodo API rather than the private helpers.
 

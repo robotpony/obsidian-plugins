@@ -11,7 +11,7 @@ const TAG = "[Warped Todo]";
 // the same form.
 const RESOLVED_MARKER_PATTERN = /\s*✅?\s*\*{0,2}RESOLVED\*{0,2}\s*$/i;
 
-/** Needed only for `headerNested` items (Phase 6 Case 1's block-move) — the git-clean safety check needs a repo to check. */
+/** Needed only for `headerNested` items (the block-move) — the git-clean safety check needs a repo to check. */
 export interface ProjectItemCompletionContext {
   repoPath: string;
   scanner: ProjectScanner;
@@ -21,8 +21,8 @@ export interface ProjectItemCompletionContext {
  * Sets a project item's completion state by editing its source line (or, for
  * `headerNested`, moving its whole block) in the external repo file directly.
  * Which edit applies — or whether one is possible at all — depends on
- * `item.shape`. See StructuredFileParser.ts's `ItemShape` doc comment and
- * PLAN.md's Phase 6 for the reasoning behind each case.
+ * `item.shape`. See StructuredFileParser.ts's `ItemShape` doc comment for
+ * the reasoning behind each case.
  *
  * `context` is required for `headerNested` (the git-clean check needs a repo
  * to check); omitting it there refuses cleanly rather than moving a block

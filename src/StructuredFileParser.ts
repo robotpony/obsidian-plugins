@@ -5,16 +5,16 @@ import { extractTags } from "./utils";
  * Parses a repo's structured files (BUGS.md, TODO.md, etc.) into project items.
  * Standalone from TodoScanner's vault-scanning machinery — these items have no
  * backing Obsidian TFile (the source lives outside the vault), only a `sourceFile`
- * absolute path. See OUTLINE.md's "Structured-file parsing" and DESIGN.md's
- * Projects Extension for the full spec this implements.
+ * absolute path. See DESIGN.md's Projects Extension for the full spec this
+ * implements.
  */
 
 export type ProjectItemType = "todo" | "idea" | "bug";
 
 /**
  * Which of the four line/block shapes an item was parsed from — determines how
- * (and whether) it can be completed. See ProjectItemMutator.ts and PLAN.md's
- * Phase 6 for how each shape maps to a mutation:
+ * (and whether) it can be completed. See ProjectItemMutator.ts for how each
+ * shape maps to a mutation:
  *  - `checkbox`: a `- [ ]`/`- [x]` flat-list line — toggle the checkbox.
  *  - `plainBullet`: a flat-list line with no checkbox — completing adds one;
  *    un-completing an already-complete plain bullet (completion inferred from
@@ -23,9 +23,9 @@ export type ProjectItemType = "todo" | "idea" | "bug";
  *  - `headerStandalone`: a `##` item heading with no enclosing status section
  *    (e.g. peep/ISSUES.md's "## Issue: ...") — toggle a "✅ RESOLVED" marker
  *    on the heading line itself.
- *  - `headerNested`: a `###` heading under a `##` status section (this repo's
- *    own BUGS.md) — completing means moving the whole block to a different
- *    section. Not a line edit; not supported until Phase 6's block-move lands.
+ *  - `headerNested`: a `###` heading under a `##` status section — completing
+ *    means moving the whole block to a different section. Not a single-line
+ *    edit; see HeaderBlockMover.ts for the block-move that implements it.
  */
 export type ItemShape = "checkbox" | "plainBullet" | "headerStandalone" | "headerNested";
 

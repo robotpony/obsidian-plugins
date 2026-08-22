@@ -1,7 +1,7 @@
 {
   "name": "@warped-command/shared",
   "version": "1.0.0",
-  "description": "Warped Command's own copy of the shared Warped-plugins utilities. Duplicated from the root shared/ at the point of the repo split (see PLAN-repo-split.md) rather than kept as a package/submodule dependency — drifts independently now.",
+  "description": "Warped Command's own copy of the shared Warped-plugins utilities. Duplicated from the root shared/ at the point of the repo split rather than kept as a package/submodule dependency — drifts independently now.",
   "private": true,
   "type": "module",
   "main": "index.ts",

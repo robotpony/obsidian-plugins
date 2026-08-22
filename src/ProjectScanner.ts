@@ -50,8 +50,9 @@ export interface ProjectScannerOptions {
 
 /**
  * Finds git repos under a base folder and reads branch/status/remote for each via
- * `git` directly (child_process, no external tool dependency — see IDEAS.md's
- * "Prior art: ~/projects/peep" decision for why this isn't shelling out to `p`).
+ * `git` directly (child_process, no external tool dependency — no shelling out
+ * to a helper CLI, so scanning doesn't depend on anything beyond `git` itself
+ * being on PATH).
  */
 export class ProjectScanner {
   private gitPath: string | null = null;
@@ -101,7 +102,7 @@ export class ProjectScanner {
    * projects, so an incidental clone vendored inside one repo doesn't surface as a
    * top-level project of its own. A `.git` *file* marks a submodule or worktree
    * checkout — not a project on its own, but the walk still recurses past it to
-   * find real repos nested deeper (see OUTLINE.md's submodule-skip decision).
+   * find real repos nested deeper.
    */
   private async walk(
     dir: string,
