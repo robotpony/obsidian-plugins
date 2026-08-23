@@ -5186,7 +5186,7 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
       return b.count - a.count;
     });
     for (const p of sortedProjects) {
-      const syncedCount = p.localPath ? this.syncManager.getCachedItems(p.localPath).filter((i) => !i.completed).length : 0;
+      const syncedCount = p.localPath ? this.syncManager.getCachedItems(p.localPath).filter((i) => !i.completed && (i.itemType === "todo" || i.itemType === "bug")).length : 0;
       const activeCount = ((_b = activeTagCounts.get(p.tag)) != null ? _b : 0) + syncedCount;
       if (activeCount === 0)
         continue;

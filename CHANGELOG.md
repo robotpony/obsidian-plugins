@@ -2,6 +2,20 @@
 
 All notable changes to the ␣⌘ Warped Command plugin will be documented in this file.
 
+## [0.47.2] - 2026-08-22
+
+### Fixed — Tag filter shows nothing for a project with only non-todo synced items
+
+- The TODOs tab's tag cloud pill count (`renderProjects`) counted a
+  linked project's synced items by any type (`todo`/`idea`/`bug`), but
+  the list underneath (`renderActiveTodos` → `buildProjectBlocks`) only
+  shows `todo`/`bug` items. A project whose repo-linked items are all
+  typed `idea` (or otherwise not `todo`/`bug`) showed a live, clickable
+  pill that filtered down to "No TODOs matching #tag" every time.
+- Scoped the pill's synced-item count to `itemType === "todo" || "bug"`,
+  matching `buildProjectBlocks(["todo", "bug"])`'s own scope, so a pill
+  only advertises items the TODOs tab can actually surface.
+
 ## [0.47.1] - 2026-08-22
 
 ### Changed — "Send selection to project" is now also on the right-click menu

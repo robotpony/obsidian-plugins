@@ -976,10 +976,17 @@ export class TodoSidebarView extends ItemView {
     // Synced items have no header/children structure to gate on (every
     // ParsedProjectItem the cache returns is already "active" once
     // completed items are filtered out), so they add straight onto the
-    // vault-derived, isActiveTodo-gated count below.
+    // vault-derived, isActiveTodo-gated count below. Scoped to itemType
+    // "todo"/"bug", matching renderActiveTodos's own
+    // buildProjectBlocks(["todo", "bug"]) — this cloud is only ever
+    // rendered from renderTodosContent, so counting a project's "idea"
+    // items here would advertise a pill that filters to nothing (see
+    // "tag filter shows nothing for an idea-only linked project").
     for (const p of sortedProjects) {
       const syncedCount = p.localPath
-        ? this.syncManager.getCachedItems(p.localPath).filter((i) => !i.completed).length
+        ? this.syncManager
+            .getCachedItems(p.localPath)
+            .filter((i) => !i.completed && (i.itemType === "todo" || i.itemType === "bug")).length
         : 0;
       const activeCount = (activeTagCounts.get(p.tag) ?? 0) + syncedCount;
       // Skip projects with no active work (see isActiveTodo) — they'd just
