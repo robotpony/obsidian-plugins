@@ -2,6 +2,20 @@
 
 All notable changes to the ␣⌘ Warped Command plugin will be documented in this file.
 
+## [0.47.1] - 2026-08-22
+
+### Changed — "Send selection to project" is now also on the right-click menu
+
+- The command palette was the only way to trigger "Send selection to
+  project," easy to miss. It now also appears on the editor's right-click
+  menu, next to "Copy as Slack" / "Copy as Notion," under the same
+  condition: a project note (has `repo` in frontmatter) with an active
+  selection.
+- The frontmatter/repo lookup and the modal-open logic are now shared
+  (`utils.getProjectRepoForFile`, `openSendSelectionToProjectModal`)
+  between the command and the menu item, so the two triggers can't drift
+  out of sync.
+
 ## [0.47.0] - 2026-08-22
 
 ### Added — "Send selection to project" command

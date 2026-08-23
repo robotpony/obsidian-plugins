@@ -639,6 +639,12 @@ function openFileAtLine(app, file, line, blockEndLine) {
     }
   });
 }
+function getProjectRepoForFile(app, file) {
+  var _a, _b;
+  if (!file)
+    return void 0;
+  return (_b = (_a = app.metadataCache.getFileCache(file)) == null ? void 0 : _a.frontmatter) == null ? void 0 : _b.repo;
+}
 
 // src/TodoScanner.ts
 var TodoScanner = class extends import_obsidian3.Events {
@@ -3685,10 +3691,8 @@ function majorMinor(version) {
   return version.split(".").slice(0, 2).join(".");
 }
 function buildHelpNoteContent() {
-  return `# Warped Command help
-
-This note is a live example, not documentation. Everything below works exactly
-like it would in any other note in your vault \u2014 try it.
+  return `> [!warning] Live example
+> This note is a live example, not documentation. Everything below works exactly like it would in any other note in your vault. Try it.
 
 ## Complete a task
 
@@ -3721,13 +3725,13 @@ priority tier.
 ## Where to go next
 
 Open the sidebar with \`Cmd/Ctrl+Shift+T\` if it isn't already open. For
-everything else \u2014 Projects, mentions, header TODOs, editor shortcuts \u2014 see the
-[full README](https://github.com/robotpony/warped-command/blob/main/README.md).
+everything else, including Projects, mentions, header TODOs, and editor
+shortcuts, see the [full README](https://github.com/robotpony/warped-command/blob/main/README.md).
 
 ---
 
 This note is yours now. Delete it, edit it, or leave it as a running
-scratchpad. Warped Command never overwrites it \u2014 a future update might
+scratchpad. Warped Command never overwrites it. A future update might
 reopen it in a tab, but your edits stay exactly as you left them.
 `;
 }
@@ -7974,23 +7978,14 @@ var WarpedTodoPlugin = class extends import_obsidian15.Plugin {
       id: "send-selection-to-project",
       name: "Send selection to project",
       editorCheckCallback: (checking, editor, ctx) => {
-        var _a, _b;
         const file = ctx.file;
-        const repo = file ? (_b = (_a = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a.frontmatter) == null ? void 0 : _b.repo : void 0;
+        const repo = getProjectRepoForFile(this.app, file);
         const selection = editor.getSelection();
         if (!repo || !selection.trim())
           return false;
         if (checking)
           return true;
-        new SendToProjectModal(this.app, file.basename, async (title) => {
-          try {
-            const filePath = await appendQueuedTodo(repo, title, selection);
-            showNotice2(`Sent to ${filePath}`);
-          } catch (error) {
-            console.error("[Warped Todo]", "Failed to send selection to project:", error);
-            showNotice2("Couldn't send selection to the project. See console for details.");
-          }
-        }).open();
+        this.openSendSelectionToProjectModal(file, repo, editor);
         return true;
       }
     });
@@ -8035,7 +8030,7 @@ var WarpedTodoPlugin = class extends import_obsidian15.Plugin {
       ]
     });
     this.registerEvent(
-      this.app.workspace.on("editor-menu", (menu, editor) => {
+      this.app.workspace.on("editor-menu", (menu, editor, info) => {
         const selection = editor.getSelection();
         if (selection) {
           menu.addItem((item) => {
@@ -8052,6 +8047,15 @@ var WarpedTodoPlugin = class extends import_obsidian15.Plugin {
               showNotice2("Copied as Notion markdown");
             });
           });
+          const file = info.file;
+          const repo = getProjectRepoForFile(this.app, file);
+          if (repo) {
+            menu.addItem((item) => {
+              item.setTitle("Send selection to project").setIcon("send").onClick(() => {
+                this.openSendSelectionToProjectModal(file, repo, editor);
+              });
+            });
+          }
         }
       })
     );
@@ -8092,6 +8096,24 @@ var WarpedTodoPlugin = class extends import_obsidian15.Plugin {
       terminalApp: this.settings.projectsTerminalApp,
       editorApp: this.settings.projectsEditorApp
     };
+  }
+  /**
+   * Opens the "Send selection to project" title prompt and, on submit,
+   * appends the editor's current selection to the project's TODO.md.
+   * Shared by the command palette entry and the editor right-click menu
+   * item so the two triggers can't drift apart in behaviour.
+   */
+  openSendSelectionToProjectModal(file, repo, editor) {
+    const selection = editor.getSelection();
+    new SendToProjectModal(this.app, file.basename, async (title) => {
+      try {
+        const filePath = await appendQueuedTodo(repo, title, selection);
+        showNotice2(`Sent to ${filePath}`);
+      } catch (error) {
+        console.error("[Warped Todo]", "Failed to send selection to project:", error);
+        showNotice2("Couldn't send selection to the project. See console for details.");
+      }
+    }).open();
   }
   onunload() {
     var _a;

@@ -1,5 +1,6 @@
 import {
   App,
+  Editor,
   FileSystemAdapter,
   MarkdownView,
   Modal,
@@ -31,7 +32,7 @@ import {
 } from "./src/types";
 import { convertToSlackMarkdown } from "./src/SlackConverter";
 import { convertToNotionMarkdown } from "./src/NotionConverter";
-import { extractTags, showNotice } from "./src/utils";
+import { extractTags, showNotice, getProjectRepoForFile } from "./src/utils";
 import { MoveTargetModal } from "./src/MoveTargetModal";
 import { SendToProjectModal } from "./src/SendToProjectModal";
 import { appendQueuedTodo } from "./src/ProjectQueue";
@@ -343,22 +344,12 @@ export default class WarpedTodoPlugin extends Plugin {
       name: "Send selection to project",
       editorCheckCallback: (checking, editor, ctx) => {
         const file = ctx.file;
-        const repo = file
-          ? (this.app.metadataCache.getFileCache(file)?.frontmatter?.repo as string | undefined)
-          : undefined;
+        const repo = getProjectRepoForFile(this.app, file);
         const selection = editor.getSelection();
         if (!repo || !selection.trim()) return false;
         if (checking) return true;
 
-        new SendToProjectModal(this.app, file!.basename, async (title) => {
-          try {
-            const filePath = await appendQueuedTodo(repo, title, selection);
-            showNotice(`Sent to ${filePath}`);
-          } catch (error) {
-            console.error("[Warped Todo]", "Failed to send selection to project:", error);
-            showNotice("Couldn't send selection to the project. See console for details.");
-          }
-        }).open();
+        this.openSendSelectionToProjectModal(file!, repo, editor);
         return true;
       },
     });
@@ -405,9 +396,9 @@ export default class WarpedTodoPlugin extends Plugin {
       ],
     });
 
-    // Editor context menu: Copy as Slack, Copy as Notion, and Define
+    // Editor context menu: Copy as Slack, Copy as Notion, Send to project, and Define
     this.registerEvent(
-      this.app.workspace.on("editor-menu", (menu, editor) => {
+      this.app.workspace.on("editor-menu", (menu, editor, info) => {
         const selection = editor.getSelection();
         if (selection) {
           menu.addItem((item) => {
@@ -430,6 +421,21 @@ export default class WarpedTodoPlugin extends Plugin {
                 showNotice("Copied as Notion markdown");
               });
           });
+
+          // Same repo gate as the "Send selection to project" command —
+          // only offer this in a project note (has `repo` in frontmatter).
+          const file = info.file;
+          const repo = getProjectRepoForFile(this.app, file);
+          if (repo) {
+            menu.addItem((item) => {
+              item
+                .setTitle("Send selection to project")
+                .setIcon("send")
+                .onClick(() => {
+                  this.openSendSelectionToProjectModal(file!, repo, editor);
+                });
+            });
+          }
         }
       })
     );
@@ -483,6 +489,25 @@ export default class WarpedTodoPlugin extends Plugin {
       terminalApp: this.settings.projectsTerminalApp,
       editorApp: this.settings.projectsEditorApp,
     };
+  }
+
+  /**
+   * Opens the "Send selection to project" title prompt and, on submit,
+   * appends the editor's current selection to the project's TODO.md.
+   * Shared by the command palette entry and the editor right-click menu
+   * item so the two triggers can't drift apart in behaviour.
+   */
+  private openSendSelectionToProjectModal(file: TFile, repo: string, editor: Editor): void {
+    const selection = editor.getSelection();
+    new SendToProjectModal(this.app, file.basename, async (title) => {
+      try {
+        const filePath = await appendQueuedTodo(repo, title, selection);
+        showNotice(`Sent to ${filePath}`);
+      } catch (error) {
+        console.error("[Warped Todo]", "Failed to send selection to project:", error);
+        showNotice("Couldn't send selection to the project. See console for details.");
+      }
+    }).open();
   }
 
   onunload() {

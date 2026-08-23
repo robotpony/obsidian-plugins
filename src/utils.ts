@@ -1038,3 +1038,15 @@ export function openFileAtLine(
     }
   });
 }
+
+/**
+ * Shared gate for "Send selection to project": the command palette entry
+ * and the editor right-click menu item both need the same answer to "is
+ * this file a project note with a repo behind it" before offering the
+ * action, so the frontmatter lookup lives here once rather than drifting
+ * out of sync between the two call sites.
+ */
+export function getProjectRepoForFile(app: App, file: TFile | null): string | undefined {
+  if (!file) return undefined;
+  return app.metadataCache.getFileCache(file)?.frontmatter?.repo as string | undefined;
+}
