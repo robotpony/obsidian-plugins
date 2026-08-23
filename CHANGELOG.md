@@ -2,6 +2,16 @@
 
 All notable changes to the ␣⌘ Warped Command plugin will be documented in this file.
 
+## [0.47.3] - 2026-08-22
+
+### Changed — Help note's intro uses a callout instead of a heading
+
+- The first-use help note's "live example, not documentation" intro is
+  now an Obsidian `> [!warning]` callout instead of a plain H1 + paragraph,
+  so it stands out visually against the real content underneath. A couple
+  of trailing em-dashes in the note's body were also tightened to plain
+  punctuation.
+
 ## [0.47.2] - 2026-08-22
 
 ### Fixed — Tag filter shows nothing for a project with only non-todo synced items

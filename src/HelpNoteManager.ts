@@ -14,10 +14,8 @@ export function majorMinor(version: string): string {
 }
 
 function buildHelpNoteContent(): string {
-  return `# Warped Command help
-
-This note is a live example, not documentation. Everything below works exactly
-like it would in any other note in your vault — try it.
+  return `> [!warning] Live example
+> This note is a live example, not documentation. Everything below works exactly like it would in any other note in your vault. Try it.
 
 ## Complete a task
 
@@ -50,13 +48,13 @@ priority tier.
 ## Where to go next
 
 Open the sidebar with \`Cmd/Ctrl+Shift+T\` if it isn't already open. For
-everything else — Projects, mentions, header TODOs, editor shortcuts — see the
-[full README](https://github.com/robotpony/warped-command/blob/main/README.md).
+everything else, including Projects, mentions, header TODOs, and editor
+shortcuts, see the [full README](https://github.com/robotpony/warped-command/blob/main/README.md).
 
 ---
 
 This note is yours now. Delete it, edit it, or leave it as a running
-scratchpad. Warped Command never overwrites it — a future update might
+scratchpad. Warped Command never overwrites it. A future update might
 reopen it in a tab, but your edits stay exactly as you left them.
 `;
 }
