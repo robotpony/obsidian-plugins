@@ -2,6 +2,26 @@
 
 All notable changes to the ␣⌘ Warped Command plugin will be documented in this file.
 
+## [0.48.2] - 2026-08-26
+
+### Changed — README restructured to lead with core features
+
+- Rewrote the tagline and added a features list up top (tag-based
+  tracking, Focus Mode, Header TODOs, Mentions, Projects) so the plugin's
+  two main surfaces, vault tags and cross-repo Projects sync, are visible
+  before Quick Start instead of only showing up 100+ lines in.
+- Moved the Projects section earlier, ahead of the Editor shortcuts and
+  Commands and hotkeys reference tables.
+- Folded "Automatic file tags" into "Organize with tags" as a sub-topic
+  instead of its own top-level section.
+- Trimmed the Contents list to top-level sections only; GitHub's own
+  file outline covers the rest.
+- Moved Troubleshooting and Known limitations to a new
+  [TROUBLESHOOTING.md](TROUBLESHOOTING.md), linked from Installation.
+- Shortened the Insert/Completion date format note in Editor shortcuts,
+  dropping the sorting edge case (still documented in the plugin's
+  settings tab).
+
 ## [0.48.1] - 2026-08-26
 
 ### Changed — Completion date format uses the same preset picker as Insert date format

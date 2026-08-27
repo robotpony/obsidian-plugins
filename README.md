@@ -4,7 +4,13 @@
 ![Platform: Desktop only](https://img.shields.io/badge/platform-desktop--only-lightgrey)
 ![Obsidian: 0.15.0+](https://img.shields.io/badge/obsidian-0.15.0%2B-7c3aed)
 
-Focus on the right next task. Plain `#todo` tags in your markdown, surfaced in a sidebar when you need them.
+Track `#todo` tags across your vault and `TODO.md`/`BUGS.md` across your git repos, all from one sidebar.
+
+- **Tag-based tracking.** `#todo`, `#idea`, `#principle` on any line or heading, scanned automatically and sorted by priority.
+- **Focus Mode.** An immersive single-item queue for working through your top-priority items one at a time.
+- **Header TODOs.** Tag a heading once and every item underneath becomes a tracked block, still living in its original note.
+- **Mentions and delegation.** `@handle` assigns work to a teammate; a tag cloud filters by person or topic.
+- **Projects.** Point a folder of git repos at the sidebar and it syncs `TODO.md`/`BUGS.md`/`ISSUES.md` items both ways, no separate app.
 
 ## Contents
 
@@ -16,23 +22,14 @@ Focus on the right next task. Plain `#todo` tags in your markdown, surfaced in a
   - [Focus mode](#focus-mode)
   - [Tabs](#tabs)
   - [Mentions and delegation](#mentions-and-delegation)
-    - [Team file](#team-file)
   - [Header TODOs](#header-todos)
   - [Ideas and principles](#ideas-and-principles)
   - [Moving TODOs between files](#moving-todos-between-files)
-  - [Automatic file tags](#automatic-file-tags)
+  - [Projects](#projects)
   - [Editor shortcuts](#editor-shortcuts)
-    - [Slash commands](#slash-commands)
-    - [@ suggestions](#-suggestions)
   - [Commands and hotkeys](#commands-and-hotkeys)
   - [Sidebar utilities](#sidebar-utilities)
-  - [Projects](#projects)
-    - [Sending work to a project](#sending-work-to-a-project)
   - [Installation](#installation)
-    - [Option 1: install script (recommended)](#option-1-install-script-recommended)
-    - [Option 2: manual build](#option-2-manual-build)
-  - [Troubleshooting](#troubleshooting)
-  - [Known limitations](#known-limitations)
   - [Releases and changelog](#releases-and-changelog)
   - [Contributing](#contributing)
   - [License](#license)
@@ -97,6 +94,16 @@ Items sort by: focus, then priority, then tag count (more tags means more contex
 - [ ] Write endpoint docs #todo #api #focus
 - [ ] Update welcome email #todo #onboarding
 ```
+
+**Automatic tags from filename.** TODOs in your projects folder without an explicit project tag are grouped by filename instead:
+
+```markdown
+<!-- In projects/api-tasks.md -->
+- [ ] Fix rate limiting #todo       → grouped under #api-tasks
+- [ ] Add caching #todo #backend    → grouped under #backend (explicit wins)
+```
+
+Files outside the projects folder don't get inferred tags. Configure excluded folders (like `log`) in Settings.
 
 Click a tag in the cloud to filter the list. Click again to clear. The cloud only shows tags with at least one active TODO; empty tags are hidden so you can always click and see results. Pinned `#focus` and `#p0` lead the cloud when they're in use.
 
@@ -212,17 +219,34 @@ Use **Move TODO to another file** (right-click or command palette) to relocate a
 
 Moved lines are dimmed in both Reading mode and Live Preview, so they stay visible as an audit trail without cluttering your active view. You can also type `#moved` manually; the plugin auto-stamps the date.
 
-## Automatic file tags
+## Projects
 
-TODOs in your projects folder without explicit project tags are grouped by filename:
+The Projects tab tracks work across a folder of git repos on disk, instead of vault notes. It's the third tab in the sidebar, alongside TODOs and Ideas, not a separate panel — earlier versions of the plugin gave it its own sidebar, which is where the `ProjectsSidebarView.ts` filename comes from.
 
-```markdown
-<!-- In projects/api-tasks.md -->
-- [ ] Fix rate limiting #todo       → grouped under #api-tasks
-- [ ] Add caching #todo #backend    → grouped under #backend (explicit wins)
-```
+Point it at a folder in Settings → Projects → "Projects base folder" (e.g. `/Users/you/projects`). It finds every git repo underneath (skipping `node_modules`, `dist`, `build`, `archive`, and anything else you add to "Exclude repo directories from scan"), and for each one:
 
-Add an explicit project tag to override. Files outside the projects folder don't get inferred tags. Configure excluded folders (like `log`) in Settings.
+- Creates or updates a vault note with the repo's branch, git status, remote, and last-synced time in the frontmatter.
+- Pulls in `#todo`/`#idea`/`#bug` items from the repo's `BUGS.md`, `TODO.md`, `TODOS.md`, `IDEAS.md`, or `ISSUES.md`, tagged explicitly or not (an untagged line in `BUGS.md` is assumed to be a bug, in `TODO.md` a todo, and so on).
+
+Each row shows branch and git status, item counts, and a relative "recently updated" date (the repo's `CHANGELOG.md`, falling back to `README.md`, whichever it has), all on one dot-separated line, plus the repo's own README excerpt below it when it has one. The sort icon beside the filter box switches between Active items first, Name (A–Z), Most items, Needs attention (dirty git status or an open bug), and Recently updated — set which one the list opens with each session in Settings → Projects → "Default projects sort" (Recently updated by default); picking a different sort from the list's own sort button is session-only and doesn't change that setting.
+
+Click a project in the list to open its note and see a detail view: repo facts pinned at the top, the README's opening paragraph underneath (if it has one), a "Guiding Principles" section for any `#principle`/`#principles` items tagged with the project (see [Ideas and principles](#ideas-and-principles)), and every tracked item grouped by type. Completing an item there writes back to the actual file in the repo, not just the vault note; the same familiar focus/snooze/priority actions from the TODOs tab work here too (no "move," since moving a synced item elsewhere would just have it reappear in its original note on the next sync).
+
+Opening any project's note anywhere in the vault (Quick Switcher, a wikilink, clicking through from a project block on the TODOs/Ideas tab) jumps the sidebar straight to that project's detail view, whatever tab it was showing before; Back returns you there. Turn this off in Settings → Projects → "Auto-open Projects tab" if you'd rather the sidebar stay put until you switch tabs yourself.
+
+Each project's detail view has its own **⋯** overflow menu (separate from the sidebar header's kebab menu) for the less-frequent actions: copy the repo's local path or remote URL, open it in a terminal or editor app (set which ones under Settings → Projects → "Terminal app"/"Editor app"; macOS only), or resync its tracked items on demand without waiting for the background watcher.
+
+Prose-style bug write-ups (a `### Title` under a `## Open`/`## Fixed` heading, rather than a flat checklist) complete the same way: the whole write-up moves to the first section that reads as "done" (creating one if the file doesn't have one yet), and moves back just as easily if you uncheck it. This refuses if the file has changes it hasn't committed yet; commit or stash first, so a mistake is always one `git checkout` away from undone.
+
+Structured files stay in sync automatically (a background watcher picks up changes on disk), or trigger a sync manually with **Sync** in the kebab menu (while on the Projects tab) or the "Sync Projects" command. Requires the plugin's desktop build (`git` and filesystem access aren't available on mobile).
+
+Frontmatter is hidden in the note's editor view for these project notes; the sidebar already shows the fields that matter, so the raw YAML would just be noise. Note content you write by hand (an `## Overview` section, your own notes) is never touched by syncing.
+
+### Sending work to a project
+
+Write in a project's note, whether that's a spec, a plan worked out with an agent, or your own notes, select a chunk of it, and run **Send selection to project** (command palette, or bind it to a hotkey). A small prompt asks for a title, then the selection is appended to that project's `TODO.md` as a new open `#todo` item, tagged and ready for whatever picks up work in that repo next, an agent or you.
+
+This only appears on notes that are themselves project notes (the ones with `repo` in frontmatter, described above); there's nowhere to send a selection from a note with no linked repo. `TODO.md` is created if the project doesn't have one yet.
 
 ## Editor shortcuts
 
@@ -253,7 +277,7 @@ Type `@` anywhere to get a combined suggestion popup:
 
 Date keywords take priority over user handles. Unknown handles are auto-added to your team file.
 
-These insert with the "Insert date format" setting (default `dddd, MMMM Do`, e.g. "Tuesday, July 10th"; a few other presets and a custom moment.js format are available in Settings → TODOs). It's separate from "Completion date format," which stamps `#todone @date` and defaults to `YYYY-MM-DD`; picking a different preset there is safe, but completed items only sort newest-first when it stays `YYYY-MM-DD`.
+These insert with the "Insert date format" setting (default `dddd, MMMM Do`, e.g. "Tuesday, July 10th"). "Completion date format," which stamps `#todone @date`, is a separate setting that defaults to `YYYY-MM-DD`. Both offer a few presets plus a custom moment.js format in Settings → TODOs.
 
 ## Commands and hotkeys
 
@@ -276,35 +300,6 @@ The ribbon icon toggles the sidebar. The kebab (⋯) button at the right of the 
 - **Stats**: kebab menu → Stats opens a modal showing counts of active TODOs, focused items, snoozed items, ideas, and principles.
 - **Clickable links**: wiki links (`[[page]]`) and external links in TODOs, ideas, and principles are clickable in the sidebar. Disable in Settings → "Make links clickable in lists."
 - **Tab lock**: enable in Settings → "Show tab lock buttons." Adds a padlock icon to Obsidian's own document tab headers (not the plugin's sidebar tabs); locking one forces links you click from the sidebar to open in a new tab instead of replacing what's there.
-
-## Projects
-
-The Projects tab tracks work across a folder of git repos on disk, instead of vault notes. It's the third tab in the sidebar, alongside TODOs and Ideas, not a separate panel — earlier versions of the plugin gave it its own sidebar, which is where the `ProjectsSidebarView.ts` filename comes from.
-
-Point it at a folder in Settings → Projects → "Projects base folder" (e.g. `/Users/you/projects`). It finds every git repo underneath (skipping `node_modules`, `dist`, `build`, `archive`, and anything else you add to "Exclude repo directories from scan"), and for each one:
-
-- Creates or updates a vault note with the repo's branch, git status, remote, and last-synced time in the frontmatter.
-- Pulls in `#todo`/`#idea`/`#bug` items from the repo's `BUGS.md`, `TODO.md`, `TODOS.md`, `IDEAS.md`, or `ISSUES.md`, tagged explicitly or not (an untagged line in `BUGS.md` is assumed to be a bug, in `TODO.md` a todo, and so on).
-
-Each row shows branch and git status, item counts, and a relative "recently updated" date (the repo's `CHANGELOG.md`, falling back to `README.md`, whichever it has), all on one dot-separated line, plus the repo's own README excerpt below it when it has one. The sort icon beside the filter box switches between Active items first, Name (A–Z), Most items, Needs attention (dirty git status or an open bug), and Recently updated — set which one the list opens with each session in Settings → Projects → "Default projects sort" (Recently updated by default); picking a different sort from the list's own sort button is session-only and doesn't change that setting.
-
-Click a project in the list to open its note and see a detail view: repo facts pinned at the top, the README's opening paragraph underneath (if it has one), a "Guiding Principles" section for any `#principle`/`#principles` items tagged with the project (see [Ideas and principles](#ideas-and-principles)), and every tracked item grouped by type. Completing an item there writes back to the actual file in the repo, not just the vault note; the same familiar focus/snooze/priority actions from the TODOs tab work here too (no "move," since moving a synced item elsewhere would just have it reappear in its original note on the next sync).
-
-Opening any project's note anywhere in the vault (Quick Switcher, a wikilink, clicking through from a project block on the TODOs/Ideas tab) jumps the sidebar straight to that project's detail view, whatever tab it was showing before; Back returns you there. Turn this off in Settings → Projects → "Auto-open Projects tab" if you'd rather the sidebar stay put until you switch tabs yourself.
-
-Each project's detail view has its own **⋯** overflow menu (separate from the sidebar header's kebab menu) for the less-frequent actions: copy the repo's local path or remote URL, open it in a terminal or editor app (set which ones under Settings → Projects → "Terminal app"/"Editor app"; macOS only), or resync its tracked items on demand without waiting for the background watcher.
-
-Prose-style bug write-ups (a `### Title` under a `## Open`/`## Fixed` heading, rather than a flat checklist) complete the same way: the whole write-up moves to the first section that reads as "done" (creating one if the file doesn't have one yet), and moves back just as easily if you uncheck it. This refuses if the file has changes it hasn't committed yet; commit or stash first, so a mistake is always one `git checkout` away from undone.
-
-Structured files stay in sync automatically (a background watcher picks up changes on disk), or trigger a sync manually with **Sync** in the kebab menu (while on the Projects tab) or the "Sync Projects" command. Requires the plugin's desktop build (`git` and filesystem access aren't available on mobile).
-
-Frontmatter is hidden in the note's editor view for these project notes; the sidebar already shows the fields that matter, so the raw YAML would just be noise. Note content you write by hand (an `## Overview` section, your own notes) is never touched by syncing.
-
-### Sending work to a project
-
-Write in a project's note, whether that's a spec, a plan worked out with an agent, or your own notes, select a chunk of it, and run **Send selection to project** (command palette, or bind it to a hotkey). A small prompt asks for a title, then the selection is appended to that project's `TODO.md` as a new open `#todo` item, tagged and ready for whatever picks up work in that repo next, an agent or you.
-
-This only appears on notes that are themselves project notes (the ones with `repo` in frontmatter, described above); there's nowhere to send a selection from a note with no linked repo. `TODO.md` is created if the project doesn't have one yet.
 
 ## Installation
 
@@ -332,35 +327,7 @@ npm run build      # produces main.js at the repo root
 
 Copy `main.js`, `manifest.json`, and `styles.css` into `<vault>/.obsidian/plugins/warped-todo/` (create the folder if it doesn't exist; `warped-todo` is the plugin's internal id, unrelated to the repo or display name). Then in Obsidian, go to Settings → Community plugins and enable "Warped Command."
 
-## Troubleshooting
-
-**Sidebar won't open.**
-Run "Toggle TODO sidebar" from the command palette, or use the ribbon icon. Default hotkey is `Cmd/Ctrl+Shift+T`.
-
-**A `#todo` I wrote isn't showing up.**
-Check that it's not inside a code block or wrapped in backticks; the scanner skips both so documentation about the tag syntax doesn't get picked up as a real TODO. Also confirm the file isn't in an excluded folder (Settings → excluded folders).
-
-**Projects tab is empty.**
-Three common causes: no base folder is set (Settings → Projects → "Projects base folder"), `git` isn't installed or isn't on your PATH, or none of the folders under the base path are git repos with a top-level `.git` directory (submodules are skipped on purpose).
-
-**Projects sync isn't picking up a change I made to `BUGS.md` or `TODO.md`.**
-The background watcher should catch it automatically. If it doesn't, run the "Sync Projects" command or use **Sync** in the Projects tab's kebab menu to force a rescan.
-
-**A prose-style bug write-up won't move to "Fixed."**
-The mover refuses to relocate a block if the file has uncommitted changes, so a mistake can't strand your work partway through a move. Commit or stash first, then try again.
-
-**Projects, or the whole plugin, doesn't load on mobile.**
-That's expected. Projects needs Node's `fs` and `child_process`, so the entire plugin is marked desktop only (`isDesktopOnly: true`).
-
-**Still stuck?**
-[Open an issue](https://github.com/robotpony/warped-command/issues) with your plugin version (`manifest.json`), Obsidian version, and steps to reproduce.
-
-## Known limitations
-
-- **Desktop only.** The whole plugin, not just Projects, is unavailable on Obsidian mobile.
-- **Not on the Community Plugins list yet.** Install from source (above) rather than through Obsidian's plugin browser.
-- **Projects tracks folders on disk, not other vaults.** It's for git repos alongside your vault, not for linking two Obsidian vaults together.
-- **Git submodules are skipped** when scanning for project repos.
+Having trouble, or hit something unexpected? See [Troubleshooting](TROUBLESHOOTING.md).
 
 ## Releases and changelog
 
