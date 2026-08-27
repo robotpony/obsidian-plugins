@@ -153,7 +153,10 @@ export interface ItemRenderConfig {
 
 export interface WarpedTodoSettings {
   showSidebarByDefault: boolean;
+  /** Format for `#todone @date` completion stamps. Must stay `YYYY-MM-DD`-shaped — due-date parsing, sorting, and filename dates all match it with a `\d{4}-\d{2}-\d{2}` regex. */
   dateFormat: string;
+  /** Format @today/@tomorrow/@yesterday/@date and /today, /tomorrow insert into note text. Free-form (see INSERT_DATE_FORMAT_PRESETS in utils.ts) since nothing parses these back out. */
+  insertDateFormat: string;
   defaultProjectsFolder: string;
   activeTodosLimit: number;
   priorityTags: string[];
@@ -195,6 +198,7 @@ export interface WarpedTodoSettings {
 export const DEFAULT_SETTINGS: WarpedTodoSettings = {
   showSidebarByDefault: true,
   dateFormat: "YYYY-MM-DD",
+  insertDateFormat: "dddd, MMMM Do",
   defaultProjectsFolder: "projects/",
   activeTodosLimit: 0,
   priorityTags: ["#p0", "#p1", "#p2", "#p3", "#p4"],

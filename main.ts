@@ -32,7 +32,7 @@ import {
 } from "./src/types";
 import { convertToSlackMarkdown } from "./src/SlackConverter";
 import { convertToNotionMarkdown } from "./src/NotionConverter";
-import { extractTags, showNotice, getProjectRepoForFile } from "./src/utils";
+import { extractTags, showNotice, getProjectRepoForFile, formatDate, INSERT_DATE_FORMAT_PRESETS } from "./src/utils";
 import { MoveTargetModal } from "./src/MoveTargetModal";
 import { SendToProjectModal } from "./src/SendToProjectModal";
 import { appendQueuedTodo } from "./src/ProjectQueue";
@@ -758,6 +758,10 @@ class WarpedTodoSettingTab extends PluginSettingTab {
   // own comment for why the actual apply is deferred to blur in the first
   // place.
   private pendingProjectsBaseFolderApply: (() => Promise<void>) | null = null;
+  // Sticky across display() re-renders: true once the user explicitly picks
+  // "Custom…" in the insert date format dropdown, so the text field stays
+  // visible even if what they type happens to match a preset's format string.
+  private showCustomInsertDateFormat = false;
 
   constructor(app: App, plugin: WarpedTodoPlugin) {
     super(app, plugin);
@@ -844,8 +848,8 @@ class WarpedTodoSettingTab extends PluginSettingTab {
     containerEl.createEl("h3", { text: "TODOs" });
 
     new Setting(containerEl)
-      .setName("Date format")
-      .setDesc("Format for completion dates. e.g. YYYY-MM-DD → 2026-05-09, D/M/YYYY → 9/5/2026")
+      .setName("Completion date format")
+      .setDesc("Format for #todone completion stamps. e.g. YYYY-MM-DD → 2026-05-09, D/M/YYYY → 9/5/2026")
       .addText((text) =>
         text
           .setPlaceholder("YYYY-MM-DD")
@@ -859,6 +863,50 @@ class WarpedTodoSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
       );
+
+    const insertFormatIsPreset = INSERT_DATE_FORMAT_PRESETS.some(
+      (p) => p.format === this.plugin.settings.insertDateFormat
+    );
+    const showCustomInsertField = this.showCustomInsertDateFormat || !insertFormatIsPreset;
+
+    new Setting(containerEl)
+      .setName("Insert date format")
+      .setDesc(
+        `Format @today, @tomorrow, @yesterday, @date, /today, and /tomorrow insert into note text. Today: "${formatDate(new Date(), this.plugin.settings.insertDateFormat)}"`
+      )
+      .addDropdown((dropdown) => {
+        for (const preset of INSERT_DATE_FORMAT_PRESETS) {
+          dropdown.addOption(preset.format, preset.label);
+        }
+        dropdown.addOption("custom", "Custom…");
+        dropdown.setValue(showCustomInsertField ? "custom" : this.plugin.settings.insertDateFormat);
+        dropdown.onChange(async (value) => {
+          if (value === "custom") {
+            this.showCustomInsertDateFormat = true;
+            this.display();
+            return;
+          }
+          this.showCustomInsertDateFormat = false;
+          this.plugin.settings.insertDateFormat = value;
+          await this.plugin.saveSettings();
+          this.display();
+        });
+      });
+
+    if (showCustomInsertField) {
+      new Setting(containerEl)
+        .setName("Custom insert date format")
+        .setDesc("moment.js format string, e.g. dddd, MMMM Do → Tuesday, July 10th")
+        .addText((text) =>
+          text
+            .setPlaceholder("dddd, MMMM Do")
+            .setValue(this.plugin.settings.insertDateFormat)
+            .onChange(async (value) => {
+              this.plugin.settings.insertDateFormat = value;
+              await this.plugin.saveSettings();
+            })
+        );
+    }
 
     new Setting(containerEl)
       .setName("Active TODOs limit")

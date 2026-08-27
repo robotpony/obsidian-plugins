@@ -129,7 +129,7 @@ export class AtSuggest extends EditorSuggest<AtSuggestion> {
     textContainer.createEl("span", { cls: "suggestion-name", text: item.label });
 
     if (item.kind === "date" && item.getDate) {
-      const date = formatDate(item.getDate(), this.settings.dateFormat);
+      const date = formatDate(item.getDate(), this.settings.insertDateFormat);
       textContainer.createEl("span", { cls: "suggestion-description", text: date });
     } else {
       textContainer.createEl("span", { cls: "suggestion-description", text: item.description });
@@ -144,7 +144,7 @@ export class AtSuggest extends EditorSuggest<AtSuggestion> {
     const end = this.context.end;
 
     if (item.kind === "date" && item.getDate) {
-      const date = formatDate(item.getDate(), this.settings.dateFormat);
+      const date = formatDate(item.getDate(), this.settings.insertDateFormat);
       editor.replaceRange(date, start, end);
       editor.setCursor({ line: start.line, ch: start.ch + date.length });
     } else if (item.handle) {

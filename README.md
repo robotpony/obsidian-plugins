@@ -253,6 +253,8 @@ Type `@` anywhere to get a combined suggestion popup:
 
 Date keywords take priority over user handles. Unknown handles are auto-added to your team file.
 
+These insert with the "Insert date format" setting (default `dddd, MMMM Do`, e.g. "Tuesday, July 10th"; a few other presets and a custom moment.js format are available in Settings → TODOs). It's separate from "Completion date format," which stamps `#todone @date` and stays `YYYY-MM-DD` since due-date sorting depends on that shape.
+
 ## Commands and hotkeys
 
 | Command                        | Default hotkey       | What it does                                            |

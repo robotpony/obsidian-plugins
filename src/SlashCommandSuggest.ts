@@ -103,7 +103,7 @@ export class SlashCommandSuggest extends EditorSuggest<SuggestionItem> {
         description: "Insert today's date",
         icon: "📅",
         action: (editor, start, end) => {
-          const date = formatDate(new Date(), this.settings.dateFormat);
+          const date = formatDate(new Date(), this.settings.insertDateFormat);
           editor.replaceRange(date, start, end);
           editor.setCursor({ line: start.line, ch: start.ch + date.length });
         },
@@ -116,7 +116,7 @@ export class SlashCommandSuggest extends EditorSuggest<SuggestionItem> {
         action: (editor, start, end) => {
           const tomorrow = new Date();
           tomorrow.setDate(tomorrow.getDate() + 1);
-          const date = formatDate(tomorrow, this.settings.dateFormat);
+          const date = formatDate(tomorrow, this.settings.insertDateFormat);
           editor.replaceRange(date, start, end);
           editor.setCursor({ line: start.line, ch: start.ch + date.length });
         },

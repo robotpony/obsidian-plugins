@@ -2,6 +2,20 @@
 
 All notable changes to the ␣⌘ Warped Command plugin will be documented in this file.
 
+## [0.48.0] - 2026-08-26
+
+### Added — Insert date format setting
+
+- @today, @tomorrow, @yesterday, @date, and /today, /tomorrow now format
+  the date they insert using a new "Insert date format" setting, separate
+  from the existing completion-stamp format. Defaults to `dddd, MMMM Do`
+  ("Tuesday, July 10th") instead of `YYYY-MM-DD`. The settings tab offers
+  a handful of presets plus a custom moment.js format field.
+- The `#todone @date` completion stamp keeps its own "Completion date
+  format" setting (renamed from "Date format"), unchanged and still
+  `YYYY-MM-DD` by default, since due-date sorting and filename-date
+  parsing depend on it staying in that shape.
+
 ## [0.47.3] - 2026-08-22
 
 ### Changed — Help note's intro uses a callout instead of a heading

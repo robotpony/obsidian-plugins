@@ -189,6 +189,13 @@ function hasCachedRelevantTags(tags) {
 function formatDate(date, format) {
   return (0, import_obsidian2.moment)(date).format(format);
 }
+var INSERT_DATE_FORMAT_PRESETS = [
+  { format: "dddd, MMMM Do", label: "Tuesday, July 10th" },
+  { format: "ddd, MMM D", label: "Tue, Jul 10" },
+  { format: "MMMM D, YYYY", label: "July 10, 2026" },
+  { format: "YYYY-MM-DD", label: "2026-07-10" },
+  { format: "D/M/YYYY", label: "10/7/2026" }
+];
 function pluralize(count, word) {
   return `${count} ${word}${count === 1 ? "" : "s"}`;
 }
@@ -3316,7 +3323,7 @@ var SlashCommandSuggest = class extends import_obsidian7.EditorSuggest {
         description: "Insert today's date",
         icon: "\u{1F4C5}",
         action: (editor, start, end) => {
-          const date = formatDate(/* @__PURE__ */ new Date(), this.settings.dateFormat);
+          const date = formatDate(/* @__PURE__ */ new Date(), this.settings.insertDateFormat);
           editor.replaceRange(date, start, end);
           editor.setCursor({ line: start.line, ch: start.ch + date.length });
         }
@@ -3329,7 +3336,7 @@ var SlashCommandSuggest = class extends import_obsidian7.EditorSuggest {
         action: (editor, start, end) => {
           const tomorrow = /* @__PURE__ */ new Date();
           tomorrow.setDate(tomorrow.getDate() + 1);
-          const date = formatDate(tomorrow, this.settings.dateFormat);
+          const date = formatDate(tomorrow, this.settings.insertDateFormat);
           editor.replaceRange(date, start, end);
           editor.setCursor({ line: start.line, ch: start.ch + date.length });
         }
@@ -3536,7 +3543,7 @@ var AtSuggest = class extends import_obsidian8.EditorSuggest {
     const textContainer = el.createEl("div", { cls: "suggestion-content" });
     textContainer.createEl("span", { cls: "suggestion-name", text: item.label });
     if (item.kind === "date" && item.getDate) {
-      const date = formatDate(item.getDate(), this.settings.dateFormat);
+      const date = formatDate(item.getDate(), this.settings.insertDateFormat);
       textContainer.createEl("span", { cls: "suggestion-description", text: date });
     } else {
       textContainer.createEl("span", { cls: "suggestion-description", text: item.description });
@@ -3550,7 +3557,7 @@ var AtSuggest = class extends import_obsidian8.EditorSuggest {
     const start = this.context.start;
     const end = this.context.end;
     if (item.kind === "date" && item.getDate) {
-      const date = formatDate(item.getDate(), this.settings.dateFormat);
+      const date = formatDate(item.getDate(), this.settings.insertDateFormat);
       editor.replaceRange(date, start, end);
       editor.setCursor({ line: start.line, ch: start.ch + date.length });
     } else if (item.handle) {
@@ -7154,6 +7161,7 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
 var DEFAULT_SETTINGS = {
   showSidebarByDefault: true,
   dateFormat: "YYYY-MM-DD",
+  insertDateFormat: "dddd, MMMM Do",
   defaultProjectsFolder: "projects/",
   activeTodosLimit: 0,
   priorityTags: ["#p0", "#p1", "#p2", "#p3", "#p4"],
@@ -8286,6 +8294,10 @@ var WarpedTodoSettingTab = class extends import_obsidian15.PluginSettingTab {
     // own comment for why the actual apply is deferred to blur in the first
     // place.
     this.pendingProjectsBaseFolderApply = null;
+    // Sticky across display() re-renders: true once the user explicitly picks
+    // "Custom…" in the insert date format dropdown, so the text field stays
+    // visible even if what they type happens to match a preset's format string.
+    this.showCustomInsertDateFormat = false;
     this.plugin = plugin;
   }
   hide() {
@@ -8338,7 +8350,7 @@ var WarpedTodoSettingTab = class extends import_obsidian15.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: "TODOs" });
-    new import_obsidian15.Setting(containerEl).setName("Date format").setDesc("Format for completion dates. e.g. YYYY-MM-DD \u2192 2026-05-09, D/M/YYYY \u2192 9/5/2026").addText(
+    new import_obsidian15.Setting(containerEl).setName("Completion date format").setDesc("Format for #todone completion stamps. e.g. YYYY-MM-DD \u2192 2026-05-09, D/M/YYYY \u2192 9/5/2026").addText(
       (text) => text.setPlaceholder("YYYY-MM-DD").setValue(this.plugin.settings.dateFormat).onChange(async (value) => {
         this.plugin.settings.dateFormat = value;
         this.plugin.processor = new TodoProcessor(
@@ -8348,6 +8360,38 @@ var WarpedTodoSettingTab = class extends import_obsidian15.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
+    const insertFormatIsPreset = INSERT_DATE_FORMAT_PRESETS.some(
+      (p) => p.format === this.plugin.settings.insertDateFormat
+    );
+    const showCustomInsertField = this.showCustomInsertDateFormat || !insertFormatIsPreset;
+    new import_obsidian15.Setting(containerEl).setName("Insert date format").setDesc(
+      `Format @today, @tomorrow, @yesterday, @date, /today, and /tomorrow insert into note text. Today: "${formatDate(/* @__PURE__ */ new Date(), this.plugin.settings.insertDateFormat)}"`
+    ).addDropdown((dropdown) => {
+      for (const preset of INSERT_DATE_FORMAT_PRESETS) {
+        dropdown.addOption(preset.format, preset.label);
+      }
+      dropdown.addOption("custom", "Custom\u2026");
+      dropdown.setValue(showCustomInsertField ? "custom" : this.plugin.settings.insertDateFormat);
+      dropdown.onChange(async (value) => {
+        if (value === "custom") {
+          this.showCustomInsertDateFormat = true;
+          this.display();
+          return;
+        }
+        this.showCustomInsertDateFormat = false;
+        this.plugin.settings.insertDateFormat = value;
+        await this.plugin.saveSettings();
+        this.display();
+      });
+    });
+    if (showCustomInsertField) {
+      new import_obsidian15.Setting(containerEl).setName("Custom insert date format").setDesc("moment.js format string, e.g. dddd, MMMM Do \u2192 Tuesday, July 10th").addText(
+        (text) => text.setPlaceholder("dddd, MMMM Do").setValue(this.plugin.settings.insertDateFormat).onChange(async (value) => {
+          this.plugin.settings.insertDateFormat = value;
+          await this.plugin.saveSettings();
+        })
+      );
+    }
     new import_obsidian15.Setting(containerEl).setName("Active TODOs limit").setDesc("Maximum number of TODOs to show in sidebar (0 for unlimited)").addText(
       (text) => text.setPlaceholder("5").setValue(String(this.plugin.settings.activeTodosLimit)).onChange(async (value) => {
         const num = parseInt(value);
