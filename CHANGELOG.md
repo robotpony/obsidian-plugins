@@ -2,6 +2,22 @@
 
 All notable changes to the ␣⌘ Warped Command plugin will be documented in this file.
 
+## [0.48.1] - 2026-08-26
+
+### Changed — Completion date format uses the same preset picker as Insert date format
+
+- "Completion date format" is now a dropdown of the same presets as
+  "Insert date format" plus a custom moment.js field, instead of a bare
+  text box. Default stays `YYYY-MM-DD`.
+- Fixed `replaceTodoneWithTodo` (reopening a completed item) to strip the
+  `#todone @date` stamp regardless of its format, instead of only
+  matching a hardcoded `YYYY-MM-DD` shape. Previously, picking any other
+  completion date format and then unchecking a completed item would
+  leave the stale `@date` text stranded in the line.
+- Completion-date sorting (newest-first among completed items) still
+  only recognizes `YYYY-MM-DD` and falls back to original order for any
+  other format; the setting's description now says so.
+
 ## [0.48.0] - 2026-08-26
 
 ### Added — Insert date format setting

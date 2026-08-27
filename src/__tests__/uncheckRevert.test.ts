@@ -36,6 +36,11 @@ describe("replaceTodoneWithTodo (uncheck revert)", () => {
     const input = "- [ ] Already a todo #todo";
     expect(replaceTodoneWithTodo(input)).toBe(input);
   });
+
+  it("reverts a non-numeric completion date format cleanly", () => {
+    expect(replaceTodoneWithTodo("- [ ] Ship it #todone @Tuesday, July 10th #p1"))
+      .toBe("- [ ] Ship it #todo #p1");
+  });
 });
 
 describe("markCheckboxComplete / markCheckboxIncomplete", () => {

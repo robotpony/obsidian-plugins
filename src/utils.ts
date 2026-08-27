@@ -123,15 +123,20 @@ export function formatDate(date: Date, format: string): string {
 }
 
 /**
- * Preset moment.js formats offered for `insertDateFormat` (the text @today,
- * @tomorrow, @yesterday, and /today, /tomorrow insert into a note). Kept
- * separate from `dateFormat`, which stamps `#todone @YYYY-MM-DD` and must
- * stay parseable by the `\d{4}-\d{2}-\d{2}` regexes scattered through
- * TodoScanner/utils for due-date sorting and filename dates.
+ * Preset moment.js formats offered for both `insertDateFormat` (the text
+ * @today, @tomorrow, @yesterday, and /today, /tomorrow insert into a note)
+ * and `dateFormat` (the `#todone @date` completion stamp).
+ *
+ * Picking a non-numeric preset for `dateFormat` is safe for reopening a
+ * completed item (`replaceTodoneWithTodo` matches the stamp generically,
+ * not just `YYYY-MM-DD`), but completed items stop sorting newest-first by
+ * completion date and fall back to their original order:
+ * `extractCompletionDate`/`compareByStatusAndDate` only recognize a
+ * `\d{4}-\d{2}-\d{2}` shape.
  *
  * Labels are illustrative, not tied to the current date.
  */
-export const INSERT_DATE_FORMAT_PRESETS: { format: string; label: string }[] = [
+export const DATE_FORMAT_PRESETS: { format: string; label: string }[] = [
   { format: "dddd, MMMM Do", label: "Tuesday, July 10th" },
   { format: "ddd, MMM D", label: "Tue, Jul 10" },
   { format: "MMMM D, YYYY", label: "July 10, 2026" },
@@ -659,13 +664,17 @@ export function extractDateFromFilename(basename: string): string | null {
 export function replaceTodoneWithTodo(text: string): string {
   // Handle both singular #todone and plural #todones
   // #todones -> #todos, #todone -> #todo
+  //
+  // The stamp's date can be in any format (see the `dateFormat` setting and
+  // DATE_FORMAT_PRESETS), so match everything after `@` up to the next tag
+  // or end of line rather than assuming a fixed YYYY-MM-DD shape.
   if (text.includes('#todones')) {
-    let result = text.replace(/#todones\s+@\d{4}-\d{2}-\d{2}/, "#todos");
+    let result = text.replace(/#todones\s+@[^#]*?(?=\s+#|\s*$)/, "#todos");
     result = result.replace(/#todones\b/, "#todos");
     return result;
   }
-  // Replace #todone @YYYY-MM-DD with #todo
-  let result = text.replace(/#todone\s+@\d{4}-\d{2}-\d{2}/, "#todo");
+  // Replace #todone @<date> with #todo
+  let result = text.replace(/#todone\s+@[^#]*?(?=\s+#|\s*$)/, "#todo");
   // Also handle #todone without date
   result = result.replace(/#todone\b/, "#todo");
   return result;

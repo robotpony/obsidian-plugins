@@ -189,7 +189,7 @@ function hasCachedRelevantTags(tags) {
 function formatDate(date, format) {
   return (0, import_obsidian2.moment)(date).format(format);
 }
-var INSERT_DATE_FORMAT_PRESETS = [
+var DATE_FORMAT_PRESETS = [
   { format: "dddd, MMMM Do", label: "Tuesday, July 10th" },
   { format: "ddd, MMM D", label: "Tue, Jul 10" },
   { format: "MMMM D, YYYY", label: "July 10, 2026" },
@@ -447,11 +447,11 @@ function extractDateFromFilename(basename3) {
 }
 function replaceTodoneWithTodo(text) {
   if (text.includes("#todones")) {
-    let result2 = text.replace(/#todones\s+@\d{4}-\d{2}-\d{2}/, "#todos");
+    let result2 = text.replace(/#todones\s+@[^#]*?(?=\s+#|\s*$)/, "#todos");
     result2 = result2.replace(/#todones\b/, "#todos");
     return result2;
   }
-  let result = text.replace(/#todone\s+@\d{4}-\d{2}-\d{2}/, "#todo");
+  let result = text.replace(/#todone\s+@[^#]*?(?=\s+#|\s*$)/, "#todo");
   result = result.replace(/#todone\b/, "#todo");
   return result;
 }
@@ -8298,6 +8298,8 @@ var WarpedTodoSettingTab = class extends import_obsidian15.PluginSettingTab {
     // "Custom…" in the insert date format dropdown, so the text field stays
     // visible even if what they type happens to match a preset's format string.
     this.showCustomInsertDateFormat = false;
+    // Same, for the completion date format dropdown.
+    this.showCustomCompletionDateFormat = false;
     this.plugin = plugin;
   }
   hide() {
@@ -8350,24 +8352,48 @@ var WarpedTodoSettingTab = class extends import_obsidian15.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: "TODOs" });
-    new import_obsidian15.Setting(containerEl).setName("Completion date format").setDesc("Format for #todone completion stamps. e.g. YYYY-MM-DD \u2192 2026-05-09, D/M/YYYY \u2192 9/5/2026").addText(
-      (text) => text.setPlaceholder("YYYY-MM-DD").setValue(this.plugin.settings.dateFormat).onChange(async (value) => {
-        this.plugin.settings.dateFormat = value;
-        this.plugin.processor = new TodoProcessor(
-          this.app,
-          value
-        );
-        await this.plugin.saveSettings();
-      })
+    const completionFormatIsPreset = DATE_FORMAT_PRESETS.some(
+      (p) => p.format === this.plugin.settings.dateFormat
     );
-    const insertFormatIsPreset = INSERT_DATE_FORMAT_PRESETS.some(
+    const showCustomCompletionField = this.showCustomCompletionDateFormat || !completionFormatIsPreset;
+    new import_obsidian15.Setting(containerEl).setName("Completion date format").setDesc(
+      "Format for #todone completion stamps. Stick to a format that sorts the same as it reads (like the default) so completed items keep sorting newest-first; anything else still reopens cleanly but falls back to original order."
+    ).addDropdown((dropdown) => {
+      for (const preset of DATE_FORMAT_PRESETS) {
+        dropdown.addOption(preset.format, preset.label);
+      }
+      dropdown.addOption("custom", "Custom\u2026");
+      dropdown.setValue(showCustomCompletionField ? "custom" : this.plugin.settings.dateFormat);
+      dropdown.onChange(async (value) => {
+        if (value === "custom") {
+          this.showCustomCompletionDateFormat = true;
+          this.display();
+          return;
+        }
+        this.showCustomCompletionDateFormat = false;
+        this.plugin.settings.dateFormat = value;
+        this.plugin.processor = new TodoProcessor(this.app, value);
+        await this.plugin.saveSettings();
+        this.display();
+      });
+    });
+    if (showCustomCompletionField) {
+      new import_obsidian15.Setting(containerEl).setName("Custom completion date format").setDesc("moment.js format string, e.g. YYYY-MM-DD \u2192 2026-05-09, D/M/YYYY \u2192 9/5/2026").addText(
+        (text) => text.setPlaceholder("YYYY-MM-DD").setValue(this.plugin.settings.dateFormat).onChange(async (value) => {
+          this.plugin.settings.dateFormat = value;
+          this.plugin.processor = new TodoProcessor(this.app, value);
+          await this.plugin.saveSettings();
+        })
+      );
+    }
+    const insertFormatIsPreset = DATE_FORMAT_PRESETS.some(
       (p) => p.format === this.plugin.settings.insertDateFormat
     );
     const showCustomInsertField = this.showCustomInsertDateFormat || !insertFormatIsPreset;
     new import_obsidian15.Setting(containerEl).setName("Insert date format").setDesc(
       `Format @today, @tomorrow, @yesterday, @date, /today, and /tomorrow insert into note text. Today: "${formatDate(/* @__PURE__ */ new Date(), this.plugin.settings.insertDateFormat)}"`
     ).addDropdown((dropdown) => {
-      for (const preset of INSERT_DATE_FORMAT_PRESETS) {
+      for (const preset of DATE_FORMAT_PRESETS) {
         dropdown.addOption(preset.format, preset.label);
       }
       dropdown.addOption("custom", "Custom\u2026");

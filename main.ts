@@ -32,7 +32,7 @@ import {
 } from "./src/types";
 import { convertToSlackMarkdown } from "./src/SlackConverter";
 import { convertToNotionMarkdown } from "./src/NotionConverter";
-import { extractTags, showNotice, getProjectRepoForFile, formatDate, INSERT_DATE_FORMAT_PRESETS } from "./src/utils";
+import { extractTags, showNotice, getProjectRepoForFile, formatDate, DATE_FORMAT_PRESETS } from "./src/utils";
 import { MoveTargetModal } from "./src/MoveTargetModal";
 import { SendToProjectModal } from "./src/SendToProjectModal";
 import { appendQueuedTodo } from "./src/ProjectQueue";
@@ -762,6 +762,8 @@ class WarpedTodoSettingTab extends PluginSettingTab {
   // "Custom…" in the insert date format dropdown, so the text field stays
   // visible even if what they type happens to match a preset's format string.
   private showCustomInsertDateFormat = false;
+  // Same, for the completion date format dropdown.
+  private showCustomCompletionDateFormat = false;
 
   constructor(app: App, plugin: WarpedTodoPlugin) {
     super(app, plugin);
@@ -847,24 +849,54 @@ class WarpedTodoSettingTab extends PluginSettingTab {
     // TODOs section
     containerEl.createEl("h3", { text: "TODOs" });
 
+    const completionFormatIsPreset = DATE_FORMAT_PRESETS.some(
+      (p) => p.format === this.plugin.settings.dateFormat
+    );
+    const showCustomCompletionField = this.showCustomCompletionDateFormat || !completionFormatIsPreset;
+
     new Setting(containerEl)
       .setName("Completion date format")
-      .setDesc("Format for #todone completion stamps. e.g. YYYY-MM-DD → 2026-05-09, D/M/YYYY → 9/5/2026")
-      .addText((text) =>
-        text
-          .setPlaceholder("YYYY-MM-DD")
-          .setValue(this.plugin.settings.dateFormat)
-          .onChange(async (value) => {
-            this.plugin.settings.dateFormat = value;
-            this.plugin.processor = new TodoProcessor(
-              this.app,
-              value
-            );
-            await this.plugin.saveSettings();
-          })
-      );
+      .setDesc(
+        "Format for #todone completion stamps. Stick to a format that sorts the same as it reads (like the default) " +
+        "so completed items keep sorting newest-first; anything else still reopens cleanly but falls back to original order."
+      )
+      .addDropdown((dropdown) => {
+        for (const preset of DATE_FORMAT_PRESETS) {
+          dropdown.addOption(preset.format, preset.label);
+        }
+        dropdown.addOption("custom", "Custom…");
+        dropdown.setValue(showCustomCompletionField ? "custom" : this.plugin.settings.dateFormat);
+        dropdown.onChange(async (value) => {
+          if (value === "custom") {
+            this.showCustomCompletionDateFormat = true;
+            this.display();
+            return;
+          }
+          this.showCustomCompletionDateFormat = false;
+          this.plugin.settings.dateFormat = value;
+          this.plugin.processor = new TodoProcessor(this.app, value);
+          await this.plugin.saveSettings();
+          this.display();
+        });
+      });
 
-    const insertFormatIsPreset = INSERT_DATE_FORMAT_PRESETS.some(
+    if (showCustomCompletionField) {
+      new Setting(containerEl)
+        .setName("Custom completion date format")
+        .setDesc("moment.js format string, e.g. YYYY-MM-DD → 2026-05-09, D/M/YYYY → 9/5/2026")
+        .addText((text) =>
+          text
+            .setPlaceholder("YYYY-MM-DD")
+            .setValue(this.plugin.settings.dateFormat)
+            .onChange(async (value) => {
+              this.plugin.settings.dateFormat = value;
+              this.plugin.processor = new TodoProcessor(this.app, value);
+              await this.plugin.saveSettings();
+            })
+        );
+    }
+
+    const insertFormatIsPreset = DATE_FORMAT_PRESETS.some(
       (p) => p.format === this.plugin.settings.insertDateFormat
     );
     const showCustomInsertField = this.showCustomInsertDateFormat || !insertFormatIsPreset;
@@ -875,7 +907,7 @@ class WarpedTodoSettingTab extends PluginSettingTab {
         `Format @today, @tomorrow, @yesterday, @date, /today, and /tomorrow insert into note text. Today: "${formatDate(new Date(), this.plugin.settings.insertDateFormat)}"`
       )
       .addDropdown((dropdown) => {
-        for (const preset of INSERT_DATE_FORMAT_PRESETS) {
+        for (const preset of DATE_FORMAT_PRESETS) {
           dropdown.addOption(preset.format, preset.label);
         }
         dropdown.addOption("custom", "Custom…");
