@@ -5,6 +5,7 @@ import { join } from "path";
 import { DEFAULT_EXCLUDE_DIRS, ProjectScanner, ScannedProject } from "./ProjectScanner";
 import { parseStructuredFile, ParsedProjectItem } from "./StructuredFileParser";
 import { projectFilePath } from "./ProjectManager";
+import { ProjectSyncStateEntry } from "./types";
 
 const TAG = "[Warped Todo]";
 const STRUCTURED_FILENAMES = ["BUGS.md", "TODO.md", "TODOS.md", "IDEAS.md", "ISSUES.md"];
@@ -15,14 +16,39 @@ const WATCH_DEBOUNCE_MS = 300;
 // on. Without this, that's a tight, potentially self-sustaining resync loop.
 const WATCH_COOLDOWN_MS = 1500;
 
-// Sync owns exactly these frontmatter keys. Anything else already in the
-// file's frontmatter is preserved as-is — see mergeFrontmatter(). `cssclasses`
-// is Obsidian's standard per-note styling hook — styles.css hides the
-// Properties panel for notes carrying it, since the sidebar already surfaces
-// those fields (see DESIGN.md's Projects Extension).
+// Sync owns exactly these frontmatter keys — all stable, human-meaningful
+// facts that only change on a rename, a README-title edit, a stack change,
+// or a remote repoint. Anything else already in the file's frontmatter is
+// preserved as-is — see mergeFrontmatter(). `cssclasses` is Obsidian's
+// standard per-note styling hook — styles.css hides the Properties panel for
+// notes carrying it, since the sidebar already surfaces those fields (see
+// DESIGN.md's Projects Extension).
 const PROJECT_NOTE_CSS_CLASS = "warped-todo-project-note";
-const SYNC_KEY_ORDER = ["project", "title", "stack", "repo", "remote", "branch", "gitStatus", "lastSynced"] as const;
+const SYNC_KEY_ORDER = ["project", "title", "stack", "remote"] as const;
 const SYNC_KEYS = new Set<string>(SYNC_KEY_ORDER);
+
+// Keys earlier versions wrote into the note that are now kept out of it:
+// `branch`/`gitStatus` flip constantly as you work in a repo, `repo` is a
+// machine-local absolute path, and `lastSynced` is pure bookkeeping. Mirrored
+// into a version-controlled vault, they churned its git history on every
+// scan with nothing a human authored. `repo` + `lastSynced` moved to
+// WarpedTodoSettings.projectSyncState; `branch`/`gitStatus` are read live
+// from the scan by the sidebar and never persisted. These are stripped from
+// any existing note's frontmatter on the next write that touches it.
+const LEGACY_SYNC_KEYS = new Set(["repo", "branch", "gitStatus", "lastSynced"]);
+
+/**
+ * Persistence hook for per-project sync bookkeeping (repo path + last-synced
+ * time). Backed by `WarpedTodoSettings.projectSyncState` in `data.json` —
+ * see `main.ts`. Kept as an interface so `ProjectSyncManager` doesn't depend
+ * on the plugin object and stays unit-testable with a plain fake.
+ */
+export interface ProjectSyncStateStore {
+  get(projectName: string): ProjectSyncStateEntry | undefined;
+  set(projectName: string, entry: ProjectSyncStateEntry): void;
+  /** Drop entries for projects no longer discovered — called after a full syncAll(). */
+  prune(currentProjectNames: string[]): void;
+}
 
 export interface SyncOptions {
   baseFolder: string;
@@ -41,6 +67,14 @@ export interface SyncOptions {
  * plus every sync writing the note — however lightly — was disruptive to a
  * note open for editing. Removed for that reason. Everything else in
  * the note (e.g. a hand-written `## Overview`) is left untouched.
+ *
+ * Volatile git facts (`branch`, `gitStatus`) and bookkeeping (`repo`,
+ * `lastSynced`) used to sit in the note's frontmatter too. In a vault under
+ * git that meant a spurious commit every time a tracked repo's working tree
+ * changed state. They're gone from the note now: `branch`/`gitStatus` are
+ * read live from the scan by the sidebar, `repo`/`lastSynced` moved to
+ * `projectSyncState` in `data.json`. The note's frontmatter now only
+ * changes on a rename, README-title edit, stack change, or remote repoint.
  */
 export class ProjectSyncManager {
   private watcher: FSWatcher | null = null;
@@ -75,7 +109,11 @@ export class ProjectSyncManager {
     // syncAll -> ... Found via live testing, spinning as fast as a full
     // scan+sync pass could complete (every ~200ms against a real base folder).
     // Callers should only re-render using the passed data.
-    private onSynced?: (scanned: ScannedProject[]) => void
+    private onSynced?: (scanned: ScannedProject[]) => void,
+    // Persists repo path + last-synced time per project (data.json). Optional
+    // so tests can construct a bare manager; in that case sync bookkeeping is
+    // simply not remembered across sessions.
+    private syncState?: ProjectSyncStateStore
   ) {}
 
   /** Discovers projects under `baseFolder`, reads their structured files, and syncs each note's frontmatter. */
@@ -92,10 +130,22 @@ export class ProjectSyncManager {
       await this.syncProject(project, items, options.projectsFolder);
     }
 
+    this.syncState?.prune(projects.map((p) => p.name));
     this.lastSyncCompletedAt = Date.now();
     this.lastScannedProjects = projects;
     this.onSynced?.(projects);
     return projects;
+  }
+
+  /**
+   * The repo root for a project by name — the live scan first (authoritative
+   * once a sync has run this session), falling back to the persisted
+   * `projectSyncState` for the window before that. Replaces the old `repo`
+   * frontmatter key as the source for "Send selection to project".
+   */
+  getRepoPathForProjectName(name: string): string | undefined {
+    const scanned = this.lastScannedProjects.find((p) => p.name === name);
+    return scanned?.localPath ?? this.syncState?.get(name)?.repoPath;
   }
 
   /** Cached items from the most recent syncAll() (or updateCachedItems) — see the class-level comment on lastItemsByPath. */
@@ -125,13 +175,12 @@ export class ProjectSyncManager {
     this.lastItemsByPath.set(scanned.localPath, items);
 
     const filePath = projectFilePath(projectsFolder, scanned.name);
-    const now = new Date().toISOString();
 
     const existing = this.app.vault.getAbstractFileByPath(filePath);
 
     if (!(existing instanceof TFile)) {
       await this.ensureFolderExists(filePath);
-      const frontmatter = serializeFrontmatter(mergeFrontmatter(new Map(), scanned, now));
+      const frontmatter = serializeFrontmatter(mergeFrontmatter(new Map(), scanned));
       // No leading `# name` heading — Obsidian's own file-title display
       // already shows the note's name at the top; a duplicate heading in the
       // body just repeated it a second time (a third, alongside the sidebar's
@@ -143,31 +192,50 @@ export class ProjectSyncManager {
       // underneath, no per-line tagging required.
       const body = `\n#${scanned.name}\n\n## Guiding Principles #principles\n\n## Overview\n\n`;
       await this.app.vault.create(filePath, frontmatter + body);
+      this.recordSyncState(scanned, { wrote: true });
       return;
     }
 
     const content = await this.app.vault.read(existing);
     const { entries, body } = parseFrontmatter(content);
-    const mergedEntries = mergeFrontmatter(entries, scanned, now);
+    const mergedEntries = mergeFrontmatter(entries, scanned);
 
-    // Bumping lastSynced on every pass made every sync a write, whether or not
-    // anything real changed — which floods Obsidian's own "modified externally"
-    // notice on a note that happens to be open (each vault.modify() on an open
-    // file triggers it, by Obsidian's own design). Compare against a version
-    // stamped with the *previous* lastSynced first; if that's the only
-    // difference, there's nothing real to sync, so skip the write and leave
-    // lastSynced stale until a sync actually finds something to change.
-    const previousLastSynced = entries.get("lastSynced");
-    if (previousLastSynced !== undefined) {
-      const unchanged = new Map(mergedEntries);
-      unchanged.set("lastSynced", previousLastSynced);
-      if (serializeFrontmatter(unchanged) + body === content) return;
+    // Semantic guard, not byte equality: write only when a key sync owns is
+    // actually out of date, or a legacy key still needs stripping. This
+    // deliberately does NOT rewrite the note over the user's own frontmatter
+    // formatting (compact `key:value`, reordered keys, a hand-added key) —
+    // sync has no opinion about any of that. With the volatile keys gone,
+    // "owned frontmatter up to date" is a stable state a project sits in
+    // indefinitely, so a synced note stops appearing in the vault's git
+    // diff until something a human would recognize as a change happens.
+    if (ownedFrontmatterUpToDate(entries, mergedEntries)) {
+      this.recordSyncState(scanned, { wrote: false });
+      return;
     }
 
     const updated = serializeFrontmatter(mergedEntries) + body;
     if (updated !== content) {
       await this.app.vault.modify(existing, updated);
+      this.recordSyncState(scanned, { wrote: true });
+    } else {
+      this.recordSyncState(scanned, { wrote: false });
     }
+  }
+
+  /**
+   * Persists the project's repo path (so "Send selection to project" works
+   * before the first scan of a session) and, when a sync actually wrote the
+   * note, a fresh `lastSynced` stamp. Skips the store write entirely when
+   * neither changed, so `data.json` doesn't churn on every idle scan either.
+   */
+  private recordSyncState(scanned: ScannedProject, opts: { wrote: boolean }): void {
+    if (!this.syncState) return;
+    const previous = this.syncState.get(scanned.name);
+    const lastSynced = opts.wrote ? new Date().toISOString() : previous?.lastSynced ?? "";
+    if (previous && previous.repoPath === scanned.localPath && previous.lastSynced === lastSynced) {
+      return;
+    }
+    this.syncState.set(scanned.name, { repoPath: scanned.localPath, lastSynced });
   }
 
   /**
@@ -430,18 +498,13 @@ function parseFrontmatter(content: string): ParsedFrontmatter {
 
 function mergeFrontmatter(
   existing: Map<string, string>,
-  scanned: ScannedProject,
-  lastSynced: string
+  scanned: ScannedProject
 ): Map<string, string> {
   const merged = new Map<string, string>();
   merged.set("project", quote(scanned.name));
   merged.set("title", quote(scanned.title));
   merged.set("stack", quoteList(scanned.stack));
-  merged.set("repo", quote(scanned.localPath));
   merged.set("remote", quote(scanned.remote));
-  merged.set("branch", quote(scanned.branch));
-  merged.set("gitStatus", quote(scanned.gitStatus));
-  merged.set("lastSynced", quote(lastSynced));
 
   // cssclasses (Obsidian's per-note styling hook, used to hide the Properties
   // panel — see styles.css) gets our class appended if it's missing, rather
@@ -456,12 +519,36 @@ function mergeFrontmatter(
   // Preserve anything else the user (or a future feature) added, in its
   // original order. cssclasses is excluded here — already handled above —
   // otherwise this would immediately overwrite mergeCssClasses()'s result
-  // with the untouched original value.
+  // with the untouched original value. LEGACY_SYNC_KEYS are dropped rather
+  // than carried forward: this is the one-time migration that strips
+  // `repo`/`branch`/`gitStatus`/`lastSynced` from a note first synced by an
+  // older version.
   for (const [key, value] of existing) {
-    if (key !== "cssclasses" && !SYNC_KEYS.has(key)) merged.set(key, value);
+    if (key !== "cssclasses" && !SYNC_KEYS.has(key) && !LEGACY_SYNC_KEYS.has(key)) {
+      merged.set(key, value);
+    }
   }
 
   return merged;
+}
+
+/**
+ * True when every frontmatter key sync owns (the four in SYNC_KEY_ORDER plus
+ * `cssclasses`) already holds its target value in `existing`, and no legacy
+ * key remains to be stripped. When this holds there is nothing for a write
+ * to accomplish, regardless of how the rest of the file is formatted.
+ */
+function ownedFrontmatterUpToDate(
+  existing: Map<string, string>,
+  merged: Map<string, string>
+): boolean {
+  for (const key of [...SYNC_KEY_ORDER, "cssclasses"]) {
+    if (existing.get(key) !== merged.get(key)) return false;
+  }
+  for (const key of LEGACY_SYNC_KEYS) {
+    if (existing.has(key)) return false;
+  }
+  return true;
 }
 
 function quote(value: string): string {

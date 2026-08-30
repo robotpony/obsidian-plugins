@@ -51,6 +51,31 @@ All notable changes to the ␣⌘ Warped Command plugin will be documented in th
   format" setting (renamed from "Date format"), unchanged and still
   `YYYY-MM-DD` by default, since due-date sorting and filename-date
   parsing depend on it staying in that shape.
+## [0.47.4] - 2026-08-30
+
+### Fixed — Project notes no longer churn the vault's git history on every sync
+
+- A repo-matched project note's frontmatter carried `branch`, `gitStatus`,
+  `repo`, and `lastSynced`. Those are transient (branch and status flip
+  every time you edit or commit in the tracked repo), machine-local (`repo`
+  is an absolute path), or pure bookkeeping. Mirrored into a vault under
+  git, they produced a spurious commit on the note whenever a tracked
+  repo's working tree changed state, and frontmatter merge conflicts
+  across machines.
+- Frontmatter now carries only `project`, `title`, `stack`, and `remote` —
+  all stable, human-meaningful facts that change on a rename, a
+  README-title edit, a stack change, or a remote repoint. The sidebar's
+  Projects detail view is unchanged: it already renders branch, status,
+  path, and stack from the live scan, not the note.
+- `repo` and `lastSynced` moved to plugin data (`data.json`), keyed by
+  project name, saved on a debounce. `branch`/`gitStatus` are read live and
+  never persisted.
+- One-time migration: the first sync that touches an existing project note
+  strips the four old keys. After that, an unchanged project's note stops
+  appearing in the vault's git diff entirely.
+- The write guard is now semantic (does an owned key actually differ?)
+  rather than byte-equality, so sync no longer rewrites a note over the
+  user's own frontmatter formatting.
 
 ## [0.47.3] - 2026-08-22
 

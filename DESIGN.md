@@ -97,9 +97,11 @@ this changed from the original delimited-block design.
 
 - `syncAll(options)`: runs `ProjectScanner`, reads each project's structured files off disk, parses them via `StructuredFileParser`, and calls `syncProject()` for each. This is the manual "Sync projects" entry point (`main.ts`'s "Sync Projects" command) and what a completed watch-debounce cycle calls.
 - `syncProject(scanned, items, projectsFolder)`: finds/creates the note via `projectFilePath()` — a helper extracted from `ProjectManager` (not `createProjectFile()`, which is coupled to an interactive create-confirmation modal that shouldn't fire during an automatic background sync). Updates the item cache (`getCachedItems()`/`updateCachedItems()`) regardless of whether the note itself needs writing.
-- Merges `ProjectScanner`-derived frontmatter keys (`project`, `repo`, `remote`, `branch`, `gitStatus`, `lastSynced`) into any existing frontmatter, rather than replacing it; unrecognized keys are preserved in their original order. **Only writes the note when something other than `lastSynced` actually changed** — bumping the timestamp unconditionally made every sync a write, which flooded Obsidian's own "modified externally" notice on a note open for editing, found via live testing. Since items no longer touch the note body, a sync where only the item list changed (the common case) now never writes the note at all.
+- Merges four `ProjectScanner`-derived frontmatter keys (`project`, `title`, `stack`, `remote`) into any existing frontmatter, rather than replacing it; unrecognized keys are preserved in their original order. These four are all stable — they change on a rename, a README-title edit, a stack change, or a remote repoint, nothing more. **The write guard is semantic, not byte-equality**: `ownedFrontmatterUpToDate()` writes only when one of the four (or `cssclasses`) is actually stale, or a legacy key still needs stripping. It deliberately does not rewrite the note over the user's own frontmatter formatting (compact `key:value`, reordered keys). Combined with items never touching the body, an unchanged project's note reaches a stable state and stops appearing in the vault's git diff.
+- **Volatile keys left the note.** Earlier versions also wrote `repo`, `branch`, `gitStatus`, and `lastSynced`. `branch`/`gitStatus` flip whenever a tracked repo's working tree changes state; `repo` is a machine-local absolute path; `lastSynced` is bookkeeping. In a vault under git that meant a spurious commit on the note every time you switched branches or left a repo dirty, plus cross-machine frontmatter merge conflicts. `branch`/`gitStatus` are now read live from the scan by the sidebar and never persisted. `repo` + `lastSynced` moved to `WarpedTodoSettings.projectSyncState` in `data.json`, keyed by project name, written through the injected `ProjectSyncStateStore` on a debounce (`main.ts`). `LEGACY_SYNC_KEYS` is stripped from an older note's frontmatter on the first sync that writes it — a one-time migration.
+- `getRepoPathForProjectName(name)`: resolves a project's repo root for "Send selection to project" (was the `repo` frontmatter key) — the live scan first, `projectSyncState` as the pre-first-scan fallback.
 - `startWatching()`/`stopWatching()`: a single recursive `fs.watch` on the base folder, debounced 300ms, ignoring events under an excluded directory (`isUnderExcludedDir()`, same list the scan uses) and events within 1500ms of the last completed sync (absorbs `git status` touching `.git/index`, which sits inside the watched tree). Recursive `fs.watch` is only reliable on macOS/Windows, not Linux, which is fine given the macOS-only scope decision
-- Calls `onSynced(scanned)` once per `syncAll()` batch, passing the fresh scan results directly. Callers **must not** respond by triggering another `syncAll()` (e.g. a sidebar "full reload" method) — `main.ts` learned this the hard way: wiring `onSynced` through a view's `reload()` (which itself calls `syncAll()`) is an unbounded loop, found via live testing as a project note's `lastSynced` updating roughly every 200ms. `onSynced` exists only to hand fresh data to an already-open sidebar for a re-render.
+- Calls `onSynced(scanned)` once per `syncAll()` batch, passing the fresh scan results directly. Callers **must not** respond by triggering another `syncAll()` (e.g. a sidebar "full reload" method) — `main.ts` learned this the hard way: wiring `onSynced` through a view's `reload()` (which itself calls `syncAll()`) is an unbounded loop, found via live testing as a project note being rewritten roughly every 200ms. `onSynced` exists only to hand fresh data to an already-open sidebar for a re-render.
 
 ### Projects tab (`src/SidebarView.ts`, logic shared from `src/ProjectsSidebarView.ts`)
 
@@ -245,9 +247,10 @@ an earlier version reconstructed its own `<ul>` around each item, which
 double-nested a source ordered list inside it; reported via screenshot).
 Omitted entirely when the project has none.
 
-Pinned fields (from frontmatter, not the full set): branch + git status,
-remote as a clickable link (opens the browsable URL), relative last-synced
-time, local path as a "reveal in Finder" action rather than raw text.
+Pinned fields, rendered from the live scan result already in memory (not by
+re-reading the note): project name doubling as the remote link (opens the
+browsable URL), stack, branch + git status, local path as a "reveal in
+Finder" action rather than raw text.
 
 **Frontmatter is hidden in the note itself for repo-matched projects** —
 the plugin applies a CSS class so the YAML block never renders in Reading/
@@ -516,9 +519,10 @@ interface ProjectInfo {
 }
 ```
 
-`lastSynced` is not a `ProjectInfo` field — it only ever lives as a string
-in the project note's frontmatter (`ProjectSyncManager`'s `SYNC_KEY_ORDER`),
-not on the in-memory type.
+`lastSynced` is not a `ProjectInfo` field and is not in the note. It lives
+in `WarpedTodoSettings.projectSyncState` (`data.json`), keyed by project
+name, alongside the repo's local path — plugin bookkeeping the sidebar
+doesn't currently surface. See `ProjectSyncManager`'s `ProjectSyncStateStore`.
 
 ## Priority System
 
@@ -699,9 +703,10 @@ Two suggester classes provide inline editing assistance:
 
 ## Projects Extension
 
-Adds a Projects tab that treats a folder of git repos as projects: repo
-facts sync into frontmatter on the same per-project vault note
-`ProjectManager` already owns, and tagged `#todo`/`#idea`/`#bug` items are
+Adds a Projects tab that treats a folder of git repos as projects: stable
+repo facts (name, README title, stack, remote) sync into frontmatter on the
+same per-project vault note `ProjectManager` already owns, and tagged
+`#todo`/`#idea`/`#bug` items are
 read from disk into an in-memory cache the sidebar displays directly (never
 written into the note — see "Item list" above for why), both in the
 Projects tab's own detail view and, interleaved with regular items, in the
@@ -719,9 +724,11 @@ shipped; this document is now the source of truth for it. Desktop only —
               reads git facts (execFile git ...) per repo
 2. Parse    : StructuredFileParser reads each repo's structured files
               for #todo/#idea/#bug items (contextual defaults, below)
-3. Sync     : ProjectSyncManager merges frontmatter into the project
-              note (item-only changes never touch the note) and
-              updates its in-memory item cache; calls onSynced(scanned)
+3. Sync     : ProjectSyncManager merges the four stable frontmatter keys
+              into the project note (item-only and volatile-git-fact
+              changes never touch the note), updates its in-memory item
+              cache, records repo path + lastSynced to data.json;
+              calls onSynced(scanned)
 4. Watch    : fs.watch on structured files + base folder triggers
               re-sync of the affected project; manual command forces
               a full rescan
@@ -757,11 +764,9 @@ A file matching neither shape contributes nothing.
 ```markdown
 ---
 project: peep
-repo: /Users/mx/projects/peep
+title: peep
+stack: ["Python"]
 remote: https://github.com/robotpony/peep
-branch: main
-gitStatus: M
-lastSynced: 2026-08-14T15:30:00Z
 cssclasses: warped-todo-project-note
 ---
 
@@ -772,8 +777,15 @@ cssclasses: warped-todo-project-note
 ## Overview
 
 Notes you write here survive every sync untouched — the whole body does,
-in fact: sync only ever touches the frontmatter block above.
+in fact: sync only ever touches the four frontmatter keys above.
 ```
+
+Branch, git status, the repo's local path, and the last-synced time are
+deliberately not in the note — they're volatile or machine-local, and
+mirroring them into a vault under git meant a spurious commit every time a
+tracked repo's working tree changed. Branch and status are read live from
+the scan for the sidebar; local path and last-synced live in
+`projectSyncState` in `data.json`.
 
 No leading `# peep` heading — Obsidian's own file-title display already
 shows it. `## Guiding Principles #principles` is scaffolded above

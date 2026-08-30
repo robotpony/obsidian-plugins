@@ -193,6 +193,24 @@ export interface WarpedTodoSettings {
   defaultProjectsSortKey: ProjectSortKey;
   /** "major.minor" of the plugin version the help note was last revealed at ("" = never). Drives HelpNoteManager: reopens (never overwrites) the help note when this falls behind the running version's major.minor. */
   helpNoteLastSeenVersion: string;
+  /**
+   * Per-project sync bookkeeping, keyed by project (repo folder) name. This
+   * moved out of each project note's frontmatter (`repo` + `lastSynced`
+   * keys) so a resync never rewrites a note the user keeps their own notes
+   * in — the old keys were volatile, machine-local, derived state that
+   * churned the vault's git history on every scan. Not a user-facing
+   * setting; it lives here only because Obsidian persists plugin state as a
+   * single `data.json` blob. See `ProjectSyncManager`.
+   */
+  projectSyncState: Record<string, ProjectSyncStateEntry>;
+}
+
+/** One project's persisted sync bookkeeping — see `WarpedTodoSettings.projectSyncState`. */
+export interface ProjectSyncStateEntry {
+  /** Absolute path to the repo root on this machine. */
+  repoPath: string;
+  /** ISO timestamp of the last sync that actually wrote the note, or "" if none has. */
+  lastSynced: string;
 }
 
 export const DEFAULT_SETTINGS: WarpedTodoSettings = {
@@ -226,4 +244,5 @@ export const DEFAULT_SETTINGS: WarpedTodoSettings = {
   projectsEditorApp: "Visual Studio Code",
   defaultProjectsSortKey: "recentlyUpdated",
   helpNoteLastSeenVersion: "",
+  projectSyncState: {},
 };

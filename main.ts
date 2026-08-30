@@ -93,8 +93,33 @@ export default class WarpedTodoPlugin extends Plugin {
     // through SidebarManager.refresh()/view.reload() — reload() itself calls
     // syncAll(), which would fire onSynced again: an unbounded loop. See
     // TodoSidebarView.applyProjectSyncResult's doc comment for how this was found.
-    this.projectSyncManager = new ProjectSyncManager(this.app, this.projectScanner, (scanned) =>
-      this.sidebarManager.forEach<TodoSidebarView>((view) => view.applyProjectSyncResult(scanned))
+    this.projectSyncManager = new ProjectSyncManager(
+      this.app,
+      this.projectScanner,
+      (scanned) =>
+        this.sidebarManager.forEach<TodoSidebarView>((view) => view.applyProjectSyncResult(scanned)),
+      // Per-project sync bookkeeping (repo path + last-synced time) lives in
+      // data.json, not the project note's frontmatter — see ProjectSyncManager
+      // and WarpedTodoSettings.projectSyncState. Saved on a debounce so a scan
+      // touching many projects is one write, not one per project.
+      {
+        get: (name) => this.settings.projectSyncState[name],
+        set: (name, entry) => {
+          this.settings.projectSyncState[name] = entry;
+          this.scheduleProjectSyncStateSave();
+        },
+        prune: (currentNames) => {
+          const keep = new Set(currentNames);
+          let changed = false;
+          for (const name of Object.keys(this.settings.projectSyncState)) {
+            if (!keep.has(name)) {
+              delete this.settings.projectSyncState[name];
+              changed = true;
+            }
+          }
+          if (changed) this.scheduleProjectSyncStateSave();
+        },
+      }
     );
     // Desktop-only feature (Node fs/child_process — see manifest.json's isDesktopOnly).
     // Only starts watching if a base folder is actually configured.
@@ -336,15 +361,20 @@ export default class WarpedTodoPlugin extends Plugin {
       },
     });
 
-    // Only available from a project note (has `repo` in frontmatter, written
-    // by ProjectSyncManager) with an active selection — checkCallback so it
-    // just doesn't appear where it can't do anything, rather than erroring.
+    // Only available from a repo-matched project note with an active
+    // selection — checkCallback so it just doesn't appear where it can't do
+    // anything, rather than erroring. The repo path comes from the live
+    // scan / projectSyncState now, not a frontmatter key.
     this.addCommand({
       id: "send-selection-to-project",
       name: "Send selection to project",
       editorCheckCallback: (checking, editor, ctx) => {
         const file = ctx.file;
-        const repo = getProjectRepoForFile(this.app, file);
+        const repo = getProjectRepoForFile(
+          file,
+          this.settings.defaultProjectsFolder,
+          (name) => this.projectSyncManager.getRepoPathForProjectName(name)
+        );
         const selection = editor.getSelection();
         if (!repo || !selection.trim()) return false;
         if (checking) return true;
@@ -423,9 +453,13 @@ export default class WarpedTodoPlugin extends Plugin {
           });
 
           // Same repo gate as the "Send selection to project" command —
-          // only offer this in a project note (has `repo` in frontmatter).
+          // only offer this in a repo-matched project note.
           const file = info.file;
-          const repo = getProjectRepoForFile(this.app, file);
+          const repo = getProjectRepoForFile(
+            file,
+            this.settings.defaultProjectsFolder,
+            (name) => this.projectSyncManager.getRepoPathForProjectName(name)
+          );
           if (repo) {
             menu.addItem((item) => {
               item
@@ -524,6 +558,13 @@ export default class WarpedTodoPlugin extends Plugin {
     this.tabLockManager.destroy();
     // Stop the Projects file watcher (fs.watch doesn't clean itself up)
     this.projectSyncManager?.stopWatching();
+    // Flush any pending projectSyncState write so a sync that landed just
+    // before unload isn't lost.
+    if (this.projectSyncStateSaveTimer) {
+      clearTimeout(this.projectSyncStateSaveTimer);
+      this.projectSyncStateSaveTimer = null;
+      void this.saveSettings();
+    }
   }
 
   async loadSettings() {
@@ -532,6 +573,21 @@ export default class WarpedTodoPlugin extends Plugin {
 
   async saveSettings() {
     await this.saveData(this.settings);
+  }
+
+  private projectSyncStateSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * Debounced persist for `settings.projectSyncState`. A full project scan
+   * calls the store's `set` once per project; without the debounce that's a
+   * `data.json` write per repo. 2s comfortably covers a scan pass.
+   */
+  private scheduleProjectSyncStateSave(): void {
+    if (this.projectSyncStateSaveTimer) clearTimeout(this.projectSyncStateSaveTimer);
+    this.projectSyncStateSaveTimer = setTimeout(() => {
+      this.projectSyncStateSaveTimer = null;
+      void this.saveSettings();
+    }, 2000);
   }
 
   /** Refresh all sidebar views (delegates to SidebarManager). */

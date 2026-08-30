@@ -1069,10 +1069,22 @@ export function openFileAtLine(
  * Shared gate for "Send selection to project": the command palette entry
  * and the editor right-click menu item both need the same answer to "is
  * this file a project note with a repo behind it" before offering the
- * action, so the frontmatter lookup lives here once rather than drifting
- * out of sync between the two call sites.
+ * action, so the resolution lives here once rather than drifting out of
+ * sync between the two call sites.
+ *
+ * The repo's local path used to be read from the note's own `repo`
+ * frontmatter key. That key (along with `branch`/`gitStatus`/`lastSynced`)
+ * no longer lives in the note — it was volatile, machine-local, derived
+ * state that churned the vault's git history on every sync. `resolveRepoPath`
+ * now answers from the live scan / plugin data instead (see
+ * `ProjectSyncManager.getRepoPathForProjectName`).
  */
-export function getProjectRepoForFile(app: App, file: TFile | null): string | undefined {
+export function getProjectRepoForFile(
+  file: TFile | null,
+  projectsFolder: string,
+  resolveRepoPath: (projectName: string) => string | undefined
+): string | undefined {
   if (!file) return undefined;
-  return app.metadataCache.getFileCache(file)?.frontmatter?.repo as string | undefined;
+  if (projectsFolder && !file.path.startsWith(projectsFolder)) return undefined;
+  return resolveRepoPath(file.basename);
 }

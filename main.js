@@ -646,11 +646,12 @@ function openFileAtLine(app, file, line, blockEndLine) {
     }
   });
 }
-function getProjectRepoForFile(app, file) {
-  var _a, _b;
+function getProjectRepoForFile(file, projectsFolder, resolveRepoPath) {
   if (!file)
     return void 0;
-  return (_b = (_a = app.metadataCache.getFileCache(file)) == null ? void 0 : _a.frontmatter) == null ? void 0 : _b.repo;
+  if (projectsFolder && !file.path.startsWith(projectsFolder))
+    return void 0;
+  return resolveRepoPath(file.basename);
 }
 
 // src/TodoScanner.ts
@@ -2882,13 +2883,15 @@ var STRUCTURED_FILENAMES = ["BUGS.md", "TODO.md", "TODOS.md", "IDEAS.md", "ISSUE
 var WATCH_DEBOUNCE_MS = 300;
 var WATCH_COOLDOWN_MS = 1500;
 var PROJECT_NOTE_CSS_CLASS = "warped-todo-project-note";
-var SYNC_KEY_ORDER = ["project", "title", "stack", "repo", "remote", "branch", "gitStatus", "lastSynced"];
+var SYNC_KEY_ORDER = ["project", "title", "stack", "remote"];
 var SYNC_KEYS = new Set(SYNC_KEY_ORDER);
+var LEGACY_SYNC_KEYS = /* @__PURE__ */ new Set(["repo", "branch", "gitStatus", "lastSynced"]);
 var ProjectSyncManager = class {
-  constructor(app, scanner = new ProjectScanner(), onSynced) {
+  constructor(app, scanner = new ProjectScanner(), onSynced, syncState) {
     this.app = app;
     this.scanner = scanner;
     this.onSynced = onSynced;
+    this.syncState = syncState;
     this.watcher = null;
     this.debounceTimer = null;
     // Set at the end of every syncAll() (manual or watch-triggered) — see
@@ -2914,7 +2917,7 @@ var ProjectSyncManager = class {
   }
   /** Discovers projects under `baseFolder`, reads their structured files, and syncs each note's frontmatter. */
   async syncAll(options) {
-    var _a;
+    var _a, _b;
     const scanned = await this.scanner.scan({
       baseFolder: options.baseFolder,
       maxDepth: options.maxDepth,
@@ -2925,10 +2928,22 @@ var ProjectSyncManager = class {
       const items = await readProjectItems(project.localPath);
       await this.syncProject(project, items, options.projectsFolder);
     }
+    (_a = this.syncState) == null ? void 0 : _a.prune(projects.map((p) => p.name));
     this.lastSyncCompletedAt = Date.now();
     this.lastScannedProjects = projects;
-    (_a = this.onSynced) == null ? void 0 : _a.call(this, projects);
+    (_b = this.onSynced) == null ? void 0 : _b.call(this, projects);
     return projects;
+  }
+  /**
+   * The repo root for a project by name — the live scan first (authoritative
+   * once a sync has run this session), falling back to the persisted
+   * `projectSyncState` for the window before that. Replaces the old `repo`
+   * frontmatter key as the source for "Send selection to project".
+   */
+  getRepoPathForProjectName(name) {
+    var _a, _b, _c;
+    const scanned = this.lastScannedProjects.find((p) => p.name === name);
+    return (_c = scanned == null ? void 0 : scanned.localPath) != null ? _c : (_b = (_a = this.syncState) == null ? void 0 : _a.get(name)) == null ? void 0 : _b.repoPath;
   }
   /** Cached items from the most recent syncAll() (or updateCachedItems) — see the class-level comment on lastItemsByPath. */
   getCachedItems(localPath) {
@@ -2948,11 +2963,10 @@ var ProjectSyncManager = class {
   async syncProject(scanned, items, projectsFolder) {
     this.lastItemsByPath.set(scanned.localPath, items);
     const filePath = projectFilePath(projectsFolder, scanned.name);
-    const now = (/* @__PURE__ */ new Date()).toISOString();
     const existing = this.app.vault.getAbstractFileByPath(filePath);
     if (!(existing instanceof import_obsidian6.TFile)) {
       await this.ensureFolderExists(filePath);
-      const frontmatter = serializeFrontmatter(mergeFrontmatter(/* @__PURE__ */ new Map(), scanned, now));
+      const frontmatter = serializeFrontmatter(mergeFrontmatter(/* @__PURE__ */ new Map(), scanned));
       const body2 = `
 #${scanned.name}
 
@@ -2962,22 +2976,40 @@ var ProjectSyncManager = class {
 
 `;
       await this.app.vault.create(filePath, frontmatter + body2);
+      this.recordSyncState(scanned, { wrote: true });
       return;
     }
     const content = await this.app.vault.read(existing);
     const { entries, body } = parseFrontmatter(content);
-    const mergedEntries = mergeFrontmatter(entries, scanned, now);
-    const previousLastSynced = entries.get("lastSynced");
-    if (previousLastSynced !== void 0) {
-      const unchanged = new Map(mergedEntries);
-      unchanged.set("lastSynced", previousLastSynced);
-      if (serializeFrontmatter(unchanged) + body === content)
-        return;
+    const mergedEntries = mergeFrontmatter(entries, scanned);
+    if (ownedFrontmatterUpToDate(entries, mergedEntries)) {
+      this.recordSyncState(scanned, { wrote: false });
+      return;
     }
     const updated = serializeFrontmatter(mergedEntries) + body;
     if (updated !== content) {
       await this.app.vault.modify(existing, updated);
+      this.recordSyncState(scanned, { wrote: true });
+    } else {
+      this.recordSyncState(scanned, { wrote: false });
     }
+  }
+  /**
+   * Persists the project's repo path (so "Send selection to project" works
+   * before the first scan of a session) and, when a sync actually wrote the
+   * note, a fresh `lastSynced` stamp. Skips the store write entirely when
+   * neither changed, so `data.json` doesn't churn on every idle scan either.
+   */
+  recordSyncState(scanned, opts) {
+    var _a;
+    if (!this.syncState)
+      return;
+    const previous = this.syncState.get(scanned.name);
+    const lastSynced = opts.wrote ? (/* @__PURE__ */ new Date()).toISOString() : (_a = previous == null ? void 0 : previous.lastSynced) != null ? _a : "";
+    if (previous && previous.repoPath === scanned.localPath && previous.lastSynced === lastSynced) {
+      return;
+    }
+    this.syncState.set(scanned.name, { repoPath: scanned.localPath, lastSynced });
   }
   /**
    * Watches the base folder recursively for changes (new/removed repos, edited
@@ -3196,22 +3228,30 @@ function parseFrontmatter(content) {
   }
   return { entries, body: content.slice(match[0].length) };
 }
-function mergeFrontmatter(existing, scanned, lastSynced) {
+function mergeFrontmatter(existing, scanned) {
   const merged = /* @__PURE__ */ new Map();
   merged.set("project", quote(scanned.name));
   merged.set("title", quote(scanned.title));
   merged.set("stack", quoteList(scanned.stack));
-  merged.set("repo", quote(scanned.localPath));
   merged.set("remote", quote(scanned.remote));
-  merged.set("branch", quote(scanned.branch));
-  merged.set("gitStatus", quote(scanned.gitStatus));
-  merged.set("lastSynced", quote(lastSynced));
   merged.set("cssclasses", mergeCssClasses(existing.get("cssclasses")));
   for (const [key, value] of existing) {
-    if (key !== "cssclasses" && !SYNC_KEYS.has(key))
+    if (key !== "cssclasses" && !SYNC_KEYS.has(key) && !LEGACY_SYNC_KEYS.has(key)) {
       merged.set(key, value);
+    }
   }
   return merged;
+}
+function ownedFrontmatterUpToDate(existing, merged) {
+  for (const key of [...SYNC_KEY_ORDER, "cssclasses"]) {
+    if (existing.get(key) !== merged.get(key))
+      return false;
+  }
+  for (const key of LEGACY_SYNC_KEYS) {
+    if (existing.has(key))
+      return false;
+  }
+  return true;
 }
 function quote(value) {
   return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
@@ -7188,7 +7228,8 @@ var DEFAULT_SETTINGS = {
   projectsTerminalApp: "Terminal",
   projectsEditorApp: "Visual Studio Code",
   defaultProjectsSortKey: "recentlyUpdated",
-  helpNoteLastSeenVersion: ""
+  helpNoteLastSeenVersion: "",
+  projectSyncState: {}
 };
 
 // src/SlackConverter.ts
@@ -7784,6 +7825,10 @@ function createHeaderChecklistExtension() {
 
 // main.ts
 var WarpedTodoPlugin = class extends import_obsidian15.Plugin {
+  constructor() {
+    super(...arguments);
+    this.projectSyncStateSaveTimer = null;
+  }
   async onload() {
     await this.loadSettings();
     if (!this.settings.focusModePersist && this.settings.focusModeActive) {
@@ -7808,7 +7853,30 @@ var WarpedTodoPlugin = class extends import_obsidian15.Plugin {
     this.projectSyncManager = new ProjectSyncManager(
       this.app,
       this.projectScanner,
-      (scanned) => this.sidebarManager.forEach((view) => view.applyProjectSyncResult(scanned))
+      (scanned) => this.sidebarManager.forEach((view) => view.applyProjectSyncResult(scanned)),
+      // Per-project sync bookkeeping (repo path + last-synced time) lives in
+      // data.json, not the project note's frontmatter — see ProjectSyncManager
+      // and WarpedTodoSettings.projectSyncState. Saved on a debounce so a scan
+      // touching many projects is one write, not one per project.
+      {
+        get: (name) => this.settings.projectSyncState[name],
+        set: (name, entry) => {
+          this.settings.projectSyncState[name] = entry;
+          this.scheduleProjectSyncStateSave();
+        },
+        prune: (currentNames) => {
+          const keep = new Set(currentNames);
+          let changed = false;
+          for (const name of Object.keys(this.settings.projectSyncState)) {
+            if (!keep.has(name)) {
+              delete this.settings.projectSyncState[name];
+              changed = true;
+            }
+          }
+          if (changed)
+            this.scheduleProjectSyncStateSave();
+        }
+      }
     );
     if (this.settings.projectsBaseFolder) {
       this.projectSyncManager.startWatching(this.projectsSyncOptions());
@@ -7987,7 +8055,11 @@ var WarpedTodoPlugin = class extends import_obsidian15.Plugin {
       name: "Send selection to project",
       editorCheckCallback: (checking, editor, ctx) => {
         const file = ctx.file;
-        const repo = getProjectRepoForFile(this.app, file);
+        const repo = getProjectRepoForFile(
+          file,
+          this.settings.defaultProjectsFolder,
+          (name) => this.projectSyncManager.getRepoPathForProjectName(name)
+        );
         const selection = editor.getSelection();
         if (!repo || !selection.trim())
           return false;
@@ -8056,7 +8128,11 @@ var WarpedTodoPlugin = class extends import_obsidian15.Plugin {
             });
           });
           const file = info.file;
-          const repo = getProjectRepoForFile(this.app, file);
+          const repo = getProjectRepoForFile(
+            file,
+            this.settings.defaultProjectsFolder,
+            (name) => this.projectSyncManager.getRepoPathForProjectName(name)
+          );
           if (repo) {
             menu.addItem((item) => {
               item.setTitle("Send selection to project").setIcon("send").onClick(() => {
@@ -8129,12 +8205,30 @@ var WarpedTodoPlugin = class extends import_obsidian15.Plugin {
     this.app.workspace.detachLeavesOfType("warped-todo-projects-sidebar");
     this.tabLockManager.destroy();
     (_a = this.projectSyncManager) == null ? void 0 : _a.stopWatching();
+    if (this.projectSyncStateSaveTimer) {
+      clearTimeout(this.projectSyncStateSaveTimer);
+      this.projectSyncStateSaveTimer = null;
+      void this.saveSettings();
+    }
   }
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
   }
   async saveSettings() {
     await this.saveData(this.settings);
+  }
+  /**
+   * Debounced persist for `settings.projectSyncState`. A full project scan
+   * calls the store's `set` once per project; without the debounce that's a
+   * `data.json` write per repo. 2s comfortably covers a scan pass.
+   */
+  scheduleProjectSyncStateSave() {
+    if (this.projectSyncStateSaveTimer)
+      clearTimeout(this.projectSyncStateSaveTimer);
+    this.projectSyncStateSaveTimer = setTimeout(() => {
+      this.projectSyncStateSaveTimer = null;
+      void this.saveSettings();
+    }, 2e3);
   }
   /** Refresh all sidebar views (delegates to SidebarManager). */
   refreshSidebar() {

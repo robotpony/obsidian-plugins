@@ -60,9 +60,15 @@ describe("ProjectSyncManager.syncProject: creating a new note", () => {
     const content = vault.getRawContent("projects/peep.md");
     expect(content).toBeDefined();
     expect(content).toContain('project: "peep"');
-    expect(content).toContain('repo: "/repos/peep"');
+    expect(content).toContain('title: "peep"');
+    expect(content).toContain('stack: []');
     expect(content).toContain('remote: "https://github.com/robotpony/peep.git"');
-    expect(content).toContain('branch: "main"');
+    // Volatile / machine-local / bookkeeping keys are not written into the
+    // note any more — they churned the vault's git history on every sync.
+    expect(content).not.toContain("repo:");
+    expect(content).not.toContain("branch:");
+    expect(content).not.toContain("gitStatus:");
+    expect(content).not.toContain("lastSynced:");
     expect(content).toContain("#peep");
     expect(content).toContain("## Guiding Principles #principles");
     expect(content).toContain("## Overview");
@@ -89,7 +95,7 @@ describe("ProjectSyncManager.syncProject: creating a new note", () => {
 });
 
 describe("ProjectSyncManager.syncProject: updating an existing note", () => {
-  it("preserves a hand-added frontmatter key and the entire body verbatim", async () => {
+  it("strips legacy volatile keys, preserves a hand-added key, and leaves the body verbatim", async () => {
     const { app, vault } = createFakeApp();
     const manager = new ProjectSyncManager(app as any);
 
@@ -122,7 +128,11 @@ describe("ProjectSyncManager.syncProject: updating an existing note", () => {
     const content = vault.getRawContent("projects/peep.md")!;
     expect(content).toContain("status: favourite"); // preserved, not sync-owned
     expect(content).toContain("Notes I wrote by hand. Do not touch."); // body untouched
-    expect(content).toContain('gitStatus: "M"'); // sync-owned key updated
+    // One-time migration: the old frontmatter keys are gone.
+    expect(content).not.toContain("repo:");
+    expect(content).not.toContain("branch:");
+    expect(content).not.toContain("gitStatus:");
+    expect(content).not.toContain("lastSynced:");
     expect(content).toContain('cssclasses: "warped-todo-project-note"'); // added, wasn't set before
   });
 
@@ -135,11 +145,9 @@ describe("ProjectSyncManager.syncProject: updating an existing note", () => {
       [
         "---",
         'project: "peep"',
-        'repo: "/repos/peep"',
+        'title: "peep"',
+        "stack: []",
         'remote: "https://github.com/robotpony/peep.git"',
-        'branch: "main"',
-        'gitStatus: ""',
-        'lastSynced: "2026-01-01T00:00:00.000Z"',
         "cssclasses: my-custom-style",
         "---",
         "",
@@ -176,15 +184,18 @@ describe("ProjectSyncManager.syncProject: updating an existing note", () => {
       ].join("\n")
     );
 
+    // Legacy keys present, so this sync does write (and strips them) — the
+    // point here is that cssclasses isn't doubled up in the process.
     await manager.syncProject(scannedFixture({ gitStatus: "M" }), [item()], PROJECTS_FOLDER);
 
     const content = vault.getRawContent("projects/peep.md")!;
     const occurrences = content.match(/warped-todo-project-note/g) ?? [];
     expect(occurrences).toHaveLength(1);
     expect(content).toContain('cssclasses: ["my-custom-style", "warped-todo-project-note"]');
+    expect(content).not.toContain("lastSynced:");
   });
 
-  it("is idempotent: two syncs with no underlying change produce identical frontmatter and body (aside from lastSynced)", async () => {
+  it("is fully idempotent: two syncs with no underlying change produce byte-identical output", async () => {
     const { app, vault } = createFakeApp();
     const manager = new ProjectSyncManager(app as any);
 
@@ -194,16 +205,13 @@ describe("ProjectSyncManager.syncProject: updating an existing note", () => {
     await manager.syncProject(scannedFixture(), [item()], PROJECTS_FOLDER);
     const second = vault.getRawContent("projects/peep.md")!;
 
-    const stripLastSynced = (s: string) => s.replace(/lastSynced: "[^"]*"/, "lastSynced: STRIPPED");
-    expect(stripLastSynced(first)).toBe(stripLastSynced(second));
+    expect(first).toBe(second);
   });
 
-  // Bug found via live testing: bumping lastSynced on every sync made every
-  // sync a write, which floods Obsidian's own "modified externally" notice on
-  // a note open for editing (each vault.modify() on an open file triggers it)
-  // — and, since items no longer touch the note either, there is now *never*
-  // a reason to write on an unchanged project.
-  it("does not write to the note at all when nothing but lastSynced would change", async () => {
+  // With the volatile keys gone from the note, an unchanged project sits in
+  // a stable "nothing to write" state indefinitely — so it stops appearing
+  // in the vault's git diff until a human-recognizable change happens.
+  it("does not write to the note on a second sync when nothing owned changed", async () => {
     const { app, vault } = createFakeApp();
     const manager = new ProjectSyncManager(app as any);
 
@@ -211,6 +219,22 @@ describe("ProjectSyncManager.syncProject: updating an existing note", () => {
     const modifySpy = vi.spyOn(vault, "modify");
 
     await manager.syncProject(scannedFixture(), [item()], PROJECTS_FOLDER);
+
+    expect(modifySpy).not.toHaveBeenCalled();
+  });
+
+  it("does not write to the note when only a volatile git fact (branch/gitStatus) changes", async () => {
+    const { app, vault } = createFakeApp();
+    const manager = new ProjectSyncManager(app as any);
+
+    await manager.syncProject(scannedFixture(), [item()], PROJECTS_FOLDER);
+    const modifySpy = vi.spyOn(vault, "modify");
+
+    await manager.syncProject(
+      scannedFixture({ branch: "feature/x", gitStatus: "M?" }),
+      [item()],
+      PROJECTS_FOLDER
+    );
 
     expect(modifySpy).not.toHaveBeenCalled();
   });
@@ -227,17 +251,75 @@ describe("ProjectSyncManager.syncProject: updating an existing note", () => {
     expect(modifySpy).not.toHaveBeenCalled();
   });
 
-  it("does write when something real (a git fact) changes, even though lastSynced also changes", async () => {
+  it("does write when an owned fact (title / stack / remote) changes", async () => {
     const { app, vault } = createFakeApp();
     const manager = new ProjectSyncManager(app as any);
 
     await manager.syncProject(scannedFixture(), [item()], PROJECTS_FOLDER);
     const modifySpy = vi.spyOn(vault, "modify");
 
-    await manager.syncProject(scannedFixture({ gitStatus: "M?" }), [item()], PROJECTS_FOLDER);
+    await manager.syncProject(
+      scannedFixture({ title: "Peep CLI", stack: ["Python"] }),
+      [item()],
+      PROJECTS_FOLDER
+    );
 
     expect(modifySpy).toHaveBeenCalledTimes(1);
-    expect(vault.getRawContent("projects/peep.md")).toContain('gitStatus: "M?"');
+    const content = vault.getRawContent("projects/peep.md")!;
+    expect(content).toContain('title: "Peep CLI"');
+    expect(content).toContain('stack: ["Python"]');
+  });
+});
+
+describe("ProjectSyncManager: projectSyncState store", () => {
+  function fakeStore() {
+    const entries = new Map<string, { repoPath: string; lastSynced: string }>();
+    return {
+      entries,
+      get: (name: string) => entries.get(name),
+      set: vi.fn((name: string, entry: { repoPath: string; lastSynced: string }) =>
+        entries.set(name, entry)
+      ),
+      prune: vi.fn((names: string[]) => {
+        const keep = new Set(names);
+        for (const key of [...entries.keys()]) if (!keep.has(key)) entries.delete(key);
+      }),
+    };
+  }
+
+  it("records the repo path and a lastSynced stamp when a sync writes the note", async () => {
+    const { app } = createFakeApp();
+    const store = fakeStore();
+    const manager = new ProjectSyncManager(app as any, new ProjectScanner(), undefined, store);
+
+    await manager.syncProject(scannedFixture(), [item()], PROJECTS_FOLDER);
+
+    const entry = store.entries.get("peep");
+    expect(entry?.repoPath).toBe("/repos/peep");
+    expect(entry?.lastSynced).not.toBe("");
+  });
+
+  it("does not touch the store on a no-op sync once repoPath and lastSynced are stable", async () => {
+    const { app } = createFakeApp();
+    const store = fakeStore();
+    const manager = new ProjectSyncManager(app as any, new ProjectScanner(), undefined, store);
+
+    await manager.syncProject(scannedFixture(), [item()], PROJECTS_FOLDER);
+    store.set.mockClear();
+
+    await manager.syncProject(scannedFixture(), [item()], PROJECTS_FOLDER);
+
+    expect(store.set).not.toHaveBeenCalled();
+  });
+
+  it("getRepoPathForProjectName falls back to the store before the first scan", () => {
+    const { app } = createFakeApp();
+    const store = fakeStore();
+    store.entries.set("peep", { repoPath: "/repos/peep", lastSynced: "2026-01-01T00:00:00.000Z" });
+    const manager = new ProjectSyncManager(app as any, new ProjectScanner(), undefined, store);
+
+    expect(manager.getRepoPathForProjectName("peep")).toBe("/repos/peep");
+    expect(manager.getRepoPathForProjectName("unknown")).toBeUndefined();
   });
 });
 
@@ -316,6 +398,33 @@ describe("ProjectSyncManager.syncAll", () => {
     expect(cached.map((i) => i.text)).toEqual(
       expect.arrayContaining([expect.stringContaining("Crashes on empty input")])
     );
+
+    // Frontmatter carries only the stable keys now.
+    expect(content).not.toMatch(/^(repo|branch|gitStatus|lastSynced):/m);
+  });
+
+  it("prunes projectSyncState entries for projects that are no longer discovered", async () => {
+    const repoDir = join(base, "widget-tool");
+    await mkdir(repoDir);
+    initRepo(repoDir);
+
+    const { app } = createFakeApp();
+    const entries = new Map<string, { repoPath: string; lastSynced: string }>();
+    entries.set("ghost-project", { repoPath: "/gone", lastSynced: "2026-01-01T00:00:00.000Z" });
+    const store = {
+      get: (name: string) => entries.get(name),
+      set: (name: string, entry: { repoPath: string; lastSynced: string }) => entries.set(name, entry),
+      prune: (names: string[]) => {
+        const keep = new Set(names);
+        for (const key of [...entries.keys()]) if (!keep.has(key)) entries.delete(key);
+      },
+    };
+    const manager = new ProjectSyncManager(app as any, new ProjectScanner(), undefined, store);
+
+    await manager.syncAll({ baseFolder: base, projectsFolder: PROJECTS_FOLDER });
+
+    expect(entries.has("ghost-project")).toBe(false);
+    expect(entries.has("widget-tool")).toBe(true);
   });
 
   it("calls onSynced once per syncAll batch, with the scanned projects", async () => {
