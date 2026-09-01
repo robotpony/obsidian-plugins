@@ -33,16 +33,25 @@ export async function setProjectItemCompletion(
   completed: boolean,
   context?: ProjectItemCompletionContext
 ): Promise<boolean> {
+  let ok: boolean;
   switch (item.shape) {
     case "checkbox":
-      return applyCheckboxToggle(item, completed);
+      ok = await applyCheckboxToggle(item, completed);
+      break;
     case "plainBullet":
-      return applyPlainBulletCompletion(item, completed);
+      ok = await applyPlainBulletCompletion(item, completed);
+      break;
     case "headerStandalone":
-      return applyResolvedMarkerToggle(item, completed);
+      ok = await applyResolvedMarkerToggle(item, completed);
+      break;
     case "headerNested":
-      return applyHeaderBlockMove(item, completed, context);
+      ok = await applyHeaderBlockMove(item, completed, context);
+      break;
   }
+  // Match the vault-item feedback (TodoProcessor.completeTodo/uncompleteTodo):
+  // the same checkbox click on a synced project row should say the same thing.
+  if (ok) showNotice(completed ? "Item completed." : "Item reopened.");
+  return ok;
 }
 
 async function applyCheckboxToggle(item: ParsedProjectItem, completed: boolean): Promise<boolean> {
@@ -57,7 +66,7 @@ async function applyCheckboxToggle(item: ParsedProjectItem, completed: boolean):
     return true;
   } catch (error) {
     console.error(TAG, "Failed to toggle checkbox:", error);
-    showNotice("Failed to update item. See console for details.");
+    showNotice("Couldn't update the item. See console for details.");
     return false;
   }
 }
@@ -65,7 +74,8 @@ async function applyCheckboxToggle(item: ParsedProjectItem, completed: boolean):
 async function applyPlainBulletCompletion(item: ParsedProjectItem, completed: boolean): Promise<boolean> {
   if (!completed) {
     showNotice(
-      "Can't un-complete this item — its completion comes from the section it's under, not its own line. Edit the file directly."
+      "Can't reopen this item from the sidebar. Its completion comes from the section it's under, not its own line, so edit the file directly.",
+      8000
     );
     return false;
   }
@@ -80,7 +90,7 @@ async function applyPlainBulletCompletion(item: ParsedProjectItem, completed: bo
     return true;
   } catch (error) {
     console.error(TAG, "Failed to complete item:", error);
-    showNotice("Failed to update item. See console for details.");
+    showNotice("Couldn't update the item. See console for details.");
     return false;
   }
 }
@@ -100,7 +110,7 @@ async function applyResolvedMarkerToggle(item: ParsedProjectItem, completed: boo
     return true;
   } catch (error) {
     console.error(TAG, "Failed to update item status:", error);
-    showNotice("Failed to update item. See console for details.");
+    showNotice("Couldn't update the item. See console for details.");
     return false;
   }
 }
@@ -112,14 +122,15 @@ async function applyHeaderBlockMove(
 ): Promise<boolean> {
   if (!context) {
     showNotice(
-      "Can't complete this from the sidebar yet — it needs moving to a different section. Edit the file directly for now."
+      "Can't complete this from the sidebar. It needs moving to a different section, so edit the file directly.",
+      8000
     );
     return false;
   }
 
   const result = await moveHeaderBlock(item, completed, context.repoPath, context.scanner);
   if (!result.ok) {
-    showNotice(result.reason ?? "Failed to move item. See console for details.");
+    showNotice(result.reason ?? "Couldn't move the item. See console for details.");
     return false;
   }
   return true;
@@ -153,10 +164,11 @@ export async function setProjectItemPriority(
       undefined,
       item.fingerprint
     );
+    showNotice(`Priority set to ${newTag}${addFocus ? " + #focus" : ""}.`);
     return true;
   } catch (error) {
     console.error(TAG, "Failed to set priority:", error);
-    showNotice("Failed to set priority. See console for details.");
+    showNotice("Couldn't set the priority. See console for details.");
     return false;
   }
 }
@@ -175,12 +187,13 @@ export async function addProjectItemTag(item: ParsedProjectItem, tag: string): P
       },
       item.fingerprint
     );
+    showNotice(`Added ${tag}.`);
     return true;
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     if (msg.includes("already present")) return true; // not a failure worth surfacing
     console.error(TAG, "Failed to add tag:", error);
-    showNotice("Failed to add tag. See console for details.");
+    showNotice("Couldn't add the tag. See console for details.");
     return false;
   }
 }
@@ -199,10 +212,11 @@ export async function removeProjectItemTag(item: ParsedProjectItem, tag: string)
       undefined,
       item.fingerprint
     );
+    showNotice(`Removed ${tag}.`);
     return true;
   } catch (error) {
     console.error(TAG, "Failed to remove tag:", error);
-    showNotice("Failed to remove tag. See console for details.");
+    showNotice("Couldn't remove the tag. See console for details.");
     return false;
   }
 }

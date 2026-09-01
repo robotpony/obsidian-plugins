@@ -2555,7 +2555,7 @@ export class TodoSidebarView extends ItemView {
       });
     } catch (error) {
       console.error("[Warped Todo]", "Project sync failed:", error);
-      showNotice("Project sync failed. See console for details.");
+      showNotice("Couldn't sync Projects. See console for details.");
     } finally {
       this.projectsSyncing = false;
       this.projectsSyncedOnce = true;
@@ -3337,7 +3337,7 @@ export class TodoSidebarView extends ItemView {
       shell.openPath(path);
     } catch (error) {
       console.error("[Warped Todo]", "Failed to open file:", error);
-      showNotice("Couldn't open file. See console for details.");
+      showNotice("Couldn't open the file. See console for details.");
     }
   }
 

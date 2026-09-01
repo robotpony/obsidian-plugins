@@ -1169,11 +1169,11 @@ var TodoProcessor = class {
       if (this.onComplete) {
         this.onComplete();
       }
-      showNotice2("TODO marked as complete!");
+      showNotice2("TODO completed.");
       return true;
     } catch (error) {
       console.error("Error completing TODO:", error);
-      showNotice2("Failed to complete TODO. See console for details.");
+      showNotice2("Couldn't complete the TODO. See console for details.");
       return false;
     }
   }
@@ -1186,11 +1186,11 @@ var TodoProcessor = class {
       if (this.onComplete) {
         this.onComplete();
       }
-      showNotice2("TODO marked as incomplete!");
+      showNotice2("TODO reopened.");
       return true;
     } catch (error) {
-      console.error("Error uncompleting TODO:", error);
-      showNotice2("Failed to uncomplete TODO. See console for details.");
+      console.error("Error reopening TODO:", error);
+      showNotice2("Couldn't reopen the TODO. See console for details.");
       return false;
     }
   }
@@ -1203,7 +1203,7 @@ var TodoProcessor = class {
     var _a, _b;
     try {
       if (todo.filePath === destinationPath) {
-        showNotice2("Cannot move to the same file.");
+        showNotice2("Can't move a TODO to the file it's already in.");
         return false;
       }
       const today = formatDate(/* @__PURE__ */ new Date(), this.dateFormat);
@@ -1248,12 +1248,12 @@ var TodoProcessor = class {
       }
       const basename3 = ((_a = destinationPath.split("/").pop()) == null ? void 0 : _a.replace(/\.md$/, "")) || destinationPath;
       const childCount = todo.isHeader && ((_b = todo.childLineNumbers) == null ? void 0 : _b.length) || 0;
-      const message = childCount > 0 ? `Moved to ${basename3} (including ${childCount} child item${childCount > 1 ? "s" : ""})` : `Moved to ${basename3}`;
+      const message = childCount > 0 ? `Moved to ${basename3}, including ${pluralize(childCount, "child item")}.` : `Moved to ${basename3}.`;
       showNotice2(message);
       return true;
     } catch (error) {
       console.error("Error moving TODO:", error);
-      showNotice2("Failed to move TODO. See console for details.");
+      showNotice2("Couldn't move the TODO. See console for details.");
       return false;
     }
   }
@@ -1361,11 +1361,11 @@ ${text}` : text;
         await this.scanner.scanFile(todo.file);
       if (this.onComplete)
         this.onComplete();
-      showNotice2(`Priority set to ${newTag}${addFocus ? " + #focus" : ""}`);
+      showNotice2(`Priority set to ${newTag}${addFocus ? " + #focus" : ""}.`);
       return true;
     } catch (error) {
       console.error("Error setting priority:", error);
-      showNotice2("Failed to set priority. See console for details.");
+      showNotice2("Couldn't set the priority. See console for details.");
       return false;
     }
   }
@@ -1387,11 +1387,11 @@ ${text}` : text;
         await this.scanner.scanFile(todo.file);
       if (this.onComplete)
         this.onComplete();
-      showNotice2(`Removed ${tag}`);
+      showNotice2(`Removed ${tag}.`);
       return true;
     } catch (error) {
       console.error("Error removing tag:", error);
-      showNotice2("Failed to remove tag. See console for details.");
+      showNotice2("Couldn't remove the tag. See console for details.");
       return false;
     }
   }
@@ -1413,14 +1413,14 @@ ${text}` : text;
         await this.scanner.scanFile(item.file);
       if (this.onComplete)
         this.onComplete();
-      showNotice2(`Added ${tag}`);
+      showNotice2(`Added ${tag}.`);
       return true;
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       if (msg.includes("already present"))
         return true;
       console.error("Error adding tag:", error);
-      showNotice2("Failed to add tag. See console for details.");
+      showNotice2("Couldn't add the tag. See console for details.");
       return false;
     }
   }
@@ -1439,11 +1439,11 @@ ${text}` : text;
         await this.scanner.scanFile(idea.file);
       if (this.onComplete)
         this.onComplete();
-      showNotice2("Idea completed!");
+      showNotice2("Idea completed.");
       return true;
     } catch (error) {
       console.error("Error completing idea:", error);
-      showNotice2("Failed to complete idea. See console for details.");
+      showNotice2("Couldn't complete the idea. See console for details.");
       return false;
     }
   }
@@ -1461,11 +1461,11 @@ ${text}` : text;
         await this.scanner.scanFile(idea.file);
       if (this.onComplete)
         this.onComplete();
-      showNotice2("Idea promoted to TODO!");
+      showNotice2("Idea promoted to TODO.");
       return true;
     } catch (error) {
-      console.error("Error converting idea to TODO:", error);
-      showNotice2("Failed to convert idea. See console for details.");
+      console.error("Error promoting idea to TODO:", error);
+      showNotice2("Couldn't promote the idea. See console for details.");
       return false;
     }
   }
@@ -1483,11 +1483,11 @@ ${text}` : text;
         await this.scanner.scanFile(idea.file);
       if (this.onComplete)
         this.onComplete();
-      showNotice2("Idea focused!");
+      showNotice2("Idea focused.");
       return true;
     } catch (error) {
       console.error("Error focusing idea:", error);
-      showNotice2("Failed to focus idea. See console for details.");
+      showNotice2("Couldn't focus the idea. See console for details.");
       return false;
     }
   }
@@ -1510,7 +1510,7 @@ ${text}` : text;
         failed++;
     }
     if (success > 0) {
-      showNotice2(`Focused ${success} TODO${success > 1 ? "s" : ""}`);
+      showNotice2(`Focused ${pluralize(success, "TODO")}.`);
     }
     return { success, failed };
   }
@@ -1530,7 +1530,7 @@ ${text}` : text;
         failed++;
     }
     if (success > 0) {
-      showNotice2(`Unfocused ${success} TODO${success > 1 ? "s" : ""}`);
+      showNotice2(`Unfocused ${pluralize(success, "TODO")}.`);
     }
     return { success, failed };
   }
@@ -1552,7 +1552,7 @@ ${text}` : text;
         failed++;
     }
     if (success > 0) {
-      showNotice2(`Set ${success} TODO${success > 1 ? "s" : ""} to later`);
+      showNotice2(`Set ${pluralize(success, "TODO")} to later.`);
     }
     return { success, failed };
   }
@@ -1573,7 +1573,7 @@ ${text}` : text;
         failed++;
     }
     if (success > 0) {
-      showNotice2(`Unlatered ${success} TODO${success > 1 ? "s" : ""}`);
+      showNotice2(`Cleared later on ${pluralize(success, "TODO")}.`);
     }
     return { success, failed };
   }
@@ -1593,7 +1593,7 @@ ${text}` : text;
         failed++;
     }
     if (success > 0) {
-      showNotice2(`Snoozed ${success} TODO${success > 1 ? "s" : ""}`);
+      showNotice2(`Snoozed ${pluralize(success, "TODO")}.`);
     }
     return { success, failed };
   }
@@ -1613,7 +1613,7 @@ ${text}` : text;
         failed++;
     }
     if (success > 0) {
-      showNotice2(`Unsnoozed ${success} TODO${success > 1 ? "s" : ""}`);
+      showNotice2(`Unsnoozed ${pluralize(success, "TODO")}.`);
     }
     return { success, failed };
   }
@@ -1765,7 +1765,7 @@ ${text}` : text;
         (child, idx) => child.lineNumber !== childLines[idx].lineNumber
       );
       if (!orderChanged) {
-        showNotice2("Items already sorted");
+        showNotice2("Items already sorted.");
         return true;
       }
       const sortedLineNumbers = [...headerTodo.childLineNumbers].sort((a, b) => a - b);
@@ -1780,11 +1780,11 @@ ${text}` : text;
       if (this.onComplete) {
         this.onComplete();
       }
-      showNotice2("Sorted items");
+      showNotice2("Sorted items.");
       return true;
     } catch (error) {
       console.error("Error sorting header children:", error);
-      showNotice2("Failed to sort items");
+      showNotice2("Couldn't sort the items. See console for details.");
       return false;
     }
   }
@@ -4005,16 +4005,24 @@ function collapseBlankRuns(lines) {
 var TAG4 = "[Warped Todo]";
 var RESOLVED_MARKER_PATTERN = /\s*✅?\s*\*{0,2}RESOLVED\*{0,2}\s*$/i;
 async function setProjectItemCompletion(item, completed, context) {
+  let ok;
   switch (item.shape) {
     case "checkbox":
-      return applyCheckboxToggle(item, completed);
+      ok = await applyCheckboxToggle(item, completed);
+      break;
     case "plainBullet":
-      return applyPlainBulletCompletion(item, completed);
+      ok = await applyPlainBulletCompletion(item, completed);
+      break;
     case "headerStandalone":
-      return applyResolvedMarkerToggle(item, completed);
+      ok = await applyResolvedMarkerToggle(item, completed);
+      break;
     case "headerNested":
-      return applyHeaderBlockMove(item, completed, context);
+      ok = await applyHeaderBlockMove(item, completed, context);
+      break;
   }
+  if (ok)
+    showNotice2(completed ? "Item completed." : "Item reopened.");
+  return ok;
 }
 async function applyCheckboxToggle(item, completed) {
   try {
@@ -4028,14 +4036,15 @@ async function applyCheckboxToggle(item, completed) {
     return true;
   } catch (error) {
     console.error(TAG4, "Failed to toggle checkbox:", error);
-    showNotice2("Failed to update item. See console for details.");
+    showNotice2("Couldn't update the item. See console for details.");
     return false;
   }
 }
 async function applyPlainBulletCompletion(item, completed) {
   if (!completed) {
     showNotice2(
-      "Can't un-complete this item \u2014 its completion comes from the section it's under, not its own line. Edit the file directly."
+      "Can't reopen this item from the sidebar. Its completion comes from the section it's under, not its own line, so edit the file directly.",
+      8e3
     );
     return false;
   }
@@ -4050,7 +4059,7 @@ async function applyPlainBulletCompletion(item, completed) {
     return true;
   } catch (error) {
     console.error(TAG4, "Failed to complete item:", error);
-    showNotice2("Failed to update item. See console for details.");
+    showNotice2("Couldn't update the item. See console for details.");
     return false;
   }
 }
@@ -4069,7 +4078,7 @@ async function applyResolvedMarkerToggle(item, completed) {
     return true;
   } catch (error) {
     console.error(TAG4, "Failed to update item status:", error);
-    showNotice2("Failed to update item. See console for details.");
+    showNotice2("Couldn't update the item. See console for details.");
     return false;
   }
 }
@@ -4077,13 +4086,14 @@ async function applyHeaderBlockMove(item, completed, context) {
   var _a;
   if (!context) {
     showNotice2(
-      "Can't complete this from the sidebar yet \u2014 it needs moving to a different section. Edit the file directly for now."
+      "Can't complete this from the sidebar. It needs moving to a different section, so edit the file directly.",
+      8e3
     );
     return false;
   }
   const result = await moveHeaderBlock(item, completed, context.repoPath, context.scanner);
   if (!result.ok) {
-    showNotice2((_a = result.reason) != null ? _a : "Failed to move item. See console for details.");
+    showNotice2((_a = result.reason) != null ? _a : "Couldn't move the item. See console for details.");
     return false;
   }
   return true;
@@ -4103,10 +4113,11 @@ async function setProjectItemPriority(item, newTag, addFocus = false) {
       void 0,
       item.fingerprint
     );
+    showNotice2(`Priority set to ${newTag}${addFocus ? " + #focus" : ""}.`);
     return true;
   } catch (error) {
     console.error(TAG4, "Failed to set priority:", error);
-    showNotice2("Failed to set priority. See console for details.");
+    showNotice2("Couldn't set the priority. See console for details.");
     return false;
   }
 }
@@ -4123,13 +4134,14 @@ async function addProjectItemTag(item, tag) {
       },
       item.fingerprint
     );
+    showNotice2(`Added ${tag}.`);
     return true;
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     if (msg.includes("already present"))
       return true;
     console.error(TAG4, "Failed to add tag:", error);
-    showNotice2("Failed to add tag. See console for details.");
+    showNotice2("Couldn't add the tag. See console for details.");
     return false;
   }
 }
@@ -4146,10 +4158,11 @@ async function removeProjectItemTag(item, tag) {
       void 0,
       item.fingerprint
     );
+    showNotice2(`Removed ${tag}.`);
     return true;
   } catch (error) {
     console.error(TAG4, "Failed to remove tag:", error);
-    showNotice2("Failed to remove tag. See console for details.");
+    showNotice2("Couldn't remove the tag. See console for details.");
     return false;
   }
 }
@@ -6576,7 +6589,7 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
       });
     } catch (error) {
       console.error("[Warped Todo]", "Project sync failed:", error);
-      showNotice2("Project sync failed. See console for details.");
+      showNotice2("Couldn't sync Projects. See console for details.");
     } finally {
       this.projectsSyncing = false;
       this.projectsSyncedOnce = true;
@@ -7193,7 +7206,7 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
       shell.openPath(path);
     } catch (error) {
       console.error("[Warped Todo]", "Failed to open file:", error);
-      showNotice2("Couldn't open file. See console for details.");
+      showNotice2("Couldn't open the file. See console for details.");
     }
   }
   /**
@@ -8218,7 +8231,7 @@ var WarpedTodoPlugin = class extends import_obsidian15.Plugin {
         const line = editor.getLine(cursor.line);
         const tags = extractTags(line);
         if (!tags.includes("#todo") && !tags.includes("#todos")) {
-          showNotice2("Cursor is not on a #todo line");
+          showNotice2("Cursor isn't on a TODO line.");
           return;
         }
         const file = (_a = this.app.workspace.getActiveViewOfType(import_obsidian15.MarkdownView)) == null ? void 0 : _a.file;
@@ -8229,7 +8242,7 @@ var WarpedTodoPlugin = class extends import_obsidian15.Plugin {
           (t) => t.file.path === file.path && t.lineNumber === cursor.line
         );
         if (!todo) {
-          showNotice2("Could not find TODO at cursor");
+          showNotice2("Couldn't find a TODO at the cursor.");
           return;
         }
         new MoveTargetModal(
@@ -8267,12 +8280,12 @@ var WarpedTodoPlugin = class extends import_obsidian15.Plugin {
       editorCallback: async (editor) => {
         const selection = editor.getSelection();
         if (!selection) {
-          showNotice2("No text selected");
+          showNotice2("No text selected.");
           return;
         }
         const slackMd = convertToSlackMarkdown(selection);
         await navigator.clipboard.writeText(slackMd);
-        showNotice2("Copied as Slack markdown");
+        showNotice2("Copied as Slack Markdown.");
       },
       hotkeys: [
         {
@@ -8287,12 +8300,12 @@ var WarpedTodoPlugin = class extends import_obsidian15.Plugin {
       editorCallback: async (editor) => {
         const selection = editor.getSelection();
         if (!selection) {
-          showNotice2("No text selected");
+          showNotice2("No text selected.");
           return;
         }
         const notionMd = convertToNotionMarkdown(selection);
         await navigator.clipboard.writeText(notionMd);
-        showNotice2("Copied as Notion markdown");
+        showNotice2("Copied as Notion Markdown.");
       },
       hotkeys: [
         {
@@ -8309,14 +8322,14 @@ var WarpedTodoPlugin = class extends import_obsidian15.Plugin {
             item.setTitle("Copy as Slack").setIcon("clipboard-copy").onClick(async () => {
               const slackMd = convertToSlackMarkdown(selection);
               await navigator.clipboard.writeText(slackMd);
-              showNotice2("Copied as Slack markdown");
+              showNotice2("Copied as Slack Markdown.");
             });
           });
           menu.addItem((item) => {
             item.setTitle("Copy as Notion").setIcon("clipboard-copy").onClick(async () => {
               const notionMd = convertToNotionMarkdown(selection);
               await navigator.clipboard.writeText(notionMd);
-              showNotice2("Copied as Notion markdown");
+              showNotice2("Copied as Notion Markdown.");
             });
           });
           const file = info.file;
@@ -8384,7 +8397,7 @@ var WarpedTodoPlugin = class extends import_obsidian15.Plugin {
     new SendToProjectModal(this.app, file.basename, async (title) => {
       try {
         const filePath = await appendQueuedTodo(repo, title, selection);
-        showNotice2(`Sent to ${filePath}`);
+        showNotice2(`Sent to ${homeRelativePath(filePath)}.`);
       } catch (error) {
         console.error("[Warped Todo]", "Failed to send selection to project:", error);
         showNotice2("Couldn't send selection to the project. See console for details.");
@@ -8779,7 +8792,7 @@ var WarpedTodoSettingTab = class extends import_obsidian15.PluginSettingTab {
             await this.plugin.projectSyncManager.syncAll(this.plugin.projectsSyncOptions());
           } catch (error) {
             console.error("[Warped Todo]", "Project sync failed:", error);
-            showNotice2("Project sync failed. See console for details.");
+            showNotice2("Couldn't sync Projects. See console for details.");
           }
         } else {
           this.plugin.projectSyncManager.stopWatching();

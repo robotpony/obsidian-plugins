@@ -19,6 +19,31 @@ All notable changes to the ␣⌘ Warped Command plugin will be documented in th
   that opens the source file in the OS default app.
 - `PLAN.md`'s mtime is now the last fallback for a repo's "Recently
   updated" date, after `CHANGELOG.md` and `README.md`.
+## [0.48.4] - 2026-09-01
+
+### Changed — Popup notice copy standardized
+
+A pass over every `showNotice` call. The branding and the "See console for
+details" pattern were already consistent; the tone, punctuation, and
+wording had drifted.
+
+- Synced project-item actions (Focus / Later / Snooze and the checkbox on a
+  repo-matched project row) now show the same confirmation notice the
+  identical action on a vault item shows. Previously they were silent on
+  success, so the sidebar gave different feedback depending on where the
+  row came from.
+- Failures now read "Couldn't X. See console for details." everywhere,
+  instead of a mix of "Failed to X" and "Couldn't X".
+- Every notice ends with a period. Dropped the exclamation marks that only
+  appeared on the vault todo/idea confirmations ("TODO marked as
+  complete!" → "TODO completed.").
+- Wording fixes: "Unlatered N TODOs" → "Cleared later on N TODOs";
+  "marked as incomplete" → "reopened"; the "Send to project" notice shows
+  `~/projects/foo/TODO.md` instead of the full absolute path; "Copied as
+  Slack markdown" → "Copied as Slack Markdown", matching the command name.
+- Batch-operation notices use the shared `pluralize` helper.
+- No behaviour change beyond the added synced-item confirmations.
+
 ## [0.48.3] - 2026-09-01
 
 ### Changed — Extracted the "project has active synced work" filter

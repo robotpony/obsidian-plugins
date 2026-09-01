@@ -40,7 +40,7 @@ import { TabLockManager } from "./src/TabLockManager";
 import { createHeaderSortPlugin } from "./src/HeaderSortExtension";
 import { createHeaderChecklistExtension } from "./src/HeaderChecklistExtension";
 import { SidebarManager } from "./src/shared";
-import { guessProjectsFolder, PROJECT_SORT_OPTIONS } from "./src/ProjectsSidebarView";
+import { guessProjectsFolder, homeRelativePath, PROJECT_SORT_OPTIONS } from "./src/ProjectsSidebarView";
 
 export default class WarpedTodoPlugin extends Plugin {
   settings: WarpedTodoSettings;
@@ -332,7 +332,7 @@ export default class WarpedTodoPlugin extends Plugin {
         const tags = extractTags(line);
 
         if (!tags.includes("#todo") && !tags.includes("#todos")) {
-          showNotice("Cursor is not on a #todo line");
+          showNotice("Cursor isn't on a TODO line.");
           return;
         }
 
@@ -346,7 +346,7 @@ export default class WarpedTodoPlugin extends Plugin {
         );
 
         if (!todo) {
-          showNotice("Could not find TODO at cursor");
+          showNotice("Couldn't find a TODO at the cursor.");
           return;
         }
 
@@ -390,12 +390,12 @@ export default class WarpedTodoPlugin extends Plugin {
       editorCallback: async (editor) => {
         const selection = editor.getSelection();
         if (!selection) {
-          showNotice("No text selected");
+          showNotice("No text selected.");
           return;
         }
         const slackMd = convertToSlackMarkdown(selection);
         await navigator.clipboard.writeText(slackMd);
-        showNotice("Copied as Slack markdown");
+        showNotice("Copied as Slack Markdown.");
       },
       hotkeys: [
         {
@@ -411,12 +411,12 @@ export default class WarpedTodoPlugin extends Plugin {
       editorCallback: async (editor) => {
         const selection = editor.getSelection();
         if (!selection) {
-          showNotice("No text selected");
+          showNotice("No text selected.");
           return;
         }
         const notionMd = convertToNotionMarkdown(selection);
         await navigator.clipboard.writeText(notionMd);
-        showNotice("Copied as Notion markdown");
+        showNotice("Copied as Notion Markdown.");
       },
       hotkeys: [
         {
@@ -438,7 +438,7 @@ export default class WarpedTodoPlugin extends Plugin {
               .onClick(async () => {
                 const slackMd = convertToSlackMarkdown(selection);
                 await navigator.clipboard.writeText(slackMd);
-                showNotice("Copied as Slack markdown");
+                showNotice("Copied as Slack Markdown.");
               });
           });
           menu.addItem((item) => {
@@ -448,7 +448,7 @@ export default class WarpedTodoPlugin extends Plugin {
               .onClick(async () => {
                 const notionMd = convertToNotionMarkdown(selection);
                 await navigator.clipboard.writeText(notionMd);
-                showNotice("Copied as Notion markdown");
+                showNotice("Copied as Notion Markdown.");
               });
           });
 
@@ -536,7 +536,7 @@ export default class WarpedTodoPlugin extends Plugin {
     new SendToProjectModal(this.app, file.basename, async (title) => {
       try {
         const filePath = await appendQueuedTodo(repo, title, selection);
-        showNotice(`Sent to ${filePath}`);
+        showNotice(`Sent to ${homeRelativePath(filePath)}.`);
       } catch (error) {
         console.error("[Warped Todo]", "Failed to send selection to project:", error);
         showNotice("Couldn't send selection to the project. See console for details.");
@@ -1131,7 +1131,7 @@ class WarpedTodoSettingTab extends PluginSettingTab {
             await this.plugin.projectSyncManager.syncAll(this.plugin.projectsSyncOptions());
           } catch (error) {
             console.error("[Warped Todo]", "Project sync failed:", error);
-            showNotice("Project sync failed. See console for details.");
+            showNotice("Couldn't sync Projects. See console for details.");
           }
         } else {
           this.plugin.projectSyncManager.stopWatching();

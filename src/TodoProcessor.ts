@@ -12,6 +12,7 @@ import {
   removeIdeaTag,
   replaceIdeaWithTodo,
   showNotice,
+  pluralize,
   compareByStatusAndDate,
 } from "./utils";
 import { TodoScanner } from "./TodoScanner";
@@ -71,11 +72,11 @@ export class TodoProcessor {
         this.onComplete();
       }
 
-      showNotice("TODO marked as complete!");
+      showNotice("TODO completed.");
       return true;
     } catch (error) {
       console.error("Error completing TODO:", error);
-      showNotice("Failed to complete TODO. See console for details.");
+      showNotice("Couldn't complete the TODO. See console for details.");
       return false;
     }
   }
@@ -95,11 +96,11 @@ export class TodoProcessor {
         this.onComplete();
       }
 
-      showNotice("TODO marked as incomplete!");
+      showNotice("TODO reopened.");
       return true;
     } catch (error) {
-      console.error("Error uncompleting TODO:", error);
-      showNotice("Failed to uncomplete TODO. See console for details.");
+      console.error("Error reopening TODO:", error);
+      showNotice("Couldn't reopen the TODO. See console for details.");
       return false;
     }
   }
@@ -112,7 +113,7 @@ export class TodoProcessor {
   async moveTodo(todo: TodoItem, destinationPath: string): Promise<boolean> {
     try {
       if (todo.filePath === destinationPath) {
-        showNotice("Cannot move to the same file.");
+        showNotice("Can't move a TODO to the file it's already in.");
         return false;
       }
 
@@ -173,13 +174,13 @@ export class TodoProcessor {
       const basename = destinationPath.split("/").pop()?.replace(/\.md$/, "") || destinationPath;
       const childCount = (todo.isHeader && todo.childLineNumbers?.length) || 0;
       const message = childCount > 0
-        ? `Moved to ${basename} (including ${childCount} child item${childCount > 1 ? 's' : ''})`
-        : `Moved to ${basename}`;
+        ? `Moved to ${basename}, including ${pluralize(childCount, "child item")}.`
+        : `Moved to ${basename}.`;
       showNotice(message);
       return true;
     } catch (error) {
       console.error("Error moving TODO:", error);
-      showNotice("Failed to move TODO. See console for details.");
+      showNotice("Couldn't move the TODO. See console for details.");
       return false;
     }
   }
@@ -298,11 +299,11 @@ export class TodoProcessor {
 
       if (this.scanner) await this.scanner.scanFile(todo.file);
       if (this.onComplete) this.onComplete();
-      showNotice(`Priority set to ${newTag}${addFocus ? " + #focus" : ""}`);
+      showNotice(`Priority set to ${newTag}${addFocus ? " + #focus" : ""}.`);
       return true;
     } catch (error) {
       console.error("Error setting priority:", error);
-      showNotice("Failed to set priority. See console for details.");
+      showNotice("Couldn't set the priority. See console for details.");
       return false;
     }
   }
@@ -324,11 +325,11 @@ export class TodoProcessor {
 
       if (this.scanner) await this.scanner.scanFile(todo.file);
       if (this.onComplete) this.onComplete();
-      showNotice(`Removed ${tag}`);
+      showNotice(`Removed ${tag}.`);
       return true;
     } catch (error) {
       console.error("Error removing tag:", error);
-      showNotice("Failed to remove tag. See console for details.");
+      showNotice("Couldn't remove the tag. See console for details.");
       return false;
     }
   }
@@ -351,14 +352,14 @@ export class TodoProcessor {
 
       if (this.scanner) await this.scanner.scanFile(item.file);
       if (this.onComplete) this.onComplete();
-      showNotice(`Added ${tag}`);
+      showNotice(`Added ${tag}.`);
       return true;
     } catch (error) {
       // "already present" is not a failure worth surfacing
       const msg = error instanceof Error ? error.message : String(error);
       if (msg.includes("already present")) return true;
       console.error("Error adding tag:", error);
-      showNotice("Failed to add tag. See console for details.");
+      showNotice("Couldn't add the tag. See console for details.");
       return false;
     }
   }
@@ -384,11 +385,11 @@ export class TodoProcessor {
 
       if (this.scanner) await this.scanner.scanFile(idea.file);
       if (this.onComplete) this.onComplete();
-      showNotice("Idea completed!");
+      showNotice("Idea completed.");
       return true;
     } catch (error) {
       console.error("Error completing idea:", error);
-      showNotice("Failed to complete idea. See console for details.");
+      showNotice("Couldn't complete the idea. See console for details.");
       return false;
     }
   }
@@ -408,11 +409,11 @@ export class TodoProcessor {
 
       if (this.scanner) await this.scanner.scanFile(idea.file);
       if (this.onComplete) this.onComplete();
-      showNotice("Idea promoted to TODO!");
+      showNotice("Idea promoted to TODO.");
       return true;
     } catch (error) {
-      console.error("Error converting idea to TODO:", error);
-      showNotice("Failed to convert idea. See console for details.");
+      console.error("Error promoting idea to TODO:", error);
+      showNotice("Couldn't promote the idea. See console for details.");
       return false;
     }
   }
@@ -430,11 +431,11 @@ export class TodoProcessor {
 
       if (this.scanner) await this.scanner.scanFile(idea.file);
       if (this.onComplete) this.onComplete();
-      showNotice("Idea focused!");
+      showNotice("Idea focused.");
       return true;
     } catch (error) {
       console.error("Error focusing idea:", error);
-      showNotice("Failed to focus idea. See console for details.");
+      showNotice("Couldn't focus the idea. See console for details.");
       return false;
     }
   }
@@ -459,7 +460,7 @@ export class TodoProcessor {
     }
 
     if (success > 0) {
-      showNotice(`Focused ${success} TODO${success > 1 ? 's' : ''}`);
+      showNotice(`Focused ${pluralize(success, "TODO")}.`);
     }
     return { success, failed };
   }
@@ -480,7 +481,7 @@ export class TodoProcessor {
     }
 
     if (success > 0) {
-      showNotice(`Unfocused ${success} TODO${success > 1 ? 's' : ''}`);
+      showNotice(`Unfocused ${pluralize(success, "TODO")}.`);
     }
     return { success, failed };
   }
@@ -504,7 +505,7 @@ export class TodoProcessor {
     }
 
     if (success > 0) {
-      showNotice(`Set ${success} TODO${success > 1 ? 's' : ''} to later`);
+      showNotice(`Set ${pluralize(success, "TODO")} to later.`);
     }
     return { success, failed };
   }
@@ -527,7 +528,7 @@ export class TodoProcessor {
     }
 
     if (success > 0) {
-      showNotice(`Unlatered ${success} TODO${success > 1 ? 's' : ''}`);
+      showNotice(`Cleared later on ${pluralize(success, "TODO")}.`);
     }
     return { success, failed };
   }
@@ -548,7 +549,7 @@ export class TodoProcessor {
     }
 
     if (success > 0) {
-      showNotice(`Snoozed ${success} TODO${success > 1 ? 's' : ''}`);
+      showNotice(`Snoozed ${pluralize(success, "TODO")}.`);
     }
     return { success, failed };
   }
@@ -569,7 +570,7 @@ export class TodoProcessor {
     }
 
     if (success > 0) {
-      showNotice(`Unsnoozed ${success} TODO${success > 1 ? 's' : ''}`);
+      showNotice(`Unsnoozed ${pluralize(success, "TODO")}.`);
     }
     return { success, failed };
   }
@@ -746,7 +747,7 @@ export class TodoProcessor {
       );
 
       if (!orderChanged) {
-        showNotice("Items already sorted");
+        showNotice("Items already sorted.");
         return true;
       }
 
@@ -767,11 +768,11 @@ export class TodoProcessor {
         this.onComplete();
       }
 
-      showNotice("Sorted items");
+      showNotice("Sorted items.");
       return true;
     } catch (error) {
       console.error("Error sorting header children:", error);
-      showNotice("Failed to sort items");
+      showNotice("Couldn't sort the items. See console for details.");
       return false;
     }
   }
