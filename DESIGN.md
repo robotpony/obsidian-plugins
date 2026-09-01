@@ -166,11 +166,12 @@ Projects                                              [⟳ Sync]
   (`justify-content: space-between`); reported as not fitting visually, so
   it moved into the dot-joined run with everything else on the meta line.
 - Recently updated: `getRepoLastUpdated` (ProjectMetadata.ts) — a repo's
-  CHANGELOG.md mtime, falling back to README.md's, falling back further to
-  the vault project note's own mtime if the repo has neither
-  (ProjectManager.applyNoteLastUpdatedFallback). CHANGELOG over an actual
-  git-log call: only touched on a real versioned change, not every
-  incidental edit, and free of a new git call per repo on every scan.
+  CHANGELOG.md mtime, falling back to README.md's, then PLAN.md's, falling
+  back further to the vault project note's own mtime if the repo has none
+  of the three (ProjectManager.applyNoteLastUpdatedFallback). CHANGELOG
+  over an actual git-log call: only touched on a real versioned change,
+  not every incidental edit, and free of a new git call per repo on every
+  scan.
 - Sort button (`sortProjectRows`/`PROJECT_SORT_OPTIONS` in
   ProjectsSidebarView.ts) opens a checkmarked menu, mirroring Obsidian's
   own file-explorer "Change sort order" menu rather than inventing a new
@@ -246,6 +247,27 @@ written in the note (no synthesised title, original list markup as-is —
 an earlier version reconstructed its own `<ul>` around each item, which
 double-nested a source ordered list inside it; reported via screenshot).
 Omitted entirely when the project has none.
+
+**Plan section.** Below Guiding Principles, `renderProjectPlanSection`
+surfaces the repo's `PLAN.md` read-only. `PLAN.md` is a reference
+document, not an item source — nothing from it feeds the TODOs/Ideas tabs,
+the project note, or the sync pipeline, and it is never written back to
+(the survey behind this: `PLAN.md` files across `~/projects` are phased
+implementation plans with hundreds of fine-grained boxes, most of them
+completed sub-steps or verify lines — interleaving them into the TODOs tab
+would swamp it, and the narrative-shape plans have no items at all).
+`PlanParser.parsePlan` (pure, string-in, `planParser.test.ts`) reduces the
+file to a `PlanSummary`: whether it has checkboxes, the `##` sections that
+carry checkboxes (its "phases"), the first phase with an unchecked box,
+that phase's open lines verbatim, and whole-file done/total counts. The
+section renders a progress strip ("Phase 3 of 7 · 47 of 155 done") and the
+current phase's open items only when `hasCheckboxes`; every `PLAN.md` also
+gets a `<details>` "Full plan" that reads the file and renders it in full,
+lazily on first expand. `ProjectMetadata.extractPlanSummary` is the
+file-reading wrapper (mirrors `extractProjectSummary` for README); the
+summary rides on `ProjectInfo.planSummary`. The README excerpt and the
+Plan section each carry an `appendExternalFileLink` "FILE →" affordance
+(`shell.openPath`, via `openExternalProjectFile`).
 
 Pinned fields, rendered from the live scan result already in memory (not by
 re-reading the note): project name doubling as the remote link (opens the
@@ -808,7 +830,8 @@ warped-command/          # repo root — flat since the repo split (Phase 1a)
 │   ├── TodoProcessor.ts      # File mutations (vault or external sourceFile)
 │   ├── ProjectManager.ts     # Project grouping (tag- and repo-derived)
 │   ├── ProjectScanner.ts     # Git repo discovery & git fact-gathering
-│   ├── ProjectMetadata.ts    # Repo "recently updated" date (CHANGELOG/README mtime)
+│   ├── ProjectMetadata.ts    # Repo title/stack, "recently updated" date, PLAN.md summary
+│   ├── PlanParser.ts         # PLAN.md → PlanSummary (phase/progress, detail view only)
 │   ├── StructuredFileParser.ts # BUGS.md/TODO.md/etc. → ParsedProjectItem[]
 │   ├── ProjectSyncManager.ts # Vault note sync, fs.watch, manual sync command
 │   ├── ProjectItemMutator.ts # Mutates a ParsedProjectItem's source line/block

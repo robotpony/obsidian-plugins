@@ -37,6 +37,7 @@ function scannedFixture(overrides: Partial<ScannedProject> = {}): ScannedProject
     title: "peep",
     stack: [],
     readmeSummary: null,
+    planSummary: null,
     lastUpdated: null,
     ...overrides,
   };

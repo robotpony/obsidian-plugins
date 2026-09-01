@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, mkdir, writeFile, rm, chmod, utimes } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
-import { detectStack, extractProjectTitle, getRepoLastUpdated } from "../ProjectMetadata";
+import { detectStack, extractPlanSummary, extractProjectTitle, getRepoLastUpdated } from "../ProjectMetadata";
 
 // See PLAN-focus-canvas.md's sibling context and ~/projects/peep/p's
 // extract_project_name()/detect_technologies() — this module ports those
@@ -147,5 +147,48 @@ describe("getRepoLastUpdated", () => {
     const mtime = new Date("2026-03-01T00:00:00Z");
     await utimes(join(dir, "changelog.md"), mtime, mtime);
     expect(getRepoLastUpdated(dir)).toBe(mtime.getTime());
+  });
+
+  it("falls back to PLAN.md's mtime when there's no CHANGELOG or README", async () => {
+    await writeFile(join(dir, "PLAN.md"), "# Plan\n\n## Phase 1\n- [ ] Do the thing\n");
+    const mtime = new Date("2026-04-01T00:00:00Z");
+    await utimes(join(dir, "PLAN.md"), mtime, mtime);
+    expect(getRepoLastUpdated(dir)).toBe(mtime.getTime());
+  });
+});
+
+describe("extractPlanSummary", () => {
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), "warped-todo-plan-"));
+  });
+
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("returns null when the repo has no PLAN.md", () => {
+    expect(extractPlanSummary(dir)).toBeNull();
+  });
+
+  it("parses a phased-checklist PLAN.md", async () => {
+    await writeFile(
+      join(dir, "PLAN.md"),
+      "# Plan\n\n## Phase 1\n- [x] Done\n\n## Phase 2\n- [ ] Open one\n- [ ] Open two\n"
+    );
+    const s = extractPlanSummary(dir)!;
+    expect(s.hasCheckboxes).toBe(true);
+    expect(s.phaseCount).toBe(2);
+    expect(s.currentPhaseIndex).toBe(2);
+    expect(s.doneCount).toBe(1);
+    expect(s.totalCount).toBe(3);
+  });
+
+  it("accepts a lowercase plan.md", async () => {
+    await writeFile(join(dir, "plan.md"), "# Plan\n\n## Next\n\nSome prose, no checkboxes.\n");
+    const s = extractPlanSummary(dir)!;
+    expect(s).not.toBeNull();
+    expect(s.hasCheckboxes).toBe(false);
   });
 });

@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "fs";
 import { extname, join } from "path";
+import { parsePlan, PlanSummary } from "./PlanParser";
 
 /**
  * README-derived display title and marker-file-derived tech stack for a
@@ -240,18 +241,52 @@ function findChangelog(projectPath: string): string | null {
   return null;
 }
 
+function findPlan(projectPath: string): string | null {
+  for (const name of ["PLAN.md", "plan.md", "Plan.md"]) {
+    const candidate = join(projectPath, name);
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+/** Absolute path to the repo's PLAN.md (any common casing), or null. */
+export function planFilePath(projectPath: string): string | null {
+  return findPlan(projectPath);
+}
+
+/** Absolute path to the repo's README (README.md or readme.md), or null. */
+export function readmeFilePath(projectPath: string): string | null {
+  return findReadme(projectPath);
+}
+
+/**
+ * Parsed PLAN.md progress summary (see PlanParser), or null when the repo
+ * has no PLAN.md or the file is empty. The Projects detail view uses this
+ * for its progress strip; the collapsible full-document render reads the
+ * file itself, lazily, via planFilePath.
+ */
+export function extractPlanSummary(projectPath: string): PlanSummary | null {
+  const path = findPlan(projectPath);
+  if (!path) return null;
+  try {
+    return parsePlan(readFileSync(path, "utf-8"));
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Best available "last real update" signal for a repo, used by the Projects
  * list's Recently updated sort and its per-row date. CHANGELOG.md's own
  * mtime wins when the repo has one — it's only touched on an actual
  * versioned change, not every incidental edit — falling back to README.md's
- * mtime otherwise. Returns null if the repo has neither; the caller falls
- * back further, to the vault project note's own mtime (ProjectManager,
- * which owns the vault side — this module only knows about files on disk
- * in the repo itself).
+ * mtime, then PLAN.md's. Returns null if the repo has none of the three;
+ * the caller falls back further, to the vault project note's own mtime
+ * (ProjectManager, which owns the vault side — this module only knows about
+ * files on disk in the repo itself).
  */
 export function getRepoLastUpdated(projectPath: string): number | null {
-  const path = findChangelog(projectPath) ?? findReadme(projectPath);
+  const path = findChangelog(projectPath) ?? findReadme(projectPath) ?? findPlan(projectPath);
   if (!path) return null;
   try {
     return statSync(path).mtimeMs;

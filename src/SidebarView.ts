@@ -3,6 +3,7 @@ import { TodoScanner } from "./TodoScanner";
 import { TodoProcessor } from "./TodoProcessor";
 import { ProjectManager, projectFilePath } from "./ProjectManager";
 import { ProjectScanner, ScannedProject } from "./ProjectScanner";
+import { planFilePath, readmeFilePath } from "./ProjectMetadata";
 import { ProjectSyncManager } from "./ProjectSyncManager";
 import { ParsedProjectItem, ProjectItemType } from "./StructuredFileParser";
 import {
@@ -3012,6 +3013,8 @@ export class TodoSidebarView extends ItemView {
     if (project.readmeSummary) {
       const summaryEl = info.createDiv({ cls: "warped-todo-project-readme-summary" });
       void this.renderProjectReadmeSummary(summaryEl, project);
+      const readmePath = readmeFilePath(project.localPath);
+      if (readmePath) this.appendExternalFileLink(summaryEl, readmePath, "README.md");
     }
     // Guiding Principles is a sibling of the readme summary, still inside
     // `info` — so info's own border-bottom (separating project context from
@@ -3019,8 +3022,118 @@ export class TodoSidebarView extends ItemView {
     // and the readme (reported via screenshot).
     void this.renderProjectPrinciplesSection(info, project);
 
+    // Plan sits below principles, still a sibling inside `info`. Read-only:
+    // PLAN.md is a reference document, not an item source (see PlanParser).
+    void this.renderProjectPlanSection(info, project);
+
     const itemsContainer = container.createDiv({ cls: "warped-todo-project-items" });
     this.renderProjectItemGroups(itemsContainer, project);
+  }
+
+  /**
+   * A "PLAN.md →" style link that opens a repo file (outside the vault) in
+   * the OS default app. Used by the detail view's README and Plan sections
+   * so the two read consistently — a small affordance to jump from the
+   * excerpt to the whole file.
+   */
+  private appendExternalFileLink(container: HTMLElement, absPath: string, label: string): void {
+    const link = container.createEl("a", {
+      cls: "warped-todo-project-source-link",
+      text: `${label} →`,
+      href: "#",
+      attr: { "aria-label": `Open ${label}` },
+    });
+    link.addEventListener("click", (evt) => {
+      evt.preventDefault();
+      evt.stopPropagation();
+      this.openExternalProjectFile(absPath);
+    });
+  }
+
+  /**
+   * The Plan section — a repo's PLAN.md surfaced read-only in the detail
+   * view, below Guiding Principles. Two parts:
+   *
+   * 1. A progress strip + current phase, only when PLAN.md is a phased
+   *    checklist (`planSummary.hasCheckboxes`). "Phase 3 of 7 · 47 of 155
+   *    done", the current phase heading, and its open `- [ ]` lines rendered
+   *    verbatim (same markdown pass as principle blocks). No checkbox
+   *    interaction and nothing written back — a plan is a curated sequence,
+   *    and multi-line edits into a phased doc carry the same risk
+   *    HeaderBlockMover already gates behind a clean `git status`.
+   *
+   * 2. The full document, collapsed. Read lazily on first expand (the common
+   *    render pass only needs the lightweight summary). This is the whole
+   *    section for narrative-shape PLAN.md files, which have no phases.
+   *
+   * Renders nothing when the repo has no PLAN.md (`planSummary` absent).
+   */
+  private async renderProjectPlanSection(container: HTMLElement, project: ProjectInfo): Promise<void> {
+    if (!project.planSummary || !project.localPath) return;
+    const planPath = planFilePath(project.localPath);
+    if (!planPath) return;
+
+    const summary = project.planSummary;
+    const section = container.createDiv({ cls: "warped-todo-project-plan" });
+
+    const header = section.createDiv({ cls: "warped-todo-project-plan-header" });
+    header.createSpan({ text: "Plan", cls: "warped-todo-project-plan-title" });
+    this.appendExternalFileLink(header, planPath, "PLAN.md");
+
+    if (summary.hasCheckboxes) {
+      const parts: string[] = [];
+      if (summary.phaseCount > 0 && summary.currentPhaseIndex > 0) {
+        parts.push(`Phase ${summary.currentPhaseIndex} of ${summary.phaseCount}`);
+      } else if (summary.phaseCount > 0) {
+        parts.push(pluralize(summary.phaseCount, "phase"));
+      }
+      parts.push(`${summary.doneCount} of ${summary.totalCount} done`);
+      section.createDiv({ cls: "warped-todo-project-plan-progress", text: parts.join(" · ") });
+
+      if (summary.currentPhaseIndex > 0 && summary.currentPhaseOpenLines.length > 0) {
+        section.createDiv({ cls: "warped-todo-project-plan-phase-heading", text: summary.currentPhaseHeading });
+        const component = new Component();
+        component.load();
+        const markdown = summary.currentPhaseOpenLines.join("\n");
+        const blockEl = section.createDiv({ cls: "warped-todo-project-plan-phase-items" });
+        await MarkdownRenderer.render(this.app, markdown, blockEl, planPath, component);
+
+        const hidden = summary.currentPhaseOpenCount - summary.currentPhaseOpenLines.length;
+        if (hidden > 0) {
+          section.createDiv({
+            cls: "warped-todo-project-plan-more",
+            text: `+${pluralize(hidden, "more open item")}`,
+          });
+        }
+      }
+    }
+
+    // Full document, collapsed. <details>'s toggle event fires on every
+    // open/close; the `loaded` guard keeps the file read + markdown render
+    // to the first expand only.
+    const details = section.createEl("details", { cls: "warped-todo-project-plan-full" });
+    details.createEl("summary", { text: "Full plan" });
+    const body = details.createDiv({ cls: "warped-todo-project-plan-full-body" });
+    let loaded = false;
+    details.addEventListener("toggle", () => {
+      if (!details.open || loaded) return;
+      loaded = true;
+      void (async () => {
+        let content: string;
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { readFileSync } = require("fs");
+          content = readFileSync(planPath, "utf-8");
+        } catch (error) {
+          console.error("[Warped Todo]", "Failed to read PLAN.md:", error);
+          body.createEl("p", { text: "Couldn't read PLAN.md. See console for details." });
+          return;
+        }
+        const component = new Component();
+        component.load();
+        await MarkdownRenderer.render(this.app, content, body, planPath, component);
+      })();
+    });
   }
 
   /**

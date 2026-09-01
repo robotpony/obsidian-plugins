@@ -2216,7 +2216,7 @@ function foldSyncedItemsIntoProjects(projects, getCachedItems) {
   });
 }
 function repoFields(scanned) {
-  var _a, _b;
+  var _a, _b, _c;
   return {
     localPath: scanned.localPath,
     remote: scanned.remote,
@@ -2225,7 +2225,8 @@ function repoFields(scanned) {
     title: scanned.title,
     stack: scanned.stack,
     readmeSummary: (_a = scanned.readmeSummary) != null ? _a : void 0,
-    lastUpdated: (_b = scanned.lastUpdated) != null ? _b : void 0
+    planSummary: (_b = scanned.planSummary) != null ? _b : void 0,
+    lastUpdated: (_c = scanned.lastUpdated) != null ? _c : void 0
   };
 }
 
@@ -2238,6 +2239,67 @@ var import_path2 = require("path");
 // src/ProjectMetadata.ts
 var import_fs = require("fs");
 var import_path = require("path");
+
+// src/PlanParser.ts
+var CHECKBOX_RE = /^\s*[-*+]\s+\[([ xX])\]\s+/;
+var HEADING_RE = /^(#{2,3})\s+(.+?)\s*$/;
+var FENCE_RE = /^\s*(```|~~~)/;
+var MAX_OPEN_LINES = 15;
+function parsePlan(content) {
+  if (!content.trim())
+    return null;
+  const sections = [];
+  let current = null;
+  let inFence = false;
+  let doneCount = 0;
+  let totalCount = 0;
+  for (const raw of content.split("\n")) {
+    if (FENCE_RE.test(raw)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence)
+      continue;
+    const heading = raw.match(HEADING_RE);
+    if (heading) {
+      const level = heading[1].length;
+      if (level === 2 || !current || current.level === 3) {
+        current = { heading: heading[2].trim(), level, done: 0, total: 0, openLines: [] };
+        sections.push(current);
+      }
+      continue;
+    }
+    const checkbox = raw.match(CHECKBOX_RE);
+    if (checkbox) {
+      const checked = checkbox[1] !== " ";
+      totalCount++;
+      if (checked)
+        doneCount++;
+      if (current) {
+        current.total++;
+        if (checked)
+          current.done++;
+        else
+          current.openLines.push(raw.replace(/\s+$/, ""));
+      }
+    }
+  }
+  const phases = sections.filter((s) => s.total > 0);
+  const currentIndex = phases.findIndex((s) => s.done < s.total);
+  const phase = currentIndex === -1 ? null : phases[currentIndex];
+  return {
+    hasCheckboxes: totalCount > 0,
+    phaseCount: phases.length,
+    currentPhaseIndex: currentIndex === -1 ? 0 : currentIndex + 1,
+    currentPhaseHeading: phase ? phase.heading : "",
+    currentPhaseOpenLines: phase ? phase.openLines.slice(0, MAX_OPEN_LINES) : [],
+    currentPhaseOpenCount: phase ? phase.openLines.length : 0,
+    doneCount,
+    totalCount
+  };
+}
+
+// src/ProjectMetadata.ts
 var TECH_FILES = {
   "package.json": ["JS", "node.js"],
   "requirements.txt": ["Python"],
@@ -2458,9 +2520,33 @@ function findChangelog(projectPath) {
   }
   return null;
 }
+function findPlan(projectPath) {
+  for (const name of ["PLAN.md", "plan.md", "Plan.md"]) {
+    const candidate = (0, import_path.join)(projectPath, name);
+    if ((0, import_fs.existsSync)(candidate))
+      return candidate;
+  }
+  return null;
+}
+function planFilePath(projectPath) {
+  return findPlan(projectPath);
+}
+function readmeFilePath(projectPath) {
+  return findReadme(projectPath);
+}
+function extractPlanSummary(projectPath) {
+  const path = findPlan(projectPath);
+  if (!path)
+    return null;
+  try {
+    return parsePlan((0, import_fs.readFileSync)(path, "utf-8"));
+  } catch (e) {
+    return null;
+  }
+}
 function getRepoLastUpdated(projectPath) {
-  var _a;
-  const path = (_a = findChangelog(projectPath)) != null ? _a : findReadme(projectPath);
+  var _a, _b;
+  const path = (_b = (_a = findChangelog(projectPath)) != null ? _a : findReadme(projectPath)) != null ? _b : findPlan(projectPath);
   if (!path)
     return null;
   try {
@@ -2638,6 +2724,7 @@ var ProjectScanner = class {
       title: (_a = extractProjectTitle(repoPath)) != null ? _a : name,
       stack: detectStack(repoPath, excludeDirs),
       readmeSummary: extractProjectSummary(repoPath),
+      planSummary: extractPlanSummary(repoPath),
       lastUpdated: getRepoLastUpdated(repoPath)
     };
   }
@@ -6813,10 +6900,111 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
     if (project.readmeSummary) {
       const summaryEl = info.createDiv({ cls: "warped-todo-project-readme-summary" });
       void this.renderProjectReadmeSummary(summaryEl, project);
+      const readmePath = readmeFilePath(project.localPath);
+      if (readmePath)
+        this.appendExternalFileLink(summaryEl, readmePath, "README.md");
     }
     void this.renderProjectPrinciplesSection(info, project);
+    void this.renderProjectPlanSection(info, project);
     const itemsContainer = container.createDiv({ cls: "warped-todo-project-items" });
     this.renderProjectItemGroups(itemsContainer, project);
+  }
+  /**
+   * A "PLAN.md →" style link that opens a repo file (outside the vault) in
+   * the OS default app. Used by the detail view's README and Plan sections
+   * so the two read consistently — a small affordance to jump from the
+   * excerpt to the whole file.
+   */
+  appendExternalFileLink(container, absPath, label) {
+    const link = container.createEl("a", {
+      cls: "warped-todo-project-source-link",
+      text: `${label} \u2192`,
+      href: "#",
+      attr: { "aria-label": `Open ${label}` }
+    });
+    link.addEventListener("click", (evt) => {
+      evt.preventDefault();
+      evt.stopPropagation();
+      this.openExternalProjectFile(absPath);
+    });
+  }
+  /**
+   * The Plan section — a repo's PLAN.md surfaced read-only in the detail
+   * view, below Guiding Principles. Two parts:
+   *
+   * 1. A progress strip + current phase, only when PLAN.md is a phased
+   *    checklist (`planSummary.hasCheckboxes`). "Phase 3 of 7 · 47 of 155
+   *    done", the current phase heading, and its open `- [ ]` lines rendered
+   *    verbatim (same markdown pass as principle blocks). No checkbox
+   *    interaction and nothing written back — a plan is a curated sequence,
+   *    and multi-line edits into a phased doc carry the same risk
+   *    HeaderBlockMover already gates behind a clean `git status`.
+   *
+   * 2. The full document, collapsed. Read lazily on first expand (the common
+   *    render pass only needs the lightweight summary). This is the whole
+   *    section for narrative-shape PLAN.md files, which have no phases.
+   *
+   * Renders nothing when the repo has no PLAN.md (`planSummary` absent).
+   */
+  async renderProjectPlanSection(container, project) {
+    if (!project.planSummary || !project.localPath)
+      return;
+    const planPath = planFilePath(project.localPath);
+    if (!planPath)
+      return;
+    const summary = project.planSummary;
+    const section = container.createDiv({ cls: "warped-todo-project-plan" });
+    const header = section.createDiv({ cls: "warped-todo-project-plan-header" });
+    header.createSpan({ text: "Plan", cls: "warped-todo-project-plan-title" });
+    this.appendExternalFileLink(header, planPath, "PLAN.md");
+    if (summary.hasCheckboxes) {
+      const parts = [];
+      if (summary.phaseCount > 0 && summary.currentPhaseIndex > 0) {
+        parts.push(`Phase ${summary.currentPhaseIndex} of ${summary.phaseCount}`);
+      } else if (summary.phaseCount > 0) {
+        parts.push(pluralize(summary.phaseCount, "phase"));
+      }
+      parts.push(`${summary.doneCount} of ${summary.totalCount} done`);
+      section.createDiv({ cls: "warped-todo-project-plan-progress", text: parts.join(" \xB7 ") });
+      if (summary.currentPhaseIndex > 0 && summary.currentPhaseOpenLines.length > 0) {
+        section.createDiv({ cls: "warped-todo-project-plan-phase-heading", text: summary.currentPhaseHeading });
+        const component = new import_obsidian13.Component();
+        component.load();
+        const markdown = summary.currentPhaseOpenLines.join("\n");
+        const blockEl = section.createDiv({ cls: "warped-todo-project-plan-phase-items" });
+        await import_obsidian13.MarkdownRenderer.render(this.app, markdown, blockEl, planPath, component);
+        const hidden = summary.currentPhaseOpenCount - summary.currentPhaseOpenLines.length;
+        if (hidden > 0) {
+          section.createDiv({
+            cls: "warped-todo-project-plan-more",
+            text: `+${pluralize(hidden, "more open item")}`
+          });
+        }
+      }
+    }
+    const details = section.createEl("details", { cls: "warped-todo-project-plan-full" });
+    details.createEl("summary", { text: "Full plan" });
+    const body = details.createDiv({ cls: "warped-todo-project-plan-full-body" });
+    let loaded = false;
+    details.addEventListener("toggle", () => {
+      if (!details.open || loaded)
+        return;
+      loaded = true;
+      void (async () => {
+        let content;
+        try {
+          const { readFileSync: readFileSync2 } = require("fs");
+          content = readFileSync2(planPath, "utf-8");
+        } catch (error) {
+          console.error("[Warped Todo]", "Failed to read PLAN.md:", error);
+          body.createEl("p", { text: "Couldn't read PLAN.md. See console for details." });
+          return;
+        }
+        const component = new import_obsidian13.Component();
+        component.load();
+        await import_obsidian13.MarkdownRenderer.render(this.app, content, body, planPath, component);
+      })();
+    });
   }
   /**
    * Guiding Principles, shown below the header/readme and above the

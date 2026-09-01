@@ -2,7 +2,8 @@ import { execFile } from "child_process";
 import { existsSync } from "fs";
 import { readdir } from "fs/promises";
 import { basename, join } from "path";
-import { detectStack, extractProjectSummary, extractProjectTitle, getRepoLastUpdated } from "./ProjectMetadata";
+import { detectStack, extractPlanSummary, extractProjectSummary, extractProjectTitle, getRepoLastUpdated } from "./ProjectMetadata";
+import { PlanSummary } from "./PlanParser";
 
 const MAX_BUFFER = 10 * 1024 * 1024; // 10 MB — git output here is small, generous headroom
 const TAG = "[Warped Todo]";
@@ -38,7 +39,9 @@ export interface ScannedProject {
   stack: string[];
   /** README's opening paragraph, capped to ~2-3 lines; null if there's no README or nothing to show. See ProjectMetadata.ts. */
   readmeSummary: string | null;
-  /** CHANGELOG.md's mtime, falling back to README.md's; null if the repo has neither. See ProjectMetadata.getRepoLastUpdated. */
+  /** PLAN.md progress summary; null if there's no PLAN.md. See PlanParser / ProjectMetadata.extractPlanSummary. */
+  planSummary: PlanSummary | null;
+  /** CHANGELOG.md's mtime, falling back to README.md's, then PLAN.md's; null if the repo has none. See ProjectMetadata.getRepoLastUpdated. */
   lastUpdated: number | null;
 }
 
@@ -161,6 +164,7 @@ export class ProjectScanner {
       title: extractProjectTitle(repoPath) ?? name,
       stack: detectStack(repoPath, excludeDirs),
       readmeSummary: extractProjectSummary(repoPath),
+      planSummary: extractPlanSummary(repoPath),
       lastUpdated: getRepoLastUpdated(repoPath),
     };
   }

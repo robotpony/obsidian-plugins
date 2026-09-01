@@ -2171,6 +2171,107 @@
   margin-bottom: 0;
 }
 
+/* Plan section (renderProjectPlanSection) — a repo's PLAN.md surfaced
+   read-only below Guiding Principles. Same horizontal inset and compact,
+   muted treatment as the readme/principles sections above it: still
+   project context, not the task list. The progress strip and current
+   phase show only for phased-checklist PLAN.md files; the collapsible
+   "Full plan" is always present when the repo has a PLAN.md. */
+.warped-todo-project-plan {
+  margin-top: var(--size-4-2);
+  padding: 0 var(--size-4-3) var(--size-4-2);
+  font-size: 0.85em;
+  line-height: 1.5;
+}
+
+.warped-todo-project-plan-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--size-4-2);
+}
+
+.warped-todo-project-plan-title {
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* Shared by the README and Plan sections' "FILE →" jump link (see
+   appendExternalFileLink). */
+.warped-todo-project-source-link {
+  font-size: 0.9em;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.warped-todo-project-source-link:hover {
+  color: var(--text-accent);
+}
+
+.warped-todo-project-readme-summary .warped-todo-project-source-link {
+  display: inline-block;
+  margin-top: 4px;
+}
+
+.warped-todo-project-plan-progress {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.warped-todo-project-plan-phase-heading {
+  margin-top: var(--size-4-2);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.warped-todo-project-plan-phase-items {
+  margin-top: 2px;
+  color: var(--text-normal);
+}
+
+.warped-todo-project-plan-phase-items ul,
+.warped-todo-project-plan-phase-items ol {
+  margin: 0;
+  padding-left: 1.2em;
+}
+
+.warped-todo-project-plan-phase-items li {
+  margin-bottom: 2px;
+}
+
+.warped-todo-project-plan-phase-items > *:last-child {
+  margin-bottom: 0;
+}
+
+.warped-todo-project-plan-more {
+  margin-top: 2px;
+  color: var(--text-faint);
+}
+
+.warped-todo-project-plan-full {
+  margin-top: var(--size-4-2);
+}
+
+.warped-todo-project-plan-full > summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.warped-todo-project-plan-full-body {
+  margin-top: var(--size-4-2);
+  color: var(--text-normal);
+}
+
+.warped-todo-project-plan-full-body > *:first-child {
+  margin-top: 0;
+}
+
+.warped-todo-project-plan-full-body > *:last-child {
+  margin-bottom: 0;
+}
+
 /* Group heading and item rows reuse the TODOs sidebar's own classes
    (.todo-orphan-section*, .todo-item, .todo-checkbox*, .todo-text) — see
    ProjectsSidebarView.ts's renderGroupHeading/renderSyncedItemRow/

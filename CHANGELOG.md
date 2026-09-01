@@ -2,6 +2,24 @@
 
 All notable changes to the ␣⌘ Warped Command plugin will be documented in this file.
 
+## [0.49.0] - 2026-08-31
+
+### Added — Plan section in the Projects detail view
+
+- A repo's `PLAN.md` now surfaces read-only in the per-project detail
+  view, below Guiding Principles. For a phased-checklist `PLAN.md` it
+  shows a progress strip ("Phase 3 of 7 · 47 of 155 done"), the current
+  phase heading, and that phase's open `- [ ]` items rendered verbatim.
+  Every `PLAN.md` also gets a collapsible "Full plan" that renders the
+  whole file, so narrative-style plans (no checkboxes) still have a home.
+- `PLAN.md` is a reference document, not an item source: nothing from it
+  feeds the TODOs/Ideas tabs, the project note, or the sync pipeline, and
+  it is never written back to.
+- The README excerpt and the new Plan section each get a "FILE →" link
+  that opens the source file in the OS default app.
+- `PLAN.md`'s mtime is now the last fallback for a repo's "Recently
+  updated" date, after `CHANGELOG.md` and `README.md`.
+
 ## [0.48.2] - 2026-08-26
 
 ### Changed — README restructured to lead with core features

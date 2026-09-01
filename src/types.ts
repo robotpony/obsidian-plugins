@@ -3,6 +3,7 @@ import { TFile } from "obsidian";
 // circular dependency even though ProjectsSidebarView.ts itself imports
 // ProjectInfo/TodoItem from this file.
 import type { ProjectSortKey } from "./ProjectsSidebarView";
+import type { PlanSummary } from "./PlanParser";
 
 export interface TeamMember {
   handle: string;
@@ -72,6 +73,12 @@ export interface ProjectInfo {
   stack?: string[];
   /** README's opening paragraph (after the title, before the next heading), capped to ~2-3 lines. See ProjectMetadata.ts. */
   readmeSummary?: string;
+  /**
+   * PLAN.md progress summary, present only when the repo has a PLAN.md. The
+   * Projects detail view uses it for its progress strip; the collapsible
+   * full-document render reads the file itself. See PlanParser.
+   */
+  planSummary?: PlanSummary;
   /**
    * Epoch ms for the Projects list's Recently updated sort/date. Repo-
    * matched projects only: CHANGELOG.md's mtime, falling back to README.md's
