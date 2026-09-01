@@ -1,6 +1,10 @@
 {
   "name": "warped-command",
+<<<<<<< HEAD
   "version": "0.49.0",
+=======
+  "version": "0.48.3",
+>>>>>>> 5f059b2 (Extract the "project has active synced work" filter into a testable helper)
   "description": "Warped Command - Obsidian plugin for managing TODOs, TODONEs, and workflows",
   "main": "main.js",
   "scripts": {

@@ -19,6 +19,30 @@ All notable changes to the ␣⌘ Warped Command plugin will be documented in th
   that opens the source file in the OS default app.
 - `PLAN.md`'s mtime is now the last fallback for a repo's "Recently
   updated" date, after `CHANGELOG.md` and `README.md`.
+## [0.48.3] - 2026-09-01
+
+### Changed — Extracted the "project has active synced work" filter
+
+Both the TODOs tab's tag-cloud pill counts (`renderProjects`) and its
+interleaved project blocks (`buildProjectBlocks`) decided which of a
+repo-matched project's synced items count as active work, with the same
+`!completed && <types>` filter written out twice. They drifted apart once
+already: the pill count included `#idea` items the list would never render,
+so a pill filtered to nothing on click (fixed in [0.47.2], with no
+regression test).
+
+- Added `activeSyncedItems(items, itemTypes)` and the
+  `TODO_TAB_SYNCED_ITEM_TYPES` constant to `ProjectsSidebarView.ts` (the
+  ItemView-independent, unit-testable helpers module). Both call sites now
+  route through them, so the cloud and the list it filters can't be scoped
+  differently by accident.
+- Added `src/__tests__/activeSyncedItems.test.ts` covering the completed
+  filter, the `#idea` exclusion under the TODOs tab, and the Ideas tab's
+  own `["idea"]` selection.
+- `BUGS.md` now keeps fixed entries in a `## Fixed` section (trimmed to a
+  one-line resolution with the shipping version) instead of deleting them
+  outright, so recent fix history stays visible in one place.
+- No behaviour change.
 
 ## [0.48.2] - 2026-08-26
 

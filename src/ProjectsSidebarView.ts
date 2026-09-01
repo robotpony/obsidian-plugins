@@ -1,6 +1,6 @@
 import { TFile } from "obsidian";
 import { ProjectInfo, TodoItem } from "./types";
-import { ProjectItemType } from "./StructuredFileParser";
+import { ParsedProjectItem, ProjectItemType } from "./StructuredFileParser";
 
 /**
  * Pure helpers and types shared by the Projects tab (TodoSidebarView's
@@ -239,6 +239,34 @@ export function buildProjectPrincipleBlocks(items: TodoItem[]): ProjectPrinciple
   }
 
   return blocks;
+}
+
+// ===== Synced project items as active work =====
+
+/**
+ * The synced-item types the TODOs tab surfaces — both its tag-cloud pills
+ * (`renderProjects`) and its interleaved project blocks
+ * (`buildProjectBlocks`). The Ideas tab uses `["idea"]` instead. Kept as one
+ * named constant so the two TODOs-tab call sites can't be scoped differently
+ * by accident, which is exactly how the pill count once ended up counting
+ * `#idea` items the list would never render (CHANGELOG [0.47.2]).
+ */
+export const TODO_TAB_SYNCED_ITEM_TYPES: ProjectItemType[] = ["todo", "bug"];
+
+/**
+ * A project's synced items (`ProjectSyncManager.getCachedItems`) that count as
+ * active work of the given types: not completed, and of a type this list view
+ * actually renders. The single source of truth for "does this repo-matched
+ * project have active work," shared by `SidebarView`'s `renderProjects` (the
+ * tag-cloud pill counts) and `buildProjectBlocks` (the interleaved blocks) so
+ * the cloud and the list it filters can't drift apart on what counts — the
+ * recurring bug class in CHANGELOG [0.35.0] and [0.47.2].
+ */
+export function activeSyncedItems(
+  items: readonly ParsedProjectItem[],
+  itemTypes: readonly ProjectItemType[]
+): ParsedProjectItem[] {
+  return items.filter((i) => !i.completed && itemTypes.includes(i.itemType));
 }
 
 // ===== Projects list sort =====

@@ -26,6 +26,8 @@ import {
   ProjectSortKey,
   PROJECT_SORT_OPTIONS,
   sortProjectRows,
+  activeSyncedItems,
+  TODO_TAB_SYNCED_ITEM_TYPES,
   calculateFocusPriority as calculateProjectFocusPriority,
   calculateLaterPriority as calculateProjectLaterPriority,
 } from "./ProjectsSidebarView";
@@ -977,17 +979,15 @@ export class TodoSidebarView extends ItemView {
     // Synced items have no header/children structure to gate on (every
     // ParsedProjectItem the cache returns is already "active" once
     // completed items are filtered out), so they add straight onto the
-    // vault-derived, isActiveTodo-gated count below. Scoped to itemType
-    // "todo"/"bug", matching renderActiveTodos's own
-    // buildProjectBlocks(["todo", "bug"]) — this cloud is only ever
-    // rendered from renderTodosContent, so counting a project's "idea"
+    // vault-derived, isActiveTodo-gated count below. Scoped via the shared
+    // activeSyncedItems + TODO_TAB_SYNCED_ITEM_TYPES that renderActiveTodos's
+    // own buildProjectBlocks call also routes through — this cloud is only
+    // ever rendered from renderTodosContent, so counting a project's "idea"
     // items here would advertise a pill that filters to nothing (see
     // "tag filter shows nothing for an idea-only linked project").
     for (const p of sortedProjects) {
       const syncedCount = p.localPath
-        ? this.syncManager
-            .getCachedItems(p.localPath)
-            .filter((i) => !i.completed && (i.itemType === "todo" || i.itemType === "bug")).length
+        ? activeSyncedItems(this.syncManager.getCachedItems(p.localPath), TODO_TAB_SYNCED_ITEM_TYPES).length
         : 0;
       const activeCount = (activeTagCounts.get(p.tag) ?? 0) + syncedCount;
       // Skip projects with no active work (see isActiveTodo) — they'd just
@@ -1439,7 +1439,7 @@ export class TodoSidebarView extends ItemView {
     // a separate section — see compareSortableEntries in utils.ts. A block
     // counts as a single entry toward activeTodosLimit below, regardless of
     // how many synced items it holds, same as a header-with-children TODO.
-    const projectBlocks = this.buildProjectBlocks(["todo", "bug"]);
+    const projectBlocks = this.buildProjectBlocks(TODO_TAB_SYNCED_ITEM_TYPES);
     const itemsByProjectTag = new Map(projectBlocks.map((b) => [b.project.tag, b.items]));
 
     // For vault TODO blocks that resolve to a project (see
@@ -1551,9 +1551,7 @@ export class TodoSidebarView extends ItemView {
       if (!project.localPath) continue;
       if (filterIsProjectTag && project.tag.toLowerCase() !== tagFilter!.toLowerCase()) continue;
 
-      let items = this.syncManager
-        .getCachedItems(project.localPath)
-        .filter((i) => !i.completed && itemTypes.includes(i.itemType));
+      let items = activeSyncedItems(this.syncManager.getCachedItems(project.localPath), itemTypes);
 
       if (tagFilter && !filterIsProjectTag) {
         items = items.filter((i) => itemMatchesTagFilter(i, tagFilter));

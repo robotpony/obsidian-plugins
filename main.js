@@ -4267,6 +4267,10 @@ function buildProjectPrincipleBlocks(items) {
   }
   return blocks;
 }
+var TODO_TAB_SYNCED_ITEM_TYPES = ["todo", "bug"];
+function activeSyncedItems(items, itemTypes) {
+  return items.filter((i) => !i.completed && itemTypes.includes(i.itemType));
+}
 var PROJECT_SORT_OPTIONS = [
   { key: "activeFirst", label: "Active items first" },
   { key: "name", label: "Name (A\u2013Z)" },
@@ -5320,7 +5324,7 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
       return b.count - a.count;
     });
     for (const p of sortedProjects) {
-      const syncedCount = p.localPath ? this.syncManager.getCachedItems(p.localPath).filter((i) => !i.completed && (i.itemType === "todo" || i.itemType === "bug")).length : 0;
+      const syncedCount = p.localPath ? activeSyncedItems(this.syncManager.getCachedItems(p.localPath), TODO_TAB_SYNCED_ITEM_TYPES).length : 0;
       const activeCount = ((_b = activeTagCounts.get(p.tag)) != null ? _b : 0) + syncedCount;
       if (activeCount === 0)
         continue;
@@ -5664,7 +5668,7 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
       }
     }
     todos = this.sortTodosByPriority(todos, allTodosForChildLookup);
-    const projectBlocks = this.buildProjectBlocks(["todo", "bug"]);
+    const projectBlocks = this.buildProjectBlocks(TODO_TAB_SYNCED_ITEM_TYPES);
     const itemsByProjectTag = new Map(projectBlocks.map((b) => [b.project.tag, b.items]));
     this.currentProjectMatchByTag = new Map(
       this.projectManager.getProjects(this.scannedProjects, (localPath) => this.syncManager.getCachedItems(localPath)).map((p) => [p.tag, !!p.localPath])
@@ -5748,7 +5752,7 @@ var TodoSidebarView = class extends import_obsidian13.ItemView {
         continue;
       if (filterIsProjectTag && project.tag.toLowerCase() !== tagFilter.toLowerCase())
         continue;
-      let items = this.syncManager.getCachedItems(project.localPath).filter((i) => !i.completed && itemTypes.includes(i.itemType));
+      let items = activeSyncedItems(this.syncManager.getCachedItems(project.localPath), itemTypes);
       if (tagFilter && !filterIsProjectTag) {
         items = items.filter((i) => itemMatchesTagFilter(i, tagFilter));
       }
